@@ -1,6 +1,6 @@
 # Dependencies
 node_modules/
-package-lock.json
+# package-lock.json - Needed for GitHub Actions cache
 
 # Build outputs
 dist/
