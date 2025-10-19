@@ -1,0 +1,1073 @@
+/* 全局样式 */
+* {
+  box-sizing: border-box;
+  transition: background-color 0.3s ease, color 0.3s ease; /* 平滑过渡 */
+}
+
+/* 浅色主题默认CSS变量 */
+:root {
+  --list-item-bg: #fff;
+  --list-item-hover-bg: #f5f5f5;
+  --list-item-overdue-bg: #fff1f0;
+  --list-item-overdue-hover-bg: #ffe7e6;
+  --list-item-current-bg: #f0f9ff;
+  --content-bg: #f5f5f5;
+  --border-color: #f0f0f0;
+}
+
+/* 深色主题CSS变量 */
+[data-theme='dark'] {
+  --list-item-bg: #1a1a1a;
+  --list-item-hover-bg: #262626;
+  --list-item-overdue-bg: #2a1215;
+  --list-item-overdue-hover-bg: #3d1a1f;
+  --list-item-current-bg: #0d1829;
+  --content-bg: #141414;
+  --border-color: #404040;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  /* 移除 background-color，由主题控制 */
+}
+
+#root {
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* 自定义滚动条 - 适配深色主题 */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scroll-track-bg, #f1f1f1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb-bg, #c1c1c1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover-bg, #a8a8a8);
+}
+
+/* 深色主题滚动条 */
+[data-theme='dark'] ::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: #404040;
+}
+
+[data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
+  background: #525252;
+}
+
+/* 待办事项状态颜色 */
+.status-pending {
+  color: #faad14;
+}
+
+.status-in-progress {
+  color: #1890ff;
+}
+
+.status-completed {
+  color: #52c41a;
+}
+
+.status-paused {
+  color: #d9d9d9;
+}
+
+/* 优先级颜色 */
+.priority-high {
+  color: #ff4d4f;
+}
+
+.priority-medium {
+  color: #faad14;
+}
+
+.priority-low {
+  color: #52c41a;
+}
+
+/* 工具栏样式 - 移除硬编码背景色 */
+.toolbar {
+  /* background: white; - 移除，由主题控制 */
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* 内容区域 - 移除硬编码背景色 */
+.content-area {
+  height: calc(100vh - 73px);
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* 状态Tab样式 - 适配主题 */
+.status-tabs {
+  /* background: white; - 移除 */
+  padding: 12px 16px 0 16px;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.status-tabs .ant-tabs-tab {
+  font-weight: 500;
+  padding: 8px 16px;
+}
+
+.status-tabs .ant-tabs-tab-active {
+  font-weight: 600;
+}
+
+.status-tabs .ant-tabs-ink-bar {
+  height: 3px;
+}
+
+/* 卡片样式 - 由主题控制 */
+.todo-card {
+  margin-bottom: 6px;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.3s ease, background-color 0.3s ease;
+}
+
+.todo-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.todo-card .ant-card-body {
+  padding: 8px;
+}
+
+/* 图片预览样式 */
+.image-preview {
+  max-width: 120px;
+  max-height: 90px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin: 2px;
+  cursor: pointer;
+}
+
+/* 待办内容预览 - 单行显示 */
+.todo-content-preview {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #666;
+  font-size: 13px;
+  line-height: 20px;
+  max-width: 100%;
+}
+
+/* 标签样式 */
+.todo-tags {
+  display: inline-flex;
+  gap: 4px;
+  margin: 0;
+}
+
+.todo-tags .ant-tag {
+  margin: 0;
+  font-size: 12px;
+  padding: 0 6px;
+  line-height: 20px;
+}
+
+/* 时间统计样式 */
+.time-stats {
+  /* background 由 theme 控制 */
+  padding: 12px;
+  border-radius: 6px;
+  margin: 8px 0;
+}
+
+.time-stats-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.time-stats-item:last-child {
+  margin-bottom: 0;
+}
+
+/* Quill 富文本编辑器样式 */
+.quill {
+  /* background 由 theme 控制 */
+}
+
+.ql-container {
+  min-height: 200px;
+  max-height: 400px;
+  overflow-y: auto;
+  font-size: 14px;
+}
+
+.ql-editor {
+  min-height: 200px;
+  max-height: 400px;
+}
+
+.ql-editor.ql-blank::before {
+  color: #bfbfbf;
+  font-style: normal;
+}
+
+/* 确保工具栏可点击 */
+.ql-toolbar {
+  /* background 由 theme 控制 */
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  position: relative;
+  z-index: 1;
+}
+
+.ql-toolbar button {
+  cursor: pointer;
+}
+
+.ql-toolbar button:hover {
+  color: #1890ff;
+}
+
+/* Modal 中的 Quill 编辑器特殊样式 */
+.ant-modal .quill {
+  margin-bottom: 16px;
+}
+
+/* 深色主题下的 Quill 编辑器 */
+[data-theme='dark'] .quill {
+  background: #141414;
+}
+
+[data-theme='dark'] .ql-toolbar {
+  background: #1a1a1a;
+  border-color: #404040;
+}
+
+[data-theme='dark'] .ql-container {
+  background: #141414;
+  border-color: #404040;
+  color: #ffffff;
+}
+
+[data-theme='dark'] .ql-editor {
+  background: #141414;
+  color: #ffffff;
+}
+
+[data-theme='dark'] .ql-editor.ql-blank::before {
+  color: #666666;
+}
+
+/* 工具栏按钮 */
+[data-theme='dark'] .ql-toolbar button {
+  color: #a6a6a6;
+}
+
+[data-theme='dark'] .ql-toolbar button:hover {
+  color: #40a9ff;
+}
+
+[data-theme='dark'] .ql-toolbar .ql-stroke {
+  stroke: #a6a6a6;
+}
+
+[data-theme='dark'] .ql-toolbar .ql-fill {
+  fill: #a6a6a6;
+}
+
+[data-theme='dark'] .ql-toolbar button:hover .ql-stroke {
+  stroke: #40a9ff;
+}
+
+[data-theme='dark'] .ql-toolbar button:hover .ql-fill {
+  fill: #40a9ff;
+}
+
+[data-theme='dark'] .ql-toolbar .ql-active .ql-stroke {
+  stroke: #1890ff;
+}
+
+[data-theme='dark'] .ql-toolbar .ql-active .ql-fill {
+  fill: #1890ff;
+}
+
+/* 下拉菜单 */
+[data-theme='dark'] .ql-toolbar .ql-picker-label {
+  color: #a6a6a6;
+  border-color: #404040;
+}
+
+[data-theme='dark'] .ql-toolbar .ql-picker-options {
+  background: #1a1a1a;
+  border-color: #404040;
+}
+
+[data-theme='dark'] .ql-toolbar .ql-picker-item {
+  color: #a6a6a6;
+}
+
+[data-theme='dark'] .ql-toolbar .ql-picker-item:hover {
+  color: #40a9ff;
+  background: #0a0a0a;
+}
+
+/* TipTap 编辑器样式 */
+.tiptap-wrapper {
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  /* background 由 theme 控制 */
+}
+
+.tiptap-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid #f0f0f0;
+  /* background 由 theme 控制 */
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+}
+
+.tiptap-toolbar button,
+.tiptap-toolbar select,
+.tiptap-toolbar input[type="color"] {
+  padding: 4px 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  /* background 由 theme 控制 */
+  cursor: pointer;
+  font-size: 12px;
+  min-width: 32px;
+  height: 28px;
+}
+
+.tiptap-toolbar button:hover,
+.tiptap-toolbar select:hover {
+  border-color: #1890ff;
+  background: #f0f8ff;
+}
+
+.tiptap-toolbar button.is-active {
+  background: #1890ff;
+  color: white;
+  border-color: #1890ff;
+}
+
+.tiptap-toolbar input[type="color"] {
+  width: 32px;
+  padding: 2px;
+}
+
+.tiptap-editor {
+  padding: 12px;
+  min-height: 200px;
+  max-height: 400px;
+  overflow-y: auto;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.tiptap-editor:empty:before {
+  content: attr(data-placeholder);
+  color: #bfbfbf;
+  pointer-events: none;
+}
+
+/* TipTap 内容样式 */
+.tiptap-editor p {
+  margin: 0 0 8px 0;
+}
+
+.tiptap-editor h1,
+.tiptap-editor h2,
+.tiptap-editor h3 {
+  margin: 12px 0 8px 0;
+  font-weight: 600;
+}
+
+.tiptap-editor h1 {
+  font-size: 1.5em;
+}
+
+.tiptap-editor h2 {
+  font-size: 1.3em;
+}
+
+.tiptap-editor h3 {
+  font-size: 1.1em;
+}
+
+.tiptap-editor ul,
+.tiptap-editor ol {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+.tiptap-editor li {
+  margin: 4px 0;
+}
+
+.tiptap-editor .tiptap-link {
+  color: #1890ff;
+  text-decoration: none;
+}
+
+.tiptap-editor .tiptap-link:hover {
+  text-decoration: underline;
+}
+
+.tiptap-editor .tiptap-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 4px 0;
+}
+
+.tiptap-editor strong {
+  font-weight: 600;
+}
+
+.tiptap-editor em {
+  font-style: italic;
+}
+
+.tiptap-editor u {
+  text-decoration: underline;
+}
+
+.tiptap-editor s {
+  text-decoration: line-through;
+}
+
+/* 待办事项列表中的富文本内容样式 */
+.todo-card .ant-card-meta-description > div > div[style*="dangerouslySetInnerHTML"] {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* 富文本内容中的样式 */
+.todo-card p {
+  margin-bottom: 8px;
+}
+
+.todo-card ul, .todo-card ol {
+  padding-left: 20px;
+  margin-bottom: 8px;
+}
+
+.todo-card img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 4px 0;
+}
+
+.todo-card h1, .todo-card h2, .todo-card h3 {
+  margin-top: 12px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.todo-card h1 {
+  font-size: 1.5em;
+}
+
+.todo-card h2 {
+  font-size: 1.3em;
+}
+
+.todo-card h3 {
+  font-size: 1.1em;
+}
+
+.todo-card a {
+  color: #1890ff;
+  text-decoration: none;
+}
+
+.todo-card a:hover {
+  text-decoration: underline;
+}
+
+/* 关系类型样式 */
+.relation-extends {
+  color: #1890ff;
+  border-left: 3px solid #1890ff;
+}
+
+.relation-background {
+  color: #722ed1;
+  border-left: 3px solid #722ed1;
+}
+
+.relation-parallel {
+  color: #fa8c16;
+  border-left: 3px solid #fa8c16;
+}
+
+/* 时间轴样式增强 */
+.ant-timeline-item-head {
+  font-size: 18px;
+}
+
+.ant-timeline .ant-timeline-item-content {
+  margin-left: 28px;
+}
+
+/* 关联上下文样式 */
+.relation-context {
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 16px;
+  /* background 由 theme 控制 */
+}
+
+.relation-current {
+  /* background 由 theme 控制 */
+  padding: 12px;
+  border-radius: 6px;
+  border: 2px solid #1890ff;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+}
+
+.relation-group-header {
+  font-weight: 600;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+/* 紧凑模式 */
+.relation-context.compact {
+  padding: 8px;
+  font-size: 12px;
+}
+
+.relation-context.compact .ant-card {
+  margin-bottom: 4px;
+}
+
+.relation-context.compact .ant-collapse {
+  font-size: 12px;
+}
+
+/* Drawer 中的富文本内容样式 */
+.ant-drawer .todo-view-content p {
+  margin-bottom: 8px;
+}
+
+.ant-drawer .todo-view-content ul,
+.ant-drawer .todo-view-content ol {
+  padding-left: 20px;
+  margin-bottom: 8px;
+}
+
+.ant-drawer .todo-view-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 4px 0;
+}
+
+.ant-drawer .todo-view-content h1,
+.ant-drawer .todo-view-content h2,
+.ant-drawer .todo-view-content h3 {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+/* 标题悬停效果 */
+.todo-title-link {
+  cursor: pointer;
+  transition: color 0.3s;
+}
+
+.todo-title-link:hover {
+  color: #40a9ff;
+}
+
+/* 工作心得样式 */
+.notes-card .ant-card-body {
+  padding: 12px;
+}
+
+.notes-editor {
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  min-height: 200px;
+}
+
+.notes-content {
+  line-height: 1.8;
+}
+
+.notes-content p {
+  margin-bottom: 8px;
+}
+
+.notes-content ul,
+.notes-content ol {
+  padding-left: 20px;
+  margin-bottom: 8px;
+}
+
+/* 深色主题下的卡片样式 */
+[data-theme='dark'] .todo-card {
+  border: 1px solid #404040;
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.03);
+}
+
+[data-theme='dark'] .todo-card:hover {
+  border-color: #505050;
+  box-shadow: 0 4px 16px rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='dark'] .todo-content-preview {
+  color: #999;
+}
+
+/* 深色主题下的关联上下文 */
+[data-theme='dark'] .relation-context {
+  border-color: #404040;
+  background: #0a0a0a;
+}
+
+[data-theme='dark'] .relation-current {
+  background: #0d1829;  /* 深蓝色背景 */
+  border-color: #1890ff;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+}
+
+[data-theme='dark'] .relation-group-header {
+  border-bottom-color: #404040;
+  color: #e0e0e0;
+}
+
+/* 关系类型样式增强 */
+[data-theme='dark'] .relation-extends {
+  border-left-color: #40a9ff;
+  color: #40a9ff;
+}
+
+[data-theme='dark'] .relation-background {
+  border-left-color: #9254de;
+  color: #9254de;
+}
+
+[data-theme='dark'] .relation-parallel {
+  border-left-color: #ffa940;
+  color: #ffa940;
+}
+
+/* 日历样式 */
+.calendar-cell-content {
+  min-height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+.ant-picker-calendar {
+  /* background 由 theme 控制 */
+}
+
+/* 日历紧凑模式 - 40px */
+.ant-picker-calendar-date,
+.calendar-compact .ant-picker-calendar-date {
+  height: 40px !important;
+  border-radius: 4px;
+  transition: all 0.3s;
+  padding: 2px !important;
+}
+
+.calendar-compact .ant-picker-calendar-date-value {
+  font-size: 11px !important;
+  line-height: 18px !important;
+  padding: 0 !important;
+}
+
+.calendar-compact .ant-picker-calendar-date-content {
+  height: 18px !important;
+  overflow: hidden;
+  display: block !important;
+}
+
+.calendar-compact .calendar-cell-content {
+  min-height: 15px !important;
+}
+
+.calendar-compact .calendar-cell-content .ant-badge {
+  transform: scale(0.75) !important;
+  display: inline-block !important;
+}
+
+/* 标准模式 - 50px */
+.calendar-standard .ant-picker-calendar-date {
+  height: 50px !important;
+  padding: 3px !important;
+}
+
+.calendar-standard .ant-picker-calendar-date-value {
+  font-size: 12px !important;
+  line-height: 20px !important;
+}
+
+.calendar-standard .ant-picker-calendar-date-content {
+  height: 25px !important;
+  overflow: hidden;
+}
+
+.calendar-standard .calendar-cell-content {
+  min-height: 20px !important;
+}
+
+.calendar-standard .calendar-cell-content .ant-badge {
+  transform: scale(0.85) !important;
+}
+
+/* 舒适模式 - 60px */
+.calendar-comfortable .ant-picker-calendar-date {
+  height: 60px !important;
+  padding: 4px !important;
+}
+
+.calendar-comfortable .ant-picker-calendar-date-value {
+  font-size: 14px !important;
+  line-height: 22px !important;
+}
+
+.calendar-comfortable .ant-picker-calendar-date-content {
+  height: 32px !important;
+  overflow: hidden;
+}
+
+.calendar-comfortable .calendar-cell-content {
+  min-height: 25px !important;
+}
+
+.calendar-comfortable .calendar-cell-content .ant-badge {
+  transform: scale(1) !important;
+}
+
+.ant-picker-calendar-date-value {
+  font-size: 14px !important;
+  line-height: 20px !important;
+}
+
+.ant-picker-calendar-date-content {
+  height: 35px !important;
+  overflow: hidden;
+}
+
+/* 日历头部缩小 */
+.ant-picker-calendar-header {
+  padding: 4px 0 !important;
+}
+
+.ant-picker-calendar-header .ant-picker-calendar-year-select,
+.ant-picker-calendar-header .ant-picker-calendar-month-select {
+  font-size: 12px !important;
+  min-height: 24px !important;
+}
+
+/* 周标题缩小 */
+.ant-picker-content thead th {
+  font-size: 9px !important;
+  padding: 2px 0 !important;
+  height: 18px !important;
+}
+
+/* Badge 缩小 */
+.calendar-cell-content .ant-badge {
+  transform: scale(0.8);
+}
+
+.ant-picker-calendar-date:hover {
+  background: #f5f5f5;
+}
+
+.ant-picker-calendar-date-today {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 1px #1890ff inset;
+}
+
+.ant-picker-calendar-date-selected {
+  background: #e6f7ff;
+}
+
+/* 深色主题下的日历样式 */
+[data-theme='dark'] .ant-picker-calendar {
+  background: #000000;
+}
+
+[data-theme='dark'] .ant-picker-calendar-date,
+[data-theme='dark'] .calendar-compact .ant-picker-calendar-date {
+  height: 40px !important;
+  background: #0a0a0a;
+  border: 1px solid #404040;
+  color: #ffffff;
+}
+
+[data-theme='dark'] .calendar-compact .ant-picker-calendar-date-content {
+  height: 18px !important;
+  overflow: hidden;
+  display: block !important;
+}
+
+[data-theme='dark'] .calendar-standard .ant-picker-calendar-date {
+  height: 50px !important;
+  background: #0a0a0a;
+  border: 1px solid #404040;
+  color: #ffffff;
+}
+
+[data-theme='dark'] .calendar-comfortable .ant-picker-calendar-date {
+  height: 60px !important;
+  background: #0a0a0a;
+  border: 1px solid #404040;
+  color: #ffffff;
+}
+
+[data-theme='dark'] .ant-picker-calendar-date:hover {
+  background: #141414;
+  border-color: #505050;
+}
+
+[data-theme='dark'] .ant-picker-calendar-date-today {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 1px #1890ff inset;
+}
+
+[data-theme='dark'] .ant-picker-calendar-date-selected {
+  background: #0d1829;
+  border-color: #1890ff;
+}
+
+/* 深色主题下的日历头部 */
+[data-theme='dark'] .ant-picker-calendar-header {
+  color: #ffffff;
+}
+
+[data-theme='dark'] .ant-picker-calendar-mode-switch,
+[data-theme='dark'] .ant-picker-calendar-year-select,
+[data-theme='dark'] .ant-picker-calendar-month-select {
+  color: #ffffff;
+}
+
+/* 周末标记 */
+[data-theme='dark'] .ant-picker-calendar-date-weekend {
+  color: #a6a6a6;
+}
+
+/* 当前月之外的日期 */
+[data-theme='dark'] .ant-picker-cell-disabled {
+  opacity: 0.3;
+}
+
+/* CalendarDrawer 中的列表项样式 */
+[data-theme='dark'] .ant-drawer .ant-list-item {
+  background: #0a0a0a !important;
+  border-color: #404040;
+}
+
+[data-theme='dark'] .ant-drawer .ant-list-item:hover {
+  background: #141414 !important;
+}
+
+/* 左侧待办列表面板滚动条 */
+.todo-list-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.todo-list-panel::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.todo-list-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .todo-list-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme='dark'] .todo-list-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .toolbar {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .content-area {
+    padding: 8px;
+  }
+  
+  .todo-card {
+    margin-bottom: 12px;
+  }
+}
+
+/* ============================================
+   深色主题下的浅色内容卡片（可读性优先）
+   ============================================ */
+
+/* 1. 关联上下文卡片保持浅色背景以确保可读性 */
+[data-theme='dark'] .relation-context .ant-card {
+  background: #f5f5f5 !important;
+  color: #000000 !important;
+  border-color: #d9d9d9 !important;
+}
+
+[data-theme='dark'] .relation-context .ant-card-head {
+  background: #e6e6e6 !important;
+  border-bottom-color: #d9d9d9 !important;
+  color: #000000 !important;
+}
+
+[data-theme='dark'] .relation-context .ant-card-body {
+  color: #000000 !important;
+}
+
+/* 2. 当前待办卡片保持浅蓝色高亮 */
+[data-theme='dark'] .relation-current {
+  background: #e6f7ff !important;
+}
+
+[data-theme='dark'] .relation-current .ant-card {
+  background: #f0f9ff !important;
+  color: #000000 !important;
+}
+
+/* 3. 详情页富文本内容区保持浅色背景 */
+[data-theme='dark'] .todo-view-content {
+  background: #f5f5f5 !important;
+  color: #000000 !important;
+}
+
+/* 4. Collapse 展开内容中的卡片保持浅色 */
+[data-theme='dark'] .ant-collapse-content .ant-card {
+  background: #f5f5f5 !important;
+  color: #000000 !important;
+  border-color: #d9d9d9 !important;
+}
+
+/* 5. 主列表中展开的关联上下文区域 */
+[data-theme='dark'] .todo-card .relation-context {
+  background: #1a1a1a !important;
+}
+
+[data-theme='dark'] .todo-card .relation-context .ant-card {
+  background: #f5f5f5 !important;
+  color: #000000 !important;
+}
+
+/* ============================================
+   深色主题下的文字颜色修复（根本原因分析版本）
+   ============================================ */
+
+/* 修复1：富文本内容区 - 强制所有HTML元素（包括内联样式）使用深色文字 */
+/* 使用更强的选择器确保优先级 */
+[data-theme='dark'] div.todo-view-content {
+  background: #f5f5f5 !important;
+  color: #000000 !important;
+}
+
+[data-theme='dark'] div.todo-view-content *:not(br):not(hr),
+[data-theme='dark'] div.todo-view-content p,
+[data-theme='dark'] div.todo-view-content span,
+[data-theme='dark'] div.todo-view-content div,
+[data-theme='dark'] div.todo-view-content h1,
+[data-theme='dark'] div.todo-view-content h2,
+[data-theme='dark'] div.todo-view-content h3,
+[data-theme='dark'] div.todo-view-content h4,
+[data-theme='dark'] div.todo-view-content h5,
+[data-theme='dark'] div.todo-view-content h6,
+[data-theme='dark'] div.todo-view-content li,
+[data-theme='dark'] div.todo-view-content ul,
+[data-theme='dark'] div.todo-view-content ol,
+[data-theme='dark'] div.todo-view-content strong,
+[data-theme='dark'] div.todo-view-content em,
+[data-theme='dark'] div.todo-view-content a,
+[data-theme='dark'] div.todo-view-content code,
+[data-theme='dark'] div.todo-view-content pre {
+  color: #000000 !important;
+}
+
+/* 修复2：Popover 中的富文本内容预览 */
+[data-theme='dark'] .ant-popover-inner-content div[dangerouslySetInnerHTML],
+[data-theme='dark'] .ant-popover-inner-content div[dangerouslySetInnerHTML] *,
+[data-theme='dark'] .ant-popover-inner-content div[dangerouslySetInnerHTML] p,
+[data-theme='dark'] .ant-popover-inner-content div[dangerouslySetInnerHTML] span,
+[data-theme='dark'] .ant-popover-inner-content div[dangerouslySetInnerHTML] div {
+  color: #000000 !important;
+}
+
+/* 修复3：日历抽屉中的列表项 - 使用浅色文字（因为背景是暗色） */
+[data-theme='dark'] .todo-list-panel .ant-list-item {
+  color: #ffffff !important;
+}
+
+[data-theme='dark'] .todo-list-panel .ant-list-item *:not(.ant-tag):not(.ant-tag *) {
+  color: #ffffff !important;
+}
+
+/* 修复4：关联上下文卡片 - 浅色背景需要深色文字 */
+[data-theme='dark'] .relation-context .ant-card,
+[data-theme='dark'] .relation-context .ant-card *,
+[data-theme='dark'] .relation-current,
+[data-theme='dark'] .relation-current *,
+[data-theme='dark'] .ant-collapse-content .ant-card,
+[data-theme='dark'] .ant-collapse-content .ant-card *,
+[data-theme='dark'] .todo-card .relation-context .ant-card,
+[data-theme='dark'] .todo-card .relation-context .ant-card * {
+  color: #000000 !important;
+}
+
+/* 确保 Ant Design 的 Typography 组件也使用正确的颜色 */
+[data-theme='dark'] .relation-context .ant-typography,
+[data-theme='dark'] .relation-current .ant-typography,
+[data-theme='dark'] .ant-collapse-content .ant-typography {
+  color: #000000 !important;
+}
+
+/* 次要文字使用深灰 */
+[data-theme='dark'] .relation-context .ant-typography-secondary,
+[data-theme='dark'] .relation-current .ant-typography-secondary {
+  color: #333333 !important;
+}
+
+/* 标签保持自己的颜色方案 */
+[data-theme='dark'] .relation-context .ant-tag,
+[data-theme='dark'] .relation-current .ant-tag,
+[data-theme='dark'] .todo-view-content .ant-tag,
+[data-theme='dark'] .todo-list-panel .ant-tag {
+  /* 标签使用自己的颜色方案 */
+}
