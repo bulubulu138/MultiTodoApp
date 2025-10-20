@@ -24,6 +24,14 @@ jobs:
           node-version: '18'
           cache: 'npm'
       
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+      
+      - name: Setup Windows SDK
+        uses: GuillaumeFalourd/setup-windows10-sdk-action@v2
+        with:
+          sdk-version: 22621
+      
       - name: Install dependencies
         run: npm install
       
