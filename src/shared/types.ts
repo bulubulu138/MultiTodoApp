@@ -17,10 +17,7 @@ export interface Todo {
 }
 
 export interface Settings {
-  id?: number;
-  key: string;
-  value: string;
-  updatedAt: string;
+  [key: string]: string;
 }
 
 export interface TodoRelation {

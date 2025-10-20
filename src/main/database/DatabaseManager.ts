@@ -248,7 +248,7 @@ export class DatabaseManager {
     return new Promise((resolve, reject) => {
       try {
         const rows = this.db!.prepare('SELECT key, value FROM settings').all() as any[];
-        const settings: Settings = {};
+        const settings: Record<string, string> = {};
         rows.forEach((row: any) => {
           settings[row.key] = row.value;
         });
@@ -321,6 +321,52 @@ export class DatabaseManager {
       try {
         this.db!.prepare('DELETE FROM todo_relations WHERE source_id = ? OR target_id = ?').run(todoId, todoId);
         resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  public getAllRelations(): Promise<TodoRelation[]> {
+    return new Promise((resolve, reject) => {
+      try {
+        const rows = this.db!.prepare('SELECT * FROM todo_relations').all() as any[];
+        resolve(rows);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  public getRelationsByType(relationType: string): Promise<TodoRelation[]> {
+    return new Promise((resolve, reject) => {
+      try {
+        const rows = this.db!.prepare('SELECT * FROM todo_relations WHERE relation_type = ?').all(relationType) as any[];
+        resolve(rows);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  public deleteSpecificRelation(sourceId: number, targetId: number, relationType: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        this.db!.prepare('DELETE FROM todo_relations WHERE source_id = ? AND target_id = ? AND relation_type = ?')
+          .run(sourceId, targetId, relationType);
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  public relationExists(sourceId: number, targetId: number, relationType: string): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      try {
+        const row = this.db!.prepare('SELECT COUNT(*) as count FROM todo_relations WHERE source_id = ? AND target_id = ? AND relation_type = ?')
+          .get(sourceId, targetId, relationType) as any;
+        resolve(row.count > 0);
       } catch (error) {
         reject(error);
       }
