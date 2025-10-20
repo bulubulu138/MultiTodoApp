@@ -12,7 +12,7 @@ on:
 jobs:
   # Windows Build Job
   build-windows:
-    runs-on: windows-2019
+    runs-on: windows-latest
     
     steps:
       - name: Checkout code
@@ -25,12 +25,17 @@ jobs:
           cache: 'npm'
       
       - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v1.1
+        uses: microsoft/setup-msbuild@v2
+      
+      - name: Setup Visual C++ Build Tools
+        run: |
+          choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive --norestart" -y
+        shell: powershell
       
       - name: Install dependencies
         run: npm install
         env:
-          npm_config_msvs_version: 2019
+          npm_config_msvs_version: 2022
       
       - name: Build application
         run: npm run build
