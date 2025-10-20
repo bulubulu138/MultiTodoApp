@@ -1,11 +1,11 @@
-// 数据库管理器 - 使用统一类型定义
-const sqlite3 = require('sqlite3').verbose();
+// 数据库管理器 - 使用 better-sqlite3
+import Database from 'better-sqlite3';
 import * as path from 'path';
 import { app } from 'electron';
 import { Todo, Settings, TodoRelation, Note } from '../../shared/types';
 
 export class DatabaseManager {
-  private db: any = null;
+  private db: Database.Database | null = null;
   private dbPath: string;
 
   constructor() {
@@ -18,20 +18,17 @@ export class DatabaseManager {
   }
 
   public async initialize(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.db = new sqlite3.Database(this.dbPath, (err: any) => {
-        if (err) {
-          console.error('Database connection error:', err);
-          reject(err);
-        } else {
-          console.log('Connected to SQLite database');
-          this.createTables()
-            .then(() => this.initializeDefaultSettings())
-            .then(() => resolve())
-            .catch(reject);
-        }
-      });
-    });
+    try {
+      this.db = new Database(this.dbPath);
+      this.db.pragma('journal_mode = WAL');
+      console.log('Connected to SQLite database');
+      
+      await this.createTables();
+      await this.initializeDefaultSettings();
+    } catch (err) {
+      console.error('Database connection error:', err);
+      throw err;
+    }
   }
 
   private async createTables(): Promise<void> {
@@ -83,7 +80,7 @@ export class DatabaseManager {
     ];
 
     for (const sql of tables) {
-      await this.runQuery(sql);
+      this.db!.prepare(sql).run();
     }
     
     // 执行表迁移
@@ -93,22 +90,22 @@ export class DatabaseManager {
   private async migrateTodosTable(): Promise<void> {
     try {
       // 检查列是否存在
-      const tableInfo: any[] = await this.allQuery("PRAGMA table_info(todos)");
+      const tableInfo = this.db!.pragma('table_info(todos)') as any[];
       
       const hasStartTime = tableInfo.some((col: any) => col.name === 'startTime');
       const hasDeadline = tableInfo.some((col: any) => col.name === 'deadline');
       
       if (!hasStartTime) {
         console.log('Adding startTime column to todos table...');
-        await this.runQuery('ALTER TABLE todos ADD COLUMN startTime TEXT');
+        this.db!.prepare('ALTER TABLE todos ADD COLUMN startTime TEXT').run();
         // 设置现有数据的默认开始时间为创建时间
-        await this.runQuery('UPDATE todos SET startTime = createdAt WHERE startTime IS NULL');
+        this.db!.prepare('UPDATE todos SET startTime = createdAt WHERE startTime IS NULL').run();
         console.log('startTime column added successfully');
       }
       
       if (!hasDeadline) {
         console.log('Adding deadline column to todos table...');
-        await this.runQuery('ALTER TABLE todos ADD COLUMN deadline TEXT');
+        this.db!.prepare('ALTER TABLE todos ADD COLUMN deadline TEXT').run();
         console.log('deadline column added successfully');
       }
       
@@ -118,295 +115,312 @@ export class DatabaseManager {
     }
   }
 
-  private runQuery(sql: string, params: any[] = []): Promise<any> {
-    return new Promise((resolve, reject) => {
-      this.db.run(sql, params, function(this: any, err: any) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(this);
-        }
-      });
-    });
-  }
-
-  private getQuery(sql: string, params: any[] = []): Promise<any> {
-    return new Promise((resolve, reject) => {
-      this.db.get(sql, params, (err: any, row: any) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(row);
-        }
-      });
-    });
-  }
-
-  private allQuery(sql: string, params: any[] = []): Promise<any[]> {
-    return new Promise((resolve, reject) => {
-      this.db.all(sql, params, (err: any, rows: any[]) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(rows);
-        }
-      });
-    });
-  }
-
   private async initializeDefaultSettings(): Promise<void> {
-    const defaultSettings: { key: string; value: string }[] = [
-      { key: 'theme', value: 'light' }, // 添加默认主题设置
-      { key: 'calendarViewSize', value: 'compact' }, // 日历视图大小设置
-    ];
-
-    for (const setting of defaultSettings) {
-      try {
-        await this.runQuery(
-          'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)',
-          [setting.key, setting.value]
-        );
-      } catch (error) {
-        console.error('Error initializing setting:', setting.key, error);
-      }
-    }
-  }
-
-  // Todo CRUD operations
-  public async createTodo(todo: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'>): Promise<number> {
-    const result = await this.runQuery(
-      `INSERT INTO todos (title, content, status, priority, tags, imageUrl, images, startTime, deadline)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        todo.title, 
-        todo.content, 
-        todo.status, 
-        todo.priority, 
-        todo.tags, 
-        todo.imageUrl, 
-        todo.images,
-        todo.startTime || new Date().toISOString(),
-        todo.deadline || null
-      ]
-    );
-    return result.lastID;
-  }
-
-  public async getAllTodos(): Promise<Todo[]> {
-    return this.allQuery('SELECT * FROM todos ORDER BY createdAt DESC');
-  }
-
-  public async getTodoById(id: number): Promise<Todo | null> {
-    return this.getQuery('SELECT * FROM todos WHERE id = ?', [id]);
-  }
-
-  public async updateTodo(id: number, updates: Partial<Todo>): Promise<void> {
-    const fields = Object.keys(updates).filter(key => key !== 'id').map(key => `${key} = ?`).join(', ');
-    const values = Object.keys(updates).filter(key => key !== 'id').map(key => updates[key as keyof Todo]);
-    
-    await this.runQuery(
-      `UPDATE todos SET ${fields}, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
-      [...values, id]
-    );
-  }
-
-  public async deleteTodo(id: number): Promise<void> {
-    // Relations will be automatically deleted due to CASCADE
-    await this.runQuery('DELETE FROM todos WHERE id = ?', [id]);
-  }
-
-  public async searchTodos(query: string): Promise<Todo[]> {
-    return this.allQuery(
-      `SELECT * FROM todos 
-       WHERE title LIKE ? OR content LIKE ? OR tags LIKE ?
-       ORDER BY createdAt DESC`,
-      [`%${query}%`, `%${query}%`, `%${query}%`]
-    );
-  }
-
-  // Settings
-  public async getSetting(key: string): Promise<string | null> {
-    const result = await this.getQuery('SELECT value FROM settings WHERE key = ?', [key]);
-    return result ? result.value : null;
-  }
-
-  public async setSetting(key: string, value: string): Promise<void> {
-    await this.runQuery(
-      'INSERT OR REPLACE INTO settings (key, value, updatedAt) VALUES (?, ?, CURRENT_TIMESTAMP)',
-      [key, value]
-    );
-  }
-
-  public async getSettings(): Promise<Settings[]> {
-    return this.allQuery('SELECT * FROM settings ORDER BY key');
-  }
-
-  public async updateSettings(settings: Record<string, string>): Promise<void> {
-    for (const [key, value] of Object.entries(settings)) {
-      await this.setSetting(key, value);
-    }
-  }
-
-  public async toggleFishingMode(isEnabled?: boolean): Promise<boolean> {
-    let newMode: string;
-    
-    if (typeof isEnabled === 'boolean') {
-      newMode = isEnabled ? 'true' : 'false';
-    } else {
-      const currentMode = await this.getSetting('fishingMode');
-      newMode = currentMode === 'true' ? 'false' : 'true';
-    }
-    
-    await this.setSetting('fishingMode', newMode);
-    return newMode === 'true';
-  }
-
-  // Export data
-  public async exportAllData(): Promise<any> {
-    const [todos, settings, relations, notes] = await Promise.all([
-      this.getAllTodos(),
-      this.getSettings(),
-      this.getAllRelations(),
-      this.getAllNotes()
-    ]);
-
-    return {
-      todos,
-      settings,
-      relations,
-      notes,
-      exportedAt: new Date().toISOString()
+    const defaultSettings = {
+      theme: 'light',
+      language: 'zh-CN',
+      notifications: 'true',
+      sortBy: 'createdAt',
+      sortOrder: 'desc'
     };
-  }
 
-  // TodoRelation CRUD operations
-  public async createRelation(relation: Omit<TodoRelation, 'id' | 'created_at'>): Promise<number> {
     try {
-      const result = await this.runQuery(
-        `INSERT INTO todo_relations (source_id, target_id, relation_type)
-         VALUES (?, ?, ?)`,
-        [relation.source_id, relation.target_id, relation.relation_type]
-      );
-      return result.lastID;
-    } catch (error: any) {
-      // Handle unique constraint violation
-      if (error.message && error.message.includes('UNIQUE constraint failed')) {
-        throw new Error('This relation already exists');
+      const existingSettings = this.db!.prepare('SELECT key FROM settings').all() as any[];
+      const existingKeys = new Set(existingSettings.map((s: any) => s.key));
+
+      for (const [key, value] of Object.entries(defaultSettings)) {
+        if (!existingKeys.has(key)) {
+          this.db!.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run(key, value);
+        }
       }
-      throw error;
+    } catch (error) {
+      console.error('Error initializing default settings:', error);
     }
   }
 
-  public async getAllRelations(): Promise<TodoRelation[]> {
-    return this.allQuery('SELECT * FROM todo_relations ORDER BY created_at DESC');
+  // Todo操作
+  public createTodo(todo: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'>): Promise<Todo> {
+    return new Promise((resolve, reject) => {
+      try {
+        const stmt = this.db!.prepare(
+          `INSERT INTO todos (title, content, status, priority, tags, imageUrl, images, startTime, deadline)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        );
+        
+        const result = stmt.run(
+          todo.title,
+          todo.content || '',
+          todo.status,
+          todo.priority,
+          JSON.stringify(todo.tags || []),
+          todo.imageUrl || null,
+          JSON.stringify(todo.images || []),
+          todo.startTime || null,
+          todo.deadline || null
+        );
+
+        const newTodo = this.db!.prepare('SELECT * FROM todos WHERE id = ?').get(result.lastInsertRowid) as any;
+        resolve(this.parseTodo(newTodo));
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
-  public async getRelationsByTodoId(todoId: number): Promise<TodoRelation[]> {
-    return this.allQuery(
-      'SELECT * FROM todo_relations WHERE source_id = ? OR target_id = ?',
-      [todoId, todoId]
-    );
+  public getTodoById(id: number): Promise<Todo | null> {
+    return new Promise((resolve, reject) => {
+      try {
+        const row = this.db!.prepare('SELECT * FROM todos WHERE id = ?').get(id) as any;
+        resolve(row ? this.parseTodo(row) : null);
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
-  public async getRelationsByType(relationType: string): Promise<TodoRelation[]> {
-    return this.allQuery(
-      'SELECT * FROM todo_relations WHERE relation_type = ?',
-      [relationType]
-    );
+  public getAllTodos(): Promise<Todo[]> {
+    return new Promise((resolve, reject) => {
+      try {
+        const rows = this.db!.prepare('SELECT * FROM todos ORDER BY createdAt DESC').all() as any[];
+        resolve(rows.map(row => this.parseTodo(row)));
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
-  public async deleteRelation(id: number): Promise<void> {
-    await this.runQuery('DELETE FROM todo_relations WHERE id = ?', [id]);
+  public updateTodo(id: number, updates: Partial<Todo>): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        const fields = [];
+        const values = [];
+
+        if (updates.title !== undefined) { fields.push('title = ?'); values.push(updates.title); }
+        if (updates.content !== undefined) { fields.push('content = ?'); values.push(updates.content); }
+        if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status); }
+        if (updates.priority !== undefined) { fields.push('priority = ?'); values.push(updates.priority); }
+        if (updates.tags !== undefined) { fields.push('tags = ?'); values.push(JSON.stringify(updates.tags)); }
+        if (updates.imageUrl !== undefined) { fields.push('imageUrl = ?'); values.push(updates.imageUrl); }
+        if (updates.images !== undefined) { fields.push('images = ?'); values.push(JSON.stringify(updates.images)); }
+        if (updates.startTime !== undefined) { fields.push('startTime = ?'); values.push(updates.startTime); }
+        if (updates.deadline !== undefined) { fields.push('deadline = ?'); values.push(updates.deadline); }
+
+        fields.push('updatedAt = CURRENT_TIMESTAMP');
+        values.push(id);
+
+        const sql = `UPDATE todos SET ${fields.join(', ')} WHERE id = ?`;
+        this.db!.prepare(sql).run(...values);
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
-  public async deleteRelationsByTodoId(todoId: number): Promise<void> {
-    await this.runQuery(
-      'DELETE FROM todo_relations WHERE source_id = ? OR target_id = ?',
-      [todoId, todoId]
-    );
+  public deleteTodo(id: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        this.db!.prepare('DELETE FROM todos WHERE id = ?').run(id);
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
-  public async deleteSpecificRelation(sourceId: number, targetId: number, relationType: string): Promise<void> {
-    await this.runQuery(
-      'DELETE FROM todo_relations WHERE source_id = ? AND target_id = ? AND relation_type = ?',
-      [sourceId, targetId, relationType]
-    );
+  public searchTodos(keyword: string): Promise<Todo[]> {
+    return new Promise((resolve, reject) => {
+      try {
+        const query = `%${keyword}%`;
+        const rows = this.db!.prepare(
+          'SELECT * FROM todos WHERE title LIKE ? OR content LIKE ? ORDER BY createdAt DESC'
+        ).all(query, query) as any[];
+        
+        resolve(rows.map(row => this.parseTodo(row)));
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
-  public async relationExists(sourceId: number, targetId: number, relationType: string): Promise<boolean> {
-    const result = await this.getQuery(
-      'SELECT id FROM todo_relations WHERE source_id = ? AND target_id = ? AND relation_type = ?',
-      [sourceId, targetId, relationType]
-    );
-    return !!result;
+  // 设置操作
+  public getSettings(): Promise<Settings> {
+    return new Promise((resolve, reject) => {
+      try {
+        const rows = this.db!.prepare('SELECT key, value FROM settings').all() as any[];
+        const settings: Settings = {};
+        rows.forEach((row: any) => {
+          settings[row.key] = row.value;
+        });
+        resolve(settings);
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
-  // ============ Notes CRUD ============
-  
-  public async getAllNotes(): Promise<Note[]> {
-    return this.allQuery(
-      'SELECT id, title, content, created_at as createdAt, updated_at as updatedAt FROM notes ORDER BY updated_at DESC',
-      []
-    );
+  public updateSettings(settings: Partial<Settings>): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        const stmt = this.db!.prepare(
+          'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?, updatedAt = CURRENT_TIMESTAMP'
+        );
+
+        for (const [key, value] of Object.entries(settings)) {
+          stmt.run(key, value, value);
+        }
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
-  public async createNote(noteData: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>): Promise<Note> {
-    const now = new Date().toISOString();
-    const result: any = await this.runQuery(
-      'INSERT INTO notes (title, content, created_at, updated_at) VALUES (?, ?, ?, ?)',
-      [noteData.title, noteData.content, now, now]
-    );
+  // 关系操作
+  public createRelation(relation: Omit<TodoRelation, 'id' | 'created_at'>): Promise<TodoRelation> {
+    return new Promise((resolve, reject) => {
+      try {
+        const result = this.db!.prepare(
+          'INSERT INTO todo_relations (source_id, target_id, relation_type) VALUES (?, ?, ?)'
+        ).run(relation.source_id, relation.target_id, relation.relation_type);
+
+        const newRelation = this.db!.prepare('SELECT * FROM todo_relations WHERE id = ?').get(result.lastInsertRowid) as any;
+        resolve(newRelation);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  public getRelationsByTodoId(todoId: number): Promise<TodoRelation[]> {
+    return new Promise((resolve, reject) => {
+      try {
+        const rows = this.db!.prepare(
+          'SELECT * FROM todo_relations WHERE source_id = ? OR target_id = ?'
+        ).all(todoId, todoId) as any[];
+        resolve(rows);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  public deleteRelation(id: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        this.db!.prepare('DELETE FROM todo_relations WHERE id = ?').run(id);
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  public deleteRelationsByTodoId(todoId: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        this.db!.prepare('DELETE FROM todo_relations WHERE source_id = ? OR target_id = ?').run(todoId, todoId);
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  // 笔记操作
+  public createNote(note: Omit<Note, 'id' | 'created_at' | 'updated_at'>): Promise<Note> {
+    return new Promise((resolve, reject) => {
+      try {
+        const now = new Date().toISOString();
+        const result = this.db!.prepare(
+          'INSERT INTO notes (title, content, created_at, updated_at) VALUES (?, ?, ?, ?)'
+        ).run(note.title, note.content, now, now);
+
+        const newNote = this.db!.prepare('SELECT * FROM notes WHERE id = ?').get(result.lastInsertRowid) as Note;
+        resolve(newNote);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  public getNoteById(id: number): Promise<Note | null> {
+    return new Promise((resolve, reject) => {
+      try {
+        const row = this.db!.prepare('SELECT * FROM notes WHERE id = ?').get(id) as Note | undefined;
+        resolve(row || null);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  public getAllNotes(): Promise<Note[]> {
+    return new Promise((resolve, reject) => {
+      try {
+        const rows = this.db!.prepare('SELECT * FROM notes ORDER BY updated_at DESC').all() as Note[];
+        resolve(rows);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  public updateNote(id: number, updates: Partial<Note>): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        const now = new Date().toISOString();
+        const fields = [];
+        const values = [];
+
+        if (updates.title !== undefined) { fields.push('title = ?'); values.push(updates.title); }
+        if (updates.content !== undefined) { fields.push('content = ?'); values.push(updates.content); }
+
+        fields.push('updated_at = ?');
+        values.push(now);
+        values.push(id);
+
+        const sql = `UPDATE notes SET ${fields.join(', ')} WHERE id = ?`;
+        this.db!.prepare(sql).run(...values);
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  public deleteNote(id: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        this.db!.prepare('DELETE FROM notes WHERE id = ?').run(id);
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  private parseTodo(row: any): Todo {
     return {
-      id: result.lastID,
-      ...noteData,
-      createdAt: now,
-      updatedAt: now
+      id: row.id,
+      title: row.title,
+      content: row.content,
+      status: row.status,
+      priority: row.priority,
+      tags: row.tags ? JSON.parse(row.tags) : [],
+      imageUrl: row.imageUrl,
+      images: row.images ? JSON.parse(row.images) : [],
+      startTime: row.startTime,
+      deadline: row.deadline,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt
     };
-  }
-
-  public async updateNote(id: number, updates: Partial<Note>): Promise<Note> {
-    const now = new Date().toISOString();
-    const fields: string[] = [];
-    const values: any[] = [];
-
-    if (updates.title !== undefined) {
-      fields.push('title = ?');
-      values.push(updates.title);
-    }
-    if (updates.content !== undefined) {
-      fields.push('content = ?');
-      values.push(updates.content);
-    }
-    
-    fields.push('updated_at = ?');
-    values.push(now);
-    values.push(id);
-
-    await this.runQuery(
-      `UPDATE notes SET ${fields.join(', ')} WHERE id = ?`,
-      values
-    );
-
-    const result = await this.getQuery(
-      'SELECT id, title, content, created_at as createdAt, updated_at as updatedAt FROM notes WHERE id = ?',
-      [id]
-    );
-    return result as Note;
-  }
-
-  public async deleteNote(id: number): Promise<void> {
-    await this.runQuery('DELETE FROM notes WHERE id = ?', [id]);
   }
 
   public close(): void {
     if (this.db) {
-      this.db.close((err: any) => {
-        if (err) {
-          console.error('Error closing database:', err);
-        } else {
-          console.log('Database connection closed');
-        }
-      });
+      this.db.close();
+      this.db = null;
     }
   }
 }

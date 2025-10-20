@@ -24,18 +24,8 @@ jobs:
           node-version: '18'
           cache: 'npm'
       
-      - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v2
-      
-      - name: Setup Visual C++ Build Tools with Windows SDK
-        run: |
-          choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.Windows11SDK.22000 --includeRecommended --passive --norestart" -y
-        shell: powershell
-      
       - name: Install dependencies
         run: npm install
-        env:
-          npm_config_msvs_version: 2022
       
       - name: Build application
         run: npm run build

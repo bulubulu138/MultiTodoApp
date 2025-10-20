@@ -10,12 +10,12 @@
     "build": "npm run build:main && npm run build:renderer",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "webpack --config webpack.renderer.config.js",
-    "rebuild": "electron-rebuild -f -w sqlite3",
+    "rebuild": "electron-rebuild -f -w better-sqlite3",
     "pack": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",
     "dist:mac": "npm run build && electron-builder --mac",
-    "postinstall": "npm run rebuild"
+    "postinstall": "electron-builder install-app-deps"
   },
   "keywords": [
     "electron",
@@ -60,7 +60,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-quill-new": "^3.6.0",
-    "sqlite3": "^5.1.7",
+    "better-sqlite3": "^11.7.0",
     "stream-browserify": "^3.0.0",
     "util": "^0.12.5"
   },
