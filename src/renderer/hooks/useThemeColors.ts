@@ -9,6 +9,8 @@ export interface ThemeColors {
   contentBg: string;
   borderColor: string;
   textColor: string;
+  cardBg: string;
+  textPrimary: string;
 }
 
 /**
@@ -57,6 +59,10 @@ export const useThemeColors = (): ThemeColors => {
     borderColor: isDark ? '#404040' : '#f0f0f0',
     // 文本颜色 - 根据主题自动调整
     textColor: isDark ? '#ffffff' : '#000000',
+    // 卡片背景 - 用于报告等卡片组件
+    cardBg: isDark ? '#1f1f1f' : '#ffffff',
+    // 主文本颜色 - 用于标题等
+    textPrimary: isDark ? '#ffffff' : '#000000',
   };
 };
 

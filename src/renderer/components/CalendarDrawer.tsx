@@ -1,10 +1,11 @@
 import { Todo, CalendarViewSize } from '../../shared/types';
 import React, { useState, useMemo } from 'react';
-import { Drawer, Calendar, Badge, List, Typography, Tag, Space, Divider } from 'antd';
-import { ClockCircleOutlined, PlayCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import { Drawer, Calendar, Badge, List, Typography, Tag, Space, Divider, Button } from 'antd';
+import { ClockCircleOutlined, PlayCircleOutlined, WarningOutlined, FileTextOutlined, BarChartOutlined, PieChartOutlined } from '@ant-design/icons';
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import { useThemeColors } from '../hooks/useThemeColors';
+import ReportModal, { ReportType } from './ReportModal';
 
 const { Title, Text } = Typography;
 
@@ -24,7 +25,15 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
   viewSize = 'compact'
 }) => {
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
+  const [showReport, setShowReport] = useState(false);
+  const [reportType, setReportType] = useState<ReportType>('daily');
   const colors = useThemeColors();
+
+  // 打开报告
+  const handleOpenReport = (type: ReportType) => {
+    setReportType(type);
+    setShowReport(true);
+  };
 
   // 判断是否逾期
   const isOverdue = (todo: Todo): boolean => {
@@ -179,23 +188,51 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
   const hasSelectedTodos = overdue.length > 0 || starting.length > 0 || deadline.length > 0;
 
   return (
-    <Drawer
-      title="📅 待办日历视图"
-      width="85%"
-      open={visible}
-      onClose={onClose}
-      placement="right"
-    >
-      <div style={{ display: 'flex', height: 'calc(100vh - 120px)', gap: 16 }}>
-        {/* 左侧：待办列表面板 */}
-        <div className="todo-list-panel" style={{ 
-          flex: '0 0 40%', 
-          overflowY: 'auto', 
-          paddingRight: 12,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 16
-        }}>
+    <>
+      <Drawer
+        title="📅 待办日历视图"
+        width="85%"
+        open={visible}
+        onClose={onClose}
+        placement="right"
+      >
+        {/* 报告按钮区 */}
+        <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'center' }}>
+          <Button 
+            icon={<FileTextOutlined />} 
+            onClick={() => handleOpenReport('daily')}
+            type="default"
+          >
+            日报
+          </Button>
+          <Button 
+            icon={<BarChartOutlined />} 
+            onClick={() => handleOpenReport('weekly')}
+            type="default"
+          >
+            周报
+          </Button>
+          <Button 
+            icon={<PieChartOutlined />} 
+            onClick={() => handleOpenReport('monthly')}
+            type="default"
+          >
+            月报
+          </Button>
+        </Space>
+
+        <Divider style={{ margin: '12px 0' }} />
+
+        <div style={{ display: 'flex', height: 'calc(100vh - 180px)', gap: 16 }}>
+          {/* 左侧：待办列表面板 */}
+          <div className="todo-list-panel" style={{ 
+            flex: '0 0 40%', 
+            overflowY: 'auto', 
+            paddingRight: 12,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16
+          }}>
           {!selectedDate ? (
             // 默认提示
             <div style={{ 
@@ -403,6 +440,16 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
         </div>
       </div>
     </Drawer>
+
+    {/* 报告弹窗 */}
+    <ReportModal
+      visible={showReport}
+      todos={todos}
+      initialType={reportType}
+      initialDate={selectedDate || dayjs()}
+      onClose={() => setShowReport(false)}
+    />
+    </>
   );
 };
 

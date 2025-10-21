@@ -46,6 +46,69 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     loadRelations();
   }, []);
 
+  // 检查报告提醒
+  useEffect(() => {
+    const checkReportReminders = () => {
+      const now = dayjs();
+      const dayOfWeek = now.day(); // 0-6, 0是周日
+      const dayOfMonth = now.date();
+      const today = now.format('YYYY-MM-DD');
+      
+      // 周五提醒写周报 (dayOfWeek === 5)
+      if (dayOfWeek === 5) {
+        const weeklyKey = `weeklyReportDismissed_${now.format('YYYY-WW')}`;
+        if (!settings[weeklyKey]) {
+          // 延迟显示，避免与其他提示冲突
+          setTimeout(() => {
+            const key = `weekly-report-${today}`;
+            message.info({
+              content: '📊 今天是周五，记得填写本周的工作周报哦！',
+              duration: 10,
+              key,
+              onClick: () => {
+                setShowCalendar(true);
+                message.destroy(key);
+              },
+            });
+            // 标记本周已提醒
+            window.electronAPI.settings.update({ [weeklyKey]: 'true' });
+          }, 2000);
+        }
+      }
+      
+      // 月初（1-3号）提醒写月报
+      if (dayOfMonth >= 1 && dayOfMonth <= 3) {
+        const monthlyKey = `monthlyReportDismissed_${now.format('YYYY-MM')}`;
+        if (!settings[monthlyKey]) {
+          // 延迟显示
+          setTimeout(() => {
+            const key = `monthly-report-${today}`;
+            message.info({
+              content: '📅 新的一月开始了，记得填写上月的工作月报哦！',
+              duration: 10,
+              key,
+              onClick: () => {
+                setShowCalendar(true);
+                message.destroy(key);
+              },
+            });
+            // 标记本月已提醒
+            window.electronAPI.settings.update({ [monthlyKey]: 'true' });
+          }, 3000);
+        }
+      }
+    };
+    
+    // 延迟检查，确保应用已完全加载
+    const timer = setTimeout(() => {
+      if (Object.keys(settings).length > 0) {
+        checkReportReminders();
+      }
+    }, 5000);
+    
+    return () => clearTimeout(timer);
+  }, [settings]);
+
   const loadTodos = async () => {
     try {
       setLoading(true);
