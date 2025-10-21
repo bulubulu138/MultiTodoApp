@@ -26,7 +26,7 @@ export class DatabaseManager {
       await this.createTables();
       await this.initializeDefaultSettings();
     } catch (err) {
-      console.error('Database connection error:', err);
+          console.error('Database connection error:', err);
       throw err;
     }
   }
@@ -152,9 +152,9 @@ export class DatabaseManager {
           todo.content || '',
           todo.status,
           todo.priority,
-          JSON.stringify(todo.tags || []),
+          todo.tags || '',
           todo.imageUrl || null,
-          JSON.stringify(todo.images || []),
+          todo.images || '',
           todo.startTime || null,
           todo.deadline || null
         );
@@ -199,9 +199,9 @@ export class DatabaseManager {
         if (updates.content !== undefined) { fields.push('content = ?'); values.push(updates.content); }
         if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status); }
         if (updates.priority !== undefined) { fields.push('priority = ?'); values.push(updates.priority); }
-        if (updates.tags !== undefined) { fields.push('tags = ?'); values.push(JSON.stringify(updates.tags)); }
+        if (updates.tags !== undefined) { fields.push('tags = ?'); values.push(updates.tags); }
         if (updates.imageUrl !== undefined) { fields.push('imageUrl = ?'); values.push(updates.imageUrl); }
-        if (updates.images !== undefined) { fields.push('images = ?'); values.push(JSON.stringify(updates.images)); }
+        if (updates.images !== undefined) { fields.push('images = ?'); values.push(updates.images); }
         if (updates.startTime !== undefined) { fields.push('startTime = ?'); values.push(updates.startTime); }
         if (updates.deadline !== undefined) { fields.push('deadline = ?'); values.push(updates.deadline); }
 
@@ -415,16 +415,16 @@ export class DatabaseManager {
   public updateNote(id: number, updates: Partial<Note>): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        const now = new Date().toISOString();
+    const now = new Date().toISOString();
         const fields = [];
         const values = [];
 
         if (updates.title !== undefined) { fields.push('title = ?'); values.push(updates.title); }
         if (updates.content !== undefined) { fields.push('content = ?'); values.push(updates.content); }
-
-        fields.push('updated_at = ?');
-        values.push(now);
-        values.push(id);
+    
+    fields.push('updated_at = ?');
+    values.push(now);
+    values.push(id);
 
         const sql = `UPDATE notes SET ${fields.join(', ')} WHERE id = ?`;
         this.db!.prepare(sql).run(...values);
@@ -453,9 +453,9 @@ export class DatabaseManager {
       content: row.content,
       status: row.status,
       priority: row.priority,
-      tags: row.tags ? JSON.parse(row.tags) : [],
+      tags: row.tags || '',
       imageUrl: row.imageUrl,
-      images: row.images ? JSON.parse(row.images) : [],
+      images: row.images || '',
       startTime: row.startTime,
       deadline: row.deadline,
       createdAt: row.createdAt,
