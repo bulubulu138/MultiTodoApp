@@ -363,8 +363,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       <SettingsModal
         visible={showSettings}
         settings={settings}
+        todos={todos}
         onSave={handleSettingsUpdate}
         onCancel={() => setShowSettings(false)}
+        onReload={loadTodos}
       />
 
       <TodoViewDrawer

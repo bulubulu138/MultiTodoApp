@@ -1,26 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Select, Button, Typography, Space, message as antdMessage } from 'antd';
-import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined } from '@ant-design/icons';
+import { Modal, Form, Select, Button, Typography, Space, Tabs } from 'antd';
+import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined } from '@ant-design/icons';
 import { App } from 'antd';
+import { Todo } from '../../shared/types';
+import TagManagement from './TagManagement';
 
 const { Text } = Typography;
 
 interface SettingsModalProps {
   visible: boolean;
   settings: Record<string, string>;
+  todos?: Todo[];
   onSave: (settings: Record<string, string>) => void;
   onCancel: () => void;
+  onReload?: () => Promise<void>;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
   visible,
   settings,
+  todos = [],
   onSave,
-  onCancel
+  onCancel,
+  onReload
 }) => {
   const [form] = Form.useForm();
   const { message } = App.useApp();
   const [dbPath, setDbPath] = useState<string>('加载中...');
+  const [activeTab, setActiveTab] = useState('general');
 
   useEffect(() => {
     if (visible) {
@@ -70,16 +77,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  return (
-    <Modal
-      title="应用设置"
-      open={visible}
-      onOk={handleSubmit}
-      onCancel={onCancel}
-      okText="保存"
-      cancelText="取消"
-    >
-      <Form form={form} layout="vertical">
+  const tabItems = [
+    {
+      key: 'general',
+      label: (
+        <span>
+          <BulbOutlined />
+          通用设置
+        </span>
+      ),
+      children: (
+        <Form form={form} layout="vertical">
         <Form.Item
           name="theme"
           label={
@@ -157,16 +165,51 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           </Space>
         </Form.Item>
         
-        <div style={{ 
-          marginTop: 16, 
-          padding: 12, 
-          borderRadius: 4,
-          fontSize: 12,
-          opacity: 0.8
-        }}>
-          💡 提示：纯黑主题更适合夜间使用，并且在AMOLED屏幕上更省电。紧凑模式可在一屏内显示完整月历。
-        </div>
-      </Form>
+          <div style={{ 
+            marginTop: 16, 
+            padding: 12, 
+            borderRadius: 4,
+            fontSize: 12,
+            opacity: 0.8
+          }}>
+            💡 提示：纯黑主题更适合夜间使用，并且在AMOLED屏幕上更省电。紧凑模式可在一屏内显示完整月历。
+          </div>
+        </Form>
+      ),
+    },
+    {
+      key: 'tags',
+      label: (
+        <span>
+          <TagOutlined />
+          标签管理
+        </span>
+      ),
+      children: (
+        <TagManagement 
+          todos={todos} 
+          onReload={onReload || (async () => {})} 
+        />
+      ),
+    },
+  ];
+
+  return (
+    <Modal
+      title="应用设置"
+      open={visible}
+      onOk={activeTab === 'general' ? handleSubmit : onCancel}
+      onCancel={onCancel}
+      okText={activeTab === 'general' ? '保存' : '关闭'}
+      cancelText={activeTab === 'general' ? '取消' : undefined}
+      width={800}
+      bodyStyle={{ padding: '16px 24px' }}
+    >
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={tabItems}
+      />
     </Modal>
   );
 };

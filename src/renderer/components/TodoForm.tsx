@@ -1,5 +1,5 @@
 import { Todo, TodoRelation } from '../../shared/types';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Form, Input, Select, Button, App, Tag, Space, Switch, DatePicker } from 'antd';
 import { PlusOutlined, EditOutlined, FileTextOutlined, CopyOutlined } from '@ant-design/icons';
 import RichTextEditor from './RichTextEditor';
@@ -31,11 +31,31 @@ const TodoForm: React.FC<TodoFormProps> = ({
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const [tags, setTags] = useState<string[]>([]);
-  const [inputTag, setInputTag] = useState('');
   const [richContent, setRichContent] = useState<string>('');
   const [isEditorReady, setIsEditorReady] = useState(false);
   const [useRichEditor, setUseRichEditor] = useState(true);
   const [editorError, setEditorError] = useState(false);
+
+  // 提取所有历史标签并按使用频率排序
+  const historyTags = useMemo(() => {
+    const tagFrequency: Record<string, number> = {};
+    
+    allTodos.forEach(todo => {
+      if (todo.tags) {
+        todo.tags.split(',').forEach(tag => {
+          const trimmed = tag.trim();
+          if (trimmed) {
+            tagFrequency[trimmed] = (tagFrequency[trimmed] || 0) + 1;
+          }
+        });
+      }
+    });
+
+    // 按使用频率排序，高频标签在前
+    return Object.keys(tagFrequency).sort((a, b) => 
+      tagFrequency[b] - tagFrequency[a]
+    );
+  }, [allTodos]);
 
   useEffect(() => {
     if (visible) {
@@ -99,15 +119,10 @@ const TodoForm: React.FC<TodoFormProps> = ({
     }
   };
 
-  const handleAddTag = () => {
-    if (inputTag && !tags.includes(inputTag)) {
-      setTags([...tags, inputTag]);
-      setInputTag('');
-    }
-  };
-
-  const handleRemoveTag = (tagToRemove: string) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
+  // 标签选择/输入处理（Select mode="tags" 自动处理）
+  const handleTagsChange = (value: string[]) => {
+    // 允许任意数量的标签
+    setTags(value);
   };
 
   // 判断是否显示关联上下文
@@ -272,36 +287,27 @@ const TodoForm: React.FC<TodoFormProps> = ({
           />
         </Form.Item>
 
-        <Form.Item label="标签">
-          <div style={{ marginBottom: 8 }}>
-            {tags.map(tag => (
-              <Tag
-                key={tag}
-                closable
-                onClose={() => handleRemoveTag(tag)}
-                style={{ marginBottom: 4 }}
-              >
-                {tag}
-              </Tag>
-            ))}
-          </div>
-          <Space.Compact style={{ width: '100%' }}>
-            <Input
-              style={{ width: 'calc(100% - 80px)' }}
-              value={inputTag}
-              onChange={(e) => setInputTag(e.target.value)}
-              onPressEnter={handleAddTag}
-              placeholder="输入标签后按回车添加"
-            />
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={handleAddTag}
-              style={{ width: 80 }}
-            >
-              添加
-            </Button>
-          </Space.Compact>
+        <Form.Item 
+          label="标签"
+          extra={`已添加 ${tags.length} 个标签${historyTags.length > 0 ? `，可从 ${historyTags.length} 个历史标签中选择` : ''}`}
+        >
+          <Select
+            mode="tags"
+            value={tags}
+            onChange={handleTagsChange}
+            placeholder="选择已有标签或输入新标签后按回车"
+            style={{ width: '100%' }}
+            options={historyTags.map(tag => ({
+              label: tag,
+              value: tag,
+            }))}
+            maxTagCount="responsive"
+            tokenSeparators={[',']}
+            showSearch
+            filterOption={(input, option) =>
+              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+          />
         </Form.Item>
       </Form>
         </div>
