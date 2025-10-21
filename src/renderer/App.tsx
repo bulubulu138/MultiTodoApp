@@ -255,12 +255,14 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         <div style={{ marginTop: 16 }}>
           <TodoList
             todos={filteredTodos}
+            allTodos={todos}
             loading={loading}
             onEdit={handleEditTodo}
             onView={handleViewTodo}
             onDelete={handleDeleteTodo}
             onStatusChange={handleUpdateTodo}
             relations={relations}
+            onRelationsChange={loadRelations}
           />
         </div>
       </Content>

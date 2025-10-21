@@ -12,13 +12,15 @@ interface RelationsModalProps {
   todo: Todo | null;
   todos: Todo[];
   onClose: () => void;
+  onRelationsChange?: () => Promise<void>;
 }
 
 const RelationsModal: React.FC<RelationsModalProps> = ({
   visible,
   todo,
   todos,
-  onClose
+  onClose,
+  onRelationsChange
 }) => {
   const { message } = App.useApp();
   const [relations, setRelations] = useState<TodoRelation[]>([]);
@@ -106,6 +108,7 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
 
       // 重新加载关系列表
       await loadRelations();
+      await onRelationsChange?.(); // Refresh global relations state
       setShowSearchModal(false);
       message.success('关联关系添加成功');
     } catch (error: any) {
@@ -124,6 +127,7 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
     try {
       await window.electronAPI.relations.delete(relationId);
       await loadRelations();
+      await onRelationsChange?.(); // Refresh global relations state
       message.success('关联关系删除成功');
     } catch (error) {
       message.error('删除关联关系失败');

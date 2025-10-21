@@ -13,22 +13,26 @@ const { Option } = Select;
 
 interface TodoListProps {
   todos: Todo[];
+  allTodos?: Todo[]; // Full list for finding related todos across all statuses
   loading: boolean;
   onEdit: (todo: Todo) => void;
   onDelete: (id: number) => void;
   onStatusChange: (id: number, updates: Partial<Todo>) => void;
   onView: (todo: Todo) => void;
   relations?: TodoRelation[];
+  onRelationsChange?: () => Promise<void>; // Callback to refresh global relations
 }
 
 const TodoList: React.FC<TodoListProps> = ({
   todos,
+  allTodos,
   loading,
   onEdit,
   onDelete,
   onStatusChange,
   onView,
-  relations = []
+  relations = [],
+  onRelationsChange
 }) => {
   const { message } = App.useApp();
   const colors = useThemeColors();
@@ -161,11 +165,12 @@ const TodoList: React.FC<TodoListProps> = ({
       <RelationsModal
         visible={showRelationsModal}
         todo={selectedTodo}
-        todos={todos}
+        todos={allTodos || todos}
         onClose={() => {
           setShowRelationsModal(false);
           setSelectedTodo(null);
         }}
+        onRelationsChange={onRelationsChange}
       />
     <List
       loading={loading}
@@ -371,7 +376,7 @@ const TodoList: React.FC<TodoListProps> = ({
               }}>
                 <RelationContext
                   currentTodo={todo}
-                  allTodos={todos}
+                  allTodos={allTodos || todos}
                   relations={relations}
                   compact
                 />
