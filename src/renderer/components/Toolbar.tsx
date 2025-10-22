@@ -1,6 +1,16 @@
 import React from 'react';
-import { Button, Space } from 'antd';
-import { PlusOutlined, SettingOutlined, ExportOutlined, SearchOutlined, BulbOutlined, CalendarOutlined } from '@ant-design/icons';
+import { Button, Space, Select } from 'antd';
+import { PlusOutlined, SettingOutlined, ExportOutlined, SearchOutlined, BulbOutlined, CalendarOutlined, SortAscendingOutlined } from '@ant-design/icons';
+
+const { Option } = Select;
+
+export type SortOption = 
+  | 'createdAt-desc' 
+  | 'createdAt-asc' 
+  | 'startTime-desc' 
+  | 'startTime-asc' 
+  | 'deadline-desc' 
+  | 'deadline-asc';
 
 interface ToolbarProps {
   onAddTodo: () => void;
@@ -9,6 +19,8 @@ interface ToolbarProps {
   onShowSearch: () => void;
   onShowNotes: () => void;
   onShowCalendar: () => void;
+  sortOption?: SortOption;
+  onSortChange?: (option: SortOption) => void;
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({
@@ -17,7 +29,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onShowExport,
   onShowSearch,
   onShowNotes,
-  onShowCalendar
+  onShowCalendar,
+  sortOption = 'createdAt-desc',
+  onSortChange
 }) => {
   return (
     <div className="toolbar">
@@ -26,6 +40,20 @@ const Toolbar: React.FC<ToolbarProps> = ({
       </div>
       
       <Space size="middle">
+        <Select
+          value={sortOption}
+          onChange={onSortChange}
+          style={{ width: 180 }}
+          suffixIcon={<SortAscendingOutlined />}
+        >
+          <Option value="createdAt-desc">创建时间 ↓ 新→旧</Option>
+          <Option value="createdAt-asc">创建时间 ↑ 旧→新</Option>
+          <Option value="startTime-desc">开始时间 ↓ 晚→早</Option>
+          <Option value="startTime-asc">开始时间 ↑ 早→晚</Option>
+          <Option value="deadline-desc">截止时间 ↓ 晚→早</Option>
+          <Option value="deadline-asc">截止时间 ↑ 早→晚</Option>
+        </Select>
+        
         <Button
           icon={<SearchOutlined />}
           onClick={onShowSearch}

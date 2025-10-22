@@ -98,12 +98,46 @@ const TodoForm: React.FC<TodoFormProps> = ({
     }
   }, [visible, todo, form]);
 
+  // 从富文本内容中提取纯文本的第一行
+  const extractFirstLineFromContent = (html: string): string => {
+    if (!html) return '';
+    
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    
+    // 移除所有图片
+    const images = temp.querySelectorAll('img');
+    images.forEach(img => img.remove());
+    
+    // 获取纯文本
+    const text = (temp.textContent || temp.innerText || '').trim();
+    
+    if (!text) return '';
+    
+    // 取第一行，最多50个字符
+    const firstLine = text.split('\n')[0].trim();
+    if (firstLine.length > 50) {
+      return firstLine.substring(0, 50) + '...';
+    }
+    
+    return firstLine;
+  };
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
       
+      // 如果标题为空，自动从内容中提取
+      let title = values.title?.trim();
+      if (!title) {
+        title = extractFirstLineFromContent(richContent);
+        if (!title) {
+          title = '未命名待办';
+        }
+      }
+      
       const todoData: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'> = {
-        title: values.title,
+        title: title,
         content: richContent,
         status: values.status || 'pending',
         startTime: values.startTime ? values.startTime.toISOString() : new Date().toISOString(),
@@ -185,9 +219,9 @@ const TodoForm: React.FC<TodoFormProps> = ({
         <Form.Item
           name="title"
           label="标题"
-          rules={[{ required: true, message: '请输入待办事项标题' }]}
+          rules={[{ required: false }]}
         >
-          <Input placeholder="请输入待办事项标题" />
+          <Input placeholder="留空则自动从内容第一行生成" />
         </Form.Item>
 
         <Form.Item

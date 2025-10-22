@@ -11,13 +11,15 @@ interface SearchModalProps {
   todos: Todo[];
   onClose: () => void;
   onSelectTodo: (todo: Todo) => void;
+  onViewTodo?: (todo: Todo) => void;
 }
 
 const SearchModal: React.FC<SearchModalProps> = ({
   visible,
   todos,
   onClose,
-  onSelectTodo
+  onSelectTodo,
+  onViewTodo
 }) => {
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -267,7 +269,18 @@ const SearchModal: React.FC<SearchModalProps> = ({
                 <Card.Meta
                   title={
                     <Space>
-                      <Text strong>{todo.title}</Text>
+                      <Text 
+                        strong 
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => {
+                          if (onViewTodo) {
+                            onViewTodo(todo);
+                            onClose();
+                          }
+                        }}
+                      >
+                        {todo.title}
+                      </Text>
                       <Tag color={getStatusColor(todo.status)}>
                         {getStatusText(todo.status)}
                       </Tag>

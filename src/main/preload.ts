@@ -42,6 +42,9 @@ export interface ElectronAPI {
     update: (id: number, updates: any) => Promise<any>;
     delete: (id: number) => Promise<void>;
   };
+  
+  // Shell API
+  openExternal: (url: string) => Promise<{success: boolean; error?: string}>;
 }
 
 // 暴露API到渲染进程
@@ -79,4 +82,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     update: (id: number, updates: any) => ipcRenderer.invoke('notes:update', id, updates),
     delete: (id: number) => ipcRenderer.invoke('notes:delete', id),
   },
+  openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
 } as ElectronAPI);

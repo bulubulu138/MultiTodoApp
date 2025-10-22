@@ -4,7 +4,7 @@ import { Layout, App as AntApp, Tabs, ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import TodoList from './components/TodoList';
 import TodoForm from './components/TodoForm';
-import Toolbar from './components/Toolbar';
+import Toolbar, { SortOption } from './components/Toolbar';
 import SettingsModal from './components/SettingsModal';
 import SearchModal from './components/SearchModal';
 import ExportModal from './components/ExportModal';
@@ -38,6 +38,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<string>('all');
   const [relations, setRelations] = useState<TodoRelation[]>([]);
+  const [sortOption, setSortOption] = useState<SortOption>('createdAt-desc');
 
   // 加载数据
   useEffect(() => {
@@ -131,6 +132,11 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       // 加载主题设置
       if (appSettings.theme) {
         onThemeChange(appSettings.theme as ThemeMode);
+      }
+      
+      // 加载排序设置
+      if (appSettings.sortOption) {
+        setSortOption(appSettings.sortOption as SortOption);
       }
     } catch (error) {
       message.error('加载设置失败');
@@ -227,6 +233,19 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     setShowForm(true);
   };
 
+  const handleSortChange = async (option: SortOption) => {
+    setSortOption(option);
+    // 保存到设置
+    try {
+      await window.electronAPI.settings.update({ 
+        ...settings, 
+        sortOption: option 
+      });
+    } catch (error) {
+      console.error('Error saving sort option:', error);
+    }
+  };
+
   // 统计各状态的待办数量
   const statusCounts = useMemo(() => ({
     all: todos.filter(t => t && t.id).length,
@@ -236,7 +255,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     paused: todos.filter(t => t && t.status === 'paused').length
   }), [todos]);
 
-  // 根据当前Tab过滤待办事项，并将逾期的置顶
+  // 根据当前Tab过滤待办事项，并应用排序
   const filteredTodos = useMemo(() => {
     const validTodos = todos.filter(todo => todo && todo.id);
     const filtered = activeTab === 'all' ? validTodos : validTodos.filter(todo => todo.status === activeTab);
@@ -263,14 +282,42 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       return aDeadline.diff(bDeadline);  // 升序，越早的越靠前
     });
     
-    // 非逾期待办保持原有排序（按更新时间）
-    normalTodos.sort((a, b) => 
-      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    );
+    // 根据排序选项对非逾期待办排序
+    const sortTodos = (todosToSort: Todo[]) => {
+      const [field, order] = sortOption.split('-') as [string, 'asc' | 'desc'];
+      
+      return [...todosToSort].sort((a, b) => {
+        let aValue: string | undefined;
+        let bValue: string | undefined;
+        
+        if (field === 'createdAt') {
+          aValue = a.createdAt;
+          bValue = b.createdAt;
+        } else if (field === 'startTime') {
+          aValue = a.startTime;
+          bValue = b.startTime;
+        } else if (field === 'deadline') {
+          aValue = a.deadline;
+          bValue = b.deadline;
+        }
+        
+        // 处理空值：将没有对应字段的项放在最后
+        if (!aValue && !bValue) return 0;
+        if (!aValue) return 1;
+        if (!bValue) return -1;
+        
+        const aTime = new Date(aValue).getTime();
+        const bTime = new Date(bValue).getTime();
+        
+        return order === 'desc' ? bTime - aTime : aTime - bTime;
+      });
+    };
+    
+    const sortedNormalTodos = sortTodos(normalTodos);
     
     // 合并：逾期在前
-    return [...overdueTodos, ...normalTodos];
-  }, [todos, activeTab]);
+    return [...overdueTodos, ...sortedNormalTodos];
+  }, [todos, activeTab, sortOption]);
 
   // Tab配置
   const tabItems = [
@@ -305,6 +352,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         onShowExport={() => setShowExport(true)}
         onShowNotes={() => setShowNotes(true)}
         onShowCalendar={() => setShowCalendar(true)}
+        sortOption={sortOption}
+        onSortChange={handleSortChange}
       />
         
         <Content className="content-area">
@@ -352,6 +401,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
           setShowSearch(false);
           handleEditTodo(todo);
         }}
+        onViewTodo={handleViewTodo}
       />
 
       <ExportModal

@@ -1,6 +1,6 @@
 import { Todo, TodoRelation } from '../../shared/types';
-import React from 'react';
-import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message } from 'antd';
+import React, { useMemo } from 'react';
+import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message, Image } from 'antd';
 import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined } from '@ant-design/icons';
 import RelationContext from './RelationContext';
 import { copyTodoToClipboard } from '../utils/copyTodo';
@@ -96,6 +96,96 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   };
 
   const showRelationContext = allTodos.length > 0;
+
+  // 处理内容点击事件，拦截链接点击
+  const handleContentClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'A') {
+      e.preventDefault();
+      const href = target.getAttribute('href');
+      if (href) {
+        window.electronAPI.openExternal(href);
+      }
+    }
+  };
+
+  // 将HTML内容转换为可预览图片的组件
+  const renderContentWithImagePreview = useMemo(() => {
+    if (!todo.content) return null;
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = todo.content;
+    const images = Array.from(tempDiv.querySelectorAll('img'));
+    
+    if (images.length === 0) {
+      // 没有图片，直接返回HTML
+      return (
+        <div
+          className="todo-view-content"
+          style={{
+            marginTop: 8,
+            padding: 12,
+            backgroundColor: colors.contentBg,
+            color: '#000000',
+            borderRadius: 4,
+            minHeight: 100,
+            maxHeight: 600,
+            overflowY: 'auto'
+          }}
+          dangerouslySetInnerHTML={{ __html: todo.content }}
+          onClick={handleContentClick}
+        />
+      );
+    }
+
+    // 提取图片URLs
+    const imageUrls = images.map(img => img.src);
+    
+    // 为每个图片添加唯一标识
+    images.forEach((img, index) => {
+      img.setAttribute('data-image-index', String(index));
+    });
+
+    return (
+      <Image.PreviewGroup>
+        <div
+          className="todo-view-content"
+          style={{
+            marginTop: 8,
+            padding: 12,
+            backgroundColor: colors.contentBg,
+            color: '#000000',
+            borderRadius: 4,
+            minHeight: 100,
+            maxHeight: 600,
+            overflowY: 'auto'
+          }}
+          onClick={(e) => {
+            handleContentClick(e);
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'IMG') {
+              e.preventDefault();
+              const index = parseInt(target.getAttribute('data-image-index') || '0');
+              // 触发对应图片的预览
+              const imageElement = document.querySelector(`img[data-image-index="${index}"]`) as HTMLElement;
+              if (imageElement) {
+                imageElement.click();
+              }
+            }
+          }}
+          dangerouslySetInnerHTML={{ __html: tempDiv.innerHTML }}
+        />
+        {/* 隐藏的Image组件用于预览 */}
+        {imageUrls.map((url, index) => (
+          <Image
+            key={index}
+            src={url}
+            style={{ display: 'none' }}
+          />
+        ))}
+      </Image.PreviewGroup>
+    );
+  }, [todo.content, colors.contentBg]);
 
   return (
     <Drawer
@@ -208,20 +298,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
           <div style={{ marginBottom: 16 }}>
             <Text strong>内容：</Text>
             {todo.content ? (
-              <div
-                className="todo-view-content"
-                style={{
-                  marginTop: 8,
-                  padding: 12,
-                  backgroundColor: colors.contentBg,
-                  color: '#000000',
-                  borderRadius: 4,
-                  minHeight: 100,
-                  maxHeight: 600,
-                  overflowY: 'auto'
-                }}
-                dangerouslySetInnerHTML={{ __html: todo.content }}
-              />
+              renderContentWithImagePreview
             ) : (
               <Paragraph type="secondary" style={{ marginTop: 8 }}>
                 无内容

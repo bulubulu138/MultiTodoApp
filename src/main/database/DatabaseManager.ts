@@ -142,9 +142,10 @@ export class DatabaseManager {
   public createTodo(todo: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'>): Promise<Todo> {
     return new Promise((resolve, reject) => {
       try {
+        const now = new Date().toISOString();
         const stmt = this.db!.prepare(
-          `INSERT INTO todos (title, content, status, priority, tags, imageUrl, images, startTime, deadline)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO todos (title, content, status, priority, tags, imageUrl, images, startTime, deadline, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         );
         
         const result = stmt.run(
@@ -156,7 +157,9 @@ export class DatabaseManager {
           todo.imageUrl || null,
           todo.images || '',
           todo.startTime || null,
-          todo.deadline || null
+          todo.deadline || null,
+          now,
+          now
         );
 
         const newTodo = this.db!.prepare('SELECT * FROM todos WHERE id = ?').get(result.lastInsertRowid) as any;
@@ -205,7 +208,8 @@ export class DatabaseManager {
         if (updates.startTime !== undefined) { fields.push('startTime = ?'); values.push(updates.startTime); }
         if (updates.deadline !== undefined) { fields.push('deadline = ?'); values.push(updates.deadline); }
 
-        fields.push('updatedAt = CURRENT_TIMESTAMP');
+        fields.push('updatedAt = ?');
+        values.push(new Date().toISOString());
         values.push(id);
 
         const sql = `UPDATE todos SET ${fields.join(', ')} WHERE id = ?`;

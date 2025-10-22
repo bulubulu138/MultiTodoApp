@@ -35,6 +35,28 @@ class Application {
       show: false,
     });
 
+    // 拦截新窗口打开，使用外部浏览器
+    this.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        shell.openExternal(url);
+      }
+      return { action: 'deny' };
+    });
+
+    // 拦截导航，防止在应用内打开外部链接
+    this.mainWindow.webContents.on('will-navigate', (event, url) => {
+      const currentUrl = this.mainWindow?.webContents.getURL() || '';
+      // 允许本地开发服务器和本地文件导航
+      if (url.startsWith('http://localhost') || url.startsWith('file://')) {
+        return;
+      }
+      // 拦截其他外部链接
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        event.preventDefault();
+        shell.openExternal(url);
+      }
+    });
+
     // 动态设置 Content Security Policy
     this.setupContentSecurityPolicy(isDev);
 
@@ -228,6 +250,19 @@ class Application {
         const dataFolder = path.dirname(dbPath);
         await shell.openPath(dataFolder);
         return { success: true };
+      } catch (error) {
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // 打开外部链接
+    ipcMain.handle('shell:openExternal', async (_, url: string) => {
+      try {
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+          await shell.openExternal(url);
+          return { success: true };
+        }
+        return { success: false, error: 'Invalid URL' };
       } catch (error) {
         return { success: false, error: (error as Error).message };
       }
