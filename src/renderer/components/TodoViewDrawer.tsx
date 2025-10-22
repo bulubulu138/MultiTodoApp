@@ -1,5 +1,5 @@
 import { Todo, TodoRelation } from '../../shared/types';
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message, Image } from 'antd';
 import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined } from '@ant-design/icons';
 import RelationContext from './RelationContext';
@@ -27,78 +27,8 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
 }) => {
   const colors = useThemeColors();
   
-  if (!todo) return null;
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'orange';
-      case 'in_progress': return 'blue';
-      case 'completed': return 'green';
-      case 'paused': return 'default';
-      default: return 'default';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'pending': return '待办';
-      case 'in_progress': return '进行中';
-      case 'completed': return '已完成';
-      case 'paused': return '暂停';
-      default: return status;
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'red';
-      case 'medium': return 'orange';
-      case 'low': return 'green';
-      default: return 'default';
-    }
-  };
-
-  const getPriorityText = (priority: string) => {
-    switch (priority) {
-      case 'high': return '高';
-      case 'medium': return '中';
-      case 'low': return '低';
-      default: return priority;
-    }
-  };
-
-  const renderTags = (tagsString: string) => {
-    if (!tagsString) return <Text type="secondary">无标签</Text>;
-    
-    const tags = tagsString.split(',').filter(tag => tag.trim());
-    if (tags.length === 0) return <Text type="secondary">无标签</Text>;
-
-    return (
-      <Space wrap>
-        {tags.map((tag, index) => (
-          <Tag key={index} color="blue" icon={<TagsOutlined />}>
-            {tag.trim()}
-          </Tag>
-        ))}
-      </Space>
-    );
-  };
-
-
-  const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const showRelationContext = allTodos.length > 0;
-
   // 处理内容点击事件，拦截链接点击
-  const handleContentClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleContentClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     if (target.tagName === 'A') {
       e.preventDefault();
@@ -107,11 +37,11 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
         window.electronAPI.openExternal(href);
       }
     }
-  };
+  }, []);
 
   // 将HTML内容转换为可预览图片的组件
   const renderContentWithImagePreview = useMemo(() => {
-    if (!todo.content) return null;
+    if (!todo || !todo.content) return null;
 
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = todo.content;
@@ -185,7 +115,77 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
         ))}
       </Image.PreviewGroup>
     );
-  }, [todo.content, colors.contentBg]);
+  }, [todo?.content, colors.contentBg, handleContentClick]);
+  
+  if (!todo) return null;
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'orange';
+      case 'in_progress': return 'blue';
+      case 'completed': return 'green';
+      case 'paused': return 'default';
+      default: return 'default';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'pending': return '待办';
+      case 'in_progress': return '进行中';
+      case 'completed': return '已完成';
+      case 'paused': return '暂停';
+      default: return status;
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'red';
+      case 'medium': return 'orange';
+      case 'low': return 'green';
+      default: return 'default';
+    }
+  };
+
+  const getPriorityText = (priority: string) => {
+    switch (priority) {
+      case 'high': return '高';
+      case 'medium': return '中';
+      case 'low': return '低';
+      default: return priority;
+    }
+  };
+
+  const renderTags = (tagsString: string) => {
+    if (!tagsString) return <Text type="secondary">无标签</Text>;
+    
+    const tags = tagsString.split(',').filter(tag => tag.trim());
+    if (tags.length === 0) return <Text type="secondary">无标签</Text>;
+
+    return (
+      <Space wrap>
+        {tags.map((tag, index) => (
+          <Tag key={index} color="blue" icon={<TagsOutlined />}>
+            {tag.trim()}
+          </Tag>
+        ))}
+      </Space>
+    );
+  };
+
+
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const showRelationContext = allTodos.length > 0;
 
   return (
     <Drawer
