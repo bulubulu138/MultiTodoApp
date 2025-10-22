@@ -588,6 +588,25 @@ body {
   height: auto;
   border-radius: 4px;
   margin: 4px 0;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.ant-drawer .todo-view-content img:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.ant-drawer .todo-view-content a {
+  color: #1890ff;
+  text-decoration: underline;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.ant-drawer .todo-view-content a:hover {
+  color: #40a9ff;
+  text-decoration: underline;
 }
 
 .ant-drawer .todo-view-content h1,
