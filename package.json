@@ -135,7 +135,9 @@
         }
       ],
       "title": "MultiTodo ${version}",
-      "icon": "assets/icon.icns"
+      "icon": "assets/icon.icns",
+      "background": null,
+      "format": "ULFO"
     }
   }
 }
