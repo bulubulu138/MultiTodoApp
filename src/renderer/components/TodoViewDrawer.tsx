@@ -1,5 +1,5 @@
 import { Todo, TodoRelation } from '../../shared/types';
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message, Image } from 'antd';
 import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined } from '@ant-design/icons';
 import RelationContext from './RelationContext';
@@ -26,6 +26,8 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   onEdit
 }) => {
   const colors = useThemeColors();
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState('');
   
   // 处理内容点击事件，拦截链接点击
   const handleContentClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -47,10 +49,8 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
       e.stopPropagation();
       const src = target.getAttribute('src');
       if (src) {
-        // 使用 Ant Design Image 的静态预览方法
-        Image.preview({
-          src: src,
-        });
+        setPreviewImage(src);
+        setPreviewOpen(true);
       }
     }
   }, []);
@@ -287,6 +287,16 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
           </div>
         )}
       </div>
+      
+      {/* 图片预览组件 */}
+      <Image
+        style={{ display: 'none' }}
+        preview={{
+          visible: previewOpen,
+          src: previewImage,
+          onVisibleChange: (visible) => setPreviewOpen(visible),
+        }}
+      />
     </Drawer>
   );
 };
