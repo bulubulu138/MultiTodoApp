@@ -55,9 +55,60 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
     }
   }, []);
 
+  // 将文本中的 URL 转换为可点击的链接
+  const linkifyContent = useCallback((html: string): string => {
+    if (!html) return '';
+    
+    // URL 正则表达式（匹配 http/https 开头的链接）
+    const urlRegex = /(https?:\/\/[^\s<>"]+)/g;
+    
+    // 创建临时 DOM 来解析 HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    
+    // 遍历所有文本节点
+    const processTextNodes = (node: Node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent || '';
+        if (urlRegex.test(text)) {
+          // 创建新的 HTML，将 URL 转换为链接
+          const linkedText = text.replace(urlRegex, (url) => {
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+          });
+          
+          // 创建临时容器并替换节点
+          const tempContainer = document.createElement('span');
+          tempContainer.innerHTML = linkedText;
+          
+          const parent = node.parentNode;
+          if (parent) {
+            // 将所有新节点插入到原节点位置
+            while (tempContainer.firstChild) {
+              parent.insertBefore(tempContainer.firstChild, node);
+            }
+            parent.removeChild(node);
+          }
+        }
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        // 跳过已经是链接或代码块的元素
+        const element = node as Element;
+        if (element.tagName !== 'A' && element.tagName !== 'CODE' && element.tagName !== 'PRE') {
+          // 递归处理子节点（需要转换为数组以避免动态修改问题）
+          Array.from(node.childNodes).forEach(processTextNodes);
+        }
+      }
+    };
+    
+    processTextNodes(tempDiv);
+    return tempDiv.innerHTML;
+  }, []);
+
   // 渲染内容（支持图片和链接）
   const renderContentWithImagePreview = useMemo(() => {
     if (!todo || !todo.content) return null;
+
+    // 自动将 URL 文本转换为链接
+    const processedContent = linkifyContent(todo.content);
 
     return (
       <div
@@ -73,13 +124,18 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
           overflowY: 'auto'
         }}
         onClick={(e) => {
-          handleContentClick(e);
-          handleImageClick(e);
+          const target = e.target as HTMLElement;
+          // 优先处理链接点击
+          if (target.tagName === 'A') {
+            handleContentClick(e);
+          } else if (target.tagName === 'IMG') {
+            handleImageClick(e);
+          }
         }}
-        dangerouslySetInnerHTML={{ __html: todo.content }}
+        dangerouslySetInnerHTML={{ __html: processedContent }}
       />
     );
-  }, [todo?.content, colors.contentBg, handleContentClick, handleImageClick]);
+  }, [todo?.content, colors.contentBg, handleContentClick, handleImageClick, linkifyContent]);
   
   if (!todo) return null;
 

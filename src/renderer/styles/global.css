@@ -598,15 +598,16 @@ body {
 }
 
 .ant-drawer .todo-view-content a {
-  color: #1890ff;
-  text-decoration: underline;
-  cursor: pointer;
+  color: #1890ff !important;
+  text-decoration: underline !important;
+  cursor: pointer !important;
   transition: color 0.2s;
+  font-weight: 500;
 }
 
 .ant-drawer .todo-view-content a:hover {
-  color: #40a9ff;
-  text-decoration: underline;
+  color: #40a9ff !important;
+  text-decoration: underline !important;
 }
 
 .ant-drawer .todo-view-content h1,
@@ -1019,7 +1020,7 @@ body {
   color: #000000 !important;
 }
 
-[data-theme='dark'] div.todo-view-content *:not(br):not(hr),
+[data-theme='dark'] div.todo-view-content *:not(br):not(hr):not(a),
 [data-theme='dark'] div.todo-view-content p,
 [data-theme='dark'] div.todo-view-content span,
 [data-theme='dark'] div.todo-view-content div,
@@ -1034,10 +1035,19 @@ body {
 [data-theme='dark'] div.todo-view-content ol,
 [data-theme='dark'] div.todo-view-content strong,
 [data-theme='dark'] div.todo-view-content em,
-[data-theme='dark'] div.todo-view-content a,
 [data-theme='dark'] div.todo-view-content code,
 [data-theme='dark'] div.todo-view-content pre {
   color: #000000 !important;
+}
+
+/* 确保链接在深色主题下也显示为蓝色 */
+[data-theme='dark'] .ant-drawer .todo-view-content a {
+  color: #1890ff !important;
+  text-decoration: underline !important;
+}
+
+[data-theme='dark'] .ant-drawer .todo-view-content a:hover {
+  color: #40a9ff !important;
 }
 
 /* 修复2：Popover 中的富文本内容预览 */
