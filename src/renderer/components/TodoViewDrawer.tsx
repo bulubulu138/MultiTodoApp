@@ -120,8 +120,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
           color: '#000000',
           borderRadius: 4,
           minHeight: 200,
-          maxHeight: 'calc(100vh - 400px)',
-          overflowY: 'auto'
+          // 移除 maxHeight 和 overflowY，让内容完整展示
         }}
         onClick={(e) => {
           const target = e.target as HTMLElement;

@@ -586,8 +586,9 @@ body {
 .ant-drawer .todo-view-content img {
   max-width: 100%;
   height: auto;
+  display: block;
   border-radius: 4px;
-  margin: 4px 0;
+  margin: 8px 0;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
 }
