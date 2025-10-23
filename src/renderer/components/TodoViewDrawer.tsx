@@ -115,12 +115,12 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
         className="todo-view-content"
         style={{
           marginTop: 8,
-          padding: 12,
+          padding: 16,
           backgroundColor: colors.contentBg,
           color: '#000000',
           borderRadius: 4,
-          minHeight: 100,
-          maxHeight: 600,
+          minHeight: 200,
+          maxHeight: 'calc(100vh - 400px)',
           overflowY: 'auto'
         }}
         onClick={(e) => {
@@ -218,7 +218,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
         </Space>
       }
       placement="right"
-      width={showRelationContext ? 1000 : 600}
+      width={showRelationContext ? 1200 : 800}
       onClose={onClose}
       open={visible}
       footer={
@@ -351,6 +351,17 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
           visible: previewOpen,
           src: previewImage,
           onVisibleChange: (visible) => setPreviewOpen(visible),
+          toolbarRender: (_, { actions }) => (
+            <Space size={12} className="toolbar-wrapper">
+              {actions.onRotateLeft}
+              {actions.onRotateRight}
+              {actions.onFlipX}
+              {actions.onFlipY}
+              {actions.onZoomIn}
+              {actions.onZoomOut}
+              {actions.onReset}
+            </Space>
+          ),
         }}
       />
     </Drawer>

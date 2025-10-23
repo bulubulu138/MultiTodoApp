@@ -260,18 +260,22 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     const validTodos = todos.filter(todo => todo && todo.id);
     const filtered = activeTab === 'all' ? validTodos : validTodos.filter(todo => todo.status === activeTab);
     
-    // 分离逾期和非逾期待办
+    // 分为三组：逾期、活跃（待办和进行中）、已完成
     const now = dayjs();
     const overdueTodos: Todo[] = [];
-    const normalTodos: Todo[] = [];
+    const activeTodos: Todo[] = [];
+    const completedTodos: Todo[] = [];
     
     filtered.forEach(todo => {
-      if (todo.deadline && 
-          todo.status !== 'completed' && 
-          dayjs(todo.deadline).isBefore(now)) {
+      if (todo.status === 'completed') {
+        // 已完成的事项单独分组
+        completedTodos.push(todo);
+      } else if (todo.deadline && dayjs(todo.deadline).isBefore(now)) {
+        // 逾期的事项（未完成且已过期）
         overdueTodos.push(todo);
       } else {
-        normalTodos.push(todo);
+        // 活跃的事项（待办、进行中、暂停等）
+        activeTodos.push(todo);
       }
     });
     
@@ -282,7 +286,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       return aDeadline.diff(bDeadline);  // 升序，越早的越靠前
     });
     
-    // 根据排序选项对非逾期待办排序
+    // 根据排序选项对活跃和已完成待办排序
     const sortTodos = (todosToSort: Todo[]) => {
       const [field, order] = sortOption.split('-') as [string, 'asc' | 'desc'];
       
@@ -313,10 +317,11 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       });
     };
     
-    const sortedNormalTodos = sortTodos(normalTodos);
+    const sortedActiveTodos = sortTodos(activeTodos);
+    const sortedCompletedTodos = sortTodos(completedTodos);
     
-    // 合并：逾期在前
-    return [...overdueTodos, ...sortedNormalTodos];
+    // 合并：逾期 > 活跃 > 已完成（沉底）
+    return [...overdueTodos, ...sortedActiveTodos, ...sortedCompletedTodos];
   }, [todos, activeTab, sortOption]);
 
   // Tab配置

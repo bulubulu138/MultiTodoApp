@@ -244,10 +244,17 @@ const RelationContext: React.FC<RelationContextProps> = ({
 
     relations.forEach(rel => {
       if (rel.relation_type === 'parallel') {
-        const parallelId = rel.source_id === currentTodo.id ? rel.target_id : rel.source_id;
-        const parallelTodo = allTodos.find(t => t && t.id === parallelId);
-        if (parallelTodo && parallelTodo.id !== currentTodo.id) {
-          result.push(parallelTodo);
+        // ✅ 必须确保当前 todo 参与了这个并列关系
+        if (rel.source_id === currentTodo.id) {
+          const parallelTodo = allTodos.find(t => t && t.id === rel.target_id);
+          if (parallelTodo) {
+            result.push(parallelTodo);
+          }
+        } else if (rel.target_id === currentTodo.id) {
+          const parallelTodo = allTodos.find(t => t && t.id === rel.source_id);
+          if (parallelTodo) {
+            result.push(parallelTodo);
+          }
         }
       }
     });
