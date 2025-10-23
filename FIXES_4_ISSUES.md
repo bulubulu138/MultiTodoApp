@@ -281,7 +281,7 @@ return [...overdueTodos, ...sortedActiveTodos, ...sortedCompletedTodos];
 
 ### 修复方案
 
-添加自定义工具栏，确保所有操作按钮可见：
+使用 Ant Design 默认工具栏（已包含所有功能）：
 
 ```tsx
 <Image
@@ -290,20 +290,12 @@ return [...overdueTodos, ...sortedActiveTodos, ...sortedCompletedTodos];
     visible: previewOpen,
     src: previewImage,
     onVisibleChange: setPreviewOpen,
-    toolbarRender: (_, { actions }) => (
-      <Space size={12} className="toolbar-wrapper">
-        {actions.onRotateLeft}
-        {actions.onRotateRight}
-        {actions.onFlipX}
-        {actions.onFlipY}
-        {actions.onZoomIn}
-        {actions.onZoomOut}
-        {actions.onReset}
-      </Space>
-    ),
+    // ✅ 使用默认工具栏，包含所有操作
   }}
 />
 ```
+
+**注意**: 初始尝试添加自定义工具栏导致 TypeScript 编译错误，因此改用默认工具栏。
 
 ### 复制图片方法
 
