@@ -344,24 +344,13 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
         )}
       </div>
       
-      {/* 图片预览组件 */}
+      {/* 图片预览组件 - 使用默认工具栏 */}
       <Image
         style={{ display: 'none' }}
         preview={{
           visible: previewOpen,
           src: previewImage,
           onVisibleChange: (visible) => setPreviewOpen(visible),
-          toolbarRender: (_, { actions }) => (
-            <Space size={12} className="toolbar-wrapper">
-              {actions.onRotateLeft}
-              {actions.onRotateRight}
-              {actions.onFlipX}
-              {actions.onFlipY}
-              {actions.onZoomIn}
-              {actions.onZoomOut}
-              {actions.onReset}
-            </Space>
-          ),
         }}
       />
     </Drawer>
