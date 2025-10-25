@@ -167,6 +167,10 @@ class Application {
       return await this.dbManager.findDuplicateTodo(contentHash, excludeId);
     });
 
+    ipcMain.handle('todo:batchUpdateDisplayOrder', async (_, updates: {id: number, displayOrder: number}[]) => {
+      return await this.dbManager.batchUpdateDisplayOrder(updates);
+    });
+
     // 设置相关
     ipcMain.handle('settings:get', async () => {
       return await this.dbManager.getSettings();

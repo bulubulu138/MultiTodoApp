@@ -29,25 +29,68 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState('');
 
+  // 转换为PNG格式
+  const convertToPng = async (blob: Blob): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0);
+        canvas.toBlob((pngBlob) => {
+          if (pngBlob) {
+            resolve(pngBlob);
+          } else {
+            reject(new Error('转换失败'));
+          }
+        }, 'image/png');
+      };
+      img.onerror = reject;
+      img.src = URL.createObjectURL(blob);
+    });
+  };
+
   // 复制图片到剪贴板
   const copyImageToClipboard = async (imageUrl: string) => {
     try {
-      // 方案1: 尝试使用 Clipboard API 复制图片
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
+      let blob: Blob;
+      
+      // 处理不同类型的图片URL
+      if (imageUrl.startsWith('data:')) {
+        // Base64 图片
+        const response = await fetch(imageUrl);
+        blob = await response.blob();
+      } else if (imageUrl.startsWith('file://')) {
+        // 本地文件，转换为可访问的格式
+        const response = await fetch(imageUrl);
+        blob = await response.blob();
+      } else {
+        // HTTP URL
+        const response = await fetch(imageUrl, { mode: 'no-cors' });
+        blob = await response.blob();
+      }
+      
+      // 确保是支持的图片格式
+      const supportedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/jpg'];
+      let finalBlob = blob;
+      
+      // 如果不是支持的格式或类型为空，转换为PNG
+      if (!blob.type || !supportedTypes.includes(blob.type)) {
+        console.log('Converting image to PNG format...');
+        finalBlob = await convertToPng(blob);
+      }
+      
+      // 复制到剪贴板
       await navigator.clipboard.write([
-        new ClipboardItem({ [blob.type]: blob })
+        new ClipboardItem({ [finalBlob.type]: finalBlob })
       ]);
+      
       message.success('图片已复制到剪贴板');
     } catch (error) {
-      // 方案2: 降级到复制图片URL
-      try {
-        await navigator.clipboard.writeText(imageUrl);
-        message.info('图片URL已复制到剪贴板');
-      } catch (err) {
-        message.error('复制失败');
-        console.error('Error copying image:', error);
-      }
+      console.error('复制图片失败:', error);
+      message.error('复制图片失败，请重试');
     }
   };
   

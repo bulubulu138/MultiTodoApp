@@ -186,13 +186,36 @@ const TodoList: React.FC<TodoListProps> = ({
       return;
     }
 
-    if (!onUpdateDisplayOrder) return;
+    if (!onUpdateDisplayOrder || newOrder === null) return;
 
     // 添加到保存中状态
     setSavingOrder(prev => new Set(prev).add(todoId));
 
     try {
+      // 1. 获取所有有序号的待办（包括allTodos，因为可能跨tab）
+      const allTodosWithOrder = (allTodos || todos).filter(t => t.displayOrder != null);
+      
+      // 2. 找出需要调整的待办（序号 >= newOrder 且不是当前待办）
+      const toAdjust = allTodosWithOrder.filter(t => 
+        t.id !== todoId && 
+        t.displayOrder! >= newOrder
+      );
+      
+      // 3. 如果有需要调整的待办，批量更新
+      if (toAdjust.length > 0) {
+        const updates = toAdjust.map(t => ({
+          id: t.id!,
+          displayOrder: t.displayOrder! + 1
+        }));
+        
+        // 批量更新受影响的待办
+        await window.electronAPI.todo.batchUpdateDisplayOrder(updates);
+        message.success(`已自动调整 ${toAdjust.length} 个待办的序号`);
+      }
+      
+      // 4. 设置当前待办的序号
       await onUpdateDisplayOrder(todoId, newOrder);
+      
       // 清除编辑状态
       setEditingOrder(prev => {
         const next = { ...prev };

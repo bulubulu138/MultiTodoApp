@@ -257,6 +257,25 @@ export class DatabaseManager {
     });
   }
 
+  // 批量更新显示序号
+  public batchUpdateDisplayOrder(updates: {id: number, displayOrder: number}[]): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        const stmt = this.db!.prepare('UPDATE todos SET displayOrder = ?, updatedAt = ? WHERE id = ?');
+        const transaction = this.db!.transaction(() => {
+          const now = new Date().toISOString();
+          for (const update of updates) {
+            stmt.run(update.displayOrder, now, update.id);
+          }
+        });
+        transaction();
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
   public deleteTodo(id: number): Promise<void> {
     return new Promise((resolve, reject) => {
       try {

@@ -10,6 +10,7 @@ export interface ElectronAPI {
     delete: (id: number) => Promise<boolean>;
     generateHash: (title: string, content: string) => Promise<string>;
     findDuplicate: (contentHash: string, excludeId?: number) => Promise<any | null>;
+    batchUpdateDisplayOrder: (updates: {id: number, displayOrder: number}[]) => Promise<void>;
   };
   
   // 设置API
@@ -58,6 +59,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     delete: (id: number) => ipcRenderer.invoke('todo:delete', id),
     generateHash: (title: string, content: string) => ipcRenderer.invoke('todo:generateHash', title, content),
     findDuplicate: (contentHash: string, excludeId?: number) => ipcRenderer.invoke('todo:findDuplicate', contentHash, excludeId),
+    batchUpdateDisplayOrder: (updates: {id: number, displayOrder: number}[]) => ipcRenderer.invoke('todo:batchUpdateDisplayOrder', updates),
   },
   settings: {
     get: (key?: string) => ipcRenderer.invoke(key === 'dbPath' ? 'settings:getDbPath' : 'settings:get'),

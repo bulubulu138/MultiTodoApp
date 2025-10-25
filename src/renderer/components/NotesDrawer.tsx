@@ -16,7 +16,6 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({ visible, onClose }) => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editingTitle, setEditingTitle] = useState('');
   const [editingContent, setEditingContent] = useState('');
   const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null);
 
@@ -57,7 +56,6 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({ visible, onClose }) => {
       });
       setNotes([newNote, ...notes]);
       setEditingId(newNote.id!);
-      setEditingTitle(newNote.title);
       setEditingContent(newNote.content);
       message.success('心得创建成功');
     } catch (error) {
@@ -66,18 +64,18 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({ visible, onClose }) => {
     }
   };
 
-  const autoSave = useCallback((id: number, title: string, content: string) => {
+  const autoSave = useCallback((id: number, content: string) => {
     if (saveTimeout) {
       clearTimeout(saveTimeout);
     }
 
     const timeout = setTimeout(async () => {
       try {
-        // 如果标题为空，自动从内容生成
-        const finalTitle = title.trim() || extractTitleFromContent(content);
-        await window.electronAPI.notes.update(id, { title: finalTitle, content });
+        // 自动从内容生成标题
+        const title = extractTitleFromContent(content);
+        await window.electronAPI.notes.update(id, { title, content });
         setNotes(prev => prev.map(n => 
-          n.id === id ? { ...n, title: finalTitle, content, updatedAt: new Date().toISOString() } : n
+          n.id === id ? { ...n, title, content, updatedAt: new Date().toISOString() } : n
         ));
         message.success('自动保存成功', 1);
       } catch (error) {
@@ -89,14 +87,9 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({ visible, onClose }) => {
     setSaveTimeout(timeout);
   }, [saveTimeout]);
 
-  const handleTitleChange = (id: number, title: string) => {
-    setEditingTitle(title);
-    autoSave(id, title, editingContent);
-  };
-
   const handleContentChange = (id: number, content: string) => {
     setEditingContent(content);
-    autoSave(id, editingTitle, content);
+    autoSave(id, content);
   };
 
   const handleDelete = async (id: number) => {
@@ -115,7 +108,6 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({ visible, onClose }) => {
 
   const startEditing = (note: Note) => {
     setEditingId(note.id!);
-    setEditingTitle(note.title);
     setEditingContent(note.content);
   };
 
@@ -126,10 +118,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({ visible, onClose }) => {
       temp.innerHTML = note.content;
       const plainText = (temp.textContent || temp.innerText || '').trim();
       
-      const copyText = `标题：${note.title}
-
-内容：
-${plainText}
+      const copyText = `${plainText}
 
 创建时间：${new Date(note.createdAt).toLocaleString()}
 更新时间：${new Date(note.updatedAt).toLocaleString()}`;
@@ -219,13 +208,6 @@ ${plainText}
             >
               {editingId === note.id ? (
                 <div onClick={(e) => e.stopPropagation()}>
-                  <Input
-                    value={editingTitle}
-                    onChange={(e) => handleTitleChange(note.id!, e.target.value)}
-                    placeholder="标题（留空自动从内容生成）"
-                    style={{ marginBottom: 8, fontWeight: 'bold' }}
-                    size="large"
-                  />
                   <RichTextEditor
                     value={editingContent}
                     onChange={(content) => handleContentChange(note.id!, content)}
@@ -237,9 +219,6 @@ ${plainText}
                 </div>
               ) : (
                 <>
-                  <Title level={5} style={{ marginTop: 0, marginBottom: 8 }}>
-                    {note.title}
-                  </Title>
                   <div
                     style={{ 
                       maxHeight: 200, 
