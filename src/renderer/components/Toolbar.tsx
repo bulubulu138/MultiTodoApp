@@ -10,7 +10,8 @@ export type SortOption =
   | 'startTime-desc' 
   | 'startTime-asc' 
   | 'deadline-desc' 
-  | 'deadline-asc';
+  | 'deadline-asc'
+  | 'manual';
 
 interface ToolbarProps {
   onAddTodo: () => void;
@@ -46,6 +47,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           style={{ width: 180 }}
           suffixIcon={<SortAscendingOutlined />}
         >
+          <Option value="manual">手动排序</Option>
           <Option value="createdAt-desc">创建时间 ↓ 新→旧</Option>
           <Option value="createdAt-asc">创建时间 ↑ 旧→新</Option>
           <Option value="startTime-desc">开始时间 ↓ 晚→早</Option>

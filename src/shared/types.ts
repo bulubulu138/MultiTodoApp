@@ -12,6 +12,7 @@ export interface Todo {
   images?: string; // JSON string of image array
   startTime?: string; // 预计开始时间
   deadline?: string;  // 截止时间
+  displayOrder?: number; // 手动排序序号
   createdAt: string;
   updatedAt: string;
 }

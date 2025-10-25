@@ -260,7 +260,27 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     const validTodos = todos.filter(todo => todo && todo.id);
     const filtered = activeTab === 'all' ? validTodos : validTodos.filter(todo => todo.status === activeTab);
     
-    // 分为三组：逾期、活跃（待办和进行中）、已完成
+    // 手动排序模式
+    if (sortOption === 'manual') {
+      // 分为有序号和无序号两组
+      const withOrder = filtered.filter(todo => todo.displayOrder != null);
+      const withoutOrder = filtered.filter(todo => todo.displayOrder == null);
+      
+      // 有序号的按序号升序排序
+      withOrder.sort((a, b) => a.displayOrder! - b.displayOrder!);
+      
+      // 无序号的按创建时间降序排序
+      withoutOrder.sort((a, b) => {
+        const aTime = new Date(a.createdAt).getTime();
+        const bTime = new Date(b.createdAt).getTime();
+        return bTime - aTime;
+      });
+      
+      // 合并：有序号的在前，无序号的在后
+      return [...withOrder, ...withoutOrder];
+    }
+    
+    // 其他排序模式：分为三组：逾期、活跃（待办和进行中）、已完成
     const now = dayjs();
     const overdueTodos: Todo[] = [];
     const activeTodos: Todo[] = [];

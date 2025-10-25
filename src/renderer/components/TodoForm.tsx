@@ -1,6 +1,6 @@
 import { Todo, TodoRelation } from '../../shared/types';
 import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, Form, Input, Select, Button, App, Tag, Space, Switch, DatePicker } from 'antd';
+import { Modal, Form, Input, Select, Button, App, Tag, Space, Switch, DatePicker, InputNumber } from 'antd';
 import { PlusOutlined, EditOutlined, FileTextOutlined, CopyOutlined } from '@ant-design/icons';
 import RichTextEditor from './RichTextEditor';
 import PlainTextFallback from './PlainTextFallback';
@@ -67,6 +67,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
           priority: todo.priority,
           startTime: todo.startTime ? dayjs(todo.startTime) : undefined,
           deadline: todo.deadline ? dayjs(todo.deadline) : undefined,
+          displayOrder: todo.displayOrder,
         });
         
         // 设置富文本内容
@@ -145,6 +146,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
         priority: values.priority || 'medium',
         tags: tags.join(','),
         images: '', // 图片现在嵌入在富文本中
+        displayOrder: values.displayOrder,
       };
 
       onSubmit(todoData);
@@ -295,6 +297,18 @@ const TodoForm: React.FC<TodoFormProps> = ({
             <Option value="completed">已完成</Option>
             <Option value="paused">暂停</Option>
           </Select>
+        </Form.Item>
+
+        <Form.Item
+          name="displayOrder"
+          label="显示序号"
+          tooltip="用于手动排序，数字越小越靠前。留空则按默认规则排序"
+        >
+          <InputNumber 
+            min={0} 
+            placeholder="可选，用于手动排序" 
+            style={{ width: '100%' }}
+          />
         </Form.Item>
 
         <Form.Item

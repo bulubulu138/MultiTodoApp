@@ -94,6 +94,7 @@ export class DatabaseManager {
       
       const hasStartTime = tableInfo.some((col: any) => col.name === 'startTime');
       const hasDeadline = tableInfo.some((col: any) => col.name === 'deadline');
+      const hasDisplayOrder = tableInfo.some((col: any) => col.name === 'displayOrder');
       
       if (!hasStartTime) {
         console.log('Adding startTime column to todos table...');
@@ -107,6 +108,12 @@ export class DatabaseManager {
         console.log('Adding deadline column to todos table...');
         this.db!.prepare('ALTER TABLE todos ADD COLUMN deadline TEXT').run();
         console.log('deadline column added successfully');
+      }
+      
+      if (!hasDisplayOrder) {
+        console.log('Adding displayOrder column to todos table...');
+        this.db!.prepare('ALTER TABLE todos ADD COLUMN displayOrder INTEGER').run();
+        console.log('displayOrder column added successfully');
       }
       
       console.log('Todos table migration completed');
@@ -144,8 +151,8 @@ export class DatabaseManager {
       try {
         const now = new Date().toISOString();
         const stmt = this.db!.prepare(
-          `INSERT INTO todos (title, content, status, priority, tags, imageUrl, images, startTime, deadline, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO todos (title, content, status, priority, tags, imageUrl, images, startTime, deadline, displayOrder, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         );
         
         const result = stmt.run(
@@ -158,6 +165,7 @@ export class DatabaseManager {
           todo.images || '',
           todo.startTime || null,
           todo.deadline || null,
+          todo.displayOrder !== undefined ? todo.displayOrder : null,
           now,
           now
         );
@@ -207,6 +215,7 @@ export class DatabaseManager {
         if (updates.images !== undefined) { fields.push('images = ?'); values.push(updates.images); }
         if (updates.startTime !== undefined) { fields.push('startTime = ?'); values.push(updates.startTime); }
         if (updates.deadline !== undefined) { fields.push('deadline = ?'); values.push(updates.deadline); }
+        if (updates.displayOrder !== undefined) { fields.push('displayOrder = ?'); values.push(updates.displayOrder); }
 
         fields.push('updatedAt = ?');
         values.push(new Date().toISOString());
@@ -462,6 +471,7 @@ export class DatabaseManager {
       images: row.images || '',
       startTime: row.startTime,
       deadline: row.deadline,
+      displayOrder: row.displayOrder !== null ? row.displayOrder : undefined,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt
     };
