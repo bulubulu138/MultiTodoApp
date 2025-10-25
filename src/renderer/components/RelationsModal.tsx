@@ -106,6 +106,31 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
         relation_type: relationType
       });
 
+      // 如果是并列关系，自动同步displayOrder
+      if (relationType === 'parallel') {
+        const sourceTodo = todos.find(t => t.id === sourceId);
+        const targetTodoItem = todos.find(t => t.id === targetId);
+        
+        if (sourceTodo && targetTodoItem) {
+          // 使用较小的displayOrder，或者如果都没有则使用较小的ID
+          const syncOrder = sourceTodo.displayOrder ?? targetTodoItem.displayOrder ?? Math.min(sourceId, targetId);
+          
+          // 更新两个待办的displayOrder
+          const updates: Promise<void>[] = [];
+          if (sourceTodo.displayOrder !== syncOrder) {
+            updates.push(window.electronAPI.todo.update(sourceId, { displayOrder: syncOrder }));
+          }
+          if (targetTodoItem.displayOrder !== syncOrder) {
+            updates.push(window.electronAPI.todo.update(targetId, { displayOrder: syncOrder }));
+          }
+          
+          if (updates.length > 0) {
+            await Promise.all(updates);
+            message.info(`已自动同步并列待办的显示序号为 ${syncOrder}`);
+          }
+        }
+      }
+
       // 重新加载关系列表
       await loadRelations();
       await onRelationsChange?.(); // Refresh global relations state

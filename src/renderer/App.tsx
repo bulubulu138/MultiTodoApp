@@ -284,6 +284,95 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     }
   };
 
+  // 批量同步并列关系的displayOrder
+  const handleSyncParallelGroups = async () => {
+    try {
+      const parallelRelations = relations.filter(r => r.relation_type === 'parallel');
+      
+      if (parallelRelations.length === 0) {
+        message.info('没有找到并列关系');
+        return;
+      }
+
+      // 按关系分组 - 使用图算法找出所有连通分量
+      const graph = new Map<number, Set<number>>();
+      parallelRelations.forEach(r => {
+        if (!graph.has(r.source_id)) graph.set(r.source_id, new Set());
+        if (!graph.has(r.target_id)) graph.set(r.target_id, new Set());
+        graph.get(r.source_id)!.add(r.target_id);
+        graph.get(r.target_id)!.add(r.source_id);
+      });
+
+      // DFS找出所有连通分量
+      const visited = new Set<number>();
+      const groups: Set<number>[] = [];
+
+      const dfs = (nodeId: number, currentGroup: Set<number>) => {
+        visited.add(nodeId);
+        currentGroup.add(nodeId);
+        const neighbors = graph.get(nodeId);
+        if (neighbors) {
+          neighbors.forEach(neighbor => {
+            if (!visited.has(neighbor)) {
+              dfs(neighbor, currentGroup);
+            }
+          });
+        }
+      };
+
+      graph.forEach((_, nodeId) => {
+        if (!visited.has(nodeId)) {
+          const group = new Set<number>();
+          dfs(nodeId, group);
+          groups.push(group);
+        }
+      });
+
+      // 为每组设置相同的displayOrder
+      let updatedCount = 0;
+      for (const todoIds of groups) {
+        const groupTodos = Array.from(todoIds)
+          .map(id => todos.find(t => t.id === id))
+          .filter((t): t is Todo => t !== undefined);
+        
+        if (groupTodos.length === 0) continue;
+
+        // 使用组内最小的displayOrder，如果都没有则使用最小的ID
+        const existingOrders = groupTodos
+          .map(t => t.displayOrder)
+          .filter((o): o is number => o !== undefined && o !== null);
+        
+        const syncOrder = existingOrders.length > 0 
+          ? Math.min(...existingOrders)
+          : Math.min(...Array.from(todoIds));
+
+        // 批量更新
+        const updates = groupTodos
+          .filter(t => t.displayOrder !== syncOrder)
+          .map(t => ({
+            id: t.id!,
+            displayOrder: syncOrder
+          }));
+
+        if (updates.length > 0) {
+          await window.electronAPI.todo.batchUpdateDisplayOrder(updates);
+          updatedCount += updates.length;
+        }
+      }
+
+      await loadTodos();
+      
+      if (updatedCount > 0) {
+        message.success(`已同步 ${groups.length} 个并列分组，更新了 ${updatedCount} 个待办的显示序号`);
+      } else {
+        message.info('所有并列待办的显示序号已经同步，无需更新');
+      }
+    } catch (error) {
+      message.error('同步并列分组失败');
+      console.error('Error syncing parallel groups:', error);
+    }
+  };
+
   // 获取所有现有标签
   const existingTags = useMemo(() => {
     const tagsSet = new Set<string>();
@@ -499,6 +588,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         onShowNotes={() => setShowNotes(true)}
         onShowCalendar={() => setShowCalendar(true)}
         onShowCustomTabManager={() => setShowCustomTabManager(true)}
+        onSyncParallelGroups={handleSyncParallelGroups}
         sortOption={sortOption}
         onSortChange={handleSortChange}
       />
