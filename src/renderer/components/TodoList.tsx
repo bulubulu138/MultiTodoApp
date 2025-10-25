@@ -282,20 +282,58 @@ const TodoList: React.FC<TodoListProps> = ({
           (nextTodo && nextTodo.displayOrder === todo.displayOrder)
         );
         
+        // 调试日志
+        if (isInGroup) {
+          console.log(`Todo ${todo.id} (order=${todo.displayOrder}): isGroupStart=${isGroupStart}, isGroupEnd=${isGroupEnd}`);
+        }
+        
         return (
-          <List.Item key={todo.id} style={{ marginBottom: isGroupEnd && isInGroup ? 16 : 6 }}>
-            <div style={{ 
-              display: 'flex', 
-              gap: 8, 
-              width: '100%', 
-              alignItems: 'flex-start',
+          <List.Item 
+            key={todo.id} 
+            style={{ 
+              marginBottom: isGroupEnd && isInGroup ? 16 : 6,
+              padding: 0
+            }}
+          >
+            {/* 分组容器 */}
+            <div style={{
+              width: '100%',
               borderTop: isGroupStart && isInGroup ? '2px dashed #fa8c16' : undefined,
               borderBottom: isGroupEnd && isInGroup ? '2px dashed #fa8c16' : undefined,
-              paddingTop: isGroupStart && isInGroup ? 8 : 0,
-              paddingBottom: isGroupEnd && isInGroup ? 8 : 0,
-              backgroundColor: isInGroup ? 'rgba(250, 140, 22, 0.05)' : undefined,
-              borderRadius: isInGroup ? 4 : undefined,
+              borderLeft: isInGroup ? '3px solid #fa8c16' : undefined,
+              borderRight: isInGroup ? '3px solid rgba(250, 140, 22, 0.3)' : undefined,
+              paddingTop: isGroupStart && isInGroup ? 12 : 0,
+              paddingBottom: isGroupEnd && isInGroup ? 12 : 0,
+              paddingLeft: isInGroup ? 12 : 0,
+              paddingRight: isInGroup ? 12 : 0,
+              backgroundColor: isInGroup ? 'rgba(250, 140, 22, 0.08)' : undefined,
+              borderRadius: isInGroup ? 6 : undefined,
+              position: 'relative',
             }}>
+              {/* 分组标签 */}
+              {isGroupStart && isInGroup && (
+                <div style={{
+                  position: 'absolute',
+                  top: -10,
+                  left: 12,
+                  backgroundColor: '#fa8c16',
+                  color: 'white',
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                  fontSize: 11,
+                  fontWeight: 'bold',
+                }}>
+                  分组 #{todo.displayOrder}
+                </div>
+              )}
+              
+              {/* 原有内容 */}
+              <div style={{ 
+                display: 'flex', 
+                gap: 8, 
+                width: '100%', 
+                alignItems: 'flex-start'
+              }}>
               {/* 序号输入框（仅手动排序模式显示） */}
               {sortOption === 'manual' && (
                 <Tooltip title="输入序号后按回车或点击其他地方保存">
@@ -530,7 +568,10 @@ const TodoList: React.FC<TodoListProps> = ({
               </div>
             )}
             </Card>
+              </div>
+              {/* 关闭内容div */}
             </div>
+            {/* 关闭分组容器div */}
           </List.Item>
         );
       }}
