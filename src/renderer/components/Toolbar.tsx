@@ -1,6 +1,6 @@
 import React from 'react';
-import { Button, Space, Select, Tooltip } from 'antd';
-import { PlusOutlined, SettingOutlined, ExportOutlined, SearchOutlined, BulbOutlined, CalendarOutlined, SortAscendingOutlined, TagsOutlined, SyncOutlined } from '@ant-design/icons';
+import { Button, Space, Select } from 'antd';
+import { PlusOutlined, SettingOutlined, ExportOutlined, SearchOutlined, BulbOutlined, CalendarOutlined, SortAscendingOutlined, TagsOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
@@ -23,7 +23,6 @@ interface ToolbarProps {
   onShowNotes: () => void;
   onShowCalendar: () => void;
   onShowCustomTabManager: () => void;
-  onSyncParallelGroups?: () => void;
   sortOption?: SortOption;
   onSortChange?: (option: SortOption) => void;
 }
@@ -36,7 +35,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onShowCustomTabManager,
   onShowNotes,
   onShowCalendar,
-  onSyncParallelGroups,
   sortOption = 'createdAt-desc',
   onSortChange
 }) => {
@@ -98,17 +96,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
         >
           管理Tab
         </Button>
-        
-        {onSyncParallelGroups && (
-          <Tooltip title="一键同步所有并列待办的显示序号">
-            <Button
-              icon={<SyncOutlined />}
-              onClick={onSyncParallelGroups}
-            >
-              同步分组
-            </Button>
-          </Tooltip>
-        )}
         
         <Button
           type="primary"

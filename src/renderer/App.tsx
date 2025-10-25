@@ -162,6 +162,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     try {
       const allRelations = await window.electronAPI.relations.getAll();
       setRelations(allRelations);
+      
+      // 自动同步并列关系的displayOrder（静默执行）
+      await syncParallelGroupsSilently();
     } catch (error) {
       console.error('Error loading relations:', error);
       message.error('加载关系失败');
@@ -284,14 +287,13 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     }
   };
 
-  // 批量同步并列关系的displayOrder
-  const handleSyncParallelGroups = async () => {
+  // 静默同步并列关系的displayOrder（不显示提示信息）
+  const syncParallelGroupsSilently = async () => {
     try {
       const parallelRelations = relations.filter(r => r.relation_type === 'parallel');
       
       if (parallelRelations.length === 0) {
-        message.info('没有找到并列关系');
-        return;
+        return; // 静默返回
       }
 
       // 按关系分组 - 使用图算法找出所有连通分量
@@ -329,7 +331,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       });
 
       // 为每组设置相同的displayOrder
-      let updatedCount = 0;
       for (const todoIds of groups) {
         const groupTodos = Array.from(todoIds)
           .map(id => todos.find(t => t.id === id))
@@ -356,20 +357,13 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
 
         if (updates.length > 0) {
           await window.electronAPI.todo.batchUpdateDisplayOrder(updates);
-          updatedCount += updates.length;
         }
       }
 
       await loadTodos();
-      
-      if (updatedCount > 0) {
-        message.success(`已同步 ${groups.length} 个并列分组，更新了 ${updatedCount} 个待办的显示序号`);
-      } else {
-        message.info('所有并列待办的显示序号已经同步，无需更新');
-      }
     } catch (error) {
-      message.error('同步并列分组失败');
-      console.error('Error syncing parallel groups:', error);
+      console.error('Error syncing parallel groups silently:', error);
+      // 静默失败，不打扰用户
     }
   };
 
@@ -588,7 +582,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         onShowNotes={() => setShowNotes(true)}
         onShowCalendar={() => setShowCalendar(true)}
         onShowCustomTabManager={() => setShowCustomTabManager(true)}
-        onSyncParallelGroups={handleSyncParallelGroups}
         sortOption={sortOption}
         onSortChange={handleSortChange}
       />

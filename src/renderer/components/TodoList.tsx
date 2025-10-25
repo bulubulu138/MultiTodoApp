@@ -213,7 +213,25 @@ const TodoList: React.FC<TodoListProps> = ({
         message.success(`已自动调整 ${toAdjust.length} 个待办的序号`);
       }
       
-      // 4. 设置当前待办的序号
+      // 4. 检查是否是分组的第一个待办，如果是则同步整组
+      const currentTodo = (allTodos || todos).find(t => t.id === todoId);
+      if (currentTodo && currentValue !== undefined) {
+        // 找出同组的其他待办（具有相同的旧displayOrder）
+        const groupTodos = (allTodos || todos).filter(t => 
+          t.displayOrder === currentValue && t.id !== todoId
+        );
+        
+        if (groupTodos.length > 0) {
+          // 批量更新同组待办到新的displayOrder
+          const groupUpdates = groupTodos.map(t => ({
+            id: t.id!,
+            displayOrder: newOrder
+          }));
+          await window.electronAPI.todo.batchUpdateDisplayOrder(groupUpdates);
+        }
+      }
+      
+      // 5. 设置当前待办的序号
       await onUpdateDisplayOrder(todoId, newOrder);
       
       // 清除编辑状态
@@ -336,7 +354,11 @@ const TodoList: React.FC<TodoListProps> = ({
               }}>
               {/* 序号输入框（仅手动排序模式显示） */}
               {sortOption === 'manual' && (
-                <Tooltip title="输入序号后按回车或点击其他地方保存">
+                <Tooltip title={
+                  isInGroup && !isGroupStart 
+                    ? "分组内待办的序号由第一个待办统一控制" 
+                    : "输入序号后按回车或点击其他地方保存"
+                }>
                   <InputNumber
                     size="small"
                     min={0}
@@ -346,11 +368,12 @@ const TodoList: React.FC<TodoListProps> = ({
                     onPressEnter={(e) => {
                       e.currentTarget.blur();
                     }}
-                    disabled={savingOrder.has(todo.id!)}
+                    disabled={savingOrder.has(todo.id!) || (isInGroup && !isGroupStart)}
                     placeholder="序号"
                     style={{ 
                       width: 70,
-                      flexShrink: 0
+                      flexShrink: 0,
+                      opacity: (isInGroup && !isGroupStart) ? 0.5 : 1
                     }}
                   />
                 </Tooltip>
