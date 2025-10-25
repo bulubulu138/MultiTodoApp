@@ -32,7 +32,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   // 转换为PNG格式
   const convertToPng = async (blob: Blob): Promise<Blob> => {
     return new Promise((resolve, reject) => {
-      const img = new Image();
+      const img = document.createElement('img');
       img.onload = () => {
         const canvas = document.createElement('canvas');
         canvas.width = img.width;
