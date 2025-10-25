@@ -264,6 +264,13 @@ const TodoList: React.FC<TodoListProps> = ({
           ? editingOrder[todo.id!] 
           : todo.displayOrder;
         
+        // 检查是否是并列待办
+        const parallelRelations = relations.filter(r => 
+          r.type === 'parallel' && 
+          (r.sourceTodoId === todo.id || r.targetTodoId === todo.id)
+        );
+        const hasParallel = parallelRelations.length > 0;
+        
         return (
           <List.Item key={todo.id} style={{ marginBottom: 6 }}>
             <div style={{ display: 'flex', gap: 8, width: '100%', alignItems: 'flex-start' }}>
@@ -292,7 +299,10 @@ const TodoList: React.FC<TodoListProps> = ({
               {/* 原有卡片 */}
               <Card
                 className="todo-card"
-                style={{ flex: 1 }}
+                style={{ 
+                  flex: 1,
+                  borderLeft: hasParallel ? '4px solid #fa8c16' : undefined
+                }}
                 bodyStyle={{ padding: '8px' }}
                 bordered={false}
               >
@@ -307,6 +317,12 @@ const TodoList: React.FC<TodoListProps> = ({
                 {/* 左侧：标题 + 标签 */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <Space wrap size={4}>
+                    {/* 并列待办标识 */}
+                    {hasParallel && (
+                      <Tag color="orange" style={{ margin: 0 }}>
+                        并列
+                      </Tag>
+                    )}
                     {/* 逾期标识 */}
                     {todo.deadline && 
                      todo.status !== 'completed' && 

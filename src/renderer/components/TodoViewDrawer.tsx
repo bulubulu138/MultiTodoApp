@@ -57,40 +57,43 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
     try {
       let blob: Blob;
       
+      console.log('开始复制图片:', imageUrl);
+      
       // 处理不同类型的图片URL
       if (imageUrl.startsWith('data:')) {
-        // Base64 图片
+        // Base64 图片 - 直接转换
+        console.log('处理 Base64 图片');
         const response = await fetch(imageUrl);
         blob = await response.blob();
-      } else if (imageUrl.startsWith('file://')) {
-        // 本地文件，转换为可访问的格式
-        const response = await fetch(imageUrl);
-        blob = await response.blob();
+      } else if (imageUrl.startsWith('file://') || imageUrl.startsWith('file:')) {
+        // 本地文件 - 使用 Electron 读取
+        console.log('处理本地文件图片');
+        const arrayBuffer = await window.electronAPI.image.readLocalFile(imageUrl);
+        blob = new Blob([arrayBuffer]);
       } else {
-        // HTTP URL
-        const response = await fetch(imageUrl, { mode: 'no-cors' });
+        // HTTP URL - 直接加载（不使用 no-cors）
+        console.log('处理 HTTP 图片');
+        const response = await fetch(imageUrl);
         blob = await response.blob();
       }
       
-      // 确保是支持的图片格式
-      const supportedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/jpg'];
-      let finalBlob = blob;
+      console.log('原始 Blob 类型:', blob.type, '大小:', blob.size);
       
-      // 如果不是支持的格式或类型为空，转换为PNG
-      if (!blob.type || !supportedTypes.includes(blob.type)) {
-        console.log('Converting image to PNG format...');
-        finalBlob = await convertToPng(blob);
-      }
+      // 强制转换为 PNG 格式以确保兼容性
+      console.log('转换为 PNG 格式...');
+      const pngBlob = await convertToPng(blob);
+      console.log('PNG Blob 大小:', pngBlob.size);
       
       // 复制到剪贴板
       await navigator.clipboard.write([
-        new ClipboardItem({ [finalBlob.type]: finalBlob })
+        new ClipboardItem({ 'image/png': pngBlob })
       ]);
       
       message.success('图片已复制到剪贴板');
-    } catch (error) {
-      console.error('复制图片失败:', error);
-      message.error('复制图片失败，请重试');
+      console.log('图片复制成功');
+    } catch (error: any) {
+      console.error('复制图片详细错误:', error);
+      message.error(`复制图片失败: ${error.message || '请重试'}`);
     }
   };
   

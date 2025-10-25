@@ -275,7 +275,7 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
                       cursor: 'pointer',
                       padding: '6px 10px',
                       background: colors.listItemOverdueBg,
-                      color: '#000000',
+                      color: colors.textColor,
                       marginBottom: 6,
                       borderRadius: 4,
                       border: '2px solid #ff4d4f',
@@ -328,7 +328,7 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
                       cursor: 'pointer',
                       padding: '6px 10px',
                       background: colors.listItemBg,
-                      color: '#000000',
+                      color: colors.textColor,
                       marginBottom: 6,
                       borderRadius: 4,
                       border: `1px solid ${colors.borderColor}`,
@@ -342,7 +342,7 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
                         <Tag color={getPriorityColor(todo.priority)}>
                           {getPriorityText(todo.priority)}
                         </Tag>
-                        <Text style={{ color: '#000000' }}>{todo.title}</Text>
+                        <Text style={{ color: colors.textColor }}>{todo.title}</Text>
                       </Space>
                       {todo.startTime && (
                         <Text type="secondary" style={{ fontSize: 12, color: '#666666' }}>
@@ -382,7 +382,7 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
                         cursor: 'pointer',
                         padding: '6px 10px',
                         background: overdueFlag ? colors.listItemOverdueBg : colors.listItemBg,
-                        color: '#000000',
+                        color: colors.textColor,
                         marginBottom: 6,
                         borderRadius: 4,
                         border: overdueFlag ? '1px solid #ff4d4f' : `1px solid ${colors.borderColor}`,

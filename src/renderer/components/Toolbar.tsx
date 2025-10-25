@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, Space, Select } from 'antd';
-import { PlusOutlined, SettingOutlined, ExportOutlined, SearchOutlined, BulbOutlined, CalendarOutlined, SortAscendingOutlined } from '@ant-design/icons';
+import { PlusOutlined, SettingOutlined, ExportOutlined, SearchOutlined, BulbOutlined, CalendarOutlined, SortAscendingOutlined, TagsOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
@@ -22,6 +22,7 @@ interface ToolbarProps {
   onShowSearch: () => void;
   onShowNotes: () => void;
   onShowCalendar: () => void;
+  onShowCustomTabManager: () => void;
   sortOption?: SortOption;
   onSortChange?: (option: SortOption) => void;
 }
@@ -31,6 +32,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onShowSettings,
   onShowExport,
   onShowSearch,
+  onShowCustomTabManager,
   onShowNotes,
   onShowCalendar,
   sortOption = 'createdAt-desc',
@@ -86,6 +88,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
           onClick={onShowCalendar}
         >
           日历
+        </Button>
+        
+        <Button
+          icon={<TagsOutlined />}
+          onClick={onShowCustomTabManager}
+        >
+          管理Tab
         </Button>
         
         <Button

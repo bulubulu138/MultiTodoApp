@@ -1,4 +1,4 @@
-import { Todo, TodoRelation, CalendarViewSize } from '../shared/types';
+import { Todo, TodoRelation, CalendarViewSize, CustomTab } from '../shared/types';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Layout, App as AntApp, Tabs, ConfigProvider, FloatButton } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
@@ -12,6 +12,7 @@ import ExportModal from './components/ExportModal';
 import TodoViewDrawer from './components/TodoViewDrawer';
 import NotesDrawer from './components/NotesDrawer';
 import CalendarDrawer from './components/CalendarDrawer';
+import CustomTabManager from './components/CustomTabManager';
 import { getTheme, ThemeMode } from './theme/themes';
 import dayjs from 'dayjs';
 
@@ -34,12 +35,14 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const [showViewDrawer, setShowViewDrawer] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showCustomTabManager, setShowCustomTabManager] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [viewingTodo, setViewingTodo] = useState<Todo | null>(null);
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<string>('all');
   const [relations, setRelations] = useState<TodoRelation[]>([]);
   const [sortOption, setSortOption] = useState<SortOption>('createdAt-desc');
+  const [customTabs, setCustomTabs] = useState<CustomTab[]>([]);
 
   // 加载数据
   useEffect(() => {
@@ -133,6 +136,16 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       // 加载主题设置
       if (appSettings.theme) {
         onThemeChange(appSettings.theme as ThemeMode);
+      }
+      
+      // 加载自定义Tab
+      if (appSettings.customTabs) {
+        try {
+          const tabs = JSON.parse(appSettings.customTabs);
+          setCustomTabs(tabs);
+        } catch (e) {
+          console.error('Failed to parse customTabs:', e);
+        }
       }
       
       // 加载排序设置
@@ -259,6 +272,34 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     }
   };
 
+  // 保存自定义Tab
+  const handleSaveCustomTabs = async (tabs: CustomTab[]) => {
+    try {
+      await window.electronAPI.settings.update({ customTabs: JSON.stringify(tabs) });
+      setCustomTabs(tabs);
+      await loadSettings();
+    } catch (error) {
+      message.error('保存自定义Tab失败');
+      console.error('Error saving custom tabs:', error);
+    }
+  };
+
+  // 获取所有现有标签
+  const existingTags = useMemo(() => {
+    const tagsSet = new Set<string>();
+    todos.forEach(todo => {
+      if (todo.tags) {
+        todo.tags.split(',').forEach(tag => {
+          const trimmed = tag.trim();
+          if (trimmed) {
+            tagsSet.add(trimmed);
+          }
+        });
+      }
+    });
+    return Array.from(tagsSet).sort();
+  }, [todos]);
+
   // 统计各状态的待办数量
   const statusCounts = useMemo(() => ({
     all: todos.filter(t => t && t.id).length,
@@ -271,7 +312,19 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   // 根据当前Tab过滤待办事项，并应用排序
   const filteredTodos = useMemo(() => {
     const validTodos = todos.filter(todo => todo && todo.id);
-    const filtered = activeTab === 'all' ? validTodos : validTodos.filter(todo => todo.status === activeTab);
+    
+    // 处理自定义标签Tab
+    let filtered: Todo[];
+    if (activeTab.startsWith('tag:')) {
+      const targetTag = activeTab.replace('tag:', '');
+      filtered = validTodos.filter(todo => {
+        if (!todo.tags) return false;
+        const tags = todo.tags.split(',').map(t => t.trim()).filter(Boolean);
+        return tags.includes(targetTag);
+      });
+    } else {
+      filtered = activeTab === 'all' ? validTodos : validTodos.filter(todo => todo.status === activeTab);
+    }
     
     // 手动排序模式
     if (sortOption === 'manual') {
@@ -361,28 +414,49 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   }, [todos, activeTab, sortOption]);
 
   // Tab配置
-  const tabItems = [
-    {
-      key: 'all',
-      label: `全部 (${statusCounts.all})`,
-    },
-    {
-      key: 'pending',
-      label: `待办 (${statusCounts.pending})`,
-    },
-    {
-      key: 'in_progress',
-      label: `进行中 (${statusCounts.in_progress})`,
-    },
-    {
-      key: 'completed',
-      label: `已完成 (${statusCounts.completed})`,
-    },
-    {
-      key: 'paused',
-      label: `已暂停 (${statusCounts.paused})`,
-    },
-  ];
+  const tabItems = useMemo(() => {
+    const defaultTabs = [
+      {
+        key: 'all',
+        label: `全部 (${statusCounts.all})`,
+      },
+      {
+        key: 'pending',
+        label: `待办 (${statusCounts.pending})`,
+      },
+      {
+        key: 'in_progress',
+        label: `进行中 (${statusCounts.in_progress})`,
+      },
+      {
+        key: 'completed',
+        label: `已完成 (${statusCounts.completed})`,
+      },
+      {
+        key: 'paused',
+        label: `已暂停 (${statusCounts.paused})`,
+      },
+    ];
+
+    // 添加自定义标签Tab
+    const customTabItems = customTabs
+      .sort((a, b) => a.order - b.order)
+      .map(tab => {
+        // 计算该标签的待办数量
+        const count = todos.filter(todo => {
+          if (!todo.tags) return false;
+          const tags = todo.tags.split(',').map(t => t.trim()).filter(Boolean);
+          return tags.includes(tab.tag);
+        }).length;
+
+        return {
+          key: `tag:${tab.tag}`,
+          label: `🏷️ ${tab.label} (${count})`,
+        };
+      });
+
+    return [...defaultTabs, ...customTabItems];
+  }, [statusCounts, customTabs, todos]);
 
   return (
     <Layout style={{ height: '100vh' }} data-theme={themeMode}>
@@ -393,6 +467,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         onShowExport={() => setShowExport(true)}
         onShowNotes={() => setShowNotes(true)}
         onShowCalendar={() => setShowCalendar(true)}
+        onShowCustomTabManager={() => setShowCustomTabManager(true)}
         sortOption={sortOption}
         onSortChange={handleSortChange}
       />
@@ -485,6 +560,14 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         onClose={() => setShowCalendar(false)}
         onSelectTodo={handleEditTodo}
         viewSize={(settings.calendarViewSize as CalendarViewSize) || 'compact'}
+      />
+
+      <CustomTabManager
+        visible={showCustomTabManager}
+        onClose={() => setShowCustomTabManager(false)}
+        customTabs={customTabs}
+        onSave={handleSaveCustomTabs}
+        existingTags={existingTags}
       />
 
       {/* 回到顶部按钮 */}

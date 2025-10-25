@@ -202,6 +202,22 @@ class Application {
       return await this.imageManager.deleteImage(filepath);
     });
 
+    ipcMain.handle('image:readLocalFile', async (_, filepath: string) => {
+      const fs = require('fs');
+      // 移除 file:// 前缀并处理 URL 编码
+      let cleanPath = filepath.replace('file://', '').replace('file:', '');
+      // Windows路径处理：移除开头的 /
+      if (process.platform === 'win32' && cleanPath.startsWith('/')) {
+        cleanPath = cleanPath.substring(1);
+      }
+      // 解码URL编码的路径
+      cleanPath = decodeURIComponent(cleanPath);
+      
+      console.log('Reading local file:', cleanPath);
+      const buffer = fs.readFileSync(cleanPath);
+      return buffer.buffer;
+    });
+
     // 关系相关的IPC处理器
     ipcMain.handle('relations:getAll', async () => {
       return await this.dbManager.getAllRelations();

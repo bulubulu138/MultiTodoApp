@@ -24,6 +24,7 @@ export interface ElectronAPI {
   image: {
     upload: () => Promise<string | null>;
     delete: (filepath: string) => Promise<boolean>;
+    readLocalFile: (filepath: string) => Promise<ArrayBuffer>;
   };
   
   // 关系API
@@ -69,6 +70,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   image: {
     upload: () => ipcRenderer.invoke('image:upload'),
     delete: (filepath: string) => ipcRenderer.invoke('image:delete', filepath),
+    readLocalFile: (filepath: string) => ipcRenderer.invoke('image:readLocalFile', filepath),
   },
   relations: {
     getAll: () => ipcRenderer.invoke('relations:getAll'),

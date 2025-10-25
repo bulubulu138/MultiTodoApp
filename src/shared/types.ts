@@ -22,6 +22,14 @@ export interface Settings {
   [key: string]: string;
 }
 
+export interface CustomTab {
+  id: string;        // 唯一ID
+  label: string;     // 显示名称
+  tag: string;       // 关联的标签
+  color?: string;    // Tab颜色（可选）
+  order: number;     // 显示顺序
+}
+
 export interface TodoRelation {
   id?: number;
   source_id: number;
