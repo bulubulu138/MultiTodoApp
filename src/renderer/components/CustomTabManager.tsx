@@ -36,16 +36,19 @@ const CustomTabManager: React.FC<CustomTabManagerProps> = ({
 
   const handleAdd = () => {
     form.validateFields().then(values => {
+      // 处理tag：mode="tags"返回数组，需要转为字符串
+      const tagValue = Array.isArray(values.tag) ? values.tag[0] : values.tag;
+      
       // 检查标签是否已存在
-      if (tabs.some(t => t.tag === values.tag)) {
-        message.warning(`标签"${values.tag}"已存在`);
+      if (tabs.some(t => t.tag === tagValue)) {
+        message.warning(`标签"${tagValue}"已存在`);
         return;
       }
 
       const newTab: CustomTab = {
         id: `tab_${Date.now()}`,
         label: values.label,
-        tag: values.tag,
+        tag: tagValue,  // 确保是字符串
         color: values.color,
         order: tabs.length
       };

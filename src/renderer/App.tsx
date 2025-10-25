@@ -458,8 +458,13 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     const customTabItems = customTabs
       .sort((a, b) => a.order - b.order)
       .map(tab => {
+        // 类型保护：确保tag是字符串（防止旧数据是数组）
+        const tagValue = typeof tab.tag === 'string' ? tab.tag : 
+                         Array.isArray(tab.tag) ? tab.tag[0] : 
+                         String(tab.tag);
+        
         // 计算该标签的待办数量（大小写不敏感）
-        const targetTag = tab.tag.trim().toLowerCase();
+        const targetTag = tagValue.trim().toLowerCase();
         const count = todos.filter(todo => {
           if (!todo.tags) return false;
           const tags = todo.tags.split(',')
@@ -468,7 +473,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
           const matches = tags.includes(targetTag);
           
           // 调试日志
-          console.log(`[Tab ${tab.label}] tag="${tab.tag}", todo ${todo.id} tags=[${todo.tags}], matches=${matches}`);
+          console.log(`[Tab ${tab.label}] tag="${tagValue}", todo ${todo.id} tags=[${todo.tags}], matches=${matches}`);
           
           return matches;
         }).length;
@@ -476,7 +481,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         console.log(`[Tab ${tab.label}] Final count: ${count}`);
 
         return {
-          key: `tag:${tab.tag}`,
+          key: `tag:${tagValue}`,
           label: `🏷️ ${tab.label} (${count})`,
         };
       });
