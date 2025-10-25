@@ -368,7 +368,7 @@ const TodoList: React.FC<TodoListProps> = ({
                     onPressEnter={(e) => {
                       e.currentTarget.blur();
                     }}
-                    disabled={savingOrder.has(todo.id!) || (isInGroup && !isGroupStart)}
+                    disabled={savingOrder.has(todo.id!) || !!(isInGroup && !isGroupStart)}
                     placeholder="序号"
                     style={{ 
                       width: 70,
