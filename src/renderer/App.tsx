@@ -316,10 +316,12 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     // 处理自定义标签Tab
     let filtered: Todo[];
     if (activeTab.startsWith('tag:')) {
-      const targetTag = activeTab.replace('tag:', '');
+      const targetTag = activeTab.replace('tag:', '').trim().toLowerCase();
       filtered = validTodos.filter(todo => {
         if (!todo.tags) return false;
-        const tags = todo.tags.split(',').map(t => t.trim()).filter(Boolean);
+        const tags = todo.tags.split(',')
+          .map(t => t.trim().toLowerCase())
+          .filter(Boolean);
         return tags.includes(targetTag);
       });
     } else {
@@ -332,8 +334,22 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       const withOrder = filtered.filter(todo => todo.displayOrder != null);
       const withoutOrder = filtered.filter(todo => todo.displayOrder == null);
       
-      // 有序号的按序号升序排序
-      withOrder.sort((a, b) => a.displayOrder! - b.displayOrder!);
+      // 按displayOrder分组
+      const grouped = new Map<number, Todo[]>();
+      withOrder.forEach(todo => {
+        const order = todo.displayOrder!;
+        if (!grouped.has(order)) {
+          grouped.set(order, []);
+        }
+        grouped.get(order)!.push(todo);
+      });
+      
+      // 组内按ID排序，组间按displayOrder排序
+      const sorted = Array.from(grouped.entries())
+        .sort((a, b) => a[0] - b[0])
+        .flatMap(([_, todos]) => 
+          todos.sort((a, b) => (a.id || 0) - (b.id || 0))
+        );
       
       // 无序号的按创建时间降序排序
       withoutOrder.sort((a, b) => {
@@ -343,7 +359,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       });
       
       // 合并：有序号的在前，无序号的在后
-      return [...withOrder, ...withoutOrder];
+      return [...sorted, ...withoutOrder];
     }
     
     // 其他排序模式：分为三组：逾期、活跃（待办和进行中）、已完成
@@ -442,12 +458,22 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     const customTabItems = customTabs
       .sort((a, b) => a.order - b.order)
       .map(tab => {
-        // 计算该标签的待办数量
+        // 计算该标签的待办数量（大小写不敏感）
+        const targetTag = tab.tag.trim().toLowerCase();
         const count = todos.filter(todo => {
           if (!todo.tags) return false;
-          const tags = todo.tags.split(',').map(t => t.trim()).filter(Boolean);
-          return tags.includes(tab.tag);
+          const tags = todo.tags.split(',')
+            .map(t => t.trim().toLowerCase())
+            .filter(Boolean);
+          const matches = tags.includes(targetTag);
+          
+          // 调试日志
+          console.log(`[Tab ${tab.label}] tag="${tab.tag}", todo ${todo.id} tags=[${todo.tags}], matches=${matches}`);
+          
+          return matches;
         }).length;
+
+        console.log(`[Tab ${tab.label}] Final count: ${count}`);
 
         return {
           key: `tag:${tab.tag}`,

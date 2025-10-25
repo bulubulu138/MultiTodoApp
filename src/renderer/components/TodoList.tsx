@@ -255,7 +255,7 @@ const TodoList: React.FC<TodoListProps> = ({
     <List
       loading={loading}
       dataSource={todos}
-      renderItem={(todo) => {
+      renderItem={(todo, index) => {
         // Data validation guard
         if (!todo || !todo.id) return null;
         
@@ -271,9 +271,31 @@ const TodoList: React.FC<TodoListProps> = ({
         );
         const hasParallel = parallelRelations.length > 0;
         
+        // 检测分组边界（仅在手动排序模式下）
+        const prevTodo = index > 0 ? todos[index - 1] : null;
+        const nextTodo = index < todos.length - 1 ? todos[index + 1] : null;
+        
+        const isGroupStart = !prevTodo || prevTodo.displayOrder !== todo.displayOrder;
+        const isGroupEnd = !nextTodo || nextTodo.displayOrder !== todo.displayOrder;
+        const isInGroup = sortOption === 'manual' && todo.displayOrder != null && (
+          (prevTodo && prevTodo.displayOrder === todo.displayOrder) ||
+          (nextTodo && nextTodo.displayOrder === todo.displayOrder)
+        );
+        
         return (
-          <List.Item key={todo.id} style={{ marginBottom: 6 }}>
-            <div style={{ display: 'flex', gap: 8, width: '100%', alignItems: 'flex-start' }}>
+          <List.Item key={todo.id} style={{ marginBottom: isGroupEnd && isInGroup ? 16 : 6 }}>
+            <div style={{ 
+              display: 'flex', 
+              gap: 8, 
+              width: '100%', 
+              alignItems: 'flex-start',
+              borderTop: isGroupStart && isInGroup ? '2px dashed #fa8c16' : undefined,
+              borderBottom: isGroupEnd && isInGroup ? '2px dashed #fa8c16' : undefined,
+              paddingTop: isGroupStart && isInGroup ? 8 : 0,
+              paddingBottom: isGroupEnd && isInGroup ? 8 : 0,
+              backgroundColor: isInGroup ? 'rgba(250, 140, 22, 0.05)' : undefined,
+              borderRadius: isInGroup ? 4 : undefined,
+            }}>
               {/* 序号输入框（仅手动排序模式显示） */}
               {sortOption === 'manual' && (
                 <Tooltip title="输入序号后按回车或点击其他地方保存">
