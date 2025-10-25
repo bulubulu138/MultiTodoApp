@@ -539,72 +539,72 @@ class AppLauncher:
         
         # 构建主进程（仅在需要时）
         if need_build_main:
-        print_info("编译主进程...")
-        result = subprocess.run(
-            'npm run build:main',
-            shell=True,
-            cwd=self.project_root,
-            capture_output=True,
-            text=True,
-            encoding='utf-8',
-            errors='replace'
-        )
-        
-        if result.returncode != 0:
-            print_error("主进程编译失败")
-            print_error(result.stderr)
-            return False
-        
-        print_success("主进程编译完成")
+            print_info("编译主进程...")
+            result = subprocess.run(
+                'npm run build:main',
+                shell=True,
+                cwd=self.project_root,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace'
+            )
+            
+            if result.returncode != 0:
+                print_error("主进程编译失败")
+                print_error(result.stderr)
+                return False
+            
+            print_success("主进程编译完成")
         else:
             print_info("✓ 主进程构建文件已是最新，跳过编译")
         
         # 构建渲染进程（仅在需要时）
         if need_build_renderer:
-        print_info("构建渲染进程...")
-        result = subprocess.run(
-            'npm run build:renderer',
-            shell=True,
-            cwd=self.project_root,
-            capture_output=True,
-            text=True,
-            encoding='utf-8',
-            errors='replace'
-        )
-        
-        if result.returncode != 0:
-            print_error("渲染进程构建失败")
-            print_error(result.stderr)
+            print_info("构建渲染进程...")
+            result = subprocess.run(
+                'npm run build:renderer',
+                shell=True,
+                cwd=self.project_root,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace'
+            )
             
-            # 同时输出 stdout（可能包含有用信息）
-            if result.stdout:
-                print()
-                print("=== 构建输出 ===")
-                print(result.stdout)
+            if result.returncode != 0:
+                print_error("渲染进程构建失败")
+                print_error(result.stderr)
+                
+                # 同时输出 stdout（可能包含有用信息）
+                if result.stdout:
+                    print()
+                    print("=== 构建输出 ===")
+                    print(result.stdout)
+                
+                # 保存详细错误到文件
+                error_log = os.path.join(self.project_root, 'build_error.log')
+                try:
+                    with open(error_log, 'w', encoding='utf-8') as f:
+                        f.write("=" * 80 + "\n")
+                        f.write("渲染进程构建错误日志\n")
+                        f.write("=" * 80 + "\n\n")
+                        f.write("=== STDERR ===\n")
+                        f.write(result.stderr if result.stderr else "(无错误输出)")
+                        f.write("\n\n=== STDOUT ===\n")
+                        f.write(result.stdout if result.stdout else "(无标准输出)")
+                        f.write("\n\n=== 返回码 ===\n")
+                        f.write(str(result.returncode))
+                        f.write("\n")
+                    print()
+                    print_info(f"详细错误已保存到: {error_log}")
+                    print_info("请查看该文件获取完整的构建错误信息")
+                except Exception as e:
+                    print_warning(f"无法保存错误日志: {str(e)}")
+                
+                return False
             
-            # 保存详细错误到文件
-            error_log = os.path.join(self.project_root, 'build_error.log')
-            try:
-                with open(error_log, 'w', encoding='utf-8') as f:
-                    f.write("=" * 80 + "\n")
-                    f.write("渲染进程构建错误日志\n")
-                    f.write("=" * 80 + "\n\n")
-                    f.write("=== STDERR ===\n")
-                    f.write(result.stderr if result.stderr else "(无错误输出)")
-                    f.write("\n\n=== STDOUT ===\n")
-                    f.write(result.stdout if result.stdout else "(无标准输出)")
-                    f.write("\n\n=== 返回码 ===\n")
-                    f.write(str(result.returncode))
-                    f.write("\n")
-                print()
-                print_info(f"详细错误已保存到: {error_log}")
-                print_info("请查看该文件获取完整的构建错误信息")
-            except Exception as e:
-                print_warning(f"无法保存错误日志: {str(e)}")
-            
-            return False
-        
-        print_success("渲染进程构建完成")
+            print_success("渲染进程构建完成")
         else:
             print_info("✓ 渲染进程构建文件已是最新，跳过构建")
         
@@ -860,18 +860,18 @@ class AppLauncher:
                 print_info("假设已完成环境配置和依赖安装")
                 print()
             else:
-            # 快速环境检查
-            if not self.check_environment():
-                print_error("环境检查失败")
+                # 快速环境检查
+                if not self.check_environment():
+                    print_error("环境检查失败")
+                    
+                    if confirm_action("是否要运行详细的环境检查？"):
+                        self.run_full_check()
+                    return False
                 
-                if confirm_action("是否要运行详细的环境检查？"):
-                    self.run_full_check()
-                return False
-            
-            # 安装依赖
-            if not self.install_dependencies():
-                print_error("依赖安装失败")
-                return False
+                # 安装依赖
+                if not self.install_dependencies():
+                    print_error("依赖安装失败")
+                    return False
             
             # 根据模式启动应用
             if self.use_dev_mode:
