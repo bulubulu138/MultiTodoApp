@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import * as path from 'path';
 import { app } from 'electron';
 import { Todo, Settings, TodoRelation, Note } from '../../shared/types';
+import { generateContentHash } from '../utils/hashUtils';
 
 export class DatabaseManager {
   private db: Database.Database | null = null;
@@ -95,6 +96,7 @@ export class DatabaseManager {
       const hasStartTime = tableInfo.some((col: any) => col.name === 'startTime');
       const hasDeadline = tableInfo.some((col: any) => col.name === 'deadline');
       const hasDisplayOrder = tableInfo.some((col: any) => col.name === 'displayOrder');
+      const hasContentHash = tableInfo.some((col: any) => col.name === 'contentHash');
       
       if (!hasStartTime) {
         console.log('Adding startTime column to todos table...');
@@ -114,6 +116,14 @@ export class DatabaseManager {
         console.log('Adding displayOrder column to todos table...');
         this.db!.prepare('ALTER TABLE todos ADD COLUMN displayOrder INTEGER').run();
         console.log('displayOrder column added successfully');
+      }
+
+      if (!hasContentHash) {
+        console.log('Adding contentHash column to todos table...');
+        this.db!.prepare('ALTER TABLE todos ADD COLUMN contentHash TEXT').run();
+        // 为现有数据生成哈希值
+        await this.generateHashesForExistingTodos();
+        console.log('contentHash column added successfully');
       }
       
       console.log('Todos table migration completed');
@@ -150,9 +160,12 @@ export class DatabaseManager {
     return new Promise((resolve, reject) => {
       try {
         const now = new Date().toISOString();
+        // 生成内容哈希
+        const contentHash = todo.contentHash || generateContentHash(todo.title, todo.content);
+        
         const stmt = this.db!.prepare(
-          `INSERT INTO todos (title, content, status, priority, tags, imageUrl, images, startTime, deadline, displayOrder, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO todos (title, content, status, priority, tags, imageUrl, images, startTime, deadline, displayOrder, contentHash, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         );
         
         const result = stmt.run(
@@ -166,6 +179,7 @@ export class DatabaseManager {
           todo.startTime || null,
           todo.deadline || null,
           todo.displayOrder !== undefined ? todo.displayOrder : null,
+          contentHash,
           now,
           now
         );
@@ -216,6 +230,19 @@ export class DatabaseManager {
         if (updates.startTime !== undefined) { fields.push('startTime = ?'); values.push(updates.startTime); }
         if (updates.deadline !== undefined) { fields.push('deadline = ?'); values.push(updates.deadline); }
         if (updates.displayOrder !== undefined) { fields.push('displayOrder = ?'); values.push(updates.displayOrder); }
+        if (updates.contentHash !== undefined) { fields.push('contentHash = ?'); values.push(updates.contentHash); }
+
+        // 如果标题或内容被更新，重新生成哈希
+        if ((updates.title !== undefined || updates.content !== undefined) && updates.contentHash === undefined) {
+          const todo = this.db!.prepare('SELECT * FROM todos WHERE id = ?').get(id) as any;
+          if (todo) {
+            const newTitle = updates.title !== undefined ? updates.title : todo.title;
+            const newContent = updates.content !== undefined ? updates.content : todo.content;
+            const newHash = generateContentHash(newTitle, newContent);
+            fields.push('contentHash = ?');
+            values.push(newHash);
+          }
+        }
 
         fields.push('updatedAt = ?');
         values.push(new Date().toISOString());
@@ -472,9 +499,48 @@ export class DatabaseManager {
       startTime: row.startTime,
       deadline: row.deadline,
       displayOrder: row.displayOrder !== null ? row.displayOrder : undefined,
+      contentHash: row.contentHash,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt
     };
+  }
+
+  // 为现有待办生成哈希值
+  private async generateHashesForExistingTodos(): Promise<void> {
+    try {
+      const todos = this.db!.prepare('SELECT * FROM todos WHERE contentHash IS NULL').all() as any[];
+      
+      for (const todo of todos) {
+        const hash = generateContentHash(todo.title, todo.content);
+        this.db!.prepare('UPDATE todos SET contentHash = ? WHERE id = ?').run(hash, todo.id);
+      }
+      
+      console.log(`Generated hashes for ${todos.length} existing todos`);
+    } catch (error) {
+      console.error('Error generating hashes for existing todos:', error);
+    }
+  }
+
+  // 根据哈希值查找重复的待办
+  public findDuplicateTodo(contentHash: string, excludeId?: number): Promise<Todo | null> {
+    return new Promise((resolve, reject) => {
+      try {
+        let query = 'SELECT * FROM todos WHERE contentHash = ?';
+        const params: any[] = [contentHash];
+        
+        if (excludeId) {
+          query += ' AND id != ?';
+          params.push(excludeId);
+        }
+        
+        query += ' LIMIT 1';
+        
+        const row = this.db!.prepare(query).get(...params) as any;
+        resolve(row ? this.parseTodo(row) : null);
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
   public close(): void {

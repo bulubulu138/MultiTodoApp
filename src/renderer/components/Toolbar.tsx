@@ -11,6 +11,8 @@ export type SortOption =
   | 'startTime-asc' 
   | 'deadline-desc' 
   | 'deadline-asc'
+  | 'updatedAt-desc'
+  | 'updatedAt-asc'
   | 'manual';
 
 interface ToolbarProps {
@@ -50,6 +52,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
           <Option value="manual">手动排序</Option>
           <Option value="createdAt-desc">创建时间 ↓ 新→旧</Option>
           <Option value="createdAt-asc">创建时间 ↑ 旧→新</Option>
+          <Option value="updatedAt-desc">更新时间 ↓ 新→旧</Option>
+          <Option value="updatedAt-asc">更新时间 ↑ 旧→新</Option>
           <Option value="startTime-desc">开始时间 ↓ 晚→早</Option>
           <Option value="startTime-asc">开始时间 ↑ 早→晚</Option>
           <Option value="deadline-desc">截止时间 ↓ 晚→早</Option>

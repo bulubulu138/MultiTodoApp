@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { DatabaseManager } from './database/DatabaseManager';
 import { ImageManager } from './utils/ImageManager';
+import { generateContentHash } from './utils/hashUtils';
 
 class Application {
   private mainWindow: BrowserWindow | null = null;
@@ -156,6 +157,14 @@ class Application {
 
     ipcMain.handle('todo:delete', async (_, id) => {
       return await this.dbManager.deleteTodo(id);
+    });
+
+    ipcMain.handle('todo:generateHash', async (_, title: string, content: string) => {
+      return generateContentHash(title, content);
+    });
+
+    ipcMain.handle('todo:findDuplicate', async (_, contentHash: string, excludeId?: number) => {
+      return await this.dbManager.findDuplicateTodo(contentHash, excludeId);
     });
 
     // 设置相关

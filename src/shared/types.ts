@@ -13,6 +13,7 @@ export interface Todo {
   startTime?: string; // 预计开始时间
   deadline?: string;  // 截止时间
   displayOrder?: number; // 手动排序序号
+  contentHash?: string; // 内容哈希值，用于去重检测
   createdAt: string;
   updatedAt: string;
 }

@@ -8,6 +8,8 @@ export interface ElectronAPI {
     create: (todo: any) => Promise<any>;
     update: (id: number, updates: any) => Promise<any>;
     delete: (id: number) => Promise<boolean>;
+    generateHash: (title: string, content: string) => Promise<string>;
+    findDuplicate: (contentHash: string, excludeId?: number) => Promise<any | null>;
   };
   
   // 设置API
@@ -54,6 +56,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     create: (todo: any) => ipcRenderer.invoke('todo:create', todo),
     update: (id: number, updates: any) => ipcRenderer.invoke('todo:update', id, updates),
     delete: (id: number) => ipcRenderer.invoke('todo:delete', id),
+    generateHash: (title: string, content: string) => ipcRenderer.invoke('todo:generateHash', title, content),
+    findDuplicate: (contentHash: string, excludeId?: number) => ipcRenderer.invoke('todo:findDuplicate', contentHash, excludeId),
   },
   settings: {
     get: (key?: string) => ipcRenderer.invoke(key === 'dbPath' ? 'settings:getDbPath' : 'settings:get'),

@@ -28,6 +28,28 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   const colors = useThemeColors();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState('');
+
+  // 复制图片到剪贴板
+  const copyImageToClipboard = async (imageUrl: string) => {
+    try {
+      // 方案1: 尝试使用 Clipboard API 复制图片
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      await navigator.clipboard.write([
+        new ClipboardItem({ [blob.type]: blob })
+      ]);
+      message.success('图片已复制到剪贴板');
+    } catch (error) {
+      // 方案2: 降级到复制图片URL
+      try {
+        await navigator.clipboard.writeText(imageUrl);
+        message.info('图片URL已复制到剪贴板');
+      } catch (err) {
+        message.error('复制失败');
+        console.error('Error copying image:', error);
+      }
+    }
+  };
   
   // 处理内容点击事件，拦截链接点击
   const handleContentClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -343,13 +365,25 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
         )}
       </div>
       
-      {/* 图片预览组件 - 使用默认工具栏 */}
+      {/* 图片预览组件 - 带复制功能 */}
       <Image
         style={{ display: 'none' }}
         preview={{
           visible: previewOpen,
           src: previewImage,
           onVisibleChange: (visible) => setPreviewOpen(visible),
+          toolbarRender: (originalNode, info) => (
+            <Space>
+              {originalNode}
+              <Button
+                type="primary"
+                icon={<CopyOutlined />}
+                onClick={() => copyImageToClipboard(previewImage)}
+              >
+                复制图片
+              </Button>
+            </Space>
+          ),
         }}
       />
     </Drawer>

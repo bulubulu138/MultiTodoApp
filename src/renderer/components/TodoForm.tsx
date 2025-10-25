@@ -137,6 +137,12 @@ const TodoForm: React.FC<TodoFormProps> = ({
         }
       }
       
+      // 生成内容哈希
+      const contentHash = await window.electronAPI.todo.generateHash(title, richContent);
+      
+      // 检测重复（编辑时排除自己）
+      const duplicate = await window.electronAPI.todo.findDuplicate(contentHash, todo?.id);
+      
       const todoData: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'> = {
         title: title,
         content: richContent,
@@ -147,9 +153,23 @@ const TodoForm: React.FC<TodoFormProps> = ({
         tags: tags.join(','),
         images: '', // 图片现在嵌入在富文本中
         displayOrder: values.displayOrder,
+        contentHash: contentHash,
       };
 
-      onSubmit(todoData);
+      // 如果检测到重复，弹出确认对话框
+      if (duplicate) {
+        Modal.confirm({
+          title: '检测到重复待办',
+          content: `与待办"${duplicate.title}"的内容完全相同，是否继续${todo ? '保存' : '创建'}？`,
+          okText: '继续',
+          cancelText: '取消',
+          onOk: () => {
+            onSubmit(todoData);
+          },
+        });
+      } else {
+        onSubmit(todoData);
+      }
     } catch (error) {
       console.error('Form validation failed:', error);
     }

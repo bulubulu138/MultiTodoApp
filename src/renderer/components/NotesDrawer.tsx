@@ -1,7 +1,7 @@
 import { Note } from '../../shared/types';
 import React, { useState, useEffect, useCallback } from 'react';
-import { Drawer, Button, Space, Card, Input, Typography, Popconfirm, App, Empty } from 'antd';
-import { PlusOutlined, DeleteOutlined, BulbOutlined } from '@ant-design/icons';
+import { Drawer, Button, Space, Card, Input, Typography, Popconfirm, App, Empty, Tooltip } from 'antd';
+import { PlusOutlined, DeleteOutlined, BulbOutlined, CopyOutlined } from '@ant-design/icons';
 import RichTextEditor from './RichTextEditor';
 
 const { Title, Text } = Typography;
@@ -39,11 +39,21 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({ visible, onClose }) => {
     }
   };
 
+  // 从内容提取标题
+  const extractTitleFromContent = (content: string): string => {
+    const temp = document.createElement('div');
+    temp.innerHTML = content;
+    const text = (temp.textContent || temp.innerText || '').trim();
+    const firstLine = text.split('\n')[0].trim();
+    return firstLine.substring(0, 20) || '未命名心得';
+  };
+
   const handleAddNote = async () => {
     try {
+      const defaultContent = '在此记录你的工作心得...';
       const newNote = await window.electronAPI.notes.create({
-        title: '新心得',
-        content: '在此记录你的工作心得...'
+        title: extractTitleFromContent(defaultContent),
+        content: defaultContent
       });
       setNotes([newNote, ...notes]);
       setEditingId(newNote.id!);
@@ -63,9 +73,11 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({ visible, onClose }) => {
 
     const timeout = setTimeout(async () => {
       try {
-        await window.electronAPI.notes.update(id, { title, content });
+        // 如果标题为空，自动从内容生成
+        const finalTitle = title.trim() || extractTitleFromContent(content);
+        await window.electronAPI.notes.update(id, { title: finalTitle, content });
         setNotes(prev => prev.map(n => 
-          n.id === id ? { ...n, title, content, updatedAt: new Date().toISOString() } : n
+          n.id === id ? { ...n, title: finalTitle, content, updatedAt: new Date().toISOString() } : n
         ));
         message.success('自动保存成功', 1);
       } catch (error) {
@@ -105,6 +117,29 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({ visible, onClose }) => {
     setEditingId(note.id!);
     setEditingTitle(note.title);
     setEditingContent(note.content);
+  };
+
+  const copyNoteToClipboard = async (note: Note) => {
+    try {
+      // 提取纯文本
+      const temp = document.createElement('div');
+      temp.innerHTML = note.content;
+      const plainText = (temp.textContent || temp.innerText || '').trim();
+      
+      const copyText = `标题：${note.title}
+
+内容：
+${plainText}
+
+创建时间：${new Date(note.createdAt).toLocaleString()}
+更新时间：${new Date(note.updatedAt).toLocaleString()}`;
+      
+      await navigator.clipboard.writeText(copyText);
+      message.success('心得已复制到剪贴板');
+    } catch (error) {
+      message.error('复制失败');
+      console.error('Error copying note:', error);
+    }
   };
 
   return (
@@ -149,23 +184,36 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({ visible, onClose }) => {
               }}
               extra={
                 <div onClick={(e) => e.stopPropagation()}>
-                  <Popconfirm
-                    title="确定要删除这条心得吗？"
-                    onConfirm={(e) => {
-                      e?.stopPropagation();
-                      handleDelete(note.id!);
-                    }}
-                    okText="确定"
-                    cancelText="取消"
-                  >
-                    <Button
-                      type="text"
-                      danger
-                      size="small"
-                      icon={<DeleteOutlined />}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  </Popconfirm>
+                  <Space size="small">
+                    <Tooltip title="复制心得">
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<CopyOutlined />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyNoteToClipboard(note);
+                        }}
+                      />
+                    </Tooltip>
+                    <Popconfirm
+                      title="确定要删除这条心得吗？"
+                      onConfirm={(e) => {
+                        e?.stopPropagation();
+                        handleDelete(note.id!);
+                      }}
+                      okText="确定"
+                      cancelText="取消"
+                    >
+                      <Button
+                        type="text"
+                        danger
+                        size="small"
+                        icon={<DeleteOutlined />}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </Popconfirm>
+                  </Space>
                 </div>
               }
             >
@@ -174,7 +222,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({ visible, onClose }) => {
                   <Input
                     value={editingTitle}
                     onChange={(e) => handleTitleChange(note.id!, e.target.value)}
-                    placeholder="标题"
+                    placeholder="标题（留空自动从内容生成）"
                     style={{ marginBottom: 8, fontWeight: 'bold' }}
                     size="large"
                   />

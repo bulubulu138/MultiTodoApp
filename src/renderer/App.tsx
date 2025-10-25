@@ -1,7 +1,8 @@
 import { Todo, TodoRelation, CalendarViewSize } from '../shared/types';
 import React, { useState, useEffect, useMemo } from 'react';
-import { Layout, App as AntApp, Tabs, ConfigProvider } from 'antd';
+import { Layout, App as AntApp, Tabs, ConfigProvider, FloatButton } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
+import { VerticalAlignTopOutlined } from '@ant-design/icons';
 import TodoList from './components/TodoList';
 import TodoForm from './components/TodoForm';
 import Toolbar, { SortOption } from './components/Toolbar';
@@ -335,6 +336,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         } else if (field === 'deadline') {
           aValue = a.deadline;
           bValue = b.deadline;
+        } else if (field === 'updatedAt') {
+          aValue = a.updatedAt;
+          bValue = b.updatedAt;
         }
         
         // 处理空值：将没有对应字段的项放在最后
@@ -481,6 +485,14 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         onClose={() => setShowCalendar(false)}
         onSelectTodo={handleEditTodo}
         viewSize={(settings.calendarViewSize as CalendarViewSize) || 'compact'}
+      />
+
+      {/* 回到顶部按钮 */}
+      <FloatButton.BackTop
+        target={() => document.querySelector('.content-area') as HTMLElement}
+        icon={<VerticalAlignTopOutlined />}
+        tooltip="回到顶部"
+        visibilityHeight={300}
       />
       </Layout>
   );
