@@ -266,8 +266,8 @@ const TodoList: React.FC<TodoListProps> = ({
         
         // 检查是否是并列待办
         const parallelRelations = relations.filter(r => 
-          r.type === 'parallel' && 
-          (r.sourceTodoId === todo.id || r.targetTodoId === todo.id)
+          r.relation_type === 'parallel' && 
+          (r.source_id === todo.id || r.target_id === todo.id)
         );
         const hasParallel = parallelRelations.length > 0;
         

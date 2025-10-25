@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Input, Button, List, Space, Popconfirm, Select, App, Empty, Tag } from 'antd';
+import { Modal, Form, Input, Button, List, Space, Popconfirm, Select, App, Empty, Tag, Typography } from 'antd';
 import { PlusOutlined, DeleteOutlined, DragOutlined, TagsOutlined } from '@ant-design/icons';
 import { CustomTab } from '../../shared/types';
 import { useThemeColors } from '../hooks/useThemeColors';
 
 const { Option } = Select;
+const { Text } = Typography;
 
 interface CustomTabManagerProps {
   visible: boolean;
@@ -109,9 +110,9 @@ const CustomTabManager: React.FC<CustomTabManagerProps> = ({
       ]}
     >
       <div style={{ marginBottom: 24 }}>
-        <div style={{ marginBottom: 12, color: colors.textSecondary, fontSize: 13 }}>
+        <Text type="secondary" style={{ marginBottom: 12, fontSize: 13, display: 'block' }}>
           💡 提示：创建自定义Tab后，所有包含对应标签的待办都会显示在该Tab中
-        </div>
+        </Text>
         
         <Form form={form} layout="inline" style={{ marginBottom: 16 }}>
           <Form.Item
@@ -165,7 +166,7 @@ const CustomTabManager: React.FC<CustomTabManagerProps> = ({
               >
                 <Space style={{ width: '100%', justifyContent: 'space-between' }}>
                   <Space>
-                    <DragOutlined style={{ color: colors.textSecondary, cursor: 'move' }} />
+                    <DragOutlined style={{ color: '#8c8c8c', cursor: 'move' }} />
                     <Tag color="blue">{tab.label}</Tag>
                     <Tag color="orange">{tab.tag}</Tag>
                   </Space>
