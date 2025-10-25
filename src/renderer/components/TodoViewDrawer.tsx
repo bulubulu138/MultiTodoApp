@@ -61,10 +61,17 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
       
       // 处理不同类型的图片URL
       if (imageUrl.startsWith('data:')) {
-        // Base64 图片 - 直接转换
+        // Base64 图片 - 直接转换（避免 CSP 限制）
         console.log('处理 Base64 图片');
-        const response = await fetch(imageUrl);
-        blob = await response.blob();
+        const base64Data = imageUrl.split(',')[1];
+        const mimeType = imageUrl.match(/data:([^;]+);/)?.[1] || 'image/png';
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        blob = new Blob([byteArray], { type: mimeType });
       } else if (imageUrl.startsWith('file://') || imageUrl.startsWith('file:')) {
         // 本地文件 - 使用 Electron 读取
         console.log('处理本地文件图片');
