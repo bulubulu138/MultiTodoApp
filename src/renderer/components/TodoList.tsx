@@ -1,7 +1,8 @@
 import { Todo, TodoRelation } from '../../shared/types';
 import React, { useState } from 'react';
-import { List, Card, Tag, Button, Space, Popconfirm, Select, Typography, Image, Tooltip, App } from 'antd';
+import { List, Card, Tag, Button, Space, Popconfirm, Select, Typography, Image, Tooltip, App, InputNumber } from 'antd';
 import { EditOutlined, DeleteOutlined, LinkOutlined, EyeOutlined, EyeInvisibleOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import { SortOption } from './Toolbar';
 import RelationsModal from './RelationsModal';
 import RelationContext from './RelationContext';
 import { copyTodoToClipboard } from '../utils/copyTodo';
@@ -21,6 +22,8 @@ interface TodoListProps {
   onView: (todo: Todo) => void;
   relations?: TodoRelation[];
   onRelationsChange?: () => Promise<void>; // Callback to refresh global relations
+  sortOption?: SortOption; // 当前排序选项
+  onUpdateDisplayOrder?: (id: number, order: number | null) => Promise<void>; // 更新显示序号
 }
 
 const TodoList: React.FC<TodoListProps> = ({
@@ -32,13 +35,17 @@ const TodoList: React.FC<TodoListProps> = ({
   onStatusChange,
   onView,
   relations = [],
-  onRelationsChange
+  onRelationsChange,
+  sortOption,
+  onUpdateDisplayOrder
 }) => {
   const { message } = App.useApp();
   const colors = useThemeColors();
   const [showRelationsModal, setShowRelationsModal] = useState(false);
   const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
   const [expandedRelations, setExpandedRelations] = useState<Set<number>>(new Set());
+  const [editingOrder, setEditingOrder] = useState<{[key: number]: number | null}>({});
+  const [savingOrder, setSavingOrder] = useState<Set<number>>(new Set());
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'orange';
@@ -160,6 +167,56 @@ const TodoList: React.FC<TodoListProps> = ({
     return `${month}/${day} ${hours}:${minutes}`;
   };
 
+  // 处理序号变化
+  const handleOrderChange = (todoId: number, value: number | null) => {
+    setEditingOrder(prev => ({ ...prev, [todoId]: value }));
+  };
+
+  // 保存序号
+  const handleOrderSave = async (todoId: number, currentValue: number | undefined) => {
+    const newOrder = editingOrder[todoId];
+    
+    // 如果没有变化，不保存
+    if (newOrder === undefined || newOrder === currentValue) {
+      setEditingOrder(prev => {
+        const next = { ...prev };
+        delete next[todoId];
+        return next;
+      });
+      return;
+    }
+
+    if (!onUpdateDisplayOrder) return;
+
+    // 添加到保存中状态
+    setSavingOrder(prev => new Set(prev).add(todoId));
+
+    try {
+      await onUpdateDisplayOrder(todoId, newOrder);
+      // 清除编辑状态
+      setEditingOrder(prev => {
+        const next = { ...prev };
+        delete next[todoId];
+        return next;
+      });
+    } catch (error) {
+      message.error('更新排序失败');
+      // 恢复原值
+      setEditingOrder(prev => {
+        const next = { ...prev };
+        delete next[todoId];
+        return next;
+      });
+    } finally {
+      // 移除保存中状态
+      setSavingOrder(prev => {
+        const next = new Set(prev);
+        next.delete(todoId);
+        return next;
+      });
+    }
+  };
+
   return (
     <>
       <RelationsModal
@@ -179,14 +236,43 @@ const TodoList: React.FC<TodoListProps> = ({
         // Data validation guard
         if (!todo || !todo.id) return null;
         
+        // 获取当前显示的序号值（编辑中的值或原始值）
+        const currentDisplayOrder = editingOrder[todo.id!] !== undefined 
+          ? editingOrder[todo.id!] 
+          : todo.displayOrder;
+        
         return (
           <List.Item key={todo.id} style={{ marginBottom: 6 }}>
-            <Card
-              className="todo-card"
-              style={{ width: '100%' }}
-              bodyStyle={{ padding: '8px' }}
-              bordered={false}
-            >
+            <div style={{ display: 'flex', gap: 8, width: '100%', alignItems: 'flex-start' }}>
+              {/* 序号输入框（仅手动排序模式显示） */}
+              {sortOption === 'manual' && (
+                <Tooltip title="输入序号后按回车或点击其他地方保存">
+                  <InputNumber
+                    size="small"
+                    min={0}
+                    value={currentDisplayOrder}
+                    onChange={(value) => handleOrderChange(todo.id!, value)}
+                    onBlur={() => handleOrderSave(todo.id!, todo.displayOrder)}
+                    onPressEnter={(e) => {
+                      e.currentTarget.blur();
+                    }}
+                    disabled={savingOrder.has(todo.id!)}
+                    placeholder="序号"
+                    style={{ 
+                      width: 70,
+                      flexShrink: 0
+                    }}
+                  />
+                </Tooltip>
+              )}
+              
+              {/* 原有卡片 */}
+              <Card
+                className="todo-card"
+                style={{ flex: 1 }}
+                bodyStyle={{ padding: '8px' }}
+                bordered={false}
+              >
               {/* 标题行：标题 + 标签 + 操作按钮 */}
               <div style={{ 
                 display: 'flex', 
@@ -383,6 +469,7 @@ const TodoList: React.FC<TodoListProps> = ({
               </div>
             )}
             </Card>
+            </div>
           </List.Item>
         );
       }}

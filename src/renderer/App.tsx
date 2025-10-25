@@ -246,6 +246,18 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     }
   };
 
+  const handleUpdateDisplayOrder = async (id: number, displayOrder: number | null) => {
+    try {
+      await window.electronAPI.todo.update(id, { displayOrder });
+      await loadTodos();
+      message.success('排序已更新');
+    } catch (error) {
+      message.error('更新排序失败');
+      console.error('Error updating display order:', error);
+      throw error; // 重新抛出错误，让TodoList组件知道保存失败
+    }
+  };
+
   // 统计各状态的待办数量
   const statusCounts = useMemo(() => ({
     all: todos.filter(t => t && t.id).length,
@@ -400,6 +412,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
             onStatusChange={handleUpdateTodo}
             relations={relations}
             onRelationsChange={loadRelations}
+            sortOption={sortOption}
+            onUpdateDisplayOrder={handleUpdateDisplayOrder}
           />
         </div>
       </Content>
