@@ -32,23 +32,28 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   // 转换为PNG格式
   const convertToPng = async (blob: Blob): Promise<Blob> => {
     return new Promise((resolve, reject) => {
-      const img = document.createElement('img');
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(img, 0, 0);
-        canvas.toBlob((pngBlob) => {
-          if (pngBlob) {
-            resolve(pngBlob);
-          } else {
-            reject(new Error('转换失败'));
-          }
-        }, 'image/png');
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = document.createElement('img');
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d')!;
+          ctx.drawImage(img, 0, 0);
+          canvas.toBlob((pngBlob) => {
+            if (pngBlob) {
+              resolve(pngBlob);
+            } else {
+              reject(new Error('转换失败'));
+            }
+          }, 'image/png');
+        };
+        img.onerror = reject;
+        img.src = reader.result as string; // Use data URL instead of blob URL
       };
-      img.onerror = reject;
-      img.src = URL.createObjectURL(blob);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob); // Convert blob to data URL
     });
   };
 
