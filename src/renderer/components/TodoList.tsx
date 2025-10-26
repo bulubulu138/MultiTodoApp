@@ -273,6 +273,7 @@ const TodoList: React.FC<TodoListProps> = ({
     <List
       loading={loading}
       dataSource={todos}
+      rowKey={(todo) => `todo-${todo.id}`}
       renderItem={(todo, index) => {
         // Data validation guard
         if (!todo || !todo.id) return null;

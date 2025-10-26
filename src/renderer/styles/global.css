@@ -732,7 +732,7 @@ body {
 .calendar-compact .ant-picker-calendar-date {
   height: 40px !important;
   border-radius: 4px;
-  transition: all 0.3s;
+  transition: background-color 0.2s ease;
   padding: 2px !important;
 }
 
