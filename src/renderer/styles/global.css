@@ -1,7 +1,16 @@
 /* 全局样式 */
 * {
   box-sizing: border-box;
-  transition: background-color 0.3s ease, color 0.3s ease; /* 平滑过渡 */
+}
+
+/* 只对需要过渡的元素应用动画 - 性能优化 */
+.todo-card,
+.ant-btn,
+.ant-tabs-tab,
+.ant-list-item,
+a,
+button {
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* 浅色主题默认CSS变量 */
@@ -143,10 +152,12 @@ body {
   margin-bottom: 6px;
   border-radius: 8px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  transition: box-shadow 0.3s ease, background-color 0.3s ease;
+  will-change: transform;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
 }
 
 .todo-card:hover {
+  transform: translateY(-2px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
@@ -590,6 +601,7 @@ body {
   border-radius: 4px;
   margin: 8px 0;
   cursor: pointer;
+  will-change: transform;
   transition: transform 0.2s, box-shadow 0.2s;
 }
 

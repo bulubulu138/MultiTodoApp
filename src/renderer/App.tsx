@@ -794,7 +794,14 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <ConfigProvider locale={zhCN} theme={getTheme(themeMode)}>
+    <ConfigProvider 
+      locale={zhCN} 
+      theme={{
+        ...getTheme(themeMode),
+        // 优化动画性能
+        motion: true,
+      }}
+    >
       <AntApp>
         <AppContent themeMode={themeMode} onThemeChange={setThemeMode} />
       </AntApp>

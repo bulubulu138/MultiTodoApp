@@ -33,6 +33,9 @@ class Application {
         sandbox: !isDev,
         // 允许运行不安全内容仅在开发模式
         allowRunningInsecureContent: isDev,
+        // 性能优化
+        enableBlinkFeatures: 'CSSContainment',
+        v8CacheOptions: 'code',
       },
       title: '多功能待办工具',
       show: false,
@@ -429,8 +432,9 @@ class Application {
 
   public async initialize(): Promise<void> {
     try {
-      // 禁用GPU加速以避免GPU进程崩溃
-      app.disableHardwareAcceleration();
+      // 启用硬件加速以提升动画性能
+      // 如果遇到 GPU 崩溃问题，可以通过命令行参数 --disable-gpu 临时禁用
+      // app.disableHardwareAcceleration(); // 已注释以提升性能
       
       console.log('Waiting for app ready...');
       await app.whenReady();
