@@ -14,6 +14,7 @@ const { Option } = Select;
 interface TodoFormProps {
   visible: boolean;
   todo?: Todo | null;
+  quickCreateContent?: string | null;
   onSubmit: (data: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'>) => void;
   onCancel: () => void;
   allTodos?: Todo[];
@@ -23,6 +24,7 @@ interface TodoFormProps {
 const TodoForm: React.FC<TodoFormProps> = ({
   visible,
   todo,
+  quickCreateContent,
   onSubmit,
   onCancel,
   allTodos = [],
@@ -83,7 +85,8 @@ const TodoForm: React.FC<TodoFormProps> = ({
         form.setFieldsValue({
           startTime: dayjs(),
         });
-        setRichContent('');
+        // 如果有快速创建内容，使用它；否则清空
+        setRichContent(quickCreateContent || '');
         setTags([]);
       }
       
@@ -97,7 +100,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
       setEditorError(false);
       setUseRichEditor(true);
     }
-  }, [visible, todo, form]);
+  }, [visible, todo, form, quickCreateContent]);
 
   // 从富文本内容中提取纯文本的第一行
   const extractFirstLineFromContent = (html: string): string => {

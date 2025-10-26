@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, nativeImage, globalShortcut, clipboard } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { DatabaseManager } from './database/DatabaseManager';
@@ -9,6 +9,8 @@ class Application {
   private mainWindow: BrowserWindow | null = null;
   private dbManager: DatabaseManager;
   private imageManager: ImageManager;
+  private tray: Tray | null = null;
+  private isQuitting: boolean = false;
 
   constructor() {
     this.dbManager = new DatabaseManager();
@@ -77,6 +79,14 @@ class Application {
       this.mainWindow?.show();
     });
 
+    // 修改窗口关闭行为：不退出应用，而是最小化到托盘
+    this.mainWindow.on('close', (event) => {
+      if (!this.isQuitting) {
+        event.preventDefault();
+        this.mainWindow?.hide();
+      }
+    });
+
     this.mainWindow.on('closed', () => {
       this.mainWindow = null;
     });
@@ -139,6 +149,125 @@ class Application {
     });
 
     console.log(`CSP configured for ${isDev ? 'development' : 'production'} mode`);
+  }
+
+  private createTray(): void {
+    try {
+      // 尝试使用项目中的图标
+      let iconPath = path.join(__dirname, '../../assets/icon.png');
+      
+      // 如果找不到，使用备用图标
+      if (!fs.existsSync(iconPath)) {
+        iconPath = path.join(__dirname, '../../assets/icon_32x32.png');
+      }
+      
+      const icon = nativeImage.createFromPath(iconPath);
+      this.tray = new Tray(icon.resize({ width: 16, height: 16 }));
+      
+      const contextMenu = Menu.buildFromTemplate([
+        {
+          label: '显示窗口',
+          click: () => {
+            this.mainWindow?.show();
+            this.mainWindow?.focus();
+          }
+        },
+        {
+          label: '快速创建待办 (Ctrl+Shift+T)',
+          enabled: false
+        },
+        { type: 'separator' },
+        {
+          label: '退出',
+          click: () => {
+            this.isQuitting = true;
+            app.quit();
+          }
+        }
+      ]);
+      
+      this.tray.setContextMenu(contextMenu);
+      this.tray.setToolTip('MultiTodo - 待办管理');
+      
+      // 单击托盘图标显示窗口
+      this.tray.on('click', () => {
+        if (this.mainWindow?.isVisible()) {
+          this.mainWindow.hide();
+        } else {
+          this.mainWindow?.show();
+          this.mainWindow?.focus();
+        }
+      });
+      
+      console.log('系统托盘创建成功');
+    } catch (error) {
+      console.error('创建系统托盘失败:', error);
+    }
+  }
+
+  private registerGlobalShortcuts(): void {
+    try {
+      // 注册快速创建待办快捷键
+      const ret = globalShortcut.register('CommandOrControl+Shift+T', () => {
+        this.handleQuickCreateTodo();
+      });
+
+      if (!ret) {
+        console.error('全局快捷键注册失败');
+      } else {
+        console.log('全局快捷键 Ctrl/Cmd+Shift+T 注册成功');
+      }
+    } catch (error) {
+      console.error('注册全局快捷键时出错:', error);
+    }
+  }
+
+  private handleQuickCreateTodo(): void {
+    try {
+      console.log('触发快速创建待办...');
+      
+      // 1. 读取剪贴板内容
+      const text = clipboard.readText();
+      const image = clipboard.readImage();
+      
+      let content = '';
+      
+      // 2. 处理图片
+      if (!image.isEmpty()) {
+        console.log('检测到剪贴板中的图片');
+        const imageDataUrl = image.toDataURL();
+        content = `<img src="${imageDataUrl}" alt="粘贴的图片" style="max-width: 100%;" />`;
+      }
+      
+      // 3. 处理文字（追加到图片后面，或单独使用）
+      if (text.trim()) {
+        console.log('检测到剪贴板中的文字:', text.substring(0, 50) + '...');
+        if (content) {
+          content += `<p>${text}</p>`;
+        } else {
+          content = `<p>${text}</p>`;
+        }
+      }
+      
+      // 4. 如果没有任何内容，提示用户
+      if (!content) {
+        console.log('剪贴板为空，无法创建待办');
+        // 可以在这里发送系统通知
+        return;
+      }
+      
+      // 5. 显示窗口并发送内容
+      if (this.mainWindow) {
+        this.mainWindow.show();
+        this.mainWindow.focus();
+        
+        // 通过 IPC 发送内容到渲染进程
+        this.mainWindow.webContents.send('quick-create-todo', { content });
+        console.log('已发送快速创建事件到渲染进程');
+      }
+    } catch (error) {
+      console.error('快速创建待办失败:', error);
+    }
   }
 
   private setupIpcHandlers(): void {
@@ -322,21 +451,46 @@ class Application {
       this.createWindow();
       console.log('Main window created successfully');
       
+      // 创建系统托盘
+      console.log('Creating system tray...');
+      this.createTray();
+      console.log('System tray created successfully');
+      
+      // 注册全局快捷键
+      console.log('Registering global shortcuts...');
+      this.registerGlobalShortcuts();
+      console.log('Global shortcuts registered successfully');
+      
     } catch (error) {
       console.error('Error during initialization:', error);
       throw error;
     }
 
+    // 退出前清理
+    app.on('before-quit', () => {
+      this.isQuitting = true;
+    });
+
+    // 注销全局快捷键
+    app.on('will-quit', () => {
+      globalShortcut.unregisterAll();
+      console.log('Global shortcuts unregistered');
+    });
+
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         this.createWindow();
+      } else {
+        // macOS 上点击 Dock 图标时显示窗口
+        this.mainWindow?.show();
+        this.mainWindow?.focus();
       }
     });
 
+    // Windows/Linux: 关闭所有窗口后退出（但托盘除外）
     app.on('window-all-closed', () => {
-      if (process.platform !== 'darwin') {
-        app.quit();
-      }
+      // 不自动退出，因为有托盘图标
+      // 用户需要从托盘菜单选择"退出"
     });
   }
 }

@@ -43,6 +43,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const [relations, setRelations] = useState<TodoRelation[]>([]);
   const [sortOption, setSortOption] = useState<SortOption>('createdAt-desc');
   const [customTabs, setCustomTabs] = useState<CustomTab[]>([]);
+  const [quickCreateContent, setQuickCreateContent] = useState<string | null>(null);
 
   // 加载数据
   useEffect(() => {
@@ -50,6 +51,28 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     loadSettings();
     loadRelations();
   }, []);
+
+  // 监听快速创建待办事件
+  useEffect(() => {
+    const handleQuickCreate = (data: { content: string }) => {
+      console.log('收到快速创建事件:', data);
+      // 打开创建表单
+      setShowForm(true);
+      setEditingTodo(null); // 确保是创建模式
+      
+      // 设置初始内容
+      setQuickCreateContent(data.content);
+      
+      // 显示提示消息
+      message.success('已从剪贴板获取内容，请补充其他信息');
+    };
+    
+    window.electronAPI.onQuickCreateTodo(handleQuickCreate);
+    
+    return () => {
+      window.electronAPI.removeQuickCreateListener();
+    };
+  }, [message]);
 
   // 检查报告提醒
   useEffect(() => {
@@ -236,6 +259,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const handleCloseForm = () => {
     setShowForm(false);
     setEditingTodo(null);
+    setQuickCreateContent(null); // 清空快速创建内容
   };
 
   const handleViewTodo = (todo: Todo) => {
@@ -615,6 +639,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         <TodoForm
           visible={showForm}
           todo={editingTodo}
+          quickCreateContent={quickCreateContent}
           onSubmit={editingTodo ? 
             (data) => handleUpdateTodo(editingTodo.id!, data) : 
             handleCreateTodo

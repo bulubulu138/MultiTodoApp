@@ -49,6 +49,10 @@ export interface ElectronAPI {
   
   // Shell API
   openExternal: (url: string) => Promise<{success: boolean; error?: string}>;
+  
+  // 快速创建待办 API
+  onQuickCreateTodo: (callback: (data: { content: string }) => void) => void;
+  removeQuickCreateListener: () => void;
 }
 
 // 暴露API到渲染进程
@@ -91,4 +95,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     delete: (id: number) => ipcRenderer.invoke('notes:delete', id),
   },
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
+  
+  // 快速创建待办
+  onQuickCreateTodo: (callback: (data: { content: string }) => void) => {
+    ipcRenderer.on('quick-create-todo', (_event, data) => callback(data));
+  },
+  removeQuickCreateListener: () => {
+    ipcRenderer.removeAllListeners('quick-create-todo');
+  },
 } as ElectronAPI);
