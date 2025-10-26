@@ -1,6 +1,6 @@
 import { Todo, TodoRelation, CalendarViewSize, CustomTab } from '../shared/types';
 import React, { useState, useEffect, useMemo } from 'react';
-import { Layout, App as AntApp, Tabs, ConfigProvider, FloatButton } from 'antd';
+import { Layout, App as AntApp, Tabs, ConfigProvider, FloatButton, Modal, Typography, Space, Tag } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { VerticalAlignTopOutlined } from '@ant-design/icons';
 import TodoList from './components/TodoList';
@@ -44,6 +44,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const [sortOption, setSortOption] = useState<SortOption>('createdAt-desc');
   const [customTabs, setCustomTabs] = useState<CustomTab[]>([]);
   const [quickCreateContent, setQuickCreateContent] = useState<string | null>(null);
+  const [showHotkeyGuide, setShowHotkeyGuide] = useState(false);
 
   // 加载数据
   useEffect(() => {
@@ -73,6 +74,18 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       window.electronAPI.removeQuickCreateListener();
     };
   }, [message]);
+
+  // 检查首次运行，显示快捷键引导
+  useEffect(() => {
+    const hasSeenHotkeyGuide = localStorage.getItem('hasSeenHotkeyGuide');
+    if (!hasSeenHotkeyGuide) {
+      // 延迟显示，避免与其他初始化冲突
+      setTimeout(() => {
+        setShowHotkeyGuide(true);
+        localStorage.setItem('hasSeenHotkeyGuide', 'true');
+      }, 1000);
+    }
+  }, []);
 
   // 检查报告提醒
   useEffect(() => {
@@ -716,6 +729,47 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         tooltip="回到顶部"
         visibilityHeight={300}
       />
+
+      {/* 快捷键引导 Modal */}
+      <Modal
+        title="🎉 欢迎使用 MultiTodo"
+        open={showHotkeyGuide}
+        onOk={() => setShowHotkeyGuide(false)}
+        onCancel={() => setShowHotkeyGuide(false)}
+        okText="知道了"
+        cancelText="关闭"
+        width={500}
+      >
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          <div>
+            <Typography.Title level={5}>✨ 快速创建待办</Typography.Title>
+            <Typography.Paragraph>
+              您可以在任何应用中使用全局快捷键快速创建待办：
+            </Typography.Paragraph>
+            <div style={{ textAlign: 'center', margin: '20px 0' }}>
+              <Tag color="blue" style={{ fontSize: '16px', padding: '8px 16px' }}>
+                {navigator.platform.includes('Mac') ? 'Cmd + Shift + T' : 'Ctrl + Shift + T'}
+              </Tag>
+            </div>
+            <Typography.Paragraph type="secondary">
+              使用方法：
+            </Typography.Paragraph>
+            <ul style={{ color: 'rgba(0, 0, 0, 0.45)' }}>
+              <li>在任何应用中选中文字或复制图片</li>
+              <li>按下快捷键</li>
+              <li>MultiTodo 会自动打开并填充内容</li>
+            </ul>
+          </div>
+          <div>
+            <Typography.Title level={5}>💡 提示</Typography.Title>
+            <Typography.Paragraph type="secondary">
+              • 应用关闭后会最小化到系统托盘，不会退出<br />
+              • 您可以在设置中查看更多快捷键信息<br />
+              • 单击托盘图标可快速显示窗口
+            </Typography.Paragraph>
+          </div>
+        </Space>
+      </Modal>
       </Layout>
   );
 };
