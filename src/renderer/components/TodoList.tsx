@@ -1,5 +1,5 @@
 import { Todo, TodoRelation } from '../../shared/types';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { List, Card, Tag, Button, Space, Popconfirm, Select, Typography, Image, Tooltip, App, InputNumber } from 'antd';
 import { EditOutlined, DeleteOutlined, LinkOutlined, EyeOutlined, EyeInvisibleOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined } from '@ant-design/icons';
 import { SortOption } from './Toolbar';
@@ -258,6 +258,43 @@ const TodoList: React.FC<TodoListProps> = ({
     }
   };
 
+  // 使用 DFS 构建并列关系分组 Map
+  const parallelGroups = useMemo(() => {
+    const groups = new Map<number, Set<number>>();
+    const visited = new Set<number>();
+    
+    const dfs = (todoId: number, groupSet: Set<number>) => {
+      if (visited.has(todoId)) return;
+      visited.add(todoId);
+      groupSet.add(todoId);
+      
+      // 找到所有与该 todo 有并列关系的其他 todo
+      const relatedIds = relations
+        .filter(r => r.relation_type === 'parallel')
+        .filter(r => r.source_id === todoId || r.target_id === todoId)
+        .map(r => r.source_id === todoId ? r.target_id : r.source_id);
+      
+      relatedIds.forEach(relatedId => dfs(relatedId, groupSet));
+    };
+    
+    todos.forEach(todo => {
+      if (!visited.has(todo.id!)) {
+        const parallelRels = relations.filter(r =>
+          r.relation_type === 'parallel' &&
+          (r.source_id === todo.id || r.target_id === todo.id)
+        );
+        
+        if (parallelRels.length > 0) {
+          const groupSet = new Set<number>();
+          dfs(todo.id!, groupSet);
+          groupSet.forEach(id => groups.set(id, groupSet));
+        }
+      }
+    });
+    
+    return groups;
+  }, [todos, relations]);
+
   return (
     <>
       <RelationsModal
@@ -294,16 +331,29 @@ const TodoList: React.FC<TodoListProps> = ({
         const prevTodo = index > 0 ? todos[index - 1] : null;
         const nextTodo = index < todos.length - 1 ? todos[index + 1] : null;
         
-        const isGroupStart = !prevTodo || prevTodo.displayOrder !== todo.displayOrder;
-        const isGroupEnd = !nextTodo || nextTodo.displayOrder !== todo.displayOrder;
-        const isInGroup = sortOption === 'manual' && todo.displayOrder != null && (
-          (prevTodo && prevTodo.displayOrder === todo.displayOrder) ||
-          (nextTodo && nextTodo.displayOrder === todo.displayOrder)
-        );
+        // 检查是否在并列分组中
+        const parallelGroup = parallelGroups.get(todo.id!);
+        const isInParallelGroup = parallelGroup && parallelGroup.size > 1;
+        
+        // 只有同时满足以下条件才显示为分组：
+        // 1. 手动排序模式
+        // 2. 有 displayOrder
+        // 3. 确实在并列关系分组中
+        // 4. displayOrder 与相邻待办相同且该相邻待办在同一并列分组中
+        const isInGroup = sortOption === 'manual' && 
+          todo.displayOrder != null && 
+          isInParallelGroup &&
+          (
+            (prevTodo && prevTodo.displayOrder === todo.displayOrder && parallelGroup?.has(prevTodo.id!)) ||
+            (nextTodo && nextTodo.displayOrder === todo.displayOrder && parallelGroup?.has(nextTodo.id!))
+          );
+        
+        const isGroupStart = isInGroup && (!prevTodo || prevTodo.displayOrder !== todo.displayOrder || !parallelGroup?.has(prevTodo.id!));
+        const isGroupEnd = isInGroup && (!nextTodo || nextTodo.displayOrder !== todo.displayOrder || !parallelGroup?.has(nextTodo.id!));
         
         // 调试日志
         if (isInGroup) {
-          console.log(`Todo ${todo.id} (order=${todo.displayOrder}): isGroupStart=${isGroupStart}, isGroupEnd=${isGroupEnd}`);
+          console.log(`Todo ${todo.id} (order=${todo.displayOrder}): isGroupStart=${isGroupStart}, isGroupEnd=${isGroupEnd}, parallelGroupSize=${parallelGroup?.size}`);
         }
         
         return (
