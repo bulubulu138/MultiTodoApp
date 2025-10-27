@@ -476,10 +476,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     
     // 构建并列分组（用于所有排序模式）
     const parallelGroups = buildParallelGroups(filtered, relations);
-    const groupRepresentatives = selectGroupRepresentatives(parallelGroups, filtered);
     
     console.log('[DEBUG] parallelGroups size:', parallelGroups.size);
-    console.log('[DEBUG] groupRepresentatives size:', groupRepresentatives.size);
     if (parallelGroups.size > 0) {
       console.log('[DEBUG] parallelGroups:', Array.from(parallelGroups.entries()).map(([id, set]) => ({
         todoId: id,
@@ -510,6 +508,11 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         id: t.id,
         order: t.displayOrders![activeTab]
       })));
+      
+      // 手动排序模式：使用 ID 比较器选择代表
+      const manualComparator = (a: Todo, b: Todo) => (a.id || 0) - (b.id || 0);
+      const groupRepresentatives = selectGroupRepresentatives(parallelGroups, filtered, manualComparator);
+      console.log('[DEBUG] groupRepresentatives size:', groupRepresentatives.size);
       
       // 使用分组排序（保持并列待办在一起）
       const sorted = sortWithGroups(withOrder, parallelGroups, groupRepresentatives, (a, b) => {
@@ -549,6 +552,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     
     // 获取排序比较器
     const comparator = getSortComparator(sortOption);
+    
+    // 使用时间比较器选择代表
+    const groupRepresentatives = selectGroupRepresentatives(parallelGroups, filtered, comparator);
+    console.log('[DEBUG] groupRepresentatives size:', groupRepresentatives.size);
     
     // 直接对所有待办进行分组排序
     const result = sortWithGroups(filtered, parallelGroups, groupRepresentatives, comparator);

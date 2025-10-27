@@ -53,11 +53,12 @@ export function buildParallelGroups(
 /**
  * 为每个分组选择代表 todo
  * 代表用于排序时取代整个组
- * 策略：选择组内 ID 最小的 todo
+ * 策略：根据比较器选择组内排序值最优的 todo
  */
 export function selectGroupRepresentatives(
   groups: Map<number, Set<number>>,
-  todos: Todo[]
+  todos: Todo[],
+  compareFn: (a: Todo, b: Todo) => number
 ): Map<Set<number>, Todo> {
   const representatives = new Map<Set<number>, Todo>();
   const processedGroups = new Set<Set<number>>();
@@ -66,11 +67,11 @@ export function selectGroupRepresentatives(
     if (processedGroups.has(group)) continue;
     processedGroups.add(group);
 
-    // 选择组内 ID 最小的作为代表
+    // 使用比较器选择代表（选择排序后会在最前面的）
     const groupTodos = todos.filter(t => group.has(t.id!));
     if (groupTodos.length > 0) {
-      const representative = groupTodos.reduce((min, todo) =>
-        todo.id! < min.id! ? todo : min
+      const representative = groupTodos.reduce((best, todo) =>
+        compareFn(todo, best) < 0 ? todo : best
       );
       representatives.set(group, representative);
     }
