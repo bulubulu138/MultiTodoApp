@@ -188,7 +188,7 @@ const TodoList: React.FC<TodoListProps> = ({
       return;
     }
 
-    if (!onUpdateDisplayOrder) return;
+    if (!onUpdateDisplayOrder || newOrder === null) return;
 
     // 添加到保存中状态
     setSavingOrder(prev => new Set(prev).add(todoId));
@@ -417,7 +417,7 @@ const TodoList: React.FC<TodoListProps> = ({
                     min={0}
                     value={currentDisplayOrder}
                     onChange={(value) => handleOrderChange(todo.id!, value)}
-                    onBlur={() => handleOrderSave(todo.id!, currentDisplayOrder)}
+                    onBlur={() => handleOrderSave(todo.id!, currentDisplayOrder ?? undefined)}
                     onPressEnter={(e) => {
                       e.currentTarget.blur();
                     }}
