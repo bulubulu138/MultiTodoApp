@@ -309,6 +309,13 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         throw new Error('Todo not found');
       }
       
+      console.log('[DEBUG] 更新序号:', {
+        todoId: id,
+        tabKey,
+        displayOrder,
+        currentDisplayOrders: todo.displayOrders
+      });
+      
       // 更新指定 tab 的序号
       const newDisplayOrders = { ...(todo.displayOrders || {}) };
       if (displayOrder === null) {
@@ -317,8 +324,12 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         newDisplayOrders[tabKey] = displayOrder;
       }
       
+      console.log('[DEBUG] 新的 displayOrders:', newDisplayOrders);
+      
       await window.electronAPI.todo.update(id, { displayOrders: newDisplayOrders });
       await loadTodos();
+      
+      console.log('[DEBUG] 数据已重新加载');
       message.success('排序已更新');
     } catch (error) {
       message.error('更新排序失败');
@@ -467,8 +478,24 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     const parallelGroups = buildParallelGroups(filtered, relations);
     const groupRepresentatives = selectGroupRepresentatives(parallelGroups, filtered);
     
+    console.log('[DEBUG] parallelGroups size:', parallelGroups.size);
+    console.log('[DEBUG] groupRepresentatives size:', groupRepresentatives.size);
+    if (parallelGroups.size > 0) {
+      console.log('[DEBUG] parallelGroups:', Array.from(parallelGroups.entries()).map(([id, set]) => ({
+        todoId: id,
+        groupIds: Array.from(set)
+      })));
+    }
+    
     // 手动排序模式（使用新的 displayOrders）
     if (sortOption === 'manual') {
+      console.log('[DEBUG] 手动排序模式, activeTab:', activeTab);
+      console.log('[DEBUG] filtered todos:', filtered.map(t => ({ 
+        id: t.id, 
+        title: t.title, 
+        displayOrders: t.displayOrders 
+      })));
+      
       // 分为有序号和无序号两组（检查当前 tab 的序号）
       const withOrder = filtered.filter(todo => 
         todo.displayOrders && todo.displayOrders[activeTab] != null
@@ -476,6 +503,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       const withoutOrder = filtered.filter(todo => 
         !todo.displayOrders || todo.displayOrders[activeTab] == null
       );
+      
+      console.log('[DEBUG] withOrder count:', withOrder.length);
+      console.log('[DEBUG] withoutOrder count:', withoutOrder.length);
       
       // 使用分组排序（保持并列待办在一起）
       const sorted = sortWithGroups(withOrder, parallelGroups, groupRepresentatives, (a, b) => {

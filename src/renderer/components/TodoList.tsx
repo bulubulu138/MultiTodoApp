@@ -178,8 +178,16 @@ const TodoList: React.FC<TodoListProps> = ({
   const handleOrderSave = async (todoId: number, currentValue: number | undefined) => {
     const newOrder = editingOrder[todoId];
     
+    console.log('[DEBUG TodoList] handleOrderSave:', {
+      todoId,
+      newOrder,
+      currentValue,
+      activeTab
+    });
+    
     // 如果没有变化，不保存
     if (newOrder === undefined || newOrder === currentValue) {
+      console.log('[DEBUG TodoList] 无变化，跳过保存');
       setEditingOrder(prev => {
         const next = { ...prev };
         delete next[todoId];
@@ -188,7 +196,10 @@ const TodoList: React.FC<TodoListProps> = ({
       return;
     }
 
-    if (!onUpdateDisplayOrder || newOrder === null) return;
+    if (!onUpdateDisplayOrder || newOrder === null) {
+      console.log('[DEBUG TodoList] 缺少 onUpdateDisplayOrder 或 newOrder 为 null');
+      return;
+    }
 
     // 添加到保存中状态
     setSavingOrder(prev => new Set(prev).add(todoId));
