@@ -14,6 +14,7 @@ import NotesDrawer from './components/NotesDrawer';
 import CalendarDrawer from './components/CalendarDrawer';
 import CustomTabManager from './components/CustomTabManager';
 import { getTheme, ThemeMode } from './theme/themes';
+import { buildParallelGroups, selectGroupRepresentatives, sortWithGroups, getSortComparator } from './utils/sortWithGroups';
 import dayjs from 'dayjs';
 
 const { Content } = Layout;
@@ -300,15 +301,29 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     }
   };
 
-  const handleUpdateDisplayOrder = async (id: number, displayOrder: number | null) => {
+  const handleUpdateDisplayOrder = async (id: number, tabKey: string, displayOrder: number | null) => {
     try {
-      await window.electronAPI.todo.update(id, { displayOrder });
+      // 读取当前 todo 的 displayOrders
+      const todo = todos.find(t => t.id === id);
+      if (!todo) {
+        throw new Error('Todo not found');
+      }
+      
+      // 更新指定 tab 的序号
+      const newDisplayOrders = { ...(todo.displayOrders || {}) };
+      if (displayOrder === null) {
+        delete newDisplayOrders[tabKey];
+      } else {
+        newDisplayOrders[tabKey] = displayOrder;
+      }
+      
+      await window.electronAPI.todo.update(id, { displayOrders: newDisplayOrders });
       await loadTodos();
       message.success('排序已更新');
     } catch (error) {
       message.error('更新排序失败');
       console.error('Error updating display order:', error);
-      throw error; // 重新抛出错误，让TodoList组件知道保存失败
+      throw error;
     }
   };
 
@@ -448,41 +463,41 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       filtered = activeTab === 'all' ? validTodos : validTodos.filter(todo => todo.status === activeTab);
     }
     
-    // 手动排序模式
+    // 构建并列分组（用于所有排序模式）
+    const parallelGroups = buildParallelGroups(filtered, relations);
+    const groupRepresentatives = selectGroupRepresentatives(parallelGroups, filtered);
+    
+    // 手动排序模式（使用新的 displayOrders）
     if (sortOption === 'manual') {
-      // 分为有序号和无序号两组
-      const withOrder = filtered.filter(todo => todo.displayOrder != null);
-      const withoutOrder = filtered.filter(todo => todo.displayOrder == null);
+      // 分为有序号和无序号两组（检查当前 tab 的序号）
+      const withOrder = filtered.filter(todo => 
+        todo.displayOrders && todo.displayOrders[activeTab] != null
+      );
+      const withoutOrder = filtered.filter(todo => 
+        !todo.displayOrders || todo.displayOrders[activeTab] == null
+      );
       
-      // 按displayOrder分组
-      const grouped = new Map<number, Todo[]>();
-      withOrder.forEach(todo => {
-        const order = todo.displayOrder!;
-        if (!grouped.has(order)) {
-          grouped.set(order, []);
-        }
-        grouped.get(order)!.push(todo);
+      // 使用分组排序（保持并列待办在一起）
+      const sorted = sortWithGroups(withOrder, parallelGroups, groupRepresentatives, (a, b) => {
+        const orderA = a.displayOrders![activeTab]!;
+        const orderB = b.displayOrders![activeTab]!;
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.id || 0) - (b.id || 0);
       });
       
-      // 组内按ID排序，组间按displayOrder排序
-      const sorted = Array.from(grouped.entries())
-        .sort((a, b) => a[0] - b[0])
-        .flatMap(([_, todos]) => 
-          todos.sort((a, b) => (a.id || 0) - (b.id || 0))
-        );
-      
-      // 无序号的按创建时间降序排序
-      withoutOrder.sort((a, b) => {
+      // 无序号的按创建时间降序排序（也保持分组）
+      const sortedWithoutOrder = sortWithGroups(withoutOrder, parallelGroups, groupRepresentatives, (a, b) => {
         const aTime = new Date(a.createdAt).getTime();
         const bTime = new Date(b.createdAt).getTime();
         return bTime - aTime;
       });
       
       // 合并：有序号的在前，无序号的在后
-      return [...sorted, ...withoutOrder];
+      return [...sorted, ...sortedWithoutOrder];
     }
     
     // 其他排序模式：分为三组：逾期、活跃（待办和进行中）、已完成
+    // 使用分组排序保持并列待办在一起
     const now = dayjs();
     const overdueTodos: Todo[] = [];
     const activeTodos: Todo[] = [];
@@ -490,64 +505,31 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     
     filtered.forEach(todo => {
       if (todo.status === 'completed') {
-        // 已完成的事项单独分组
         completedTodos.push(todo);
       } else if (todo.deadline && dayjs(todo.deadline).isBefore(now)) {
-        // 逾期的事项（未完成且已过期）
         overdueTodos.push(todo);
       } else {
-        // 活跃的事项（待办、进行中、暂停等）
         activeTodos.push(todo);
       }
     });
     
-    // 逾期待办按逾期时长排序（逾期越久越靠前）
-    overdueTodos.sort((a, b) => {
+    // 获取排序比较器
+    const comparator = getSortComparator(sortOption);
+    
+    // 逾期待办按逾期时长排序（保持分组）
+    const sortedOverdueTodos = sortWithGroups(overdueTodos, parallelGroups, groupRepresentatives, (a, b) => {
       const aDeadline = dayjs(a.deadline!);
       const bDeadline = dayjs(b.deadline!);
-      return aDeadline.diff(bDeadline);  // 升序，越早的越靠前
+      return aDeadline.diff(bDeadline);
     });
     
-    // 根据排序选项对活跃和已完成待办排序
-    const sortTodos = (todosToSort: Todo[]) => {
-      const [field, order] = sortOption.split('-') as [string, 'asc' | 'desc'];
-      
-      return [...todosToSort].sort((a, b) => {
-        let aValue: string | undefined;
-        let bValue: string | undefined;
-        
-        if (field === 'createdAt') {
-          aValue = a.createdAt;
-          bValue = b.createdAt;
-        } else if (field === 'startTime') {
-          aValue = a.startTime;
-          bValue = b.startTime;
-        } else if (field === 'deadline') {
-          aValue = a.deadline;
-          bValue = b.deadline;
-        } else if (field === 'updatedAt') {
-          aValue = a.updatedAt;
-          bValue = b.updatedAt;
-        }
-        
-        // 处理空值：将没有对应字段的项放在最后
-        if (!aValue && !bValue) return 0;
-        if (!aValue) return 1;
-        if (!bValue) return -1;
-        
-        const aTime = new Date(aValue).getTime();
-        const bTime = new Date(bValue).getTime();
-        
-        return order === 'desc' ? bTime - aTime : aTime - bTime;
-      });
-    };
-    
-    const sortedActiveTodos = sortTodos(activeTodos);
-    const sortedCompletedTodos = sortTodos(completedTodos);
+    // 活跃和已完成待办使用排序选项（保持分组）
+    const sortedActiveTodos = sortWithGroups(activeTodos, parallelGroups, groupRepresentatives, comparator);
+    const sortedCompletedTodos = sortWithGroups(completedTodos, parallelGroups, groupRepresentatives, comparator);
     
     // 合并：逾期 > 活跃 > 已完成（沉底）
-    return [...overdueTodos, ...sortedActiveTodos, ...sortedCompletedTodos];
-  }, [todos, activeTab, sortOption]);
+    return [...sortedOverdueTodos, ...sortedActiveTodos, ...sortedCompletedTodos];
+  }, [todos, activeTab, sortOption, relations]);
 
   // Tab配置
   const tabItems = useMemo(() => {
@@ -643,6 +625,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
             relations={relations}
             onRelationsChange={loadRelations}
             sortOption={sortOption}
+            activeTab={activeTab}
             onUpdateDisplayOrder={handleUpdateDisplayOrder}
           />
         </div>

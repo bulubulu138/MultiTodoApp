@@ -23,7 +23,8 @@ interface TodoListProps {
   relations?: TodoRelation[];
   onRelationsChange?: () => Promise<void>; // Callback to refresh global relations
   sortOption?: SortOption; // 当前排序选项
-  onUpdateDisplayOrder?: (id: number, order: number | null) => Promise<void>; // 更新显示序号
+  activeTab: string; // 当前激活的 Tab（用于多Tab独立排序）
+  onUpdateDisplayOrder?: (id: number, tabKey: string, order: number | null) => Promise<void>; // 更新显示序号
 }
 
 const TodoList: React.FC<TodoListProps> = ({
@@ -37,6 +38,7 @@ const TodoList: React.FC<TodoListProps> = ({
   relations = [],
   onRelationsChange,
   sortOption,
+  activeTab,
   onUpdateDisplayOrder
 }) => {
   const { message } = App.useApp();
@@ -172,7 +174,7 @@ const TodoList: React.FC<TodoListProps> = ({
     setEditingOrder(prev => ({ ...prev, [todoId]: value }));
   };
 
-  // 保存序号
+  // 保存序号（支持多Tab独立排序）
   const handleOrderSave = async (todoId: number, currentValue: number | undefined) => {
     const newOrder = editingOrder[todoId];
     
@@ -186,53 +188,53 @@ const TodoList: React.FC<TodoListProps> = ({
       return;
     }
 
-    if (!onUpdateDisplayOrder || newOrder === null) return;
+    if (!onUpdateDisplayOrder) return;
 
     // 添加到保存中状态
     setSavingOrder(prev => new Set(prev).add(todoId));
 
     try {
-      // 1. 获取所有有序号的待办（包括allTodos，因为可能跨tab）
-      const allTodosWithOrder = (allTodos || todos).filter(t => t.displayOrder != null);
+      // 1. 获取当前 tab 所有有序号的待办
+      const currentTabTodos = (allTodos || todos).filter(t => 
+        t.displayOrders && t.displayOrders[activeTab] != null
+      );
       
-      // 2. 找出需要调整的待办（序号 >= newOrder 且不是当前待办）
-      const toAdjust = allTodosWithOrder.filter(t => 
+      // 2. 找出需要调整的待办（当前tab序号 >= newOrder 且不是当前待办）
+      const toAdjust = currentTabTodos.filter(t => 
         t.id !== todoId && 
-        t.displayOrder! >= newOrder
+        t.displayOrders![activeTab]! >= newOrder
       );
       
       // 3. 如果有需要调整的待办，批量更新
       if (toAdjust.length > 0) {
         const updates = toAdjust.map(t => ({
           id: t.id!,
-          displayOrder: t.displayOrder! + 1
+          tabKey: activeTab,
+          displayOrder: t.displayOrders![activeTab]! + 1
         }));
         
-        // 批量更新受影响的待办
-        await window.electronAPI.todo.batchUpdateDisplayOrder(updates);
+        await window.electronAPI.todo.batchUpdateDisplayOrders(updates);
         message.success(`已自动调整 ${toAdjust.length} 个待办的序号`);
       }
       
-      // 4. 检查是否是分组的第一个待办，如果是则同步整组
-      const currentTodo = (allTodos || todos).find(t => t.id === todoId);
-      if (currentTodo && currentValue !== undefined) {
-        // 找出同组的其他待办（具有相同的旧displayOrder）
-        const groupTodos = (allTodos || todos).filter(t => 
-          t.displayOrder === currentValue && t.id !== todoId
-        );
-        
-        if (groupTodos.length > 0) {
-          // 批量更新同组待办到新的displayOrder
-          const groupUpdates = groupTodos.map(t => ({
-            id: t.id!,
+      // 4. 检查是否是并列分组，如果是则同步整组
+      const parallelGroup = parallelGroups.get(todoId);
+      if (parallelGroup && parallelGroup.size > 1) {
+        const groupUpdates = Array.from(parallelGroup)
+          .filter(id => id !== todoId)
+          .map(id => ({
+            id,
+            tabKey: activeTab,
             displayOrder: newOrder
           }));
-          await window.electronAPI.todo.batchUpdateDisplayOrder(groupUpdates);
+        
+        if (groupUpdates.length > 0) {
+          await window.electronAPI.todo.batchUpdateDisplayOrders(groupUpdates);
         }
       }
       
       // 5. 设置当前待办的序号
-      await onUpdateDisplayOrder(todoId, newOrder);
+      await onUpdateDisplayOrder(todoId, activeTab, newOrder);
       
       // 清除编辑状态
       setEditingOrder(prev => {
@@ -315,10 +317,10 @@ const TodoList: React.FC<TodoListProps> = ({
         // Data validation guard
         if (!todo || !todo.id) return null;
         
-        // 获取当前显示的序号值（编辑中的值或原始值）
+        // 获取当前显示的序号值（编辑中的值或原始值，使用当前tab的序号）
         const currentDisplayOrder = editingOrder[todo.id!] !== undefined 
           ? editingOrder[todo.id!] 
-          : todo.displayOrder;
+          : (todo.displayOrders && todo.displayOrders[activeTab]);
         
         // 检查是否是并列待办
         const parallelRelations = relations.filter(r => 
@@ -392,7 +394,7 @@ const TodoList: React.FC<TodoListProps> = ({
                   fontSize: 11,
                   fontWeight: 'bold',
                 }}>
-                  分组 #{todo.displayOrder}
+                  分组 #{currentDisplayOrder}
                 </div>
               )}
               
@@ -415,7 +417,7 @@ const TodoList: React.FC<TodoListProps> = ({
                     min={0}
                     value={currentDisplayOrder}
                     onChange={(value) => handleOrderChange(todo.id!, value)}
-                    onBlur={() => handleOrderSave(todo.id!, todo.displayOrder)}
+                    onBlur={() => handleOrderSave(todo.id!, currentDisplayOrder)}
                     onPressEnter={(e) => {
                       e.currentTarget.blur();
                     }}

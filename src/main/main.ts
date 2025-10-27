@@ -300,6 +300,10 @@ class Application {
       return await this.dbManager.batchUpdateDisplayOrder(updates);
     });
 
+    ipcMain.handle('todo:batchUpdateDisplayOrders', async (_, updates: {id: number, tabKey: string, displayOrder: number}[]) => {
+      return await this.dbManager.batchUpdateDisplayOrders(updates);
+    });
+
     // 设置相关
     ipcMain.handle('settings:get', async () => {
       return await this.dbManager.getSettings();

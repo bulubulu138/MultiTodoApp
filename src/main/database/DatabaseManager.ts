@@ -126,9 +126,58 @@ export class DatabaseManager {
         console.log('contentHash column added successfully');
       }
       
+      // 迁移 displayOrders
+      await this.migrateDisplayOrdersToJSON();
+      
       console.log('Todos table migration completed');
     } catch (error) {
       console.error('Migration error:', error);
+    }
+  }
+
+  private async migrateDisplayOrdersToJSON(): Promise<void> {
+    try {
+      const tableInfo = this.db!.pragma('table_info(todos)') as any[];
+      const hasDisplayOrders = tableInfo.some((col: any) => col.name === 'displayOrders');
+      const hasDisplayOrder = tableInfo.some((col: any) => col.name === 'displayOrder');
+      
+      if (!hasDisplayOrders) {
+        console.log('Adding displayOrders column and migrating data...');
+        
+        // 1. 添加新列
+        this.db!.prepare('ALTER TABLE todos ADD COLUMN displayOrders TEXT').run();
+        
+        // 2. 迁移数据（使用事务保证数据安全）
+        const transaction = this.db!.transaction(() => {
+          if (hasDisplayOrder) {
+            const todosWithOrder = this.db!.prepare(
+              'SELECT id, displayOrder FROM todos WHERE displayOrder IS NOT NULL'
+            ).all() as any[];
+            
+            console.log(`Migrating ${todosWithOrder.length} todos with displayOrder to displayOrders...`);
+            
+            const updateStmt = this.db!.prepare(
+              'UPDATE todos SET displayOrders = ? WHERE id = ?'
+            );
+            
+            for (const row of todosWithOrder) {
+              const orders = JSON.stringify({ all: row.displayOrder });
+              updateStmt.run(orders, row.id);
+            }
+          }
+          
+          // 3. 设置默认值（空对象）
+          this.db!.prepare(
+            "UPDATE todos SET displayOrders = '{}' WHERE displayOrders IS NULL"
+          ).run();
+        });
+        
+        transaction();
+        console.log('displayOrders column added and data migrated successfully');
+      }
+    } catch (error) {
+      console.error('Error migrating displayOrders:', error);
+      throw error;
     }
   }
 
@@ -162,10 +211,12 @@ export class DatabaseManager {
         const now = new Date().toISOString();
         // 生成内容哈希
         const contentHash = todo.contentHash || generateContentHash(todo.title, todo.content);
+        // 处理 displayOrders
+        const displayOrdersJSON = todo.displayOrders ? JSON.stringify(todo.displayOrders) : '{}';
         
         const stmt = this.db!.prepare(
-          `INSERT INTO todos (title, content, status, priority, tags, imageUrl, images, startTime, deadline, displayOrder, contentHash, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO todos (title, content, status, priority, tags, imageUrl, images, startTime, deadline, displayOrder, displayOrders, contentHash, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         );
         
         const result = stmt.run(
@@ -179,6 +230,7 @@ export class DatabaseManager {
           todo.startTime || null,
           todo.deadline || null,
           todo.displayOrder !== undefined ? todo.displayOrder : null,
+          displayOrdersJSON,
           contentHash,
           now,
           now
@@ -230,6 +282,7 @@ export class DatabaseManager {
         if (updates.startTime !== undefined) { fields.push('startTime = ?'); values.push(updates.startTime); }
         if (updates.deadline !== undefined) { fields.push('deadline = ?'); values.push(updates.deadline); }
         if (updates.displayOrder !== undefined) { fields.push('displayOrder = ?'); values.push(updates.displayOrder); }
+        if (updates.displayOrders !== undefined) { fields.push('displayOrders = ?'); values.push(JSON.stringify(updates.displayOrders)); }
         if (updates.contentHash !== undefined) { fields.push('contentHash = ?'); values.push(updates.contentHash); }
 
         // 如果标题或内容被更新，重新生成哈希
@@ -257,7 +310,7 @@ export class DatabaseManager {
     });
   }
 
-  // 批量更新显示序号
+  // 批量更新显示序号（旧方法，保留向后兼容）
   public batchUpdateDisplayOrder(updates: {id: number, displayOrder: number}[]): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
@@ -268,6 +321,33 @@ export class DatabaseManager {
             stmt.run(update.displayOrder, now, update.id);
           }
         });
+        transaction();
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  // 批量更新多Tab独立显示序号
+  public batchUpdateDisplayOrders(updates: {id: number, tabKey: string, displayOrder: number}[]): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        const transaction = this.db!.transaction(() => {
+          const selectStmt = this.db!.prepare('SELECT displayOrders FROM todos WHERE id = ?');
+          const updateStmt = this.db!.prepare('UPDATE todos SET displayOrders = ?, updatedAt = ? WHERE id = ?');
+          const now = new Date().toISOString();
+          
+          for (const update of updates) {
+            const row = selectStmt.get(update.id) as any;
+            if (row) {
+              const orders = row.displayOrders ? JSON.parse(row.displayOrders) : {};
+              orders[update.tabKey] = update.displayOrder;
+              updateStmt.run(JSON.stringify(orders), now, update.id);
+            }
+          }
+        });
+        
         transaction();
         resolve();
       } catch (error) {
@@ -518,6 +598,7 @@ export class DatabaseManager {
       startTime: row.startTime,
       deadline: row.deadline,
       displayOrder: row.displayOrder !== null ? row.displayOrder : undefined,
+      displayOrders: row.displayOrders ? JSON.parse(row.displayOrders) : {},
       contentHash: row.contentHash,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt

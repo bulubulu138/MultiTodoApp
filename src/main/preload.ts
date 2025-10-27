@@ -11,6 +11,7 @@ export interface ElectronAPI {
     generateHash: (title: string, content: string) => Promise<string>;
     findDuplicate: (contentHash: string, excludeId?: number) => Promise<any | null>;
     batchUpdateDisplayOrder: (updates: {id: number, displayOrder: number}[]) => Promise<void>;
+    batchUpdateDisplayOrders: (updates: {id: number, tabKey: string, displayOrder: number}[]) => Promise<void>;
   };
   
   // 设置API
@@ -65,6 +66,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     generateHash: (title: string, content: string) => ipcRenderer.invoke('todo:generateHash', title, content),
     findDuplicate: (contentHash: string, excludeId?: number) => ipcRenderer.invoke('todo:findDuplicate', contentHash, excludeId),
     batchUpdateDisplayOrder: (updates: {id: number, displayOrder: number}[]) => ipcRenderer.invoke('todo:batchUpdateDisplayOrder', updates),
+    batchUpdateDisplayOrders: (updates: {id: number, tabKey: string, displayOrder: number}[]) => ipcRenderer.invoke('todo:batchUpdateDisplayOrders', updates),
   },
   settings: {
     get: (key?: string) => ipcRenderer.invoke(key === 'dbPath' ? 'settings:getDbPath' : 'settings:get'),
