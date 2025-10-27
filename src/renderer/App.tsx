@@ -506,6 +506,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       
       console.log('[DEBUG] withOrder count:', withOrder.length);
       console.log('[DEBUG] withoutOrder count:', withoutOrder.length);
+      console.log('[DEBUG] withOrder todos:', withOrder.map(t => ({
+        id: t.id,
+        order: t.displayOrders![activeTab]
+      })));
       
       // 使用分组排序（保持并列待办在一起）
       const sorted = sortWithGroups(withOrder, parallelGroups, groupRepresentatives, (a, b) => {
@@ -515,6 +519,11 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         return (a.id || 0) - (b.id || 0);
       });
       
+      console.log('[DEBUG] sorted (有序号):', sorted.map(t => ({
+        id: t.id,
+        order: t.displayOrders![activeTab]
+      })));
+      
       // 无序号的按创建时间降序排序（也保持分组）
       const sortedWithoutOrder = sortWithGroups(withoutOrder, parallelGroups, groupRepresentatives, (a, b) => {
         const aTime = new Date(a.createdAt).getTime();
@@ -522,43 +531,36 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         return bTime - aTime;
       });
       
+      console.log('[DEBUG] sortedWithoutOrder (无序号):', sortedWithoutOrder.map(t => t.id));
+      
       // 合并：有序号的在前，无序号的在后
-      return [...sorted, ...sortedWithoutOrder];
+      const result = [...sorted, ...sortedWithoutOrder];
+      console.log('[DEBUG] 排序后结果:', result.map(t => ({
+        id: t.id,
+        title: t.title.substring(0, 10),
+        order: t.displayOrders?.[activeTab]
+      })));
+      return result;
     }
     
-    // 其他排序模式：分为三组：逾期、活跃（待办和进行中）、已完成
-    // 使用分组排序保持并列待办在一起
-    const now = dayjs();
-    const overdueTodos: Todo[] = [];
-    const activeTodos: Todo[] = [];
-    const completedTodos: Todo[] = [];
-    
-    filtered.forEach(todo => {
-      if (todo.status === 'completed') {
-        completedTodos.push(todo);
-      } else if (todo.deadline && dayjs(todo.deadline).isBefore(now)) {
-        overdueTodos.push(todo);
-      } else {
-        activeTodos.push(todo);
-      }
-    });
+    // 其他排序模式：直接使用分组排序
+    // 不再分为逾期/活跃/已完成三组，避免拆散并列待办
+    console.log('[DEBUG] 非手动排序模式, sortOption:', sortOption);
     
     // 获取排序比较器
     const comparator = getSortComparator(sortOption);
     
-    // 逾期待办按逾期时长排序（保持分组）
-    const sortedOverdueTodos = sortWithGroups(overdueTodos, parallelGroups, groupRepresentatives, (a, b) => {
-      const aDeadline = dayjs(a.deadline!);
-      const bDeadline = dayjs(b.deadline!);
-      return aDeadline.diff(bDeadline);
-    });
+    // 直接对所有待办进行分组排序
+    const result = sortWithGroups(filtered, parallelGroups, groupRepresentatives, comparator);
     
-    // 活跃和已完成待办使用排序选项（保持分组）
-    const sortedActiveTodos = sortWithGroups(activeTodos, parallelGroups, groupRepresentatives, comparator);
-    const sortedCompletedTodos = sortWithGroups(completedTodos, parallelGroups, groupRepresentatives, comparator);
+    console.log('[DEBUG] 排序后结果:', result.map(t => ({
+      id: t.id,
+      title: t.title.substring(0, 10),
+      createdAt: t.createdAt,
+      status: t.status
+    })));
     
-    // 合并：逾期 > 活跃 > 已完成（沉底）
-    return [...sortedOverdueTodos, ...sortedActiveTodos, ...sortedCompletedTodos];
+    return result;
   }, [todos, activeTab, sortOption, relations]);
 
   // Tab配置

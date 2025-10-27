@@ -428,7 +428,7 @@ const TodoList: React.FC<TodoListProps> = ({
                     min={0}
                     value={currentDisplayOrder}
                     onChange={(value) => handleOrderChange(todo.id!, value)}
-                    onBlur={() => handleOrderSave(todo.id!, currentDisplayOrder ?? undefined)}
+                    onBlur={() => handleOrderSave(todo.id!, todo.displayOrders?.[activeTab])}
                     onPressEnter={(e) => {
                       e.currentTarget.blur();
                     }}
