@@ -4,11 +4,16 @@ import * as fs from 'fs';
 import { DatabaseManager } from './database/DatabaseManager';
 import { ImageManager } from './utils/ImageManager';
 import { generateContentHash } from './utils/hashUtils';
+import { KeywordProcessor } from './services/KeywordProcessor';
+import { keywordExtractor, KeywordExtractor } from './services/KeywordExtractor';
+import { aiService } from './services/AIService';
+import { TodoRecommendation } from '../shared/types';
 
 class Application {
   private mainWindow: BrowserWindow | null = null;
   private dbManager: DatabaseManager;
   private imageManager: ImageManager;
+  private keywordProcessor: KeywordProcessor | null = null;
   private tray: Tray | null = null;
   private isQuitting: boolean = false;
 
@@ -277,11 +282,27 @@ class Application {
     });
 
     ipcMain.handle('todo:create', async (_, todo) => {
-      return await this.dbManager.createTodo(todo);
+      const createdTodo = await this.dbManager.createTodo(todo);
+      // 异步生成关键词（不阻塞创建流程）
+      if (this.keywordProcessor && createdTodo.id) {
+        this.keywordProcessor.queueTodoForKeywordExtraction(createdTodo).catch(err => {
+          console.error('Failed to queue todo for keyword extraction:', err);
+        });
+      }
+      return createdTodo;
     });
 
     ipcMain.handle('todo:update', async (_, id, updates) => {
-      return await this.dbManager.updateTodo(id, updates);
+      await this.dbManager.updateTodo(id, updates);
+      // 如果标题或内容更新，重新生成关键词
+      if ((updates.title !== undefined || updates.content !== undefined) && this.keywordProcessor) {
+        const todo = await this.dbManager.getTodoById(id);
+        if (todo) {
+          this.keywordProcessor.queueTodoForKeywordExtraction(todo).catch(err => {
+            console.error('Failed to queue todo for keyword extraction:', err);
+          });
+        }
+      }
     });
 
     ipcMain.handle('todo:delete', async (_, id) => {
@@ -417,6 +438,83 @@ class Application {
       }
     });
 
+    // 关键词和推荐相关
+    ipcMain.handle('keywords:getRecommendations', async (_, title: string, content: string, excludeId?: number) => {
+      try {
+        // 提取当前待办的关键词
+        const keywords = keywordExtractor.extractKeywords(title, content);
+        
+        if (keywords.length === 0) {
+          return [];
+        }
+        
+        // 获取相似待办
+        const similarTodos = await this.dbManager.getSimilarTodos(keywords, excludeId, 10);
+        
+        // 构建推荐结果
+        const recommendations: TodoRecommendation[] = similarTodos.map(todo => {
+          const todoKeywords = todo.keywords || [];
+          const similarity = KeywordExtractor.calculateSimilarity(keywords, todoKeywords);
+          const matchedKeywords = KeywordExtractor.getMatchedKeywords(keywords, todoKeywords);
+          
+          return {
+            todo,
+            similarity,
+            matchedKeywords
+          };
+        });
+        
+        return recommendations;
+      } catch (error) {
+        console.error('Error getting recommendations:', error);
+        return [];
+      }
+    });
+
+    ipcMain.handle('keywords:batchGenerate', async () => {
+      try {
+        if (!this.keywordProcessor) {
+          return { success: false, error: 'Keyword processor not initialized' };
+        }
+        
+        const result = await this.keywordProcessor.generateKeywordsForAllTodos();
+        return { success: true, ...result };
+      } catch (error) {
+        console.error('Error in batch keyword generation:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // AI 相关
+    ipcMain.handle('ai:testConnection', async () => {
+      return await aiService.testConnection();
+    });
+
+    ipcMain.handle('ai:configure', async (_, provider: string, apiKey: string, endpoint?: string) => {
+      try {
+        aiService.configure(provider as any, apiKey, endpoint);
+        // 保存到数据库
+        await this.dbManager.updateSettings({
+          ai_provider: provider,
+          ai_api_key: apiKey,
+          ai_api_endpoint: endpoint || '',
+          ai_enabled: provider !== 'disabled' && apiKey ? 'true' : 'false'
+        });
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    ipcMain.handle('ai:getConfig', async () => {
+      return aiService.getConfig();
+    });
+
+    ipcMain.handle('ai:getSupportedProviders', async () => {
+      const { AIService } = await import('./services/AIService');
+      return AIService.getSupportedProviders();
+    });
+
     // 打开外部链接
     ipcMain.handle('shell:openExternal', async (_, url: string) => {
       try {
@@ -445,6 +543,23 @@ class Application {
       console.log('Initializing database...');
       await this.dbManager.initialize();
       console.log('Database initialized successfully');
+      
+      // 初始化关键词处理器
+      console.log('Initializing keyword processor...');
+      this.keywordProcessor = new KeywordProcessor(this.dbManager);
+      console.log('Keyword processor initialized successfully');
+      
+      // 初始化 AI 服务
+      console.log('Initializing AI service...');
+      const settings = await this.dbManager.getSettings();
+      if (settings.ai_enabled === 'true' && settings.ai_provider !== 'disabled') {
+        aiService.configure(
+          settings.ai_provider as any,
+          settings.ai_api_key || '',
+          settings.ai_api_endpoint || undefined
+        );
+      }
+      console.log('AI service initialized successfully');
       
       // 设置IPC处理器
       console.log('Setting up IPC handlers...');

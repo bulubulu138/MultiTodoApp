@@ -97,6 +97,7 @@ export class DatabaseManager {
       const hasDeadline = tableInfo.some((col: any) => col.name === 'deadline');
       const hasDisplayOrder = tableInfo.some((col: any) => col.name === 'displayOrder');
       const hasContentHash = tableInfo.some((col: any) => col.name === 'contentHash');
+      const hasKeywords = tableInfo.some((col: any) => col.name === 'keywords');
       
       if (!hasStartTime) {
         console.log('Adding startTime column to todos table...');
@@ -124,6 +125,14 @@ export class DatabaseManager {
         // 为现有数据生成哈希值
         await this.generateHashesForExistingTodos();
         console.log('contentHash column added successfully');
+      }
+
+      if (!hasKeywords) {
+        console.log('Adding keywords column to todos table...');
+        this.db!.prepare('ALTER TABLE todos ADD COLUMN keywords TEXT').run();
+        // 设置默认值为空数组的JSON字符串
+        this.db!.prepare("UPDATE todos SET keywords = '[]' WHERE keywords IS NULL").run();
+        console.log('keywords column added successfully');
       }
       
       // 迁移 displayOrders
@@ -187,7 +196,12 @@ export class DatabaseManager {
       language: 'zh-CN',
       notifications: 'true',
       sortBy: 'createdAt',
-      sortOrder: 'desc'
+      sortOrder: 'desc',
+      // AI 相关设置
+      ai_provider: 'disabled',
+      ai_api_key: '',
+      ai_api_endpoint: '',
+      ai_enabled: 'false'
     };
 
     try {
@@ -213,10 +227,12 @@ export class DatabaseManager {
         const contentHash = todo.contentHash || generateContentHash(todo.title, todo.content);
         // 处理 displayOrders
         const displayOrdersJSON = todo.displayOrders ? JSON.stringify(todo.displayOrders) : '{}';
+        // 处理 keywords
+        const keywordsJSON = todo.keywords ? JSON.stringify(todo.keywords) : '[]';
         
         const stmt = this.db!.prepare(
-          `INSERT INTO todos (title, content, status, priority, tags, imageUrl, images, startTime, deadline, displayOrder, displayOrders, contentHash, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO todos (title, content, status, priority, tags, imageUrl, images, startTime, deadline, displayOrder, displayOrders, contentHash, keywords, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         );
         
         const result = stmt.run(
@@ -232,6 +248,7 @@ export class DatabaseManager {
           todo.displayOrder !== undefined ? todo.displayOrder : null,
           displayOrdersJSON,
           contentHash,
+          keywordsJSON,
           now,
           now
         );
@@ -284,6 +301,7 @@ export class DatabaseManager {
         if (updates.displayOrder !== undefined) { fields.push('displayOrder = ?'); values.push(updates.displayOrder); }
         if (updates.displayOrders !== undefined) { fields.push('displayOrders = ?'); values.push(JSON.stringify(updates.displayOrders)); }
         if (updates.contentHash !== undefined) { fields.push('contentHash = ?'); values.push(updates.contentHash); }
+        if (updates.keywords !== undefined) { fields.push('keywords = ?'); values.push(JSON.stringify(updates.keywords)); }
 
         // 如果标题或内容被更新，重新生成哈希
         if ((updates.title !== undefined || updates.content !== undefined) && updates.contentHash === undefined) {
@@ -600,6 +618,7 @@ export class DatabaseManager {
       displayOrder: row.displayOrder !== null ? row.displayOrder : undefined,
       displayOrders: row.displayOrders ? JSON.parse(row.displayOrders) : {},
       contentHash: row.contentHash,
+      keywords: row.keywords ? JSON.parse(row.keywords) : [],
       createdAt: row.createdAt,
       updatedAt: row.updatedAt
     };
@@ -641,6 +660,95 @@ export class DatabaseManager {
         reject(error);
       }
     });
+  }
+
+  // 更新待办关键词
+  public updateTodoKeywords(id: number, keywords: string[]): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        const keywordsJSON = JSON.stringify(keywords);
+        this.db!.prepare('UPDATE todos SET keywords = ?, updatedAt = ? WHERE id = ?')
+          .run(keywordsJSON, new Date().toISOString(), id);
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  // 获取所有待办用于批量关键词生成
+  public getTodosWithoutKeywords(): Promise<Todo[]> {
+    return new Promise((resolve, reject) => {
+      try {
+        const rows = this.db!.prepare(
+          "SELECT * FROM todos WHERE keywords IS NULL OR keywords = '[]'"
+        ).all() as any[];
+        resolve(rows.map(row => this.parseTodo(row)));
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  // 根据关键词获取相似待办
+  public getSimilarTodos(keywords: string[], excludeId?: number, limit: number = 10): Promise<Todo[]> {
+    return new Promise((resolve, reject) => {
+      try {
+        // 获取所有待办（除了当前待办）
+        let query = 'SELECT * FROM todos WHERE keywords IS NOT NULL AND keywords != ?';
+        const params: any[] = ['[]'];
+        
+        if (excludeId) {
+          query += ' AND id != ?';
+          params.push(excludeId);
+        }
+        
+        const rows = this.db!.prepare(query).all(...params) as any[];
+        const todos = rows.map(row => this.parseTodo(row));
+        
+        // 如果没有关键词，直接返回空数组
+        if (!keywords || keywords.length === 0) {
+          resolve([]);
+          return;
+        }
+        
+        // 计算相似度并排序
+        const todosWithSimilarity = todos.map(todo => {
+          const todoKeywords = todo.keywords || [];
+          const similarity = this.calculateJaccardSimilarity(keywords, todoKeywords);
+          return { todo, similarity };
+        });
+        
+        // 过滤相似度 > 0.2 的待办，按相似度降序排序
+        const filtered = todosWithSimilarity
+          .filter(item => item.similarity > 0.2)
+          .sort((a, b) => b.similarity - a.similarity)
+          .slice(0, limit)
+          .map(item => item.todo);
+        
+        resolve(filtered);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  // 计算 Jaccard 相似度
+  private calculateJaccardSimilarity(keywords1: string[], keywords2: string[]): number {
+    if (!keywords1 || !keywords2 || keywords1.length === 0 || keywords2.length === 0) {
+      return 0;
+    }
+    
+    const set1 = new Set(keywords1);
+    const set2 = new Set(keywords2);
+    
+    // 交集
+    const intersection = new Set([...set1].filter(x => set2.has(x)));
+    
+    // 并集
+    const union = new Set([...set1, ...set2]);
+    
+    return intersection.size / union.size;
   }
 
   public close(): void {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider } from 'antd';
-import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert } from 'antd';
+import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { App } from 'antd';
 import { Todo } from '../../shared/types';
 import TagManagement from './TagManagement';
@@ -25,15 +25,28 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   onReload
 }) => {
   const [form] = Form.useForm();
+  const [aiForm] = Form.useForm();
   const { message } = App.useApp();
   const [dbPath, setDbPath] = useState<string>('加载中...');
   const [activeTab, setActiveTab] = useState('general');
+  const [aiProviders, setAiProviders] = useState<Array<{value: string; label: string; endpoint: string}>>([]);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionTestResult, setConnectionTestResult] = useState<{success: boolean; message: string} | null>(null);
+  const [generatingKeywords, setGeneratingKeywords] = useState(false);
 
   useEffect(() => {
     if (visible) {
       form.setFieldsValue({
         theme: settings.theme || 'light',
         calendarViewSize: settings.calendarViewSize || 'compact',
+      });
+      
+      // 加载AI配置
+      aiForm.setFieldsValue({
+        ai_provider: settings.ai_provider || 'disabled',
+        ai_api_key: settings.ai_api_key || '',
+        ai_api_endpoint: settings.ai_api_endpoint || '',
+        ai_enabled: settings.ai_enabled === 'true',
       });
       
       // 获取数据库路径
@@ -46,8 +59,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       }).catch(() => {
         setDbPath('获取失败');
       });
+      
+      // 获取支持的AI提供商
+      window.electronAPI.ai.getSupportedProviders().then((providers) => {
+        setAiProviders(providers);
+      }).catch(() => {
+        console.error('Failed to load AI providers');
+      });
     }
-  }, [visible, settings, form]);
+  }, [visible, settings, form, aiForm]);
 
   const handleSubmit = () => {
     const values = form.getFieldsValue();
@@ -74,6 +94,86 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       }).catch(() => {
         message.error('复制失败');
       });
+    }
+  };
+
+  const handleAIConfigSave = async () => {
+    try {
+      const values = await aiForm.validateFields();
+      const result = await window.electronAPI.ai.configure(
+        values.ai_provider,
+        values.ai_api_key || '',
+        values.ai_api_endpoint || ''
+      );
+      
+      if (result.success) {
+        message.success('AI配置已保存');
+        // 同时更新settings
+        await window.electronAPI.settings.update({
+          ai_provider: values.ai_provider,
+          ai_api_key: values.ai_api_key || '',
+          ai_api_endpoint: values.ai_api_endpoint || '',
+          ai_enabled: values.ai_provider !== 'disabled' && values.ai_api_key ? 'true' : 'false'
+        });
+        setConnectionTestResult(null); // 清除测试结果
+      } else {
+        message.error('保存失败: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Failed to save AI config:', error);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setTestingConnection(true);
+    setConnectionTestResult(null);
+    
+    try {
+      const values = await aiForm.validateFields();
+      
+      // 先保存配置
+      await window.electronAPI.ai.configure(
+        values.ai_provider,
+        values.ai_api_key || '',
+        values.ai_api_endpoint || ''
+      );
+      
+      // 测试连接
+      const result = await window.electronAPI.ai.testConnection();
+      setConnectionTestResult(result);
+      
+      if (result.success) {
+        message.success('连接成功！');
+      } else {
+        message.error('连接失败: ' + result.message);
+      }
+    } catch (error: any) {
+      setConnectionTestResult({
+        success: false,
+        message: error.message || '测试失败'
+      });
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
+  const handleBatchGenerateKeywords = async () => {
+    setGeneratingKeywords(true);
+    try {
+      const result = await window.electronAPI.keywords.batchGenerate();
+      
+      if (result.success) {
+        message.success(`关键词生成完成！处理了 ${result.processed}/${result.total} 个待办`);
+        if (onReload) {
+          await onReload();
+        }
+      } else {
+        message.error('生成失败: ' + result.error);
+      }
+    } catch (error: any) {
+      message.error('生成失败: ' + error.message);
+    } finally {
+      setGeneratingKeywords(false);
     }
   };
 
@@ -251,6 +351,130 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
       ),
     },
+    {
+      key: 'ai',
+      label: (
+        <span>
+          <RobotOutlined />
+          AI 助手
+        </span>
+      ),
+      children: (
+        <div>
+          <Alert
+            message="智能推荐与AI增强"
+            description="配置AI服务后，未来可享受智能待办分析、自动摘要等功能。当前已支持基于关键词的智能推荐。"
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+          
+          <Form form={aiForm} layout="vertical">
+            <Form.Item
+              name="ai_provider"
+              label="AI 服务提供商"
+              tooltip="选择您使用的AI服务商"
+            >
+              <Select
+                options={[
+                  { label: '🚫 禁用', value: 'disabled' },
+                  ...aiProviders.map(p => ({ label: p.label, value: p.value }))
+                ]}
+                onChange={() => setConnectionTestResult(null)}
+              />
+            </Form.Item>
+
+            <Form.Item
+              noStyle
+              shouldUpdate={(prevValues, currentValues) => prevValues.ai_provider !== currentValues.ai_provider}
+            >
+              {({ getFieldValue }) => {
+                const provider = getFieldValue('ai_provider');
+                if (provider === 'disabled') {
+                  return null;
+                }
+                
+                return (
+                  <>
+                    <Form.Item
+                      name="ai_api_key"
+                      label="API Key"
+                      rules={[{ required: provider !== 'disabled', message: '请输入API Key' }]}
+                    >
+                      <Input.Password
+                        placeholder="输入您的API Key"
+                        onChange={() => setConnectionTestResult(null)}
+                      />
+                    </Form.Item>
+
+                    <Form.Item
+                      name="ai_api_endpoint"
+                      label="API 端点（可选）"
+                      tooltip="如需使用自定义端点，请填写完整URL"
+                    >
+                      <Input
+                        placeholder={aiProviders.find(p => p.value === provider)?.endpoint || '默认端点'}
+                        onChange={() => setConnectionTestResult(null)}
+                      />
+                    </Form.Item>
+
+                    <Form.Item>
+                      <Space>
+                        <Button
+                          type="primary"
+                          onClick={handleAIConfigSave}
+                        >
+                          保存配置
+                        </Button>
+                        <Button
+                          onClick={handleTestConnection}
+                          loading={testingConnection}
+                        >
+                          测试连接
+                        </Button>
+                      </Space>
+                    </Form.Item>
+
+                    {connectionTestResult && (
+                      <Alert
+                        message={connectionTestResult.success ? '连接成功' : '连接失败'}
+                        description={connectionTestResult.message}
+                        type={connectionTestResult.success ? 'success' : 'error'}
+                        showIcon
+                        icon={connectionTestResult.success ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+                        closable
+                        onClose={() => setConnectionTestResult(null)}
+                      />
+                    )}
+                  </>
+                );
+              }}
+            </Form.Item>
+          </Form>
+
+          <Divider />
+
+          <Card title="🔑 关键词管理" bordered={false} size="small">
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                系统会自动为新建和编辑的待办提取关键词，用于智能推荐相关待办。
+              </Text>
+              <Button
+                type="default"
+                loading={generatingKeywords}
+                onClick={handleBatchGenerateKeywords}
+                block
+              >
+                {generatingKeywords ? '生成中...' : '为所有待办生成关键词'}
+              </Button>
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                💡 首次使用或导入数据后，建议点击此按钮为现有待办生成关键词
+              </Text>
+            </Space>
+          </Card>
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -259,8 +483,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       open={visible}
       onOk={activeTab === 'general' ? handleSubmit : onCancel}
       onCancel={onCancel}
-      okText={activeTab === 'general' ? '保存' : '关闭'}
-      cancelText={activeTab === 'general' ? '取消' : undefined}
+      okText={activeTab === 'general' || activeTab === 'ai' ? '保存' : '关闭'}
+      cancelText={(activeTab === 'general' || activeTab === 'ai') ? '取消' : undefined}
       width={800}
       bodyStyle={{ padding: '16px 24px' }}
     >

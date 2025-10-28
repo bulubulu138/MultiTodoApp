@@ -15,12 +15,31 @@ export interface Todo {
   displayOrder?: number; // 手动排序序号（向后兼容，保留）
   displayOrders?: { [tabKey: string]: number }; // 多Tab独立排序序号
   contentHash?: string; // 内容哈希值，用于去重检测
+  keywords?: string[]; // 关键词数组，用于智能推荐
   createdAt: string;
   updatedAt: string;
 }
 
 export interface Settings {
   [key: string]: string;
+}
+
+// AI 提供商类型
+export type AIProvider = 'disabled' | 'kimi' | 'deepseek' | 'doubao' | 'custom';
+
+// AI 配置接口
+export interface AIConfig {
+  provider: AIProvider;
+  apiKey: string;
+  apiEndpoint?: string; // 自定义端点
+  enabled: boolean;
+}
+
+// 待办推荐结果
+export interface TodoRecommendation {
+  todo: Todo;
+  similarity: number; // 相似度 0-1
+  matchedKeywords: string[]; // 匹配的关键词
 }
 
 export interface CustomTab {

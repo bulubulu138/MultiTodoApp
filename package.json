@@ -7,15 +7,18 @@
     "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
     "dev:main": "tsc -p tsconfig.main.json && electron dist/main/main.js",
     "dev:renderer": "webpack serve --config webpack.renderer.config.js",
+    "prebuild": "node scripts/prebuild-check.js && npm run rebuild",
     "build": "npm run build:main && npm run build:renderer",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "webpack --config webpack.renderer.config.js",
-    "rebuild": "electron-rebuild -f -w better-sqlite3",
+    "rebuild": "electron-rebuild -f -w better-sqlite3 -w nodejieba",
+    "verify": "node scripts/verify-native-modules.js",
     "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder",
-    "dist:win": "npm run build && electron-builder --win",
-    "dist:mac": "npm run build && electron-builder --mac",
-    "postinstall": "electron-builder install-app-deps"
+    "predist": "npm run build",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "postinstall": "electron-builder install-app-deps && npm run rebuild"
   },
   "keywords": [
     "electron",
@@ -61,6 +64,7 @@
     "react-dom": "^18.2.0",
     "react-quill-new": "^3.6.0",
     "better-sqlite3": "^11.7.0",
+    "nodejieba": "^2.6.0",
     "stream-browserify": "^3.0.0",
     "util": "^0.12.5"
   },
@@ -75,7 +79,19 @@
     "files": [
       "dist/**/*",
       "node_modules/**/*",
-      "package.json"
+      "package.json",
+      "!node_modules/better-sqlite3/build/Release/obj{,/**/*}",
+      "!node_modules/nodejieba/build/Release/obj{,/**/*}",
+      "!node_modules/**/test/**/*",
+      "!node_modules/**/*.md",
+      "!node_modules/**/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!node_modules/**/{test,__tests__,tests,powered-test,example,examples}",
+      "!node_modules/**/*.d.ts",
+      "!node_modules/.bin"
+    ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*",
+      "node_modules/nodejieba/**/*"
     ],
     "win": {
       "target": [
@@ -113,13 +129,17 @@
           ]
         }
       ],
-      "icon": "assets/icon_512x512.png",
+      "icon": "assets/icon.icns",
       "category": "public.app-category.productivity",
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "assets/entitlements.mac.plist",
-      "entitlementsInherit": "assets/entitlements.mac.plist"
+      "entitlementsInherit": "assets/entitlements.mac.plist",
+      "extendInfo": {
+        "NSCameraUsageDescription": "This app does not use the camera.",
+        "NSMicrophoneUsageDescription": "This app does not use the microphone."
+      }
     },
     "dmg": {
       "contents": [
@@ -135,9 +155,10 @@
         }
       ],
       "title": "MultiTodo ${version}",
-      "icon": "assets/icon_512x512.png",
+      "icon": "assets/icon.icns",
       "background": null,
       "format": "ULFO"
-    }
+    },
+    "electronVersion": "27.0.0"
   }
 }

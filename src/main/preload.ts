@@ -14,6 +14,20 @@ export interface ElectronAPI {
     batchUpdateDisplayOrders: (updates: {id: number, tabKey: string, displayOrder: number}[]) => Promise<void>;
   };
   
+  // 关键词和推荐API
+  keywords: {
+    getRecommendations: (title: string, content: string, excludeId?: number) => Promise<any[]>;
+    batchGenerate: () => Promise<{success: boolean; total?: number; processed?: number; failed?: number; error?: string}>;
+  };
+  
+  // AI API
+  ai: {
+    testConnection: () => Promise<{success: boolean; message: string}>;
+    configure: (provider: string, apiKey: string, endpoint?: string) => Promise<{success: boolean; error?: string}>;
+    getConfig: () => Promise<{provider: string; endpoint: string; enabled: boolean}>;
+    getSupportedProviders: () => Promise<Array<{value: string; label: string; endpoint: string}>>;
+  };
+  
   // 设置API
   settings: {
     get: (key?: string) => Promise<any>;
@@ -67,6 +81,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     findDuplicate: (contentHash: string, excludeId?: number) => ipcRenderer.invoke('todo:findDuplicate', contentHash, excludeId),
     batchUpdateDisplayOrder: (updates: {id: number, displayOrder: number}[]) => ipcRenderer.invoke('todo:batchUpdateDisplayOrder', updates),
     batchUpdateDisplayOrders: (updates: {id: number, tabKey: string, displayOrder: number}[]) => ipcRenderer.invoke('todo:batchUpdateDisplayOrders', updates),
+  },
+  keywords: {
+    getRecommendations: (title: string, content: string, excludeId?: number) => 
+      ipcRenderer.invoke('keywords:getRecommendations', title, content, excludeId),
+    batchGenerate: () => ipcRenderer.invoke('keywords:batchGenerate'),
+  },
+  ai: {
+    testConnection: () => ipcRenderer.invoke('ai:testConnection'),
+    configure: (provider: string, apiKey: string, endpoint?: string) => 
+      ipcRenderer.invoke('ai:configure', provider, apiKey, endpoint),
+    getConfig: () => ipcRenderer.invoke('ai:getConfig'),
+    getSupportedProviders: () => ipcRenderer.invoke('ai:getSupportedProviders'),
   },
   settings: {
     get: (key?: string) => ipcRenderer.invoke(key === 'dbPath' ? 'settings:getDbPath' : 'settings:get'),
