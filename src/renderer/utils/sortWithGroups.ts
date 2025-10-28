@@ -104,11 +104,9 @@ export function sortWithGroups(
     grouped.get(group)!.push(todo);
   }
 
-  // 2. 组内也使用比较器排序（确保手动模式按序号、时间模式按时间）
+  // 2. 组内排序：所有待办都使用比较器排序（无论是否有分组）
   for (const [group, todoList] of grouped) {
-    if (group) {
-      todoList.sort(compareFn);
-    }
+    todoList.sort(compareFn);
   }
 
   // 3. 组间排序（使用代表）
