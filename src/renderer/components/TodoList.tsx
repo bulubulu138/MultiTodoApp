@@ -348,29 +348,20 @@ const TodoList: React.FC<TodoListProps> = ({
         const parallelGroup = parallelGroups.get(todo.id!);
         const isInParallelGroup = parallelGroup && parallelGroup.size > 1;
         
-        // 获取相邻待办的显示序号
-        const prevDisplayOrder = prevTodo?.displayOrders?.[activeTab];
-        const nextDisplayOrder = nextTodo?.displayOrders?.[activeTab];
-        
-        // 只有同时满足以下条件才显示为分组：
-        // 1. 手动排序模式
-        // 2. 有 displayOrder
-        // 3. 确实在并列关系分组中
-        // 4. displayOrder 与相邻待办相同且该相邻待办在同一并列分组中
-        const isInGroup = sortOption === 'manual' && 
-          currentDisplayOrder != null && 
-          isInParallelGroup &&
+        // 统一分组判断：所有排序模式下，只要有并列关系且相邻即显示分组
+        // sortWithGroups 确保并列待办在所有模式下都相邻
+        const isInGroup = isInParallelGroup &&
           (
-            (prevTodo && prevDisplayOrder === currentDisplayOrder && parallelGroup?.has(prevTodo.id!)) ||
-            (nextTodo && nextDisplayOrder === currentDisplayOrder && parallelGroup?.has(nextTodo.id!))
+            (prevTodo && parallelGroup?.has(prevTodo.id!)) ||
+            (nextTodo && parallelGroup?.has(nextTodo.id!))
           );
         
-        const isGroupStart = isInGroup && (!prevTodo || prevDisplayOrder !== currentDisplayOrder || !parallelGroup?.has(prevTodo.id!));
-        const isGroupEnd = isInGroup && (!nextTodo || nextDisplayOrder !== currentDisplayOrder || !parallelGroup?.has(nextTodo.id!));
+        const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(prevTodo.id!));
+        const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(nextTodo.id!));
         
         // 调试日志
         if (isInGroup) {
-          console.log(`Todo ${todo.id} (order=${currentDisplayOrder}): isGroupStart=${isGroupStart}, isGroupEnd=${isGroupEnd}, parallelGroupSize=${parallelGroup?.size}`);
+          console.log(`Todo ${todo.id}: isGroupStart=${isGroupStart}, isGroupEnd=${isGroupEnd}, parallelGroupSize=${parallelGroup?.size}, sortOption=${sortOption}`);
         }
         
         return (
