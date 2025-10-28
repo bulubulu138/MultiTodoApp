@@ -43,40 +43,33 @@ jobs:
           cache-dependency-path: '**/package-lock.json'
 
       - name: Install dependencies
-        working-directory: MultiTodoApp
         run: npm ci
 
       - name: Rebuild native modules (Windows)
         if: matrix.platform == 'win'
-        working-directory: MultiTodoApp
         run: npm run rebuild
         env:
           npm_config_msvs_version: 2019
 
       - name: Rebuild native modules (macOS)
         if: matrix.platform == 'mac'
-        working-directory: MultiTodoApp
         run: npm run rebuild
 
       - name: Verify native modules
-        working-directory: MultiTodoApp
         run: npm run verify
         continue-on-error: true
 
       - name: Build application
-        working-directory: MultiTodoApp
         run: npm run build
 
       - name: Package application (Windows)
         if: matrix.platform == 'win'
-        working-directory: MultiTodoApp
         run: npm run dist:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Package application (macOS x64)
         if: matrix.platform == 'mac' && matrix.arch == 'x64'
-        working-directory: MultiTodoApp
         run: npm run dist:mac -- --x64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -87,7 +80,6 @@ jobs:
 
       - name: Package application (macOS ARM64)
         if: matrix.platform == 'mac' && matrix.arch == 'arm64'
-        working-directory: MultiTodoApp
         run: npm run dist:mac -- --arm64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -102,8 +94,8 @@ jobs:
         with:
           name: MultiTodo-Windows-${{ matrix.arch }}
           path: |
-            MultiTodoApp/release/*.exe
-            MultiTodoApp/release/*.exe.blockmap
+            release/*.exe
+            release/*.exe.blockmap
           if-no-files-found: error
 
       - name: Upload artifacts (macOS)
@@ -112,8 +104,8 @@ jobs:
         with:
           name: MultiTodo-macOS-${{ matrix.arch }}
           path: |
-            MultiTodoApp/release/*.dmg
-            MultiTodoApp/release/*.dmg.blockmap
+            release/*.dmg
+            release/*.dmg.blockmap
           if-no-files-found: error
 
   release:
@@ -141,9 +133,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/MultiTodo-Windows-x64/*.exe
-            artifacts/MultiTodo-macOS-x64/*.dmg
-            artifacts/MultiTodo-macOS-arm64/*.dmg
+            artifacts/**/*.exe
+            artifacts/**/*.dmg
           draft: false
           prerelease: false
           generate_release_notes: true
