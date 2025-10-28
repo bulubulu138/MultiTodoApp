@@ -104,10 +104,10 @@ export function sortWithGroups(
     grouped.get(group)!.push(todo);
   }
 
-  // 2. 组内按 ID 排序（保持稳定顺序）
+  // 2. 组内也使用比较器排序（确保手动模式按序号、时间模式按时间）
   for (const [group, todoList] of grouped) {
     if (group) {
-      todoList.sort((a, b) => (a.id || 0) - (b.id || 0));
+      todoList.sort(compareFn);
     }
   }
 
