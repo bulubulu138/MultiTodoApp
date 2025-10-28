@@ -82,49 +82,35 @@ async function verifyBetterSqlite3() {
 }
 
 /**
- * 验证 nodejieba
+ * 验证 segment
  */
-async function verifyNodeJieba() {
-  logInfo('验证 nodejieba...');
+async function verifySegment() {
+  logInfo('验证 segment...');
   
   try {
-    const nodejieba = require('nodejieba');
+    const Segment = require('segment');
+    const segment = new Segment();
+    segment.useDefault();
     
     // 测试分词
     const testText = '我来到北京清华大学学习自然语言处理';
-    const words = nodejieba.cut(testText);
+    const words = segment.doSegment(testText, { simple: true });
     
     if (words && words.length > 0) {
-      logSuccess(`nodejieba 加载成功，功能正常`);
+      logSuccess(`segment 加载成功，功能正常`);
       logInfo(`  - 分词功能: ✓`);
       logInfo(`  - 测试文本: "${testText}"`);
       logInfo(`  - 分词结果: [${words.join(', ')}]`);
       logInfo(`  - 词数: ${words.length}`);
       
-      // 测试关键词提取
-      const keywords = nodejieba.extract(testText, 5);
-      if (keywords && keywords.length > 0) {
-        logInfo(`  - 关键词提取: ✓`);
-        logInfo(`  - 关键词: [${keywords.map(k => k.word).join(', ')}]`);
-      }
-      
       return true;
     } else {
-      logError(`nodejieba 功能异常: 分词结果为空`);
+      logError(`segment 功能异常: 分词结果为空`);
       return false;
     }
   } catch (error) {
-    logError(`nodejieba 验证失败: ${error.message}`);
+    logError(`segment 验证失败: ${error.message}`);
     logError(`错误详情: ${error.stack}`);
-    
-    // 提供详细的错误诊断
-    if (error.message.includes('MODULE_NOT_FOUND')) {
-      logError(`模块未找到，可能需要重新安装`);
-      logInfo(`尝试运行: npm run rebuild`);
-    } else if (error.message.includes('找不到指定的模块')) {
-      logError(`原生模块编译失败或不匹配`);
-      logInfo(`尝试运行: npm run rebuild`);
-    }
     
     return false;
   }
@@ -139,13 +125,13 @@ function getModuleInfo() {
   try {
     const pkg = require('../package.json');
     const betterSqlite3Version = pkg.dependencies['better-sqlite3'];
-    const nodejiebaVersion = pkg.dependencies['nodejieba'];
+    const segmentVersion = pkg.dependencies['segment'];
     const electronVersion = pkg.devDependencies['electron'];
     
     logInfo(`当前配置:`);
     logInfo(`  - Electron: ${electronVersion}`);
     logInfo(`  - better-sqlite3: ${betterSqlite3Version}`);
-    logInfo(`  - nodejieba: ${nodejiebaVersion}`);
+    logInfo(`  - segment: ${segmentVersion}`);
     logInfo(`  - Node.js: ${process.version}`);
     logInfo(`  - 平台: ${process.platform}-${process.arch}`);
   } catch (error) {
@@ -167,11 +153,6 @@ function checkBinaryFiles() {
       name: 'better-sqlite3',
       binary: 'better_sqlite3.node',
       path: path.join(nodeModulesPath, 'better-sqlite3', 'build', 'Release', 'better_sqlite3.node')
-    },
-    {
-      name: 'nodejieba',
-      binary: 'nodejieba.node',
-      path: path.join(nodeModulesPath, 'nodejieba', 'build', 'Release', 'nodejieba.node')
     }
   ];
   
@@ -219,8 +200,8 @@ async function main() {
   console.log('');
   
   results.push({
-    name: 'nodejieba',
-    passed: await verifyNodeJieba()
+    name: 'segment',
+    passed: await verifySegment()
   });
   console.log('');
 
@@ -234,7 +215,7 @@ async function main() {
     logSuccess(`所有原生模块验证通过！(${passedCount}/${totalCount})`);
     log('='.repeat(60), colors.bright);
     console.log('');
-    logInfo('✓ 可以安全使用关键词提取和数据库功能');
+    logInfo('✓ 可以安全使用中文分词和数据库功能');
     logInfo('✓ 可以进行打包构建');
   } else {
     logError(`部分模块验证失败 (${passedCount}/${totalCount})`);

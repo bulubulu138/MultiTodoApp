@@ -25,7 +25,7 @@
 #### 2.1 KeywordExtractor服务
 **文件**: `src/main/services/KeywordExtractor.ts`
 
-- **分词引擎**: 使用 nodejieba 进行高精度中文分词
+- **分词引擎**: 使用 segment 进行中文分词（纯 JavaScript，跨平台兼容性好）
 - **关键词提取**: 实现 TF-IDF 算法，提取Top 10关键词
 - **停用词过滤**: 内置常见中文停用词表（60+个）
 - **词长过滤**: 保留2-15个字符的有效词汇
@@ -204,7 +204,7 @@ interface TodoRecommendation {
 ## 技术架构
 
 ### 核心技术栈
-- **分词**: nodejieba (C++原生模块，高性能)
+- **分词**: segment (纯 JavaScript，无需编译)
 - **算法**: TF-IDF关键词提取 + Jaccard相似度
 - **存储**: SQLite JSON字段
 - **UI**: Ant Design (Card/Tag/Space/Spin/Empty组件)
@@ -263,7 +263,7 @@ src/renderer/components/
 ├── SettingsModal.tsx         # AI助手Tab
 └── TodoForm.tsx              # 推荐关联UI
 
-package.json                  # 新增nodejieba依赖
+package.json                  # 新增segment依赖
 ```
 
 ## 依赖变更
@@ -271,14 +271,14 @@ package.json                  # 新增nodejieba依赖
 ### 新增依赖
 ```json
 {
-  "nodejieba": "^2.6.0"
+  "segment": "^0.1.3"
 }
 ```
 
 ### 构建脚本更新
 ```json
 {
-  "rebuild": "electron-rebuild -f -w better-sqlite3 -w nodejieba"
+  "rebuild": "electron-rebuild -f -w better-sqlite3"
 }
 ```
 
@@ -312,13 +312,13 @@ package.json                  # 新增nodejieba依赖
 - [ ] 前端防抖机制有效性
 
 ### 兼容性测试
-- [ ] Windows平台nodejieba编译
-- [ ] macOS平台nodejieba编译
+- [x] Windows平台segment安装（纯JS，无需编译）
+- [x] macOS平台segment安装（纯JS，无需编译）
 - [ ] 数据库迁移正确性
 
 ## 注意事项
 
-1. **原生模块编译**: nodejieba是C++原生模块，首次安装需要运行 `npm run rebuild`
+1. **依赖安装**: segment是纯JavaScript库，无需编译，`npm install` 后即可使用
 2. **性能考虑**: 批量生成关键词时会有一定CPU占用，建议在空闲时执行
 3. **API安全**: AI API Key存储在本地数据库，建议使用环境变量或加密存储
 4. **推荐精度**: 基于关键词的推荐可能不如语义理解准确，可通过调整相似度阈值优化

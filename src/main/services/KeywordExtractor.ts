@@ -1,5 +1,8 @@
-// 关键词提取服务 - 使用 nodejieba 进行中文分词和关键词提取
-import * as nodejieba from 'nodejieba';
+// 关键词提取服务 - 使用 segment 进行中文分词和关键词提取
+const Segment = require('segment');
+const segment = new Segment.Segment();
+// 使用默认的识别模块及字典
+segment.useDefault();
 
 // 常见中文停用词表
 const STOP_WORDS = new Set([
@@ -19,25 +22,8 @@ const MIN_WORD_LENGTH = 2;
 const MAX_WORD_LENGTH = 15;
 
 export class KeywordExtractor {
-  private initialized: boolean = false;
-
   constructor() {
-    this.initialize();
-  }
-
-  /**
-   * 初始化 nodejieba（加载词典）
-   */
-  private initialize(): void {
-    try {
-      if (!this.initialized) {
-        // nodejieba 会自动加载默认词典
-        console.log('KeywordExtractor initialized successfully');
-        this.initialized = true;
-      }
-    } catch (error) {
-      console.error('Failed to initialize KeywordExtractor:', error);
-    }
+    console.log('KeywordExtractor initialized with segment');
   }
 
   /**
@@ -59,14 +45,26 @@ export class KeywordExtractor {
         return [];
       }
 
-      // 使用 TF-IDF 提取关键词
-      const keywords = nodejieba.extract(text, 15); // 提取最多15个候选关键词
+      // 使用 segment 进行分词
+      const segmentResult = segment.doSegment(text, {
+        simple: true,
+        stripPunctuation: true
+      });
       
-      // 过滤和处理关键词
-      const filtered = keywords
-        .map((item: any) => item.word) // 获取词语
-        .filter((word: string) => this.isValidKeyword(word)) // 过滤无效词
-        .slice(0, 10); // 取前10个
+      // 计算词频
+      const wordFreq: Record<string, number> = {};
+      for (const word of segmentResult) {
+        const w = word.toString();
+        if (this.isValidKeyword(w)) {
+          wordFreq[w] = (wordFreq[w] || 0) + 1;
+        }
+      }
+      
+      // 按词频排序，取前10个
+      const filtered = Object.entries(wordFreq)
+        .sort((a, b) => b[1] - a[1]) // 按频率降序
+        .slice(0, 10)
+        .map(([word]) => word);
 
       return filtered;
     } catch (error) {

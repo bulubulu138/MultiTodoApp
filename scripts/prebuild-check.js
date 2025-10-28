@@ -146,7 +146,7 @@ function checkNodeModules() {
   const criticalDeps = [
     'electron',
     'better-sqlite3',
-    'nodejieba',
+    'segment',
     'electron-builder',
     'electron-rebuild'
   ];
@@ -174,8 +174,7 @@ function checkNativeModules() {
   
   const nodeModulesPath = path.join(__dirname, '..', 'node_modules');
   const nativeModules = [
-    { name: 'better-sqlite3', binary: 'better_sqlite3.node' },
-    { name: 'nodejieba', binary: 'nodejieba.node' }
+    { name: 'better-sqlite3', binary: 'better_sqlite3.node' }
   ];
 
   let allCompiled = true;

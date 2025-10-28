@@ -1,6 +1,7 @@
 import { Todo, TodoRelation, TodoRecommendation } from '../../shared/types';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Modal, Form, Input, Select, Button, App, Tag, Space, Switch, DatePicker, InputNumber, Card, Divider, Empty, Spin } from 'antd';
+import { Modal, Form, Input, Select, Button, App, Tag, Space, Switch, DatePicker, InputNumber, Card, Divider, Empty, Spin, Typography } from 'antd';
+const { Text } = Typography;
 import { PlusOutlined, EditOutlined, FileTextOutlined, CopyOutlined, LinkOutlined, BulbOutlined } from '@ant-design/icons';
 import RichTextEditor from './RichTextEditor';
 import PlainTextFallback from './PlainTextFallback';

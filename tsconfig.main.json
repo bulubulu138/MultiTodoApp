@@ -6,6 +6,6 @@
     "lib": ["ES2020"],
     "jsx": "react-jsx"
   },
-  "include": ["src/main/**/*"],
+  "include": ["src/main/**/*", "src/types/**/*", "src/shared/**/*"],
   "exclude": ["src/renderer/**/*"]
 }

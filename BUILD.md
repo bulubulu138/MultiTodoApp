@@ -48,7 +48,7 @@ npm install
 这会自动：
 - 安装所有依赖
 - 运行 `electron-builder install-app-deps`
-- 编译原生模块 (better-sqlite3, nodejieba)
+- 编译原生模块 (better-sqlite3)
 
 ### 3. 验证环境
 
@@ -94,7 +94,7 @@ npm run dist:mac
 MultiTodo 使用两个原生模块：
 
 1. **better-sqlite3** - 数据库引擎
-2. **nodejieba** - 中文分词
+2. **segment** - 中文分词 (纯 JavaScript，无需编译)
 
 这些模块需要针对 Electron 的运行时编译：
 
@@ -105,11 +105,8 @@ npm run rebuild
 #### 手动重建（如果自动失败）
 
 ```bash
-# Windows
-npx electron-rebuild -f -w better-sqlite3 -w nodejieba
-
-# macOS/Linux
-npm run rebuild
+# Windows 和 macOS/Linux
+npx electron-rebuild -f -w better-sqlite3
 ```
 
 ### 打包配置
@@ -120,8 +117,7 @@ npm run rebuild
 {
   "build": {
     "asarUnpack": [
-      "node_modules/better-sqlite3/**/*",
-      "node_modules/nodejieba/**/*"
+      "node_modules/better-sqlite3/**/*"
     ]
   }
 }
@@ -266,7 +262,7 @@ npm run verify
 
 # 手动测试
 node -e "console.log(require('better-sqlite3'))"
-node -e "console.log(require('nodejieba'))"
+node -e "const Segment = require('segment'); const s = new Segment(); s.useDefault(); console.log(s.doSegment('中文分词测试', {simple: true}))"
 ```
 
 ## 📦 CI/CD 构建
@@ -330,7 +326,7 @@ npm run dist        # 打包应用
 - [Electron Builder 文档](https://www.electron.build/)
 - [electron-rebuild 文档](https://github.com/electron/electron-rebuild)
 - [better-sqlite3 文档](https://github.com/WiseLibs/better-sqlite3)
-- [nodejieba 文档](https://github.com/yanyiwu/nodejieba)
+- [segment 文档](https://github.com/leizongmin/node-segment)
 
 ## 💬 获取帮助
 
