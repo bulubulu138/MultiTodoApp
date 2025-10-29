@@ -468,7 +468,43 @@ const TodoForm: React.FC<TodoFormProps> = ({
 
         {/* 推荐关联待办 */}
         {!todo && (
-          <Form.Item label={<span><BulbOutlined /> 推荐关联</span>}>
+          <Form.Item label={<span><BulbOutlined /> 关联待办</span>}>
+            {/* 手动选择待办 */}
+            <Card size="small" title="手动添加关联" style={{ marginBottom: 16 }}>
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Select
+                  showSearch
+                  placeholder="搜索待办..."
+                  style={{ width: '100%' }}
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  options={allTodos
+                    .filter(t => 
+                      t.id !== todo?.id && // 排除当前待办
+                      !pendingRelations.some(r => r.targetId === t.id) // 排除已添加的
+                    )
+                    .map(t => ({
+                      label: `${t.title}${t.tags ? ` [${t.tags}]` : ''}`,
+                      value: t.id,
+                      todo: t
+                    }))}
+                  onSelect={(value) => {
+                    const selectedTodo = allTodos.find(t => t.id === value);
+                    if (selectedTodo) {
+                      // 默认添加为扩展关系
+                      handleAddPendingRelation(selectedTodo.id!, 'extends');
+                      message.success(`已添加「${selectedTodo.title}」为扩展关系`);
+                    }
+                  }}
+                />
+                <Text type="secondary" style={{ fontSize: 11 }}>
+                  💡 选择待办后将自动添加为"扩展"关系，您可以在下方修改关系类型或移除
+                </Text>
+              </Space>
+            </Card>
+
+            {/* 推荐的待办 */}
             {loadingRecommendations ? (
               <div style={{ textAlign: 'center', padding: '20px' }}>
                 <Spin tip="正在分析相关待办..." />
@@ -558,11 +594,73 @@ const TodoForm: React.FC<TodoFormProps> = ({
             )}
             
             {pendingRelations.length > 0 && (
-              <div style={{ marginTop: 8, padding: 8, background: '#f0f2f5', borderRadius: 4 }}>
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  待建立关系: {pendingRelations.length} 个（保存后自动创建）
+              <Card 
+                size="small" 
+                title={`已选择的关系 (${pendingRelations.length})`}
+                style={{ marginTop: 16 }}
+              >
+                <Space direction="vertical" style={{ width: '100%' }} size="small">
+                  {pendingRelations.map((rel) => {
+                    const targetTodo = allTodos.find(t => t.id === rel.targetId);
+                    if (!targetTodo) return null;
+                    
+                    const relationTypeMap = {
+                      extends: { label: '扩展', color: 'blue' },
+                      background: { label: '背景', color: 'green' },
+                      parallel: { label: '并列', color: 'orange' }
+                    };
+                    const relInfo = relationTypeMap[rel.relationType as keyof typeof relationTypeMap];
+                    
+                    return (
+                      <div 
+                        key={`${rel.targetId}-${rel.relationType}`}
+                        style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'center',
+                          padding: '8px',
+                          background: '#fafafa',
+                          borderRadius: 4
+                        }}
+                      >
+                        <div>
+                          <Text strong>{targetTodo.title}</Text>
+                          <Tag color={relInfo.color} style={{ marginLeft: 8 }}>
+                            {relInfo.label}
+                          </Tag>
+                        </div>
+                        <Space>
+                          <Select
+                            size="small"
+                            value={rel.relationType}
+                            style={{ width: 90 }}
+                            onChange={(newType) => {
+                              handleRemovePendingRelation(rel.targetId, rel.relationType);
+                              handleAddPendingRelation(rel.targetId, newType);
+                            }}
+                            options={[
+                              { label: '扩展', value: 'extends' },
+                              { label: '背景', value: 'background' },
+                              { label: '并列', value: 'parallel' }
+                            ]}
+                          />
+                          <Button
+                            size="small"
+                            danger
+                            onClick={() => handleRemovePendingRelation(rel.targetId, rel.relationType)}
+                          >
+                            移除
+                          </Button>
+                        </Space>
+                      </div>
+                    );
+                  })}
+                </Space>
+                <Divider style={{ margin: '8px 0' }} />
+                <Text type="secondary" style={{ fontSize: 11 }}>
+                  💡 保存待办后将自动创建这些关系
                 </Text>
-              </div>
+              </Card>
             )}
           </Form.Item>
         )}

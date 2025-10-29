@@ -158,21 +158,28 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleBatchGenerateKeywords = async () => {
+    console.log('[SettingsModal] 开始批量生成关键词...');
     setGeneratingKeywords(true);
     try {
+      console.log('[SettingsModal] 调用 electronAPI.keywords.batchGenerate...');
       const result = await window.electronAPI.keywords.batchGenerate();
+      console.log('[SettingsModal] 收到结果:', result);
       
       if (result.success) {
         message.success(`关键词生成完成！处理了 ${result.processed}/${result.total} 个待办`);
         if (onReload) {
+          console.log('[SettingsModal] 重新加载数据...');
           await onReload();
         }
       } else {
+        console.error('[SettingsModal] 生成失败:', result.error);
         message.error('生成失败: ' + result.error);
       }
     } catch (error: any) {
+      console.error('[SettingsModal] 捕获到错误:', error);
       message.error('生成失败: ' + error.message);
     } finally {
+      console.log('[SettingsModal] 完成，设置 loading 为 false');
       setGeneratingKeywords(false);
     }
   };
