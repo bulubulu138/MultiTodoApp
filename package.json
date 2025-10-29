@@ -155,7 +155,6 @@
       ],
       "title": "MultiTodo ${version}",
       "icon": "assets/icon_512x512.png",
-      "background": null,
       "format": "ULFO"
     },
     "electronVersion": "27.0.0"
