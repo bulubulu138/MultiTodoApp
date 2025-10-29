@@ -481,7 +481,6 @@ const TodoForm: React.FC<TodoFormProps> = ({
                   }
                   options={allTodos
                     .filter(t => 
-                      t.id !== todo?.id && // 排除当前待办
                       !pendingRelations.some(r => r.targetId === t.id) // 排除已添加的
                     )
                     .map(t => ({
