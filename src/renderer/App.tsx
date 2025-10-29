@@ -509,8 +509,17 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         order: t.displayOrders![activeTab]
       })));
       
-      // 手动排序模式：使用 ID 比较器选择代表
-      const manualComparator = (a: Todo, b: Todo) => (a.id || 0) - (b.id || 0);
+      // 手动排序模式：使用序号比较器选择代表（序号相同时用 ID）
+      const manualComparator = (a: Todo, b: Todo) => {
+        const orderA = a.displayOrders?.[activeTab];
+        const orderB = b.displayOrders?.[activeTab];
+        // 如果都有序号，比较序号
+        if (orderA != null && orderB != null) {
+          if (orderA !== orderB) return orderA - orderB;
+        }
+        // 序号相同或都没序号，比较 ID
+        return (a.id || 0) - (b.id || 0);
+      };
       const groupRepresentatives = selectGroupRepresentatives(parallelGroups, filtered, manualComparator);
       console.log('[DEBUG] groupRepresentatives size:', groupRepresentatives.size);
       
@@ -573,27 +582,27 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   // Tab配置
   const tabItems = useMemo(() => {
     const defaultTabs = [
-      {
-        key: 'all',
-        label: `全部 (${statusCounts.all})`,
-      },
-      {
-        key: 'pending',
-        label: `待办 (${statusCounts.pending})`,
-      },
-      {
-        key: 'in_progress',
-        label: `进行中 (${statusCounts.in_progress})`,
-      },
-      {
-        key: 'completed',
-        label: `已完成 (${statusCounts.completed})`,
-      },
-      {
-        key: 'paused',
-        label: `已暂停 (${statusCounts.paused})`,
-      },
-    ];
+    {
+      key: 'all',
+      label: `全部 (${statusCounts.all})`,
+    },
+    {
+      key: 'pending',
+      label: `待办 (${statusCounts.pending})`,
+    },
+    {
+      key: 'in_progress',
+      label: `进行中 (${statusCounts.in_progress})`,
+    },
+    {
+      key: 'completed',
+      label: `已完成 (${statusCounts.completed})`,
+    },
+    {
+      key: 'paused',
+      label: `已暂停 (${statusCounts.paused})`,
+    },
+  ];
 
     // 添加自定义标签Tab
     const customTabItems = customTabs

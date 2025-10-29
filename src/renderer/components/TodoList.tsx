@@ -210,22 +210,30 @@ const TodoList: React.FC<TodoListProps> = ({
         t.displayOrders && t.displayOrders[activeTab] != null
       );
       
-      // 2. 找出需要调整的待办（当前tab序号 >= newOrder 且不是当前待办）
-      const toAdjust = currentTabTodos.filter(t => 
+      // 2. 检查是否有重复序号（完全相同）
+      const duplicate = currentTabTodos.find(t => 
         t.id !== todoId && 
-        t.displayOrders![activeTab]! >= newOrder
+        t.displayOrders![activeTab] === newOrder
       );
       
-      // 3. 如果有需要调整的待办，批量更新
-      if (toAdjust.length > 0) {
-        const updates = toAdjust.map(t => ({
-          id: t.id!,
-          tabKey: activeTab,
-          displayOrder: t.displayOrders![activeTab]! + 1
-        }));
+      // 3. 如果有重复序号，递增已有待办及其后续所有待办
+      if (duplicate) {
+        // 找出所有序号 >= newOrder 的待办（不包括当前待办）
+        const toAdjust = currentTabTodos.filter(t => 
+          t.id !== todoId && 
+          t.displayOrders![activeTab]! >= newOrder
+        );
         
-        await window.electronAPI.todo.batchUpdateDisplayOrders(updates);
-        message.success(`已自动调整 ${toAdjust.length} 个待办的序号`);
+        if (toAdjust.length > 0) {
+          const updates = toAdjust.map(t => ({
+            id: t.id!,
+            tabKey: activeTab,
+            displayOrder: t.displayOrders![activeTab]! + 1
+          }));
+          
+          await window.electronAPI.todo.batchUpdateDisplayOrders(updates);
+          message.success(`序号 ${newOrder} 已被占用，已自动调整 ${toAdjust.length} 个待办的序号`);
+        }
       }
       
       // 4. 检查是否是并列分组，如果是则同步整组
