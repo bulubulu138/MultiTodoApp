@@ -93,11 +93,18 @@ export function sortWithGroups(
   representatives: Map<Set<number>, Todo>,
   compareFn: (a: Todo, b: Todo) => number
 ): Todo[] {
-  // 1. 分组 todos
-  const grouped = new Map<Set<number> | null, Todo[]>();
+  // 1. 分组 todos - 每个非并列待办也单独成组
+  const grouped = new Map<Set<number>, Todo[]>();
+  const allRepresentatives = new Map(representatives); // 复制现有代表
 
   for (const todo of todos) {
-    const group = groups.get(todo.id!) || null;
+    let group = groups.get(todo.id!);
+    if (!group) {
+      // 无并列关系：创建只包含自己的 Set
+      group = new Set([todo.id!]);
+      // 为这个单独的待办设置代表（就是它自己）
+      allRepresentatives.set(group, todo);
+    }
     if (!grouped.has(group)) {
       grouped.set(group, []);
     }
@@ -112,8 +119,8 @@ export function sortWithGroups(
   // 3. 组间排序（使用代表）
   const sortedGroups = Array.from(grouped.entries()).sort(
     ([groupA, todosA], [groupB, todosB]) => {
-      const repA = groupA ? representatives.get(groupA)! : todosA[0];
-      const repB = groupB ? representatives.get(groupB)! : todosB[0];
+      const repA = allRepresentatives.get(groupA)!;
+      const repB = allRepresentatives.get(groupB)!;
       return compareFn(repA, repB);
     }
   );
