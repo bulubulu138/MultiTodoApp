@@ -1,5 +1,5 @@
 import { Todo } from '../../shared/types';
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Divider, Button, Checkbox, Space, Spin, Empty, App } from 'antd';
 import { SaveOutlined, EyeOutlined } from '@ant-design/icons';
 import RichTextEditor from './RichTextEditor';
@@ -22,6 +22,7 @@ const ContentFocusItem = React.memo<{
   const { message } = App.useApp();
   const [editedContent, setEditedContent] = useState<string>(todo.content);
   const [isSaving, setIsSaving] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // 检查内容是否被修改
   const hasChanges = useMemo(() => {
@@ -35,7 +36,8 @@ const ContentFocusItem = React.memo<{
     setIsSaving(true);
     try {
       await onUpdate(todo.id, { content: editedContent });
-      message.success('内容已保存');
+      // 自动保存使用更轻量的提示
+      message.success({ content: '已自动保存', duration: 1 });
     } catch (error) {
       message.error('保存失败');
       console.error('Save error:', error);
@@ -43,6 +45,45 @@ const ContentFocusItem = React.memo<{
       setIsSaving(false);
     }
   }, [hasChanges, todo.id, editedContent, onUpdate, message]);
+
+  // 自动保存：内容改变后 1.5 秒自动保存（防抖）
+  useEffect(() => {
+    if (!hasChanges) return;
+
+    // 清除之前的定时器
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // 设置新的定时器
+    saveTimeoutRef.current = setTimeout(() => {
+      handleSave();
+    }, 1500); // 1.5秒防抖延迟
+
+    // 清理函数：组件卸载或内容再次变化时清除定时器
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [editedContent, hasChanges, handleSave]);
+
+  // 组件卸载时保存未保存的更改
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      // 如果有未保存的更改，立即保存
+      // 注意：这里使用 ref 获取最新值，避免闭包问题
+      const currentContent = editedContent;
+      const currentTodoId = todo.id;
+      if (currentContent !== todo.content && currentTodoId) {
+        onUpdate(currentTodoId, { content: currentContent });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 仅在组件卸载时执行
 
   // 切换完成状态
   const handleToggleComplete = useCallback(async (checked: boolean) => {
@@ -90,17 +131,19 @@ const ContentFocusItem = React.memo<{
           </Button>
         </Space>
 
-        {hasChanges && (
-          <Button
-            type="primary"
-            size="small"
-            icon={<SaveOutlined />}
-            onClick={handleSave}
-            loading={isSaving}
-          >
-            保存
-          </Button>
-        )}
+        {/* 保存状态指示器 */}
+        <Space size={4}>
+          {isSaving && (
+            <span style={{ fontSize: 12, color: '#1890ff' }}>
+              <SaveOutlined /> 保存中...
+            </span>
+          )}
+          {!isSaving && hasChanges && (
+            <span style={{ fontSize: 12, color: '#faad14' }}>
+              未保存
+            </span>
+          )}
+        </Space>
       </div>
 
       {/* 富文本编辑器 */}

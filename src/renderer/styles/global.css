@@ -1127,7 +1127,7 @@ body {
 
 /* 单个待办项 */
 .content-focus-item {
-  margin-bottom: 32px;
+  margin-bottom: 0;
 }
 
 /* 顶部工具栏 */
@@ -1135,14 +1135,14 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
   border-bottom: 1px solid var(--border-color);
 }
 
 /* 富文本编辑器容器 */
 .content-focus-item-editor {
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 
 .content-focus-item-editor .quill {
@@ -1171,7 +1171,7 @@ body {
 
 /* 分割线 */
 .content-focus-divider {
-  margin: 24px 0;
+  margin: 1px 0;
   border-color: var(--border-color);
   opacity: 0.3;
 }
