@@ -52,18 +52,6 @@ const TodoList: React.FC<TodoListProps> = ({
   const [editingOrder, setEditingOrder] = useState<{[key: number]: number | null}>({});
   const [savingOrder, setSavingOrder] = useState<Set<number>>(new Set());
   
-  // 如果是内容专注模式，使用专用组件
-  if (viewMode === 'content-focus') {
-    return (
-      <ContentFocusView
-        todos={todos}
-        allTodos={allTodos}
-        onUpdate={onStatusChange}
-        onView={onView}
-        loading={loading}
-      />
-    );
-  }
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'orange';
@@ -331,6 +319,19 @@ const TodoList: React.FC<TodoListProps> = ({
     
     return groups;
   }, [todos, relations]);
+
+  // 如果是内容专注模式，使用专用组件
+  if (viewMode === 'content-focus') {
+    return (
+      <ContentFocusView
+        todos={todos}
+        allTodos={allTodos}
+        onUpdate={onStatusChange}
+        onView={onView}
+        loading={loading}
+      />
+    );
+  }
 
   return (
     <>
