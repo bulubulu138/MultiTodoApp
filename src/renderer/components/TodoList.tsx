@@ -2,9 +2,10 @@ import { Todo, TodoRelation } from '../../shared/types';
 import React, { useState, useMemo } from 'react';
 import { List, Card, Tag, Button, Space, Popconfirm, Select, Typography, Image, Tooltip, App, InputNumber } from 'antd';
 import { EditOutlined, DeleteOutlined, LinkOutlined, EyeOutlined, EyeInvisibleOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined } from '@ant-design/icons';
-import { SortOption } from './Toolbar';
+import { SortOption, ViewMode } from './Toolbar';
 import RelationsModal from './RelationsModal';
 import RelationContext from './RelationContext';
+import ContentFocusView from './ContentFocusView';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
 import dayjs from 'dayjs';
@@ -25,6 +26,7 @@ interface TodoListProps {
   sortOption?: SortOption; // 当前排序选项
   activeTab: string; // 当前激活的 Tab（用于多Tab独立排序）
   onUpdateDisplayOrder?: (id: number, tabKey: string, order: number | null) => Promise<void>; // 更新显示序号
+  viewMode?: ViewMode; // 视图模式
 }
 
 const TodoList: React.FC<TodoListProps> = ({
@@ -39,7 +41,8 @@ const TodoList: React.FC<TodoListProps> = ({
   onRelationsChange,
   sortOption,
   activeTab,
-  onUpdateDisplayOrder
+  onUpdateDisplayOrder,
+  viewMode = 'card'
 }) => {
   const { message } = App.useApp();
   const colors = useThemeColors();
@@ -48,6 +51,19 @@ const TodoList: React.FC<TodoListProps> = ({
   const [expandedRelations, setExpandedRelations] = useState<Set<number>>(new Set());
   const [editingOrder, setEditingOrder] = useState<{[key: number]: number | null}>({});
   const [savingOrder, setSavingOrder] = useState<Set<number>>(new Set());
+  
+  // 如果是内容专注模式，使用专用组件
+  if (viewMode === 'content-focus') {
+    return (
+      <ContentFocusView
+        todos={todos}
+        allTodos={allTodos}
+        onUpdate={onStatusChange}
+        onView={onView}
+        loading={loading}
+      />
+    );
+  }
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'orange';

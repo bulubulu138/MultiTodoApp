@@ -1113,3 +1113,151 @@ body {
 [data-theme='dark'] .todo-list-panel .ant-tag {
   /* 标签使用自己的颜色方案 */
 }
+
+/* ============================================
+   内容专注视图样式
+   ============================================ */
+
+/* 内容专注视图容器 */
+.content-focus-view {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* 单个待办项 */
+.content-focus-item {
+  margin-bottom: 32px;
+}
+
+/* 顶部工具栏 */
+.content-focus-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* 富文本编辑器容器 */
+.content-focus-item-editor {
+  margin-bottom: 16px;
+}
+
+.content-focus-item-editor .quill {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.content-focus-item-editor .quill:focus-within {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+.content-focus-item-editor .ql-container {
+  min-height: 150px;
+  max-height: none;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.content-focus-item-editor .ql-editor {
+  min-height: 150px;
+  max-height: none;
+  padding: 16px;
+}
+
+/* 分割线 */
+.content-focus-divider {
+  margin: 24px 0;
+  border-color: var(--border-color);
+  opacity: 0.3;
+}
+
+/* 加载状态 */
+.content-focus-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+
+/* 空状态 */
+.content-focus-empty {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+
+/* 保存按钮悬浮效果 */
+.content-focus-item-header .ant-btn-primary {
+  box-shadow: 0 2px 6px rgba(24, 144, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.content-focus-item-header .ant-btn-primary:hover {
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+/* 深色主题适配 */
+[data-theme='dark'] .content-focus-item-header {
+  border-bottom-color: #404040;
+}
+
+[data-theme='dark'] .content-focus-divider {
+  border-color: #404040;
+}
+
+[data-theme='dark'] .content-focus-item-editor .quill {
+  border-color: #404040;
+  background: #141414;
+}
+
+[data-theme='dark'] .content-focus-item-editor .quill:focus-within {
+  border-color: #40a9ff;
+  box-shadow: 0 0 0 2px rgba(64, 169, 255, 0.2);
+}
+
+[data-theme='dark'] .content-focus-item-editor .ql-container {
+  background: #141414;
+  color: #ffffff;
+}
+
+[data-theme='dark'] .content-focus-item-editor .ql-editor {
+  background: #141414;
+  color: #ffffff;
+}
+
+/* 响应式设计 */
+@media (max-width: 1400px) {
+  .content-focus-view {
+    max-width: 1000px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .content-focus-view {
+    max-width: 800px;
+    padding: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .content-focus-view {
+    padding: 12px;
+  }
+  
+  .content-focus-item {
+    margin-bottom: 24px;
+  }
+  
+  .content-focus-item-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+}

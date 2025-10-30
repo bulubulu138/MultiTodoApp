@@ -1,11 +1,11 @@
 import { Todo, TodoRelation, CalendarViewSize, CustomTab } from '../shared/types';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Layout, App as AntApp, Tabs, ConfigProvider, FloatButton, Modal, Typography, Space, Tag } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { VerticalAlignTopOutlined } from '@ant-design/icons';
 import TodoList from './components/TodoList';
 import TodoForm from './components/TodoForm';
-import Toolbar, { SortOption } from './components/Toolbar';
+import Toolbar, { SortOption, ViewMode } from './components/Toolbar';
 import SettingsModal from './components/SettingsModal';
 import SearchModal from './components/SearchModal';
 import ExportModal from './components/ExportModal';
@@ -18,6 +18,17 @@ import { buildParallelGroups, selectGroupRepresentatives, sortWithGroups, getSor
 import dayjs from 'dayjs';
 
 const { Content } = Layout;
+
+// Tab 设置接口
+interface TabSettings {
+  sortOption: SortOption;
+  viewMode: ViewMode;
+}
+
+// Tab 设置映射
+type TabSettingsMap = {
+  [tabKey: string]: TabSettings;
+};
 
 interface AppContentProps {
   themeMode: ThemeMode;
@@ -42,7 +53,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<string>('all');
   const [relations, setRelations] = useState<TodoRelation[]>([]);
-  const [sortOption, setSortOption] = useState<SortOption>('createdAt-desc');
+  const [tabSettings, setTabSettings] = useState<TabSettingsMap>({});
   const [customTabs, setCustomTabs] = useState<CustomTab[]>([]);
   const [quickCreateContent, setQuickCreateContent] = useState<string | null>(null);
   const [showHotkeyGuide, setShowHotkeyGuide] = useState(false);
@@ -185,10 +196,28 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         }
       }
       
-      // 加载排序设置
-      if (appSettings.sortOption) {
-        setSortOption(appSettings.sortOption as SortOption);
+      // 加载 Tab 设置（新格式）
+      let loadedTabSettings: TabSettingsMap = {};
+      if (appSettings.tabSettings) {
+        try {
+          loadedTabSettings = JSON.parse(appSettings.tabSettings);
+        } catch (e) {
+          console.error('Failed to parse tabSettings:', e);
+        }
       }
+      
+      // 向后兼容：如果没有新格式的设置，但有旧的设置，则迁移
+      if (Object.keys(loadedTabSettings).length === 0) {
+        const defaultTab: TabSettings = {
+          sortOption: (appSettings.sortOption as SortOption) || 'createdAt-desc',
+          viewMode: (appSettings.viewMode as ViewMode) || 'card'
+        };
+        loadedTabSettings = {
+          all: defaultTab
+        };
+      }
+      
+      setTabSettings(loadedTabSettings);
     } catch (error) {
       message.error('加载设置失败');
       console.error('Error loading settings:', error);
@@ -207,6 +236,45 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       message.error('加载关系失败');
     }
   };
+
+  // 获取当前 Tab 的设置（带默认值）
+  const getCurrentTabSettings = useCallback((): TabSettings => {
+    return tabSettings[activeTab] || {
+      sortOption: 'createdAt-desc',
+      viewMode: 'card'
+    };
+  }, [tabSettings, activeTab]);
+
+  // 保存 Tab 设置到数据库
+  const saveTabSettings = async (settings: TabSettingsMap) => {
+    try {
+      await window.electronAPI.settings.update({
+        tabSettings: JSON.stringify(settings)
+      });
+    } catch (error) {
+      console.error('Error saving tab settings:', error);
+    }
+  };
+
+  // 更新当前 Tab 的设置
+  const updateCurrentTabSettings = useCallback((updates: Partial<TabSettings>) => {
+    const newSettings = {
+      ...tabSettings,
+      [activeTab]: {
+        ...getCurrentTabSettings(),
+        ...updates
+      }
+    };
+    setTabSettings(newSettings);
+    // 保存到数据库
+    saveTabSettings(newSettings);
+  }, [tabSettings, activeTab, getCurrentTabSettings]);
+
+  // 监听 Tab 切换，输出当前设置（便于调试）
+  useEffect(() => {
+    const settings = getCurrentTabSettings();
+    console.log(`[Tab切换] ${activeTab}:`, settings);
+  }, [activeTab, getCurrentTabSettings]);
 
   const handleCreateTodo = async (todoData: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
@@ -289,16 +357,11 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   };
 
   const handleSortChange = async (option: SortOption) => {
-    setSortOption(option);
-    // 保存到设置
-    try {
-      await window.electronAPI.settings.update({ 
-        ...settings, 
-        sortOption: option 
-      });
-    } catch (error) {
-      console.error('Error saving sort option:', error);
-    }
+    updateCurrentTabSettings({ sortOption: option });
+  };
+
+  const handleViewModeChange = async (mode: ViewMode) => {
+    updateCurrentTabSettings({ viewMode: mode });
   };
 
   const handleUpdateDisplayOrder = async (id: number, tabKey: string, displayOrder: number | null) => {
@@ -457,6 +520,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
 
   // 根据当前Tab过滤待办事项，并应用排序
   const filteredTodos = useMemo(() => {
+    // 获取当前 Tab 的排序设置
+    const currentSettings = getCurrentTabSettings();
+    const sortOption = currentSettings.sortOption;
+    
     const validTodos = todos.filter(todo => todo && todo.id);
     
     // 处理自定义标签Tab
@@ -577,7 +644,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     })));
     
     return result;
-  }, [todos, activeTab, sortOption, relations]);
+  }, [todos, activeTab, tabSettings, relations, getCurrentTabSettings]);
 
   // Tab配置
   const tabItems = useMemo(() => {
@@ -639,6 +706,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     return [...defaultTabs, ...customTabItems];
   }, [statusCounts, customTabs, todos]);
 
+  // 使用 useMemo 缓存当前 Tab 的设置
+  const currentTabSettings = useMemo(() => getCurrentTabSettings(), [getCurrentTabSettings]);
+
   return (
     <Layout style={{ height: '100vh' }} data-theme={themeMode}>
         <Toolbar
@@ -649,8 +719,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         onShowNotes={() => setShowNotes(true)}
         onShowCalendar={() => setShowCalendar(true)}
         onShowCustomTabManager={() => setShowCustomTabManager(true)}
-        sortOption={sortOption}
+        sortOption={currentTabSettings.sortOption}
         onSortChange={handleSortChange}
+        viewMode={currentTabSettings.viewMode}
+        onViewModeChange={handleViewModeChange}
       />
         
         <Content className="content-area">
@@ -672,9 +744,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
             onStatusChange={handleUpdateTodo}
             relations={relations}
             onRelationsChange={loadRelations}
-            sortOption={sortOption}
+            sortOption={currentTabSettings.sortOption}
             activeTab={activeTab}
             onUpdateDisplayOrder={handleUpdateDisplayOrder}
+            viewMode={currentTabSettings.viewMode}
           />
         </div>
       </Content>

@@ -1,6 +1,6 @@
 import React from 'react';
-import { Button, Space, Select } from 'antd';
-import { PlusOutlined, SettingOutlined, ExportOutlined, SearchOutlined, BulbOutlined, CalendarOutlined, SortAscendingOutlined, TagsOutlined } from '@ant-design/icons';
+import { Button, Space, Select, Tooltip, Segmented } from 'antd';
+import { PlusOutlined, SettingOutlined, ExportOutlined, SearchOutlined, BulbOutlined, CalendarOutlined, SortAscendingOutlined, TagsOutlined, UnorderedListOutlined, AlignLeftOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
@@ -15,6 +15,8 @@ export type SortOption =
   | 'updatedAt-asc'
   | 'manual';
 
+export type ViewMode = 'card' | 'content-focus';
+
 interface ToolbarProps {
   onAddTodo: () => void;
   onShowSettings: () => void;
@@ -25,6 +27,8 @@ interface ToolbarProps {
   onShowCustomTabManager: () => void;
   sortOption?: SortOption;
   onSortChange?: (option: SortOption) => void;
+  viewMode?: ViewMode;
+  onViewModeChange?: (mode: ViewMode) => void;
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({
@@ -36,7 +40,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onShowNotes,
   onShowCalendar,
   sortOption = 'createdAt-desc',
-  onSortChange
+  onSortChange,
+  viewMode = 'card',
+  onViewModeChange
 }) => {
   return (
     <div className="toolbar">
@@ -61,6 +67,25 @@ const Toolbar: React.FC<ToolbarProps> = ({
           <Option value="deadline-desc">截止时间 ↓ 晚→早</Option>
           <Option value="deadline-asc">截止时间 ↑ 早→晚</Option>
         </Select>
+        
+        <Tooltip title="切换视图模式">
+          <Segmented
+            value={viewMode}
+            onChange={(value) => onViewModeChange?.(value as ViewMode)}
+            options={[
+              {
+                label: '卡片',
+                value: 'card',
+                icon: <UnorderedListOutlined />,
+              },
+              {
+                label: '专注',
+                value: 'content-focus',
+                icon: <AlignLeftOutlined />,
+              },
+            ]}
+          />
+        </Tooltip>
         
         <Button
           icon={<SearchOutlined />}
