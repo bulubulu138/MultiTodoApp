@@ -1,5 +1,5 @@
 import { Todo, TodoRelation, CalendarViewSize, CustomTab } from '../shared/types';
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Layout, App as AntApp, Tabs, ConfigProvider, FloatButton, Modal, Typography, Space, Tag } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { VerticalAlignTopOutlined } from '@ant-design/icons';
@@ -57,6 +57,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const [customTabs, setCustomTabs] = useState<CustomTab[]>([]);
   const [quickCreateContent, setQuickCreateContent] = useState<string | null>(null);
   const [showHotkeyGuide, setShowHotkeyGuide] = useState(false);
+  
+  // 保存状态追踪（用于专注模式的乐观更新）
+  const savingTodosRef = useRef<Set<number>>(new Set());
+  const pendingSavesRef = useRef<Map<number, Promise<void>>>(new Map());
 
   // 加载数据
   useEffect(() => {
@@ -303,6 +307,66 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       console.error('Error updating todo:', error);
     }
   };
+
+  // 专注模式专用：乐观更新（不刷新页面，保持滚动位置）
+  const handleUpdateTodoInPlace = useCallback(async (id: number, updates: Partial<Todo>) => {
+    // 1. 标记为正在保存
+    savingTodosRef.current.add(id);
+    
+    // 2. 乐观更新本地状态（立即生效，不刷新页面）
+    setTodos(prev => prev.map(todo => 
+      todo.id === id 
+        ? { ...todo, ...updates, updatedAt: new Date().toISOString() } 
+        : todo
+    ));
+    
+    // 3. 创建保存 Promise 并追踪
+    const savePromise = (async () => {
+      try {
+        await window.electronAPI.todo.update(id, updates);
+        // 保存成功，移除追踪
+        savingTodosRef.current.delete(id);
+        pendingSavesRef.current.delete(id);
+      } catch (error) {
+        // 保存失败，移除追踪并回滚
+        console.error('Update error:', error);
+        savingTodosRef.current.delete(id);
+        pendingSavesRef.current.delete(id);
+        
+        // 重新加载确保数据一致性
+        await loadTodos();
+        message.error('保存失败，已回滚更改');
+      }
+    })();
+    
+    pendingSavesRef.current.set(id, savePromise);
+  }, []);
+
+  // 等待所有保存完成
+  const waitForAllSaves = useCallback(async (): Promise<boolean> => {
+    if (pendingSavesRef.current.size === 0) {
+      return true;
+    }
+
+    const hide = message.loading('正在保存更改...', 0);
+    
+    try {
+      // 等待所有保存操作完成（最多等待 10 秒）
+      const allSaves = Array.from(pendingSavesRef.current.values());
+      await Promise.race([
+        Promise.all(allSaves),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('保存超时')), 10000))
+      ]);
+      
+      hide();
+      message.success('所有更改已保存');
+      return true;
+    } catch (error) {
+      hide();
+      message.error('部分更改保存超时');
+      return false;
+    }
+  }, [message]);
 
   const handleDeleteTodo = async (id: number) => {
     try {
@@ -709,6 +773,33 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   // 使用 useMemo 缓存当前 Tab 的设置
   const currentTabSettings = useMemo(() => getCurrentTabSettings(), [getCurrentTabSettings]);
 
+  // Tab 切换处理（带未保存检查）
+  const handleTabChange = useCallback((newTab: string) => {
+    // 检查是否有正在保存的数据
+    if (savingTodosRef.current.size > 0 || pendingSavesRef.current.size > 0) {
+      Modal.confirm({
+        title: '有未保存的更改',
+        content: `检测到 ${savingTodosRef.current.size} 个待办正在保存，是否等待保存完成？`,
+        okText: '等待保存',
+        cancelText: '放弃更改',
+        onOk: async () => {
+          const success = await waitForAllSaves();
+          if (success) {
+            setActiveTab(newTab);
+          }
+        },
+        onCancel: () => {
+          // 清空待保存队列，直接切换
+          savingTodosRef.current.clear();
+          pendingSavesRef.current.clear();
+          setActiveTab(newTab);
+        }
+      });
+    } else {
+      setActiveTab(newTab);
+    }
+  }, [waitForAllSaves]);
+
   return (
     <Layout style={{ height: '100vh' }} data-theme={themeMode}>
         <Toolbar
@@ -728,7 +819,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         <Content className="content-area">
         <Tabs
           activeKey={activeTab}
-          onChange={setActiveTab}
+          onChange={handleTabChange}
           items={tabItems}
           className="status-tabs"
           size="large"
@@ -742,6 +833,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
             onView={handleViewTodo}
             onDelete={handleDeleteTodo}
             onStatusChange={handleUpdateTodo}
+            onUpdateInPlace={handleUpdateTodoInPlace}
             relations={relations}
             onRelationsChange={loadRelations}
             sortOption={currentTabSettings.sortOption}

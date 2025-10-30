@@ -27,6 +27,7 @@ interface TodoListProps {
   activeTab: string; // 当前激活的 Tab（用于多Tab独立排序）
   onUpdateDisplayOrder?: (id: number, tabKey: string, order: number | null) => Promise<void>; // 更新显示序号
   viewMode?: ViewMode; // 视图模式
+  onUpdateInPlace?: (id: number, updates: Partial<Todo>) => void; // 专注模式专用：乐观更新
 }
 
 const TodoList: React.FC<TodoListProps> = ({
@@ -42,7 +43,8 @@ const TodoList: React.FC<TodoListProps> = ({
   sortOption,
   activeTab,
   onUpdateDisplayOrder,
-  viewMode = 'card'
+  viewMode = 'card',
+  onUpdateInPlace
 }) => {
   const { message } = App.useApp();
   const colors = useThemeColors();
@@ -326,7 +328,7 @@ const TodoList: React.FC<TodoListProps> = ({
       <ContentFocusView
         todos={todos}
         allTodos={allTodos}
-        onUpdate={onStatusChange}
+        onUpdate={onUpdateInPlace || onStatusChange}
         onView={onView}
         loading={loading}
       />
