@@ -21,6 +21,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const [isMounted, setIsMounted] = useState(false);
   const [editorInstance, setEditorInstance] = useState<any>(null);
   const [hasError, setHasError] = useState(false);
+  
+  // 添加输入状态和焦点状态追踪
+  const isComposingRef = useRef(false);
+  const isFocusedRef = useRef(false);
+  const lastValueRef = useRef(value);
 
   useEffect(() => {
     setIsMounted(true);
@@ -38,17 +43,50 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     };
   }, []);
 
-  // 监听 value 变化，确保内容同步
+  // 监听 value 变化，确保内容同步（优化：仅在非输入状态时同步）
   useEffect(() => {
     if (isReady && editorInstance && value !== editorInstance.root.innerHTML) {
       try {
+        // 关键优化：仅在用户未输入且编辑器未聚焦时才同步内容
+        // 这避免了在用户输入时被外部更新打断
+        if (isComposingRef.current || isFocusedRef.current) {
+          // 用户正在输入或编辑器有焦点，跳过同步
+          return;
+        }
+        
         // 安全地更新编辑器内容
         const currentText = editorInstance.getText();
         
         // 只有当内容真正不同时才更新
         if (currentText.trim() !== value.replace(/<[^>]*>/g, '').trim()) {
+          // 保存光标位置
+          const selection = editorInstance.getSelection();
+          
+          // 方案2：在使用 dangerouslyPasteHTML 前清空历史记录
+          // 双重保障，确保程序化更新不会污染撤销栈
+          try {
+            const historyModule = editorInstance.getModule('history');
+            if (historyModule) {
+              historyModule.clear();  // 清空历史记录
+            }
+          } catch (error) {
+            console.warn('Failed to clear history:', error);
+          }
+          
+          // 更新内容
           editorInstance.clipboard.dangerouslyPasteHTML(value);
+          
+          // 恢复光标位置（如果之前有选择）
+          if (selection) {
+            try {
+              editorInstance.setSelection(selection.index, selection.length);
+            } catch (error) {
+              // 光标恢复失败，静默处理
+            }
+          }
         }
+        
+        lastValueRef.current = value;
       } catch (error) {
         console.warn('Content sync failed:', error);
       }
@@ -78,20 +116,46 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     }
   }, [isMounted, editorInstance]);
 
-  // Simplified selection handling - react-quill-new handles this better
-  const handleSelection = useCallback(() => {
+  // 设置输入法和焦点事件监听
+  useEffect(() => {
     const editor = getEditorSafely();
     if (!editor) return;
     
-    try {
-      const length = editor.getLength();
-      if (length > 0) {
-        editor.setSelection(length, 0);
-      }
-    } catch (error) {
-      // Silent fail - react-quill-new handles selection more gracefully
-    }
-  }, [getEditorSafely]);
+    const editorElement = editor.root;
+    if (!editorElement) return;
+    
+    // 输入法事件监听
+    const handleCompositionStart = () => {
+      isComposingRef.current = true;
+    };
+    
+    const handleCompositionEnd = () => {
+      isComposingRef.current = false;
+    };
+    
+    // 焦点事件监听
+    const handleFocus = () => {
+      isFocusedRef.current = true;
+    };
+    
+    const handleBlur = () => {
+      isFocusedRef.current = false;
+    };
+    
+    // 添加事件监听
+    editorElement.addEventListener('compositionstart', handleCompositionStart);
+    editorElement.addEventListener('compositionend', handleCompositionEnd);
+    editorElement.addEventListener('focus', handleFocus);
+    editorElement.addEventListener('blur', handleBlur);
+    
+    // 清理函数
+    return () => {
+      editorElement.removeEventListener('compositionstart', handleCompositionStart);
+      editorElement.removeEventListener('compositionend', handleCompositionEnd);
+      editorElement.removeEventListener('focus', handleFocus);
+      editorElement.removeEventListener('blur', handleBlur);
+    };
+  }, [editorInstance, getEditorSafely]);
 
   // Toolbar configuration - react-quill-new handles DOM operations better
   const modules = {
@@ -110,7 +174,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     history: {
       delay: 1000,
       maxStack: 50,
-      userOnly: false
+      userOnly: true  // 只记录用户操作，不记录程序化更新，避免 Ctrl+Z 删除内容
     }
   };
 
@@ -136,10 +200,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           const safePath = imagePath.replace(/\\/g, '/');
           editor.insertEmbed(range.index, 'image', `file://${safePath}`);
           
-          // react-quill-new handles selection updates more reliably
+          // 自动将光标移动到图片后面，但不强制
           setTimeout(() => {
             try {
-              editor.setSelection(range.index + 1, 0);
+              const newPosition = range.index + 1;
+              editor.setSelection(newPosition, 0);
             } catch (error) {
               // Silent fail - selection will be handled by the editor
             }

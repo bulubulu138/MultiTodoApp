@@ -372,6 +372,25 @@ class Application {
       return buffer.buffer;
     });
 
+    // 文件存在性检查
+    ipcMain.handle('file:exists', async (_, filepath: string) => {
+      try {
+        // 移除 file:// 前缀并处理 URL 编码
+        let cleanPath = filepath.replace('file://', '').replace('file:', '');
+        // Windows路径处理：移除开头的 /
+        if (process.platform === 'win32' && cleanPath.startsWith('/')) {
+          cleanPath = cleanPath.substring(1);
+        }
+        // 解码URL编码的路径
+        cleanPath = decodeURIComponent(cleanPath);
+        
+        return fs.existsSync(cleanPath);
+      } catch (error) {
+        console.error('Error checking file existence:', error);
+        return false;
+      }
+    });
+
     // 关系相关的IPC处理器
     ipcMain.handle('relations:getAll', async () => {
       return await this.dbManager.getAllRelations();

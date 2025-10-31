@@ -23,19 +23,37 @@ const ContentFocusItem = React.memo<{
   const [editedContent, setEditedContent] = useState<string>(todo.content);
   const [isSaving, setIsSaving] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 添加输入状态追踪，避免在用户输入时触发保存
+  const isEditingRef = useRef(false);
+  const lastSavedContentRef = useRef(todo.content);
+
+  // 同步外部更新的 todo.content（仅在保存完成后更新）
+  useEffect(() => {
+    // 只有当外部内容变化且不是由当前组件保存触发时，才更新本地状态
+    if (todo.content !== lastSavedContentRef.current && !isSaving) {
+      setEditedContent(todo.content);
+      lastSavedContentRef.current = todo.content;
+    }
+  }, [todo.content, isSaving]);
 
   // 检查内容是否被修改
   const hasChanges = useMemo(() => {
-    return editedContent !== todo.content;
-  }, [editedContent, todo.content]);
+    return editedContent !== lastSavedContentRef.current;
+  }, [editedContent]);
 
   // 保存内容
   const handleSave = useCallback(async () => {
     if (!hasChanges || !todo.id) return;
     
+    // 如果内容与上次保存的内容相同，跳过保存
+    if (editedContent === lastSavedContentRef.current) return;
+    
     setIsSaving(true);
     try {
       await onUpdate(todo.id, { content: editedContent });
+      // 更新最后保存的内容引用
+      lastSavedContentRef.current = editedContent;
       // 自动保存使用更轻量的提示
       message.success({ content: '已自动保存', duration: 1 });
     } catch (error) {
@@ -46,7 +64,7 @@ const ContentFocusItem = React.memo<{
     }
   }, [hasChanges, todo.id, editedContent, onUpdate, message]);
 
-  // 自动保存：内容改变后 1.5 秒自动保存（防抖）
+  // 优化的自动保存：增加防抖延迟，减少对用户输入的干扰
   useEffect(() => {
     if (!hasChanges) return;
 
@@ -55,10 +73,10 @@ const ContentFocusItem = React.memo<{
       clearTimeout(saveTimeoutRef.current);
     }
 
-    // 设置新的定时器
+    // 设置新的定时器 - 增加到 3 秒，避免频繁打断用户输入
     saveTimeoutRef.current = setTimeout(() => {
       handleSave();
-    }, 1500); // 1.5秒防抖延迟
+    }, 3000); // 3秒防抖延迟，给用户充足的连续输入时间
 
     // 清理函数：组件卸载或内容再次变化时清除定时器
     return () => {

@@ -135,12 +135,46 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
     }
   }, []);
 
-  // 将文本中的 URL 转换为可点击的链接
+  // 根据文件扩展名获取对应的图标
+  const getFileIcon = useCallback((filePath: string): string => {
+    const ext = filePath.split('.').pop()?.toLowerCase();
+    const iconMap: Record<string, string> = {
+      // 文档类
+      'pdf': '📄',
+      'doc': '📝', 'docx': '📝',
+      'xls': '📊', 'xlsx': '📊',
+      'ppt': '📊', 'pptx': '📊',
+      'txt': '📃',
+      // 图片类
+      'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️', 'bmp': '🖼️', 'svg': '🖼️', 'webp': '🖼️',
+      // 压缩包
+      'zip': '📦', 'rar': '📦', '7z': '📦', 'tar': '📦', 'gz': '📦',
+      // 代码类
+      'js': '📜', 'ts': '📜', 'jsx': '📜', 'tsx': '📜',
+      'py': '🐍', 'java': '☕', 'c': '©️', 'cpp': '©️', 'cs': '©️',
+      'html': '🌐', 'css': '🎨', 'json': '{}',
+      // 视频音频
+      'mp4': '🎬', 'avi': '🎬', 'mov': '🎬', 'mkv': '🎬', 'wmv': '🎬',
+      'mp3': '🎵', 'wav': '🎵', 'flac': '🎵', 'aac': '🎵',
+      // 其他
+      'exe': '⚙️', 'msi': '⚙️',
+      'md': '📋', 'markdown': '📋',
+    };
+    return iconMap[ext || ''] || '📎'; // 默认图标
+  }, []);
+
+  // 将文本中的 URL 转换为可点击的链接（扩展支持本地文件路径）
   const linkifyContent = useCallback((html: string): string => {
     if (!html) return '';
     
     // URL 正则表达式（匹配 http/https 开头的链接）
     const urlRegex = /(https?:\/\/[^\s<>"]+)/g;
+    
+    // 本地文件路径正则
+    // Windows 绝对路径: C:\path\file.ext 或 D:\path\file.ext
+    const windowsPathRegex = /[A-Za-z]:\\(?:[^\\/:*?"<>|\r\n\s]+\\)*[^\\/:*?"<>|\r\n\s]+\.[a-zA-Z0-9]+/g;
+    // UNC 网络路径: \\server\share\file.ext
+    const uncPathRegex = /\\\\[^\s\\/:*?"<>|\r\n]+\\[^\s\\/:*?"<>|\r\n]+(?:\\[^\\/:*?"<>|\r\n\s]+)*\.[a-zA-Z0-9]+/g;
     
     // 创建临时 DOM 来解析 HTML
     const tempDiv = document.createElement('div');
@@ -150,12 +184,38 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
     const processTextNodes = (node: Node) => {
       if (node.nodeType === Node.TEXT_NODE) {
         const text = node.textContent || '';
+        let linkedText = text;
+        let hasMatch = false;
+        
+        // 优先处理 HTTP/HTTPS URL
         if (urlRegex.test(text)) {
-          // 创建新的 HTML，将 URL 转换为链接
-          const linkedText = text.replace(urlRegex, (url) => {
+          linkedText = linkedText.replace(urlRegex, (url) => {
             return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
           });
-          
+          hasMatch = true;
+        }
+        
+        // 处理 Windows 路径（C:\path\file）
+        if (windowsPathRegex.test(linkedText) && !hasMatch) {
+          linkedText = linkedText.replace(windowsPathRegex, (path) => {
+            const fileUrl = `file:///${path.replace(/\\/g, '/')}`;
+            const icon = getFileIcon(path);
+            return `<a href="${fileUrl}" class="local-file-link" title="点击打开本地文件: ${path}" style="color: #722ed1; text-decoration: none;">${icon} ${path}</a>`;
+          });
+          hasMatch = true;
+        }
+        
+        // 处理 UNC 路径（\\server\share\file）
+        if (uncPathRegex.test(linkedText) && !hasMatch) {
+          linkedText = linkedText.replace(uncPathRegex, (path) => {
+            const fileUrl = `file:${path.replace(/\\/g, '/')}`;
+            const icon = getFileIcon(path);
+            return `<a href="${fileUrl}" class="local-file-link" title="点击打开网络文件: ${path}" style="color: #722ed1; text-decoration: none;">${icon} ${path}</a>`;
+          });
+          hasMatch = true;
+        }
+        
+        if (hasMatch) {
           // 创建临时容器并替换节点
           const tempContainer = document.createElement('span');
           tempContainer.innerHTML = linkedText;
@@ -181,7 +241,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
     
     processTextNodes(tempDiv);
     return tempDiv.innerHTML;
-  }, []);
+  }, [getFileIcon]);
 
   // 渲染内容（支持图片和链接）
   const renderContentWithImagePreview = useMemo(() => {

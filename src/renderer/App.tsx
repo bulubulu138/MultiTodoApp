@@ -280,15 +280,44 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     console.log(`[Tab切换] ${activeTab}:`, settings);
   }, [activeTab, getCurrentTabSettings]);
 
-  const handleCreateTodo = async (todoData: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const handleCreateTodo = async (
+    todoData: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'>,
+    pendingRelations?: Array<{targetId: number; relationType: string}>
+  ) => {
     try {
-      await window.electronAPI.todo.create(todoData);
+      const newTodo = await window.electronAPI.todo.create(todoData);
+      
+      // 如果有待创建的关系，创建它们
+      if (pendingRelations && pendingRelations.length > 0 && newTodo.id) {
+        let successCount = 0;
+        for (const relation of pendingRelations) {
+          try {
+            await window.electronAPI.relations.create({
+              sourceId: newTodo.id,
+              targetId: relation.targetId,
+              relationType: relation.relationType
+            });
+            successCount++;
+          } catch (error) {
+            console.error('Failed to create relation:', error);
+            // 继续创建其他关系，不中断流程
+          }
+        }
+        
+        if (successCount > 0) {
+          message.success(`待办事项创建成功，已建立 ${successCount} 个关系`);
+        } else if (successCount === 0 && pendingRelations.length > 0) {
+          message.warning('待办事项创建成功，但关系创建失败');
+        }
+      } else {
+        message.success('待办事项创建成功');
+      }
+      
       // 重新加载所有待办，确保数据一致性（与更新操作保持一致）
       await loadTodos();
       // 同时刷新关联关系
       await loadRelations();
       setShowForm(false);
-      message.success('待办事项创建成功');
     } catch (error) {
       message.error('创建待办事项失败');
       console.error('Error creating todo:', error);
@@ -850,7 +879,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
           todo={editingTodo}
           quickCreateContent={quickCreateContent}
           onSubmit={editingTodo ? 
-            (data) => handleUpdateTodo(editingTodo.id!, data) : 
+            (data, _pendingRelations) => handleUpdateTodo(editingTodo.id!, data) : 
             handleCreateTodo
           }
           onCancel={handleCloseForm}

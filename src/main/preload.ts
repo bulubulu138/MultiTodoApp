@@ -42,6 +42,11 @@ export interface ElectronAPI {
     readLocalFile: (filepath: string) => Promise<ArrayBuffer>;
   };
   
+  // 文件API
+  file: {
+    exists: (filepath: string) => Promise<boolean>;
+  };
+  
   // 关系API
   relations: {
     getAll: () => Promise<any[]>;
@@ -103,6 +108,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     upload: () => ipcRenderer.invoke('image:upload'),
     delete: (filepath: string) => ipcRenderer.invoke('image:delete', filepath),
     readLocalFile: (filepath: string) => ipcRenderer.invoke('image:readLocalFile', filepath),
+  },
+  file: {
+    exists: (filepath: string) => ipcRenderer.invoke('file:exists', filepath),
   },
   relations: {
     getAll: () => ipcRenderer.invoke('relations:getAll'),

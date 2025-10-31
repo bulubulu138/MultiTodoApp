@@ -16,7 +16,10 @@ interface TodoFormProps {
   visible: boolean;
   todo?: Todo | null;
   quickCreateContent?: string | null;
-  onSubmit: (data: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onSubmit: (
+    data: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'>,
+    pendingRelations?: Array<{targetId: number; relationType: string}>
+  ) => void;
   onCancel: () => void;
   allTodos?: Todo[];
   relations?: TodoRelation[];
@@ -41,6 +44,9 @@ const TodoForm: React.FC<TodoFormProps> = ({
   const [recommendations, setRecommendations] = useState<TodoRecommendation[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [pendingRelations, setPendingRelations] = useState<Array<{targetId: number; relationType: string}>>([]);
+  
+  // 添加编辑器焦点状态追踪
+  const editorHasFocusRef = React.useRef(false);
 
   // 提取所有历史标签并按使用频率排序
   const historyTags = useMemo(() => {
@@ -94,10 +100,9 @@ const TodoForm: React.FC<TodoFormProps> = ({
         setTags([]);
       }
       
-      // 延迟标记编辑器准备就绪，确保 Modal 完全打开
-      setTimeout(() => {
-        setIsEditorReady(true);
-      }, 150);
+      // 优化：直接标记编辑器准备就绪，依赖编辑器自身的初始化
+      // 移除不必要的延迟，避免状态不同步
+      setIsEditorReady(true);
       
       // 重置推荐状态
       setRecommendations([]);
@@ -168,14 +173,15 @@ const TodoForm: React.FC<TodoFormProps> = ({
     [todo?.id]
   );
 
-  // 防抖effect
+  // 优化的防抖effect - 增加更长的延迟，避免在输入时频繁触发
   useEffect(() => {
     if (!visible || todo) return; // 仅在新建模式下获取推荐
     
+    // 增加防抖延迟到 2 秒，减少对输入的干扰
     const timer = setTimeout(() => {
       const title = form.getFieldValue('title') || '';
       fetchRecommendations(title, richContent);
-    }, 800); // 800ms防抖
+    }, 2000); // 2秒防抖，避免频繁打断用户输入
     
     return () => clearTimeout(timer);
   }, [visible, richContent, form, fetchRecommendations, todo]);
@@ -220,32 +226,14 @@ const TodoForm: React.FC<TodoFormProps> = ({
           okText: '继续',
           cancelText: '取消',
           onOk: async () => {
-            onSubmit(todoData);
-            // 创建待处理的关系
-            await createPendingRelations();
+            onSubmit(todoData, pendingRelations);
           },
         });
       } else {
-        onSubmit(todoData);
-        // 创建待处理的关系
-        await createPendingRelations();
+        onSubmit(todoData, pendingRelations);
       }
     } catch (error) {
       console.error('Form validation failed:', error);
-    }
-  };
-
-  // 创建待处理的关系
-  const createPendingRelations = async () => {
-    if (pendingRelations.length === 0) return;
-    
-    try {
-      // 等待待办创建后再建立关系
-      // 注意：这里假设onSubmit是异步的，实际需要在父组件处理
-      console.log('Pending relations to create:', pendingRelations);
-      // 这部分逻辑需要在App.tsx中处理，因为需要等待新待办被创建后才能建立关系
-    } catch (error) {
-      console.error('Failed to create pending relations:', error);
     }
   };
 
@@ -307,14 +295,6 @@ const TodoForm: React.FC<TodoFormProps> = ({
           </Space>
         </div>
       }
-      afterOpenChange={(open) => {
-        if (open) {
-          // Modal 完全打开后确保编辑器准备就绪
-          setTimeout(() => {
-            setIsEditorReady(true);
-          }, 100);
-        }
-      }}
     >
       <div style={{ display: 'flex', gap: 16 }}>
         <div style={{ flex: 1 }}>
