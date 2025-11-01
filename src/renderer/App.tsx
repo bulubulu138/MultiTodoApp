@@ -13,6 +13,7 @@ import TodoViewDrawer from './components/TodoViewDrawer';
 import NotesDrawer from './components/NotesDrawer';
 import CalendarDrawer from './components/CalendarDrawer';
 import CustomTabManager from './components/CustomTabManager';
+import ContentFocusView, { ContentFocusViewRef } from './components/ContentFocusView';
 import { getTheme, ThemeMode } from './theme/themes';
 import { buildParallelGroups, selectGroupRepresentatives, sortWithGroups, getSortComparator } from './utils/sortWithGroups';
 import dayjs from 'dayjs';
@@ -61,6 +62,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   // 保存状态追踪（用于专注模式的乐观更新）
   const savingTodosRef = useRef<Set<number>>(new Set());
   const pendingSavesRef = useRef<Map<number, Promise<void>>>(new Map());
+  
+  // ContentFocusView 的 ref，用于切换视图时保存
+  const contentFocusRef = useRef<ContentFocusViewRef>(null);
 
   // 加载数据
   useEffect(() => {
@@ -101,6 +105,26 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         localStorage.setItem('hasSeenHotkeyGuide', 'true');
       }, 1000);
     }
+  }, []);
+
+  // 监听页面可见性变化，页面隐藏时自动保存
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.hidden) {
+        // 页面隐藏时，保存所有未保存的内容（如果在专注模式）
+        try {
+          await contentFocusRef.current?.saveAll();
+        } catch (error) {
+          console.error('Error saving on visibility change:', error);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   // 检查报告提醒
@@ -454,6 +478,16 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   };
 
   const handleViewModeChange = async (mode: ViewMode) => {
+    // 如果从专注模式切换出去，先保存所有未保存的内容
+    if (currentTabSettings.viewMode === 'content-focus' && mode !== 'content-focus') {
+      try {
+        await contentFocusRef.current?.saveAll();
+      } catch (error) {
+        console.error('Error saving before view change:', error);
+        message.error('保存失败，请稍后重试');
+        return;
+      }
+    }
     updateCurrentTabSettings({ viewMode: mode });
   };
 
@@ -802,32 +836,19 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   // 使用 useMemo 缓存当前 Tab 的设置
   const currentTabSettings = useMemo(() => getCurrentTabSettings(), [getCurrentTabSettings]);
 
-  // Tab 切换处理（带未保存检查）
-  const handleTabChange = useCallback((newTab: string) => {
-    // 检查是否有正在保存的数据
-    if (savingTodosRef.current.size > 0 || pendingSavesRef.current.size > 0) {
-      Modal.confirm({
-        title: '有未保存的更改',
-        content: `检测到 ${savingTodosRef.current.size} 个待办正在保存，是否等待保存完成？`,
-        okText: '等待保存',
-        cancelText: '放弃更改',
-        onOk: async () => {
-          const success = await waitForAllSaves();
-          if (success) {
-            setActiveTab(newTab);
-          }
-        },
-        onCancel: () => {
-          // 清空待保存队列，直接切换
-          savingTodosRef.current.clear();
-          pendingSavesRef.current.clear();
-          setActiveTab(newTab);
-        }
-      });
-    } else {
-      setActiveTab(newTab);
+  // Tab 切换处理（带自动保存）
+  const handleTabChange = useCallback(async (newTab: string) => {
+    // 如果当前在专注模式，先保存所有未保存的内容
+    if (currentTabSettings.viewMode === 'content-focus') {
+      try {
+        await contentFocusRef.current?.saveAll();
+      } catch (error) {
+        console.error('Error saving before tab change:', error);
+        // 保存失败也允许切换，避免阻塞用户操作
+      }
     }
-  }, [waitForAllSaves]);
+    setActiveTab(newTab);
+  }, [currentTabSettings.viewMode]);
 
   return (
     <Layout style={{ height: '100vh' }} data-theme={themeMode}>
@@ -854,22 +875,33 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
           size="large"
         />
         <div style={{ marginTop: 16 }}>
-          <TodoList
-            todos={filteredTodos}
-            allTodos={todos}
-            loading={loading}
-            onEdit={handleEditTodo}
-            onView={handleViewTodo}
-            onDelete={handleDeleteTodo}
-            onStatusChange={handleUpdateTodo}
-            onUpdateInPlace={handleUpdateTodoInPlace}
-            relations={relations}
-            onRelationsChange={loadRelations}
-            sortOption={currentTabSettings.sortOption}
-            activeTab={activeTab}
-            onUpdateDisplayOrder={handleUpdateDisplayOrder}
-            viewMode={currentTabSettings.viewMode}
-          />
+          {currentTabSettings.viewMode === 'content-focus' ? (
+            <ContentFocusView
+              ref={contentFocusRef}
+              todos={filteredTodos}
+              allTodos={todos}
+              loading={loading}
+              onUpdate={handleUpdateTodoInPlace}
+              onView={handleViewTodo}
+            />
+          ) : (
+            <TodoList
+              todos={filteredTodos}
+              allTodos={todos}
+              loading={loading}
+              onEdit={handleEditTodo}
+              onView={handleViewTodo}
+              onDelete={handleDeleteTodo}
+              onStatusChange={handleUpdateTodo}
+              onUpdateInPlace={handleUpdateTodoInPlace}
+              relations={relations}
+              onRelationsChange={loadRelations}
+              sortOption={currentTabSettings.sortOption}
+              activeTab={activeTab}
+              onUpdateDisplayOrder={handleUpdateDisplayOrder}
+              viewMode={currentTabSettings.viewMode}
+            />
+          )}
         </div>
       </Content>
 

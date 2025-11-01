@@ -171,45 +171,42 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({ visible, onClose }) => {
                 cursor: editingId === note.id ? 'default' : 'pointer',
                 border: editingId === note.id ? '2px solid #1890ff' : undefined
               }}
-              styles={{
-                header: { display: 'none' },
-                body: { padding: '12px' }
-              }}
-              extra={
-                <div onClick={(e) => e.stopPropagation()}>
-                  <Space size="small">
-                    <Tooltip title="复制心得">
-                      <Button
-                        type="text"
-                        size="small"
-                        icon={<CopyOutlined />}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          copyNoteToClipboard(note);
-                        }}
-                      />
-                    </Tooltip>
-                    <Popconfirm
-                      title="确定要删除这条心得吗？"
-                      onConfirm={(e) => {
-                        e?.stopPropagation();
-                        handleDelete(note.id!);
-                      }}
-                      okText="确定"
-                      cancelText="取消"
-                    >
-                      <Button
-                        type="text"
-                        danger
-                        size="small"
-                        icon={<DeleteOutlined />}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </Popconfirm>
-                  </Space>
-                </div>
-              }
             >
+              {/* 操作按钮 - 移到卡片内容顶部 */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }} onClick={(e) => e.stopPropagation()}>
+                <Space size="small">
+                  <Tooltip title="复制心得">
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<CopyOutlined />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyNoteToClipboard(note);
+                      }}
+                    />
+                  </Tooltip>
+                  <Popconfirm
+                    title="确定要删除这条心得吗？"
+                    onConfirm={(e) => {
+                      e?.stopPropagation();
+                      handleDelete(note.id!);
+                    }}
+                    okText="确定"
+                    cancelText="取消"
+                  >
+                    <Button
+                      type="text"
+                      danger
+                      size="small"
+                      icon={<DeleteOutlined />}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </Popconfirm>
+                </Space>
+              </div>
+
+              {/* 内容区域 */}
               {editingId === note.id ? (
                 <div onClick={(e) => e.stopPropagation()}>
                   <RichTextEditor
