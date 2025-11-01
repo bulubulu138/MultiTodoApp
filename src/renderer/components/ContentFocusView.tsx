@@ -1,7 +1,7 @@
 import { Todo } from '../../shared/types';
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Divider, Button, Checkbox, Space, Spin, Empty, App } from 'antd';
-import { SaveOutlined, EyeOutlined } from '@ant-design/icons';
+import { SaveOutlined, EyeOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import RichTextEditor from './RichTextEditor';
 
 interface ContentFocusViewProps {
@@ -22,6 +22,7 @@ const ContentFocusItem = React.memo<{
   const { message } = App.useApp();
   const [editedContent, setEditedContent] = useState<string>(todo.content);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPending, setIsPending] = useState(false); // 等待保存状态（防抖倒计时中）
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // 添加输入状态追踪，避免在用户输入时触发保存
@@ -66,15 +67,21 @@ const ContentFocusItem = React.memo<{
 
   // 优化的自动保存：增加防抖延迟，减少对用户输入的干扰
   useEffect(() => {
-    if (!hasChanges) return;
+    if (!hasChanges) {
+      setIsPending(false); // 没有改动，清除等待状态
+      return;
+    }
 
     // 清除之前的定时器
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
+    setIsPending(true); // 设置等待保存状态
+
     // 设置新的定时器 - 增加到 3 秒，避免频繁打断用户输入
     saveTimeoutRef.current = setTimeout(() => {
+      setIsPending(false); // 开始保存，清除等待状态
       handleSave();
     }, 3000); // 3秒防抖延迟，给用户充足的连续输入时间
 
@@ -156,7 +163,12 @@ const ContentFocusItem = React.memo<{
               <SaveOutlined /> 保存中...
             </span>
           )}
-          {!isSaving && hasChanges && (
+          {!isSaving && isPending && (
+            <span style={{ fontSize: 12, color: '#52c41a' }}>
+              <ClockCircleOutlined /> 等待保存...
+            </span>
+          )}
+          {!isSaving && !isPending && hasChanges && (
             <span style={{ fontSize: 12, color: '#faad14' }}>
               未保存
             </span>

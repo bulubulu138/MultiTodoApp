@@ -537,12 +537,48 @@ class Application {
     // 打开外部链接
     ipcMain.handle('shell:openExternal', async (_, url: string) => {
       try {
+        // 处理 HTTP/HTTPS URL
         if (url.startsWith('http://') || url.startsWith('https://')) {
           await shell.openExternal(url);
           return { success: true };
         }
-        return { success: false, error: 'Invalid URL' };
+        
+        // 处理 file:// 协议（本地文件）
+        if (url.startsWith('file://')) {
+          // 解析 file:// URL 获取实际路径
+          let filePath = url.replace('file:///', '').replace('file://', '');
+          
+          // Windows 路径处理
+          if (process.platform === 'win32') {
+            // file:///C:/path/file -> C:/path/file
+            filePath = filePath.replace(/^\//, '');
+          }
+          
+          // 解码 URL 编码的路径（处理中文路径）
+          filePath = decodeURIComponent(filePath);
+          
+          // 将正斜杠转换为反斜杠（Windows）
+          if (process.platform === 'win32') {
+            filePath = filePath.replace(/\//g, '\\');
+          }
+          
+          console.log('Opening local file:', filePath);
+          
+          // 使用 shell.openPath 打开本地文件
+          const result = await shell.openPath(filePath);
+          
+          if (result) {
+            // result 非空表示出错
+            console.error('Failed to open file:', result);
+            return { success: false, error: result };
+          }
+          
+          return { success: true };
+        }
+        
+        return { success: false, error: 'Unsupported protocol' };
       } catch (error) {
+        console.error('Error opening external:', error);
         return { success: false, error: (error as Error).message };
       }
     });

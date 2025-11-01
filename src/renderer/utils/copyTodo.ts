@@ -124,22 +124,12 @@ function getPriorityText(priority: string): string {
 
 // 生成HTML格式
 async function generateHtml(todo: Todo): Promise<{ html: string; size: number }> {
-  const statusText = getStatusText(todo.status);
-  const priorityText = getPriorityText(todo.priority);
-  const tags = todo.tags ? todo.tags.split(',').map(t => `#${t.trim()}`).join(' ') : '无';
-  
   // 处理内容中的图片
-  let content = todo.content || '无';
+  let content = todo.content || '';
   const { html: processedContent, totalSize } = await processImagesInHtml(content);
   
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.6; color: #333;">
-      <div style="font-size: 16px; font-weight: bold; margin-bottom: 8px;">【待办】${todo.title}</div>
-      <div style="border-top: 2px solid #d9d9d9; margin: 8px 0;"></div>
-      <div style="margin-bottom: 4px;"><strong>状态：</strong>${statusText} | <strong>优先级：</strong>${priorityText}</div>
-      <div style="margin-bottom: 8px;"><strong>标签：</strong>${tags}</div>
-      <div style="border-top: 2px solid #d9d9d9; margin: 8px 0;"></div>
-      <div style="font-weight: bold; margin-bottom: 8px;">内容：</div>
       ${processedContent}
     </div>
   `;
@@ -149,19 +139,9 @@ async function generateHtml(todo: Todo): Promise<{ html: string; size: number }>
 
 // 生成纯文本格式
 function generatePlainText(todo: Todo): string {
-  const statusText = getStatusText(todo.status);
-  const priorityText = getPriorityText(todo.priority);
-  const tags = todo.tags ? todo.tags.split(',').map(t => `#${t.trim()}`).join(' ') : '无';
+  const content = todo.content ? htmlToPlainText(todo.content) : '';
   
-  const content = todo.content ? htmlToPlainText(todo.content) : '无';
-  
-  return `【待办】${todo.title}
-━━━━━━━━━━━━━━━
-状态：${statusText} | 优先级：${priorityText}
-标签：${tags}
-━━━━━━━━━━━━━━━
-内容：
-${content}`;
+  return content;
 }
 
 // 主复制函数
@@ -196,7 +176,7 @@ export async function copyTodoToClipboard(todo: Todo): Promise<CopyResult> {
     
     return {
       success: true,
-      message: `已复制到剪切板（${sizeText}）`,
+      message: `已复制内容到剪切板（${sizeText}）`,
       size
     };
   } catch (error) {
@@ -208,7 +188,7 @@ export async function copyTodoToClipboard(todo: Todo): Promise<CopyResult> {
       await navigator.clipboard.writeText(plainText);
       return {
         success: true,
-        message: '已复制纯文本到剪切板（不含图片）'
+        message: '已复制内容到剪切板（不含图片）'
       };
     } catch (fallbackError) {
       return {

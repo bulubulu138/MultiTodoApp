@@ -74,18 +74,18 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({ visible, onClose }) => {
         // 自动从内容生成标题
         const title = extractTitleFromContent(content);
         await window.electronAPI.notes.update(id, { title, content });
+        // 静默更新，不显示成功消息，减少对用户的干扰
         setNotes(prev => prev.map(n => 
           n.id === id ? { ...n, title, content, updatedAt: new Date().toISOString() } : n
         ));
-        message.success('自动保存成功', 1);
       } catch (error) {
         message.error('保存失败');
         console.error('Error saving note:', error);
       }
-    }, 1000);
+    }, 3000); // 增加到 3 秒，减少频繁保存对输入的干扰
 
     setSaveTimeout(timeout);
-  }, [saveTimeout]);
+  }, [saveTimeout, message]);
 
   const handleContentChange = (id: number, content: string) => {
     setEditingContent(content);
@@ -160,7 +160,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({ visible, onClose }) => {
           image={Empty.PRESENTED_IMAGE_SIMPLE}
         />
       ) : (
-        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+        <Space direction="vertical" style={{ width: '100%' }} size="small">
           {notes.map(note => (
             <Card
               key={note.id}
@@ -170,6 +170,10 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({ visible, onClose }) => {
               style={{ 
                 cursor: editingId === note.id ? 'default' : 'pointer',
                 border: editingId === note.id ? '2px solid #1890ff' : undefined
+              }}
+              styles={{
+                header: { display: 'none' },
+                body: { padding: '12px' }
               }}
               extra={
                 <div onClick={(e) => e.stopPropagation()}>
