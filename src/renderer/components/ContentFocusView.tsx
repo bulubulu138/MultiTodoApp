@@ -199,6 +199,31 @@ const ContentFocusItem = React.memo(
       }
     }, [hasChanges, handleSave]);
 
+    // 键盘事件处理 - Ctrl+S / Cmd+S 手动保存
+    const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+      // 检测 Ctrl+S (Windows/Linux) 或 Cmd+S (Mac)
+      if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+        event.preventDefault(); // 阻止浏览器默认的保存行为
+        
+        // 立即保存（即使在输入法状态也保存）
+        if (hasChanges) {
+          // 清除自动保存定时器
+          if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+            saveTimeoutRef.current = null;
+          }
+          
+          // 立即保存
+          handleSave();
+          
+          // 显示保存提示
+          message.success('已手动保存', 1);
+        } else {
+          message.info('没有需要保存的更改', 1);
+        }
+      }
+    }, [hasChanges, handleSave, message]);
+
     return (
       <div className="content-focus-item">
         {/* 顶部工具栏 */}
@@ -236,12 +261,14 @@ const ContentFocusItem = React.memo(
           </Space>
         </div>
 
-        {/* 富文本编辑器 - 添加输入法事件和失去焦点保存 */}
+        {/* 富文本编辑器 - 添加输入法事件、失去焦点保存和键盘快捷键 */}
         <div 
           className="content-focus-item-editor" 
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
           onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          tabIndex={-1}
         >
           <RichTextEditor
             value={editedContent}
@@ -249,6 +276,11 @@ const ContentFocusItem = React.memo(
             placeholder="编辑待办内容..."
             style={{ minHeight: '150px' }}
           />
+        </div>
+
+        {/* 快捷键提示 */}
+        <div style={{ fontSize: 11, color: '#999', marginTop: 4, textAlign: 'right' }}>
+          提示：Ctrl+S 手动保存 | 自动保存间隔 1 秒
         </div>
 
         {/* 分割线 */}
