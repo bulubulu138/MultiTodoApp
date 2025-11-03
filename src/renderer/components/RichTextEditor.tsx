@@ -126,11 +126,22 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     
     // 输入法事件监听
     const handleCompositionStart = () => {
+      console.log('[RichTextEditor] 输入法开始');
       isComposingRef.current = true;
     };
     
     const handleCompositionEnd = () => {
+      console.log('[RichTextEditor] 输入法结束');
       isComposingRef.current = false;
+      
+      // 关键修复：输入法结束后，手动触发一次 onChange
+      // 这样可以确保输入法结束后的最终内容被正确保存
+      try {
+        const currentContent = editor.root.innerHTML;
+        onChange(currentContent);
+      } catch (error) {
+        console.warn('Failed to trigger onChange after composition:', error);
+      }
     };
     
     // 焦点事件监听
@@ -155,7 +166,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       editorElement.removeEventListener('focus', handleFocus);
       editorElement.removeEventListener('blur', handleBlur);
     };
-  }, [editorInstance, getEditorSafely]);
+  }, [editorInstance, getEditorSafely, onChange]);
 
   // Toolbar configuration - react-quill-new handles DOM operations better
   const modules = {
@@ -269,6 +280,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         value={value}
         onChange={(content) => {
           try {
+            // 关键修复：输入法期间不触发 onChange，避免频繁状态更新导致重渲染
+            // 这样可以防止中文输入法被打断
+            if (isComposingRef.current) {
+              console.log('[RichTextEditor] 输入法期间，跳过 onChange');
+              return;
+            }
+            
+            // 非输入法状态，正常触发 onChange
             onChange(content);
           } catch (error) {
             console.warn('Content change handling failed:', error);

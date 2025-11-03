@@ -278,11 +278,6 @@ const ContentFocusItem = React.memo(
           />
         </div>
 
-        {/* 快捷键提示 */}
-        <div style={{ fontSize: 11, color: '#999', marginTop: 4, textAlign: 'right' }}>
-          提示：Ctrl+S 手动保存 | 自动保存间隔 1 秒
-        </div>
-
         {/* 分割线 */}
         {!isLast && <Divider className="content-focus-divider" />}
       </div>
