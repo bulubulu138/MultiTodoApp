@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Layout, App as AntApp, Tabs, ConfigProvider, FloatButton, Modal, Typography, Space, Tag } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { VerticalAlignTopOutlined } from '@ant-design/icons';
+import { motion, AnimatePresence } from 'framer-motion';
 import TodoList from './components/TodoList';
 import TodoForm from './components/TodoForm';
 import Toolbar, { SortOption, ViewMode } from './components/Toolbar';
@@ -874,34 +875,47 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
           className="status-tabs"
           size="large"
         />
-        <div style={{ marginTop: 16 }}>
-          {currentTabSettings.viewMode === 'content-focus' ? (
-            <ContentFocusView
-              ref={contentFocusRef}
-              todos={filteredTodos}
-              allTodos={todos}
-              loading={loading}
-              onUpdate={handleUpdateTodoInPlace}
-              onView={handleViewTodo}
-            />
-          ) : (
-            <TodoList
-              todos={filteredTodos}
-              allTodos={todos}
-              loading={loading}
-              onEdit={handleEditTodo}
-              onView={handleViewTodo}
-              onDelete={handleDeleteTodo}
-              onStatusChange={handleUpdateTodo}
-              onUpdateInPlace={handleUpdateTodoInPlace}
-              relations={relations}
-              onRelationsChange={loadRelations}
-              sortOption={currentTabSettings.sortOption}
-              activeTab={activeTab}
-              onUpdateDisplayOrder={handleUpdateDisplayOrder}
-              viewMode={currentTabSettings.viewMode}
-            />
-          )}
+        <div style={{ marginTop: 16, position: 'relative' }}>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`${activeTab}-${currentTabSettings.viewMode}`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ 
+                duration: 0.2, 
+                ease: [0.4, 0, 0.2, 1] // cubic-bezier easing
+              }}
+            >
+              {currentTabSettings.viewMode === 'content-focus' ? (
+                <ContentFocusView
+                  ref={contentFocusRef}
+                  todos={filteredTodos}
+                  allTodos={todos}
+                  loading={loading}
+                  onUpdate={handleUpdateTodoInPlace}
+                  onView={handleViewTodo}
+                />
+              ) : (
+                <TodoList
+                  todos={filteredTodos}
+                  allTodos={todos}
+                  loading={loading}
+                  onEdit={handleEditTodo}
+                  onView={handleViewTodo}
+                  onDelete={handleDeleteTodo}
+                  onStatusChange={handleUpdateTodo}
+                  onUpdateInPlace={handleUpdateTodoInPlace}
+                  relations={relations}
+                  onRelationsChange={loadRelations}
+                  sortOption={currentTabSettings.sortOption}
+                  activeTab={activeTab}
+                  onUpdateDisplayOrder={handleUpdateDisplayOrder}
+                  viewMode={currentTabSettings.viewMode}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </Content>
 
@@ -1051,7 +1065,14 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <ConfigProvider locale={zhCN} theme={getTheme(themeMode)}>
+    <ConfigProvider 
+      locale={zhCN} 
+      theme={getTheme(themeMode)}
+      // 性能优化：减少不必要的动画效果
+      virtual={false}
+      // 优化波纹效果和动画时长
+      wave={{ disabled: false }}
+    >
       <AntApp>
         <AppContent themeMode={themeMode} onThemeChange={setThemeMode} />
       </AntApp>

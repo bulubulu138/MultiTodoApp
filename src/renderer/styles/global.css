@@ -4,13 +4,15 @@
 }
 
 /* 只对需要过渡的元素应用动画 - 性能优化 */
-.todo-card,
-.ant-btn,
-.ant-tabs-tab,
-.ant-list-item,
-a,
-button {
-  transition: background-color 0.3s ease, color 0.3s ease;
+/* 使用更精确的选择器，避免全局应用 */
+.ant-btn {
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ant-tabs-tab {
+  transition: color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* 浅色主题默认CSS变量 */
@@ -147,18 +149,24 @@ body {
   height: 3px;
 }
 
-/* 卡片样式 - 由主题控制 */
+/* 卡片样式 - 由主题控制，性能优化版 */
 .todo-card {
   margin-bottom: 6px;
   border-radius: 8px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  will-change: transform;
-  transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+  /* 移除全局will-change，仅在hover时动态添加 */
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .todo-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  will-change: transform; /* 仅在hover时启用 */
+}
+
+.todo-card:not(:hover) {
+  will-change: auto; /* hover结束后移除 */
 }
 
 .todo-card .ant-card-body {
@@ -601,20 +609,22 @@ body {
   border-radius: 4px;
   margin: 8px 0;
   cursor: pointer;
-  will-change: transform;
-  transition: transform 0.2s, box-shadow 0.2s;
+  /* 移除全局will-change */
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .ant-drawer .todo-view-content img:hover {
   transform: scale(1.02);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  will-change: transform; /* 仅在hover时启用 */
 }
 
 .ant-drawer .todo-view-content a {
   color: #1890ff !important;
   text-decoration: underline !important;
   cursor: pointer !important;
-  transition: color 0.2s;
+  transition: color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   font-weight: 500;
 }
 
@@ -631,10 +641,10 @@ body {
   font-weight: 600;
 }
 
-/* 标题悬停效果 */
+/* 标题悬停效果 - 性能优化 */
 .todo-title-link {
   cursor: pointer;
-  transition: color 0.3s;
+  transition: color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .todo-title-link:hover {
@@ -732,7 +742,7 @@ body {
 .calendar-compact .ant-picker-calendar-date {
   height: 40px !important;
   border-radius: 4px;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 2px !important;
 }
 
@@ -952,6 +962,39 @@ body {
   background: rgba(255, 255, 255, 0.3);
 }
 
+/* ============================================
+   优化的动画类（framer-motion + 自定义）
+   ============================================ */
+
+/* 快速淡入淡出动画 - 用于 Modal */
+.ant-fade-enter {
+  opacity: 0;
+}
+
+.ant-fade-enter-active {
+  opacity: 1;
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ant-fade-exit {
+  opacity: 1;
+}
+
+.ant-fade-exit-active {
+  opacity: 0;
+  transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 优化 Drawer 动画性能 */
+.animated-drawer .ant-drawer-content-wrapper {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  will-change: transform;
+}
+
+.animated-drawer.ant-drawer-open .ant-drawer-content-wrapper {
+  will-change: auto;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .toolbar {
@@ -1148,7 +1191,8 @@ body {
 .content-focus-item-editor .quill {
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .content-focus-item-editor .quill:focus-within {
@@ -1192,15 +1236,17 @@ body {
   min-height: 300px;
 }
 
-/* 保存按钮悬浮效果 */
+/* 保存按钮悬浮效果 - 性能优化 */
 .content-focus-item-header .ant-btn-primary {
   box-shadow: 0 2px 6px rgba(24, 144, 255, 0.3);
-  transition: all 0.3s ease;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .content-focus-item-header .ant-btn-primary:hover {
   box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
   transform: translateY(-1px);
+  will-change: transform;
 }
 
 /* 深色主题适配 */

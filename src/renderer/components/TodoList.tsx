@@ -1,7 +1,8 @@
 import { Todo, TodoRelation } from '../../shared/types';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { List, Card, Tag, Button, Space, Popconfirm, Select, Typography, Image, Tooltip, App, InputNumber } from 'antd';
 import { EditOutlined, DeleteOutlined, LinkOutlined, EyeOutlined, EyeInvisibleOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import { motion } from 'framer-motion';
 import { SortOption, ViewMode } from './Toolbar';
 import RelationsModal from './RelationsModal';
 import RelationContext from './RelationContext';
@@ -30,7 +31,8 @@ interface TodoListProps {
   onUpdateInPlace?: (id: number, updates: Partial<Todo>) => void; // 专注模式专用：乐观更新
 }
 
-const TodoList: React.FC<TodoListProps> = ({
+// 性能优化：使用 React.memo 避免不必要的重渲染
+const TodoList: React.FC<TodoListProps> = React.memo(({
   todos,
   allTodos,
   loading,
@@ -92,13 +94,14 @@ const TodoList: React.FC<TodoListProps> = ({
     }
   };
 
-  const handleStatusChange = (todoId: number, newStatus: string) => {
+  // 性能优化：使用 useCallback 缓存函数
+  const handleStatusChange = useCallback((todoId: number, newStatus: string) => {
     const updates: Partial<Todo> = { status: newStatus as Todo['status'] };
     if (newStatus === 'completed') {
       updates.updatedAt = new Date().toISOString();
     }
     onStatusChange(todoId, updates);
-  };
+  }, [onStatusChange]);
 
   // 从富文本 HTML 中提取纯文本
   const extractPlainText = (html: string): string => {
@@ -151,12 +154,13 @@ const TodoList: React.FC<TodoListProps> = ({
     );
   };
 
-  const handleShowRelations = (todo: Todo) => {
+  // 性能优化：使用 useCallback 缓存函数
+  const handleShowRelations = useCallback((todo: Todo) => {
     setSelectedTodo(todo);
     setShowRelationsModal(true);
-  };
+  }, []);
 
-  const toggleRelationContext = (todoId: number) => {
+  const toggleRelationContext = useCallback((todoId: number) => {
     const newExpanded = new Set(expandedRelations);
     if (newExpanded.has(todoId)) {
       newExpanded.delete(todoId);
@@ -164,7 +168,7 @@ const TodoList: React.FC<TodoListProps> = ({
       newExpanded.add(todoId);
     }
     setExpandedRelations(newExpanded);
-  };
+  }, [expandedRelations]);
 
   const formatCompactTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -687,6 +691,8 @@ const TodoList: React.FC<TodoListProps> = ({
     />
     </>
   );
-};
+});
+
+TodoList.displayName = 'TodoList';
 
 export default TodoList;

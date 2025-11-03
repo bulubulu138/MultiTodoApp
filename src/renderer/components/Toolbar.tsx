@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button, Space, Select, Tooltip, Segmented } from 'antd';
 import { PlusOutlined, SettingOutlined, ExportOutlined, SearchOutlined, BulbOutlined, CalendarOutlined, SortAscendingOutlined, TagsOutlined, UnorderedListOutlined, AlignLeftOutlined } from '@ant-design/icons';
+import { motion } from 'framer-motion';
 
 const { Option } = Select;
 
@@ -31,7 +32,8 @@ interface ToolbarProps {
   onViewModeChange?: (mode: ViewMode) => void;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({
+// 性能优化：使用 React.memo 避免不必要的重渲染
+const Toolbar: React.FC<ToolbarProps> = React.memo(({
   onAddTodo,
   onShowSettings,
   onShowExport,
@@ -139,6 +141,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
       </Space>
     </div>
   );
-};
+});
+
+Toolbar.displayName = 'Toolbar';
 
 export default Toolbar;
