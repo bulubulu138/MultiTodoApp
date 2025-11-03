@@ -37,6 +37,7 @@ const ContentFocusItem = React.memo(
     const [editedContent, setEditedContent] = useState<string>(todo.content);
     const [isSaving, setIsSaving] = useState(false);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const isComposingRef = useRef(false); // 追踪输入法状态
     
     const lastSavedContentRef = useRef(todo.content);
 
@@ -75,6 +76,27 @@ const ContentFocusItem = React.memo(
       }
     }, [hasChanges, todo.id, editedContent, onUpdate, message]);
 
+    // 智能保存调度函数 - 检查输入法状态
+    const scheduleAutoSave = useCallback(() => {
+      // 如果正在使用输入法，直接返回，不调度保存
+      if (isComposingRef.current) {
+        return;
+      }
+
+      // 清除之前的定时器
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
+      // 设置新的保存定时器 - 1秒防抖
+      saveTimeoutRef.current = setTimeout(() => {
+        // 再次检查输入法状态（防止在定时器执行时正在使用输入法）
+        if (!isComposingRef.current) {
+          handleSave();
+        }
+      }, 1000);
+    }, [handleSave]);
+
     // 暴露给父组件的保存方法
     useImperativeHandle(ref, () => ({
       saveNow: async () => {
@@ -84,35 +106,11 @@ const ContentFocusItem = React.memo(
             clearTimeout(saveTimeoutRef.current);
             saveTimeoutRef.current = null;
           }
-          // 立即保存
+          // 立即保存（即使在输入法状态也保存，因为是用户主动触发）
           await handleSave();
         }
       }
     }), [hasChanges, editedContent, handleSave]);
-
-    // 优化的自动保存：使用短防抖（1秒），避免频繁保存但不打断输入
-    useEffect(() => {
-      if (!hasChanges) {
-        return;
-      }
-
-      // 清除之前的定时器
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-
-      // 设置新的定时器 - 1秒防抖，输入停止后自动保存
-      saveTimeoutRef.current = setTimeout(() => {
-        handleSave();
-      }, 1000); // 1秒防抖，快速响应但不打断输入
-
-      // 清理函数：组件卸载或内容再次变化时清除定时器
-      return () => {
-        if (saveTimeoutRef.current) {
-          clearTimeout(saveTimeoutRef.current);
-        }
-      };
-    }, [editedContent, hasChanges, handleSave]);
 
     // 组件卸载时保存未保存的更改
     useEffect(() => {
@@ -154,9 +152,43 @@ const ContentFocusItem = React.memo(
       onView(todo);
     }, [todo, onView]);
 
+    // 输入法开始事件
+    const handleCompositionStart = useCallback(() => {
+      console.log('[AutoSave] 输入法开始');
+      isComposingRef.current = true;
+      
+      // 清除所有待触发的保存定时器
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+    }, []);
+
+    // 输入法结束事件
+    const handleCompositionEnd = useCallback(() => {
+      console.log('[AutoSave] 输入法结束');
+      isComposingRef.current = false;
+      
+      // 输入法结束后，重新启动防抖保存
+      scheduleAutoSave();
+    }, [scheduleAutoSave]);
+
+    // 内容变化处理
+    const handleContentChange = useCallback((content: string) => {
+      // 立即更新本地内容（不影响输入）
+      setEditedContent(content);
+      
+      // 只在非输入法状态下启动保存调度
+      if (!isComposingRef.current) {
+        scheduleAutoSave();
+      }
+      // 如果在输入法状态，不做任何保存操作
+    }, [scheduleAutoSave]);
+
     // 失去焦点时立即保存
     const handleBlur = useCallback(() => {
-      if (hasChanges) {
+      // 失去焦点时，如果不在输入法状态且有更改，立即保存
+      if (!isComposingRef.current && hasChanges) {
         // 清除防抖定时器
         if (saveTimeoutRef.current) {
           clearTimeout(saveTimeoutRef.current);
@@ -204,11 +236,16 @@ const ContentFocusItem = React.memo(
           </Space>
         </div>
 
-        {/* 富文本编辑器 - 添加失去焦点保存 */}
-        <div className="content-focus-item-editor" onBlur={handleBlur}>
+        {/* 富文本编辑器 - 添加输入法事件和失去焦点保存 */}
+        <div 
+          className="content-focus-item-editor" 
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
+          onBlur={handleBlur}
+        >
           <RichTextEditor
             value={editedContent}
-            onChange={setEditedContent}
+            onChange={handleContentChange}
             placeholder="编辑待办内容..."
             style={{ minHeight: '150px' }}
           />
