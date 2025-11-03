@@ -44,6 +44,8 @@ const TodoForm: React.FC<TodoFormProps> = ({
   const [recommendations, setRecommendations] = useState<TodoRecommendation[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [pendingRelations, setPendingRelations] = useState<Array<{targetId: number; relationType: string}>>([]);
+  const [selectedTodoId, setSelectedTodoId] = useState<number | null>(null);
+  const [selectedRelationType, setSelectedRelationType] = useState<string>('extends');
   
   // 添加编辑器焦点状态追踪
   const editorHasFocusRef = React.useRef(false);
@@ -451,34 +453,70 @@ const TodoForm: React.FC<TodoFormProps> = ({
           <Form.Item label={<span><BulbOutlined /> 关联待办</span>}>
             {/* 手动选择待办 */}
             <Card size="small" title="手动添加关联" style={{ marginBottom: 16 }}>
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Select
-                  showSearch
-                  placeholder="搜索待办..."
-                  style={{ width: '100%' }}
-                  filterOption={(input, option) =>
-                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                  }
-                  options={allTodos
-                    .filter(t => 
-                      !pendingRelations.some(r => r.targetId === t.id) // 排除已添加的
-                    )
-                    .map(t => ({
-                      label: `${t.title}${t.tags ? ` [${t.tags}]` : ''}`,
-                      value: t.id,
-                      todo: t
-                    }))}
-                  onSelect={(value) => {
-                    const selectedTodo = allTodos.find(t => t.id === value);
-                    if (selectedTodo) {
-                      // 默认添加为扩展关系
-                      handleAddPendingRelation(selectedTodo.id!, 'extends');
-                      message.success(`已添加「${selectedTodo.title}」为扩展关系`);
+              <Space direction="vertical" style={{ width: '100%' }} size="small">
+                {/* 待办选择器 + 关系类型选择器 + 添加按钮 */}
+                <Space.Compact style={{ width: '100%' }}>
+                  <Select
+                    showSearch
+                    placeholder="搜索待办..."
+                    style={{ width: '50%' }}
+                    value={selectedTodoId}
+                    onChange={setSelectedTodoId}
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                     }
-                  }}
-                />
+                    options={allTodos
+                      .filter(t => !pendingRelations.some(r => r.targetId === t.id))
+                      .map(t => ({
+                        label: `${t.title}${t.tags ? ` [${t.tags}]` : ''}`,
+                        value: t.id
+                      }))}
+                  />
+                  
+                  <Select
+                    value={selectedRelationType}
+                    onChange={setSelectedRelationType}
+                    style={{ width: '30%' }}
+                  >
+                    <Option value="extends">延伸</Option>
+                    <Option value="background">背景</Option>
+                    <Option value="parallel">并列</Option>
+                  </Select>
+                  
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => {
+                      if (selectedTodoId) {
+                        const selectedTodo = allTodos.find(t => t.id === selectedTodoId);
+                        if (selectedTodo) {
+                          handleAddPendingRelation(selectedTodoId, selectedRelationType);
+                          
+                          const typeNames: Record<string, string> = {
+                            extends: '延伸',
+                            background: '背景',
+                            parallel: '并列'
+                          };
+                          message.success(
+                            `已添加「${selectedTodo.title}」为${typeNames[selectedRelationType]}关系`
+                          );
+                          
+                          // 清空选择
+                          setSelectedTodoId(null);
+                          setSelectedRelationType('extends');
+                        }
+                      }
+                    }}
+                    disabled={!selectedTodoId}
+                    style={{ width: '20%' }}
+                  >
+                    添加
+                  </Button>
+                </Space.Compact>
+                
+                {/* 提示文字 */}
                 <Text type="secondary" style={{ fontSize: 11 }}>
-                  💡 选择待办后将自动添加为"扩展"关系，您可以在下方修改关系类型或移除
+                  💡 选择待办和关系类型后点击"添加"按钮
                 </Text>
               </Space>
             </Card>
@@ -530,7 +568,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
                               }
                             }}
                           >
-                            {hasPendingRelation('extends') ? '已选扩展' : '扩展'}
+                            {hasPendingRelation('extends') ? '已选延伸' : '延伸'}
                           </Button>
                           <Button
                             size="small"
@@ -584,7 +622,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
                     if (!targetTodo) return null;
                     
                     const relationTypeMap = {
-                      extends: { label: '扩展', color: 'blue' },
+                      extends: { label: '延伸', color: 'blue' },
                       background: { label: '背景', color: 'green' },
                       parallel: { label: '并列', color: 'orange' }
                     };
@@ -618,7 +656,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
                               handleAddPendingRelation(rel.targetId, newType);
                             }}
                             options={[
-                              { label: '扩展', value: 'extends' },
+                              { label: '延伸', value: 'extends' },
                               { label: '背景', value: 'background' },
                               { label: '并列', value: 'parallel' }
                             ]}
