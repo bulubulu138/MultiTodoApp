@@ -43,41 +43,30 @@ jobs:
           cache-dependency-path: '**/package-lock.json'
 
       - name: Install dependencies
-        run: |
-          cd MultiTodoApp
-          npm ci
+        run: npm ci
 
       - name: Install app dependencies and rebuild native modules
         run: |
-          cd MultiTodoApp
           npx electron-builder install-app-deps
           npm run rebuild
         env:
           npm_config_msvs_version: ${{ matrix.platform == 'win' && '2019' || '' }}
 
       - name: Verify native modules
-        run: |
-          cd MultiTodoApp
-          npm run verify
+        run: npm run verify
 
       - name: Build application
-        run: |
-          cd MultiTodoApp
-          npm run build
+        run: npm run build
 
       - name: Package application (Windows)
         if: matrix.platform == 'win'
-        run: |
-          cd MultiTodoApp
-          npm run dist:win
+        run: npm run dist:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Package application (macOS x64)
         if: matrix.platform == 'mac' && matrix.arch == 'x64'
-        run: |
-          cd MultiTodoApp
-          npm run dist:mac -- --x64
+        run: npm run dist:mac -- --x64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -87,9 +76,7 @@ jobs:
 
       - name: Package application (macOS ARM64)
         if: matrix.platform == 'mac' && matrix.arch == 'arm64'
-        run: |
-          cd MultiTodoApp
-          npm run dist:mac -- --arm64
+        run: npm run dist:mac -- --arm64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -103,8 +90,8 @@ jobs:
         with:
           name: MultiTodo-Windows-${{ matrix.arch }}
           path: |
-            MultiTodoApp/release/*.exe
-            MultiTodoApp/release/*.exe.blockmap
+            release/*.exe
+            release/*.exe.blockmap
           if-no-files-found: error
 
       - name: Upload artifacts (macOS)
@@ -113,8 +100,8 @@ jobs:
         with:
           name: MultiTodo-macOS-${{ matrix.arch }}
           path: |
-            MultiTodoApp/release/*.dmg
-            MultiTodoApp/release/*.dmg.blockmap
+            release/*.dmg
+            release/*.dmg.blockmap
           if-no-files-found: error
 
   release:
