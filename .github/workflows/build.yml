@@ -55,7 +55,11 @@ jobs:
           echo "Installing app dependencies..."
           npx electron-builder install-app-deps
           
-          echo "Rebuilding for Electron with verbose output..."
+          echo "Removing prebuilt binaries downloaded by electron-builder..."
+          rm -rf node_modules/better-sqlite3/build
+          rm -rf node_modules/better-sqlite3/prebuilds
+          
+          echo "Rebuilding for Electron from source..."
           npx electron-rebuild -f -w better-sqlite3 -v
           
           echo "Checking build result..."
