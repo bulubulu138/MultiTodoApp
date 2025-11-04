@@ -49,6 +49,14 @@ const TodoForm: React.FC<TodoFormProps> = ({
   
   // 添加编辑器焦点状态追踪
   const editorHasFocusRef = React.useRef(false);
+  
+  // 添加输入法状态追踪，避免输入法期间触发推荐系统
+  const isComposingRef = React.useRef(false);
+
+  // 包装的内容变化处理函数
+  const handleContentChange = useCallback((content: string) => {
+    setRichContent(content);
+  }, []);
 
   // 提取所有历史标签并按使用频率排序
   const historyTags = useMemo(() => {
@@ -179,11 +187,17 @@ const TodoForm: React.FC<TodoFormProps> = ({
   useEffect(() => {
     if (!visible || todo) return; // 仅在新建模式下获取推荐
     
-    // 增加防抖延迟到 2 秒，减少对输入的干扰
+    // 输入法期间不触发推荐系统，避免干扰输入
+    if (isComposingRef.current) {
+      console.log('[TodoForm] 输入法期间，跳过推荐系统');
+      return;
+    }
+    
+    // 增加防抖延迟到 3 秒，进一步减少对输入的干扰
     const timer = setTimeout(() => {
       const title = form.getFieldValue('title') || '';
       fetchRecommendations(title, richContent);
-    }, 2000); // 2秒防抖，避免频繁打断用户输入
+    }, 3000); // 3秒防抖，避免频繁打断用户输入
     
     return () => clearTimeout(timer);
   }, [visible, richContent, form, fetchRecommendations, todo]);
@@ -338,15 +352,26 @@ const TodoForm: React.FC<TodoFormProps> = ({
         >
           {isEditorReady ? (
             useRichEditor && !editorError ? (
-              <RichTextEditor
-                value={richContent}
-                onChange={setRichContent}
-                placeholder="输入内容，支持格式化文本、粘贴图片等..."
-              />
+              <div 
+                onCompositionStart={() => {
+                  console.log('[TodoForm] 输入法开始');
+                  isComposingRef.current = true;
+                }}
+                onCompositionEnd={() => {
+                  console.log('[TodoForm] 输入法结束');
+                  isComposingRef.current = false;
+                }}
+              >
+                <RichTextEditor
+                  value={richContent}
+                  onChange={handleContentChange}
+                  placeholder="输入内容，支持格式化文本、粘贴图片等..."
+                />
+              </div>
             ) : (
               <PlainTextFallback
                 value={richContent}
-                onChange={setRichContent}
+                onChange={handleContentChange}
                 placeholder="输入内容..."
               />
             )
