@@ -1,6 +1,6 @@
-import { Todo } from '../../shared/types';
+import { Todo, TodoRelation } from '../../shared/types';
 import React, { useState, useMemo, useCallback, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
-import { Divider, Button, Checkbox, Space, Spin, Empty, App } from 'antd';
+import { Divider, Button, Checkbox, Space, Spin, Empty, App, InputNumber, Tag } from 'antd';
 import { SaveOutlined, EyeOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import RichTextEditor from './RichTextEditor';
 
@@ -10,6 +10,9 @@ interface ContentFocusViewProps {
   onUpdate: (id: number, updates: Partial<Todo>) => void;
   onView: (todo: Todo) => void;
   loading: boolean;
+  activeTab: string;
+  relations: TodoRelation[];
+  onUpdateDisplayOrder: (todoId: number, tabKey: string, displayOrder: number) => Promise<void>;
 }
 
 // 暴露给父组件的方法
@@ -23,6 +26,13 @@ interface ContentFocusItemProps {
   onUpdate: (id: number, updates: Partial<Todo>) => void;
   onView: (todo: Todo) => void;
   isLast: boolean;
+  activeTab: string;
+  allTodos: Todo[];
+  relations: TodoRelation[];
+  parallelGroup?: Set<number>;
+  prevTodo: Todo | null;
+  nextTodo: Todo | null;
+  onUpdateDisplayOrder: (todoId: number, tabKey: string, displayOrder: number) => Promise<void>;
 }
 
 // 暴露给父组件的方法
@@ -32,10 +42,24 @@ export interface ContentFocusItemRef {
 
 // 单个待办项组件（使用 forwardRef 暴露保存方法）
 const ContentFocusItem = React.memo(
-  forwardRef<ContentFocusItemRef, ContentFocusItemProps>(({ todo, onUpdate, onView, isLast }, ref) => {
+  forwardRef<ContentFocusItemRef, ContentFocusItemProps>(({ 
+    todo, 
+    onUpdate, 
+    onView, 
+    isLast,
+    activeTab,
+    allTodos,
+    relations,
+    parallelGroup,
+    prevTodo,
+    nextTodo,
+    onUpdateDisplayOrder
+  }, ref) => {
     const { message } = App.useApp();
     const [editedContent, setEditedContent] = useState<string>(todo.content);
     const [isSaving, setIsSaving] = useState(false);
+    const [editingOrder, setEditingOrder] = useState<number | undefined>(undefined);
+    const [savingOrder, setSavingOrder] = useState(false);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const isComposingRef = useRef(false); // 追踪输入法状态
     
@@ -152,6 +176,110 @@ const ContentFocusItem = React.memo(
       onView(todo);
     }, [todo, onView]);
 
+    // 保存排序序号（复用TodoList的冲突解决算法）
+    const handleOrderSave = useCallback(async () => {
+      if (!todo.id || editingOrder === undefined) return;
+      
+      const currentValue = todo.displayOrders && todo.displayOrders[activeTab];
+      if (editingOrder === currentValue) {
+        setEditingOrder(undefined);
+        return;
+      }
+      
+      const newOrder = editingOrder;
+      setSavingOrder(true);
+      
+      try {
+        // 1. 获取当前 tab 所有有序号的待办（排除当前待办）
+        const currentTabTodos = allTodos.filter(t => 
+          t.id !== todo.id &&
+          t.displayOrders && 
+          t.displayOrders[activeTab] != null
+        );
+        
+        // 2. 构建序号到待办的映射（用于快速查找）
+        const orderToTodoMap = new Map<number, Todo>();
+        currentTabTodos.forEach(t => {
+          const order = t.displayOrders![activeTab]!;
+          orderToTodoMap.set(order, t);
+        });
+        
+        // 3. 递归式冲突解决：收集所有需要调整的待办
+        const adjustments: Array<{id: number; oldOrder: number; newOrder: number}> = [];
+        
+        const resolveConflict = (targetOrder: number): void => {
+          const conflictTodo = orderToTodoMap.get(targetOrder);
+          
+          if (!conflictTodo) {
+            // 没有冲突，这个序号可以使用
+            return;
+          }
+          
+          // 有冲突，需要将冲突的待办移到下一个序号
+          const nextOrder = targetOrder + 1;
+          
+          // 递归检查下一个序号是否也有冲突
+          resolveConflict(nextOrder);
+          
+          // 记录这个待办需要被移动
+          adjustments.push({
+            id: conflictTodo.id!,
+            oldOrder: targetOrder,
+            newOrder: nextOrder
+          });
+          
+          // 更新映射（模拟移动后的状态）
+          orderToTodoMap.delete(targetOrder);
+          orderToTodoMap.set(nextOrder, conflictTodo);
+        };
+        
+        // 从新序号开始检查冲突
+        resolveConflict(newOrder);
+        
+        // 4. 批量更新需要调整的待办
+        if (adjustments.length > 0) {
+          const updates = adjustments.map(adj => ({
+            id: adj.id,
+            tabKey: activeTab,
+            displayOrder: adj.newOrder
+          }));
+          
+          await window.electronAPI.todo.batchUpdateDisplayOrders(updates);
+          message.success(`序号 ${newOrder} 已占用，已自动调整 ${adjustments.length} 个待办的序号`);
+        }
+        
+        // 5. 检查是否是并列分组，如果是则同步整组
+        if (parallelGroup && parallelGroup.size > 1) {
+          const groupUpdates = Array.from(parallelGroup)
+            .filter(id => id !== todo.id)
+            .map(id => ({
+              id,
+              tabKey: activeTab,
+              displayOrder: newOrder
+            }));
+          
+          if (groupUpdates.length > 0) {
+            await window.electronAPI.todo.batchUpdateDisplayOrders(groupUpdates);
+          }
+        }
+        
+        // 6. 设置当前待办的序号
+        await onUpdateDisplayOrder(todo.id, activeTab, newOrder);
+        
+        // 清除编辑状态
+        setEditingOrder(undefined);
+        message.success('序号已保存');
+      } catch (error) {
+        message.error('更新排序失败');
+        console.error('Order save error:', error);
+        // 恢复原值
+        setEditingOrder(undefined);
+      } finally {
+        // 移除保存中状态
+        setSavingOrder(false);
+      }
+    }, [todo.id, editingOrder, activeTab, allTodos, parallelGroup, onUpdateDisplayOrder, message, todo.displayOrders]);
+
     // 输入法开始事件
     const handleCompositionStart = useCallback(() => {
       console.log('[AutoSave] 输入法开始');
@@ -224,8 +352,40 @@ const ContentFocusItem = React.memo(
       }
     }, [hasChanges, handleSave, message]);
 
+    // 计算分组边界和并列关系
+    const isInParallelGroup = parallelGroup && parallelGroup.size > 1;
+    const isInGroup = isInParallelGroup && (
+      (prevTodo && parallelGroup?.has(prevTodo.id!)) ||
+      (nextTodo && parallelGroup?.has(nextTodo.id!))
+    );
+    const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(prevTodo.id!));
+    const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(nextTodo.id!));
+    
+    // 检查是否有并列关系
+    const hasParallel = relations.some(r => 
+      r.relation_type === 'parallel' && 
+      (r.source_id === todo.id || r.target_id === todo.id)
+    );
+    
+    // 获取当前显示的序号
+    const currentDisplayOrder = editingOrder !== undefined 
+      ? editingOrder 
+      : (todo.displayOrders && todo.displayOrders[activeTab]);
+
     return (
-      <div className="content-focus-item">
+      <div 
+        className="content-focus-item"
+        style={{
+          borderTop: isGroupStart ? '2px dashed #fa8c16' : undefined,
+          borderBottom: isGroupEnd ? '2px dashed #fa8c16' : undefined,
+          borderLeft: isInGroup ? '3px solid #fa8c16' : undefined,
+          borderRight: isInGroup ? '3px solid rgba(250, 140, 22, 0.3)' : undefined,
+          paddingTop: isGroupStart ? 12 : 0,
+          paddingBottom: isGroupEnd ? 12 : 0,
+          paddingLeft: isInGroup ? 12 : 0,
+          paddingRight: isInGroup ? 12 : 0,
+        }}
+      >
         {/* 顶部工具栏 */}
         <div className="content-focus-item-header">
           <Space>
@@ -235,6 +395,13 @@ const ContentFocusItem = React.memo(
             >
               {todo.status === 'completed' ? '已完成' : '标记完成'}
             </Checkbox>
+            
+            {/* 并列待办标识 */}
+            {hasParallel && (
+              <Tag color="orange" style={{ margin: 0, fontSize: 12 }}>
+                并列
+              </Tag>
+            )}
             
             <Button
               type="link"
@@ -246,16 +413,53 @@ const ContentFocusItem = React.memo(
             </Button>
           </Space>
 
-          {/* 保存状态指示器 - 简化状态显示 */}
-          <Space size={4}>
+          {/* 右侧：排序序号 + 保存状态 */}
+          <Space size={8}>
+            {/* 排序序号 */}
+            <Space size={4} style={{ fontSize: 12 }}>
+              <span style={{ color: '#999' }}>序号:</span>
+              {editingOrder !== undefined ? (
+                <InputNumber
+                  size="small"
+                  value={editingOrder}
+                  onChange={(value) => setEditingOrder(value ?? undefined)}
+                  onPressEnter={handleOrderSave}
+                  onBlur={handleOrderSave}
+                  min={0}
+                  disabled={savingOrder}
+                  style={{ width: 70 }}
+                  placeholder="设置序号"
+                />
+              ) : (
+                <span 
+                  onClick={() => setEditingOrder(currentDisplayOrder)}
+                  style={{ 
+                    cursor: 'pointer', 
+                    color: currentDisplayOrder !== undefined ? '#1890ff' : '#ccc',
+                    minWidth: 20,
+                    textAlign: 'center',
+                    display: 'inline-block'
+                  }}
+                >
+                  {currentDisplayOrder ?? '-'}
+                </span>
+              )}
+            </Space>
+            
+            {/* 保存状态指示器 */}
             {isSaving && (
               <span style={{ fontSize: 12, color: '#1890ff' }}>
                 <SaveOutlined /> 保存中...
               </span>
             )}
-            {!isSaving && !hasChanges && (
+            {!isSaving && !hasChanges && !savingOrder && (
               <span style={{ fontSize: 12, color: '#52c41a' }}>
                 <CheckCircleOutlined /> 已保存
+              </span>
+            )}
+            {savingOrder && (
+              <span style={{ fontSize: 12, color: '#1890ff' }}>
+                <SaveOutlined /> 保存序号...
               </span>
             )}
           </Space>
@@ -294,9 +498,56 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
   onUpdate,
   onView,
   loading,
+  activeTab,
+  relations,
+  onUpdateDisplayOrder,
 }, ref) => {
   // 为每个待办项创建 ref
   const itemRefsMap = useRef<Map<number, ContentFocusItemRef>>(new Map());
+
+  // 使用 DFS 构建并列关系分组 Map（复用自TodoList）
+  const parallelGroups = useMemo(() => {
+    const groups = new Map<number, Set<number>>();
+    const visited = new Set<number>();
+    
+    const dfs = (todoId: number, groupSet: Set<number>) => {
+      if (visited.has(todoId)) return;
+      visited.add(todoId);
+      groupSet.add(todoId);
+      
+      // 找到所有与该 todo 有并列关系的其他 todo
+      const relatedIds = relations
+        .filter(r => r.relation_type === 'parallel')
+        .filter(r => r.source_id === todoId || r.target_id === todoId)
+        .map(r => r.source_id === todoId ? r.target_id : r.source_id);
+      
+      for (const relatedId of relatedIds) {
+        dfs(relatedId, groupSet);
+      }
+    };
+    
+    // 为每个有并列关系的 todo 构建分组
+    todos.forEach(todo => {
+      if (!todo.id) return;
+      
+      const hasParallel = relations.some(r => 
+        r.relation_type === 'parallel' && 
+        (r.source_id === todo.id || r.target_id === todo.id)
+      );
+      
+      if (hasParallel && !visited.has(todo.id)) {
+        const groupSet = new Set<number>();
+        dfs(todo.id, groupSet);
+        
+        // 将这个分组应用到所有成员
+        groupSet.forEach(id => {
+          groups.set(id, groupSet);
+        });
+      }
+    });
+    
+    return groups;
+  }, [relations, todos]);
 
   // 暴露给父组件的保存所有方法
   useImperativeHandle(ref, () => ({
@@ -341,6 +592,13 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
           onUpdate={onUpdate}
           onView={onView}
           isLast={index === todos.length - 1}
+          activeTab={activeTab}
+          allTodos={allTodos || todos}
+          relations={relations}
+          parallelGroup={parallelGroups.get(todo.id!)}
+          prevTodo={index > 0 ? todos[index - 1] : null}
+          nextTodo={index < todos.length - 1 ? todos[index + 1] : null}
+          onUpdateDisplayOrder={onUpdateDisplayOrder}
         />
       ))}
     </div>

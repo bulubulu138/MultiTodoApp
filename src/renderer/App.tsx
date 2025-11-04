@@ -922,6 +922,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
                   loading={loading}
                   onUpdate={handleUpdateTodoInPlace}
                   onView={handleViewTodo}
+                  activeTab={activeTab}
+                  relations={relations}
+                  onUpdateDisplayOrder={handleUpdateDisplayOrder}
                 />
               ) : (
                 <TodoList
