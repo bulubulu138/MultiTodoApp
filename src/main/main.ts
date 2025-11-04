@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { DatabaseManager } from './database/DatabaseManager';
 import { ImageManager } from './utils/ImageManager';
+import { BackupManager } from './utils/BackupManager';
 import { generateContentHash } from './utils/hashUtils';
 import { KeywordProcessor } from './services/KeywordProcessor';
 import { keywordExtractor, KeywordExtractor } from './services/KeywordExtractor';
@@ -13,6 +14,7 @@ class Application {
   private mainWindow: BrowserWindow | null = null;
   private dbManager: DatabaseManager;
   private imageManager: ImageManager;
+  private backupManager: BackupManager | null = null;
   private keywordProcessor: KeywordProcessor | null = null;
   private tray: Tray | null = null;
   private isQuitting: boolean = false;
@@ -441,6 +443,22 @@ class Application {
       return await this.dbManager.deleteNote(id);
     });
 
+    // Backup operations
+    ipcMain.handle('backup:list', async () => {
+      return await this.backupManager?.listBackups() || [];
+    });
+
+    ipcMain.handle('backup:create', async () => {
+      return await this.backupManager?.createBackup();
+    });
+
+    ipcMain.handle('backup:restore', async (_, backupPath: string) => {
+      await this.backupManager?.restoreBackup(backupPath);
+      // 重新加载数据库
+      this.dbManager.close();
+      await this.dbManager.initialize();
+    });
+
     // Settings - Data folder operations
     ipcMain.handle('settings:getDbPath', async () => {
       return this.dbManager.getDbPath();
@@ -599,6 +617,13 @@ class Application {
       await this.dbManager.initialize();
       console.log('Database initialized successfully');
       
+      // 初始化备份管理器
+      console.log('Initializing backup manager...');
+      const dbPath = this.dbManager.getDbPath();
+      this.backupManager = new BackupManager(dbPath);
+      this.backupManager.startAutoBackup();
+      console.log('Backup manager initialized successfully');
+      
       // 初始化关键词处理器
       console.log('Initializing keyword processor...');
       this.keywordProcessor = new KeywordProcessor(this.dbManager);
@@ -646,10 +671,11 @@ class Application {
       this.isQuitting = true;
     });
 
-    // 注销全局快捷键
+    // 注销全局快捷键并停止备份
     app.on('will-quit', () => {
       globalShortcut.unregisterAll();
-      console.log('Global shortcuts unregistered');
+      this.backupManager?.stopAutoBackup();
+      console.log('Global shortcuts unregistered and backup stopped');
     });
 
     app.on('activate', () => {

@@ -1,7 +1,8 @@
 import { Todo } from '../../shared/types';
 import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, Input, List, Card, Tag, Typography, Space, Button, Checkbox, Divider } from 'antd';
+import { Input, List, Card, Tag, Typography, Space, Button, Checkbox, Divider } from 'antd';
 import { SearchOutlined, LinkOutlined, ClearOutlined } from '@ant-design/icons';
+import AnimatedModal from './AnimatedModal';
 
 const { Search } = Input;
 const { Text } = Typography;
@@ -22,13 +23,15 @@ const SearchModal: React.FC<SearchModalProps> = ({
   onViewTodo
 }) => {
   const [searchText, setSearchText] = useState('');
+  const [debouncedSearchText, setDebouncedSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [filteredTodos, setFilteredTodos] = useState<Todo[]>([]);
 
-  // Extract all unique tags from todos
+  // Extract all unique tags from todos - 仅在visible时计算
   const allTags = useMemo(() => {
+    if (!visible) return [];
     const tagSet = new Set<string>();
     todos.forEach(todo => {
       // 添加空值检查
@@ -40,18 +43,37 @@ const SearchModal: React.FC<SearchModalProps> = ({
       }
     });
     return Array.from(tagSet).sort();
-  }, [todos]);
+  }, [todos, visible]);
 
-  // Apply all filters
+  // 搜索防抖 - 避免频繁触发过滤计算
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchText(searchText);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchText]);
+
+  // Apply all filters - 仅在visible时执行
+  useEffect(() => {
+    // 关闭时清空状态，下次打开重新计算
+    if (!visible) {
+      setSearchText('');
+      setDebouncedSearchText('');
+      setStatusFilter([]);
+      setPriorityFilter([]);
+      setTagFilter([]);
+      setFilteredTodos([]);
+      return;
+    }
+
     // 添加空值过滤
     let filtered = todos.filter(todo => todo && todo.id);
 
-    // 1. Text search (title and content)
-    if (searchText.trim()) {
+    // 1. Text search (title and content) - 使用防抖后的搜索文本
+    if (debouncedSearchText.trim()) {
       filtered = filtered.filter(todo =>
-        todo.title?.toLowerCase().includes(searchText.toLowerCase()) ||
-        todo.content?.toLowerCase().includes(searchText.toLowerCase())
+        todo.title?.toLowerCase().includes(debouncedSearchText.toLowerCase()) ||
+        todo.content?.toLowerCase().includes(debouncedSearchText.toLowerCase())
       );
     }
 
@@ -75,7 +97,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
     }
 
     setFilteredTodos(filtered);
-  }, [searchText, statusFilter, priorityFilter, tagFilter, todos]);
+  }, [visible, debouncedSearchText, statusFilter, priorityFilter, tagFilter, todos]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -137,7 +159,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   };
 
   return (
-    <Modal
+    <AnimatedModal
       title={
         <Space>
           <SearchOutlined />
@@ -249,6 +271,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
       <div style={{ maxHeight: 400, overflowY: 'auto' }}>
         <List
+          virtual
           dataSource={filteredTodos}
           renderItem={(todo) => (
             <List.Item key={todo.id}>
@@ -310,7 +333,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
           locale={{ emptyText: searchText ? '没有找到匹配的待办事项' : '暂无待办事项' }}
         />
       </div>
-    </Modal>
+    </AnimatedModal>
   );
 };
 

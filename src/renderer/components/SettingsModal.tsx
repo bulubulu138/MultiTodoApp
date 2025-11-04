@@ -4,6 +4,7 @@ import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, Thunde
 import { App } from 'antd';
 import { Todo } from '../../shared/types';
 import TagManagement from './TagManagement';
+import BackupSettings from './BackupSettings';
 
 const { Text } = Typography;
 
@@ -481,6 +482,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           </Card>
         </div>
       ),
+    },
+    {
+      key: 'backup',
+      label: (
+        <span>
+          <DatabaseOutlined />
+          数据备份
+        </span>
+      ),
+      children: <BackupSettings />,
     },
   ];
 

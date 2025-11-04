@@ -7,7 +7,7 @@
     "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
     "dev:main": "tsc -p tsconfig.main.json && electron dist/main/main.js",
     "dev:renderer": "webpack serve --config webpack.renderer.config.js",
-    "prebuild": "node scripts/prebuild-check.js && npm run rebuild",
+    "prebuild": "node scripts/prebuild-check.js",
     "build": "npm run build:main && npm run build:renderer",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "webpack --config webpack.renderer.config.js",
@@ -18,7 +18,7 @@
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
-    "postinstall": "electron-builder install-app-deps && npm run rebuild"
+    "postinstall": "electron-builder install-app-deps"
   },
   "keywords": [
     "electron",

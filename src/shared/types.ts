@@ -83,3 +83,11 @@ export interface SearchFilters {
 }
 
 export type CalendarViewSize = 'compact' | 'standard' | 'comfortable';
+
+export interface BackupInfo {
+  filename: string;
+  filepath: string;
+  timestamp: number;
+  size: number;
+  createdAt: string;
+}

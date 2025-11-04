@@ -67,6 +67,13 @@ export interface ElectronAPI {
     delete: (id: number) => Promise<void>;
   };
   
+  // 备份API
+  backup: {
+    list: () => Promise<any[]>;
+    create: () => Promise<any>;
+    restore: (backupPath: string) => Promise<void>;
+  };
+  
   // Shell API
   openExternal: (url: string) => Promise<{success: boolean; error?: string}>;
   
@@ -129,6 +136,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     create: (noteData: any) => ipcRenderer.invoke('notes:create', noteData),
     update: (id: number, updates: any) => ipcRenderer.invoke('notes:update', id, updates),
     delete: (id: number) => ipcRenderer.invoke('notes:delete', id),
+  },
+  backup: {
+    list: () => ipcRenderer.invoke('backup:list'),
+    create: () => ipcRenderer.invoke('backup:create'),
+    restore: (backupPath: string) => ipcRenderer.invoke('backup:restore', backupPath),
   },
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
   
