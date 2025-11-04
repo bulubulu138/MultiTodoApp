@@ -315,24 +315,36 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       // 如果有待创建的关系，创建它们
       if (pendingRelations && pendingRelations.length > 0 && newTodo.id) {
         let successCount = 0;
+        let failedRelations: string[] = [];
+        
         for (const relation of pendingRelations) {
           try {
+            // 修复：使用下划线命名（与数据库期望的格式一致）
             await window.electronAPI.relations.create({
-              sourceId: newTodo.id,
-              targetId: relation.targetId,
-              relationType: relation.relationType
+              source_id: newTodo.id,
+              target_id: relation.targetId,
+              relation_type: relation.relationType
             });
             successCount++;
           } catch (error) {
             console.error('Failed to create relation:', error);
+            // 记录失败的关系类型
+            const relationTypeMap: {[key: string]: string} = {
+              'extends': '延伸',
+              'background': '背景',
+              'parallel': '并列'
+            };
+            failedRelations.push(relationTypeMap[relation.relationType] || relation.relationType);
             // 继续创建其他关系，不中断流程
           }
         }
         
-        if (successCount > 0) {
+        if (successCount === pendingRelations.length) {
           message.success(`待办事项创建成功，已建立 ${successCount} 个关系`);
+        } else if (successCount > 0) {
+          message.warning(`待办事项创建成功，${successCount} 个关系成功，${failedRelations.length} 个失败（${failedRelations.join('、')}）`);
         } else if (successCount === 0 && pendingRelations.length > 0) {
-          message.warning('待办事项创建成功，但关系创建失败');
+          message.error(`待办事项创建成功，但所有关系创建失败（${failedRelations.join('、')}）`);
         }
       } else {
         message.success('待办事项创建成功');
