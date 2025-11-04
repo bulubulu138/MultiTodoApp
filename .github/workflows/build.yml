@@ -47,10 +47,20 @@ jobs:
 
       - name: Install app dependencies and rebuild native modules
         run: |
+          echo "Cleaning better-sqlite3 build..."
+          rm -rf node_modules/better-sqlite3/build || true
+          
+          echo "Installing app dependencies..."
           npx electron-builder install-app-deps
+          
+          echo "Rebuilding native modules..."
           npm run rebuild
+          
+          echo "Listing better-sqlite3 build..."
+          ls -la node_modules/better-sqlite3/build/Release/ || echo "Build directory not found"
         env:
           npm_config_msvs_version: ${{ matrix.platform == 'win' && '2019' || '' }}
+        shell: bash
 
       - name: Verify native modules
         run: npm run verify
