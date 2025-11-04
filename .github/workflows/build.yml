@@ -43,26 +43,23 @@ jobs:
           cache-dependency-path: '**/package-lock.json'
 
       - name: Install dependencies
-        run: npm ci
-
-      - name: Install app dependencies and rebuild native modules
         run: |
-          echo "Cleaning better-sqlite3 build and prebuilds..."
-          rm -rf node_modules/better-sqlite3/build
-          rm -rf node_modules/better-sqlite3/prebuilds
-          
+          npm ci --ignore-scripts
+          npm rebuild better-sqlite3
+        shell: bash
+
+      - name: Rebuild native modules for Electron
+        run: |
           echo "Installing app dependencies..."
           npx electron-builder install-app-deps
           
-          echo "Rebuilding with verbose output..."
+          echo "Rebuilding for Electron with verbose output..."
           npx electron-rebuild -f -w better-sqlite3 -v
           
           echo "Checking build result..."
           ls -lh node_modules/better-sqlite3/build/Release/
-          file node_modules/better-sqlite3/build/Release/better_sqlite3.node || true
         env:
           npm_config_msvs_version: ${{ matrix.platform == 'win' && '2019' || '' }}
-          DEBUG: '*'
         shell: bash
 
       - name: Verify native modules
