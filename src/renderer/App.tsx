@@ -368,11 +368,26 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     savingTodosRef.current.add(id);
     
     // 2. 乐观更新本地状态（立即生效，不刷新页面）
-    setTodos(prev => prev.map(todo => 
-      todo.id === id 
-        ? { ...todo, ...updates, updatedAt: new Date().toISOString() } 
-        : todo
-    ));
+    setTodos(prev => prev.map(todo => {
+      if (todo.id !== id) return todo;
+      
+      // 准备乐观更新的数据
+      const optimisticUpdates: Partial<Todo> = {
+        ...updates,
+        updatedAt: new Date().toISOString()
+      };
+      
+      // 如果状态改为 completed，设置 completedAt
+      if (updates.status === 'completed' && !updates.completedAt) {
+        optimisticUpdates.completedAt = new Date().toISOString();
+      }
+      // 如果从 completed 改为其他状态，清除 completedAt
+      else if (updates.status && updates.status !== 'completed' && todo.status === 'completed') {
+        optimisticUpdates.completedAt = undefined;
+      }
+      
+      return { ...todo, ...optimisticUpdates };
+    }));
     
     // 3. 创建保存 Promise 并追踪
     const savePromise = (async () => {

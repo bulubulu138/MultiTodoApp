@@ -98,6 +98,7 @@ export class DatabaseManager {
       const hasDisplayOrder = tableInfo.some((col: any) => col.name === 'displayOrder');
       const hasContentHash = tableInfo.some((col: any) => col.name === 'contentHash');
       const hasKeywords = tableInfo.some((col: any) => col.name === 'keywords');
+      const hasCompletedAt = tableInfo.some((col: any) => col.name === 'completedAt');
       
       if (!hasStartTime) {
         console.log('Adding startTime column to todos table...');
@@ -133,6 +134,15 @@ export class DatabaseManager {
         // 设置默认值为空数组的JSON字符串
         this.db!.prepare("UPDATE todos SET keywords = '[]' WHERE keywords IS NULL").run();
         console.log('keywords column added successfully');
+      }
+
+      // 添加 completedAt 列用于准确记录完成时间
+      if (!hasCompletedAt) {
+        console.log('Adding completedAt column to todos table...');
+        this.db!.prepare('ALTER TABLE todos ADD COLUMN completedAt TEXT').run();
+        // 为现有已完成的待办，使用 updatedAt 作为 completedAt 的初始值（数据迁移）
+        this.db!.prepare('UPDATE todos SET completedAt = updatedAt WHERE status = "completed"').run();
+        console.log('completedAt column added successfully');
       }
       
       // 迁移 displayOrders
@@ -229,10 +239,12 @@ export class DatabaseManager {
         const displayOrdersJSON = todo.displayOrders ? JSON.stringify(todo.displayOrders) : '{}';
         // 处理 keywords
         const keywordsJSON = todo.keywords ? JSON.stringify(todo.keywords) : '[]';
+        // 处理 completedAt：如果状态为 completed，设置完成时间
+        const completedAt = todo.status === 'completed' ? (todo.completedAt || now) : null;
         
         const stmt = this.db!.prepare(
-          `INSERT INTO todos (title, content, status, priority, tags, imageUrl, images, startTime, deadline, displayOrder, displayOrders, contentHash, keywords, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO todos (title, content, status, priority, tags, imageUrl, images, startTime, deadline, displayOrder, displayOrders, contentHash, keywords, completedAt, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         );
         
         const result = stmt.run(
@@ -249,6 +261,7 @@ export class DatabaseManager {
           displayOrdersJSON,
           contentHash,
           keywordsJSON,
+          completedAt,
           now,
           now
         );
@@ -302,6 +315,22 @@ export class DatabaseManager {
         if (updates.displayOrders !== undefined) { fields.push('displayOrders = ?'); values.push(JSON.stringify(updates.displayOrders)); }
         if (updates.contentHash !== undefined) { fields.push('contentHash = ?'); values.push(updates.contentHash); }
         if (updates.keywords !== undefined) { fields.push('keywords = ?'); values.push(JSON.stringify(updates.keywords)); }
+        
+        // 处理 completedAt 字段
+        if (updates.completedAt !== undefined) { 
+          fields.push('completedAt = ?'); 
+          values.push(updates.completedAt); 
+        } else if (updates.status !== undefined) {
+          // 如果状态改为 completed，自动设置 completedAt
+          if (updates.status === 'completed') {
+            fields.push('completedAt = ?');
+            values.push(new Date().toISOString());
+          } else {
+            // 如果从 completed 改为其他状态，清除 completedAt
+            fields.push('completedAt = ?');
+            values.push(null);
+          }
+        }
 
         // 如果标题或内容被更新，重新生成哈希
         if ((updates.title !== undefined || updates.content !== undefined) && updates.contentHash === undefined) {
@@ -619,6 +648,7 @@ export class DatabaseManager {
       displayOrders: row.displayOrders ? JSON.parse(row.displayOrders) : {},
       contentHash: row.contentHash,
       keywords: row.keywords ? JSON.parse(row.keywords) : [],
+      completedAt: row.completedAt || undefined,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt
     };

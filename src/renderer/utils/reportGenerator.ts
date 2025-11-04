@@ -80,11 +80,11 @@ export function generateDailyReport(todos: Todo[], date: Dayjs): DailyStats {
     return createDate.isSame(targetDate, 'day');
   });
 
-  // 当天完成的待办（状态为已完成，且 updatedAt 在当天）
+  // 当天完成的待办（状态为已完成，且 completedAt 在当天）
   const completed = todos.filter(todo => {
-    if (todo.status !== 'completed' || !todo.updatedAt) return false;
-    const updateDate = dayjs(todo.updatedAt);
-    return updateDate.isSame(targetDate, 'day');
+    if (todo.status !== 'completed' || !todo.completedAt) return false;
+    const completedDate = dayjs(todo.completedAt);
+    return completedDate.isSame(targetDate, 'day');
   });
 
   // 当天逾期的待办
@@ -144,10 +144,10 @@ export function generateWeeklyReport(todos: Todo[], weekStart: Dayjs): WeeklySta
 
   // 本周完成的待办
   const completed = todos.filter(todo => {
-    if (todo.status !== 'completed' || !todo.updatedAt) return false;
-    const updateDate = dayjs(todo.updatedAt);
-    return updateDate.isAfter(monday.subtract(1, 'second')) && 
-           updateDate.isBefore(friday.add(1, 'second'));
+    if (todo.status !== 'completed' || !todo.completedAt) return false;
+    const completedDate = dayjs(todo.completedAt);
+    return completedDate.isAfter(monday.subtract(1, 'second')) && 
+           completedDate.isBefore(friday.add(1, 'second'));
   });
 
   // 当前进行中的待办
@@ -177,8 +177,8 @@ export function generateWeeklyReport(todos: Todo[], weekStart: Dayjs): WeeklySta
     
     const dayCompleted = todos.filter(todo => {
       return todo.status === 'completed' && 
-             todo.updatedAt && 
-             dayjs(todo.updatedAt).isSame(day, 'day');
+             todo.completedAt && 
+             dayjs(todo.completedAt).isSame(day, 'day');
     });
     
     dailyStats[dayKey] = {
@@ -229,10 +229,10 @@ export function generateMonthlyReport(todos: Todo[], month: Dayjs): MonthlyStats
 
   // 本月完成的待办
   const completed = todos.filter(todo => {
-    if (todo.status !== 'completed' || !todo.updatedAt) return false;
-    const updateDate = dayjs(todo.updatedAt);
-    return updateDate.isAfter(monthStart.subtract(1, 'second')) && 
-           updateDate.isBefore(monthEnd.add(1, 'second'));
+    if (todo.status !== 'completed' || !todo.completedAt) return false;
+    const completedDate = dayjs(todo.completedAt);
+    return completedDate.isAfter(monthStart.subtract(1, 'second')) && 
+           completedDate.isBefore(monthEnd.add(1, 'second'));
   });
 
   // 当前进行中和待办
@@ -248,9 +248,9 @@ export function generateMonthlyReport(todos: Todo[], month: Dayjs): MonthlyStats
     const weekEnd = currentWeek.add(6, 'day').endOf('day');
     
     const weekCompleted = completed.filter(todo => {
-      const updateDate = dayjs(todo.updatedAt!);
-      return updateDate.isAfter(currentWeek.subtract(1, 'second')) && 
-             updateDate.isBefore(weekEnd.add(1, 'second'));
+      const completedDate = dayjs(todo.completedAt!);
+      return completedDate.isAfter(currentWeek.subtract(1, 'second')) && 
+             completedDate.isBefore(weekEnd.add(1, 'second'));
     });
     
     const weekCreated = created.filter(todo => {
@@ -314,8 +314,8 @@ function calculateLongestStreak(todos: Todo[], start: Dayjs, end: Dayjs): number
   while (currentDay.isBefore(end) || currentDay.isSame(end, 'day')) {
     const hasCompleted = todos.some(todo => {
       return todo.status === 'completed' && 
-             todo.updatedAt && 
-             dayjs(todo.updatedAt).isSame(currentDay, 'day');
+             todo.completedAt && 
+             dayjs(todo.completedAt).isSame(currentDay, 'day');
     });
     
     if (hasCompleted) {

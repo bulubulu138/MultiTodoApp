@@ -134,8 +134,8 @@ const ContentFocusItem = React.memo(
       
       const newStatus = checked ? 'completed' : 'pending';
       const updates: Partial<Todo> = { 
-        status: newStatus,
-        updatedAt: new Date().toISOString()
+        status: newStatus
+        // 注意：completedAt 和 updatedAt 由数据库层自动处理
       };
       
       try {

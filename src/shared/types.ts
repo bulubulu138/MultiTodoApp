@@ -16,6 +16,7 @@ export interface Todo {
   displayOrders?: { [tabKey: string]: number }; // 多Tab独立排序序号
   contentHash?: string; // 内容哈希值，用于去重检测
   keywords?: string[]; // 关键词数组，用于智能推荐
+  completedAt?: string; // 完成时间，准确记录待办完成的时间点
   createdAt: string;
   updatedAt: string;
 }

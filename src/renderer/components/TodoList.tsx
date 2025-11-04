@@ -97,9 +97,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   // 性能优化：使用 useCallback 缓存函数
   const handleStatusChange = useCallback((todoId: number, newStatus: string) => {
     const updates: Partial<Todo> = { status: newStatus as Todo['status'] };
-    if (newStatus === 'completed') {
-      updates.updatedAt = new Date().toISOString();
-    }
+    // 注意：completedAt 和 updatedAt 由数据库层自动处理
     onStatusChange(todoId, updates);
   }, [onStatusChange]);
 
