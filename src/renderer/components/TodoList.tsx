@@ -184,7 +184,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
     setEditingOrder(prev => ({ ...prev, [todoId]: value }));
   };
 
-  // 保存序号（支持多Tab独立排序）
+  // 保存序号（支持多Tab独立排序）- 优化版：递归式冲突解决
   const handleOrderSave = async (todoId: number, currentValue: number | undefined) => {
     const newOrder = editingOrder[todoId];
     
@@ -215,38 +215,67 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
     setSavingOrder(prev => new Set(prev).add(todoId));
 
     try {
-      // 1. 获取当前 tab 所有有序号的待办
+      // 1. 获取当前 tab 所有有序号的待办（排除当前待办）
       const currentTabTodos = (allTodos || todos).filter(t => 
-        t.displayOrders && t.displayOrders[activeTab] != null
+        t.id !== todoId &&
+        t.displayOrders && 
+        t.displayOrders[activeTab] != null
       );
       
-      // 2. 检查是否有重复序号（完全相同）
-      const duplicate = currentTabTodos.find(t => 
-        t.id !== todoId && 
-        t.displayOrders![activeTab] === newOrder
-      );
+      // 2. 构建序号到待办的映射（用于快速查找）
+      const orderToTodoMap = new Map<number, Todo>();
+      currentTabTodos.forEach(t => {
+        const order = t.displayOrders![activeTab]!;
+        orderToTodoMap.set(order, t);
+      });
       
-      // 3. 如果有重复序号，递增已有待办及其后续所有待办
-      if (duplicate) {
-        // 找出所有序号 >= newOrder 的待办（不包括当前待办）
-        const toAdjust = currentTabTodos.filter(t => 
-          t.id !== todoId && 
-          t.displayOrders![activeTab]! >= newOrder
-        );
+      // 3. 递归式冲突解决：收集所有需要调整的待办
+      const adjustments: Array<{id: number; oldOrder: number; newOrder: number}> = [];
+      
+      const resolveConflict = (targetOrder: number): void => {
+        const conflictTodo = orderToTodoMap.get(targetOrder);
         
-        if (toAdjust.length > 0) {
-          const updates = toAdjust.map(t => ({
-            id: t.id!,
-            tabKey: activeTab,
-            displayOrder: t.displayOrders![activeTab]! + 1
-          }));
-          
-          await window.electronAPI.todo.batchUpdateDisplayOrders(updates);
-          message.success(`序号 ${newOrder} 已被占用，已自动调整 ${toAdjust.length} 个待办的序号`);
+        if (!conflictTodo) {
+          // 没有冲突，这个序号可以使用
+          return;
         }
+        
+        // 有冲突，需要将冲突的待办移到下一个序号
+        const nextOrder = targetOrder + 1;
+        
+        // 递归检查下一个序号是否也有冲突
+        resolveConflict(nextOrder);
+        
+        // 记录这个待办需要被移动
+        adjustments.push({
+          id: conflictTodo.id!,
+          oldOrder: targetOrder,
+          newOrder: nextOrder
+        });
+        
+        // 更新映射（模拟移动后的状态）
+        orderToTodoMap.delete(targetOrder);
+        orderToTodoMap.set(nextOrder, conflictTodo);
+      };
+      
+      // 从新序号开始检查冲突
+      resolveConflict(newOrder);
+      
+      console.log('[DEBUG] 冲突解决结果:', adjustments);
+      
+      // 4. 批量更新需要调整的待办
+      if (adjustments.length > 0) {
+        const updates = adjustments.map(adj => ({
+          id: adj.id,
+          tabKey: activeTab,
+          displayOrder: adj.newOrder
+        }));
+        
+        await window.electronAPI.todo.batchUpdateDisplayOrders(updates);
+        message.success(`序号 ${newOrder} 已占用，已自动调整 ${adjustments.length} 个待办的序号`);
       }
       
-      // 4. 检查是否是并列分组，如果是则同步整组
+      // 5. 检查是否是并列分组，如果是则同步整组
       const parallelGroup = parallelGroups.get(todoId);
       if (parallelGroup && parallelGroup.size > 1) {
         const groupUpdates = Array.from(parallelGroup)
@@ -262,7 +291,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
         }
       }
       
-      // 5. 设置当前待办的序号
+      // 6. 设置当前待办的序号
       await onUpdateDisplayOrder(todoId, activeTab, newOrder);
       
       // 清除编辑状态
@@ -273,6 +302,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
       });
     } catch (error) {
       message.error('更新排序失败');
+      console.error('Order save error:', error);
       // 恢复原值
       setEditingOrder(prev => {
         const next = { ...prev };
