@@ -52,15 +52,8 @@ jobs:
 
       - name: Rebuild native modules for Electron
         run: |
-          echo "Installing app dependencies..."
-          npx electron-builder install-app-deps
-          
-          echo "Removing prebuilt binaries downloaded by electron-builder..."
-          rm -rf node_modules/better-sqlite3/build
-          rm -rf node_modules/better-sqlite3/prebuilds
-          
-          echo "Rebuilding for Electron from source..."
-          npx electron-rebuild -f -w better-sqlite3 -v
+          echo "Rebuilding native modules for Electron from source..."
+          npx electron-rebuild -f -w better-sqlite3 -v --prebuild-tag-prefix disabled
           
           echo "Checking build result..."
           ls -lh node_modules/better-sqlite3/build/Release/
