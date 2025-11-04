@@ -39,11 +39,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: '**/package-lock.json'
+          # 禁用缓存，确保每次都是全新编译
+          # cache: 'npm'
+          # cache-dependency-path: '**/package-lock.json'
 
       - name: Install dependencies
         run: |
+          npm cache clean --force
           npm ci --ignore-scripts
           npm rebuild better-sqlite3
         shell: bash
