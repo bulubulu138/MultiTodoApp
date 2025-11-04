@@ -7,6 +7,7 @@ import { SortOption, ViewMode } from './Toolbar';
 import RelationsModal from './RelationsModal';
 import RelationContext from './RelationContext';
 import ContentFocusView from './ContentFocusView';
+import RelationIndicators from './RelationIndicators';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
 import dayjs from 'dayjs';
@@ -545,6 +546,17 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                     >
                       {todo.title}
                     </Text>
+                    {/* 关联指示器 */}
+                    {todo.id && (
+                      <RelationIndicators
+                        todoId={todo.id}
+                        relations={relations}
+                        allTodos={allTodos}
+                        size="small"
+                        showLabels={false}
+                        onViewRelations={() => onView(todo)}
+                      />
+                    )}
                     {renderTags(todo.tags)}
                   </Space>
                 </div>

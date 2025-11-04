@@ -3,6 +3,7 @@ import React, { useState, useMemo, useCallback, useEffect, useRef, useImperative
 import { Divider, Button, Checkbox, Space, Spin, Empty, App, InputNumber, Tag } from 'antd';
 import { SaveOutlined, EyeOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import RichTextEditor from './RichTextEditor';
+import RelationIndicators from './RelationIndicators';
 
 interface ContentFocusViewProps {
   todos: Todo[];
@@ -411,6 +412,18 @@ const ContentFocusItem = React.memo(
             >
               查看详情
             </Button>
+            
+            {/* 关联指示器 */}
+            {todo.id && (
+              <RelationIndicators
+                todoId={todo.id}
+                relations={relations}
+                allTodos={allTodos}
+                size="small"
+                showLabels={false}
+                onViewRelations={handleViewDetails}
+              />
+            )}
           </Space>
 
           {/* 右侧：排序序号 + 保存状态 */}
