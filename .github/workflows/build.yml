@@ -43,6 +43,12 @@ jobs:
           # cache: 'npm'
           # cache-dependency-path: '**/package-lock.json'
 
+      - name: Setup Python (macOS)
+        if: matrix.platform == 'mac'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Install dependencies
         run: |
           npm cache clean --force
