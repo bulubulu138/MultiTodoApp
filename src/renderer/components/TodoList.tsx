@@ -364,6 +364,9 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
         onUpdate={onUpdateInPlace || onStatusChange}
         onView={onView}
         loading={loading}
+        activeTab={activeTab}
+        relations={relations}
+        onUpdateDisplayOrder={onUpdateDisplayOrder || (async () => {})}
       />
     );
   }
@@ -551,7 +554,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                       <RelationIndicators
                         todoId={todo.id}
                         relations={relations}
-                        allTodos={allTodos}
+                        allTodos={allTodos || []}
                         size="small"
                         showLabels={false}
                         onViewRelations={() => onView(todo)}

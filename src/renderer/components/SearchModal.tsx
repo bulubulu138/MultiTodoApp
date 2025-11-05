@@ -271,7 +271,6 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
       <div style={{ maxHeight: 400, overflowY: 'auto' }}>
         <List
-          virtual
           dataSource={filteredTodos}
           renderItem={(todo) => (
             <List.Item key={todo.id}>
