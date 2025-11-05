@@ -38,7 +38,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20.x'
           # 禁用缓存，确保每次都是全新编译
           # cache: 'npm'
           # cache-dependency-path: '**/package-lock.json'
@@ -170,3 +170,4 @@ jobs:
             - 首次使用建议在设置中执行"为所有待办生成关键词"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
