@@ -451,7 +451,7 @@ const ContentFocusItem = React.memo(
                     onPressEnter={handleOrderSave}
                     onBlur={handleOrderSave}
                     min={0}
-                    disabled={savingOrder || (isInGroup && !isGroupStart)}
+                    disabled={savingOrder || !!(isInGroup && !isGroupStart)}
                     style={{ 
                       width: 70,
                       opacity: (isInGroup && !isGroupStart) ? 0.5 : 1
@@ -467,14 +467,15 @@ const ContentFocusItem = React.memo(
                 }>
                   <span 
                     onClick={() => {
-                      if (!(isInGroup && !isGroupStart)) {
-                        setEditingOrder(currentDisplayOrder);
+                      if (!!(isInGroup && !isGroupStart)) {
+                        return; // 禁用点击
                       }
+                      setEditingOrder(currentDisplayOrder);
                     }}
                     style={{ 
-                      cursor: (isInGroup && !isGroupStart) ? 'not-allowed' : 'pointer', 
+                      cursor: !!(isInGroup && !isGroupStart) ? 'not-allowed' : 'pointer', 
                       color: currentDisplayOrder !== undefined ? '#1890ff' : '#ccc',
-                      opacity: (isInGroup && !isGroupStart) ? 0.5 : 1,
+                      opacity: !!(isInGroup && !isGroupStart) ? 0.5 : 1,
                     minWidth: 20,
                     textAlign: 'center',
                     display: 'inline-block'
