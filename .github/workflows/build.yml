@@ -61,8 +61,10 @@ jobs:
           npm_config_msvs_version: ${{ matrix.platform == 'win' && '2019' || '' }}
         shell: bash
 
-      - name: Verify native modules
-        run: npm run verify
+      # 注意：不在此处运行 npm run verify
+      # 原因：verify 脚本在 Node.js 环境运行，但 better-sqlite3 已为 Electron 编译
+      # MODULE_VERSION 不同：Node.js 20 (115) vs Electron 27 (127)
+      # 如果原生模块有问题，后续的 build 和 dist 步骤会失败
 
       - name: Build application
         run: npm run build
