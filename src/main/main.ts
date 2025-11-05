@@ -160,16 +160,51 @@ class Application {
 
   private createTray(): void {
     try {
-      // 尝试使用项目中的图标
-      let iconPath = path.join(__dirname, '../../assets/icon.png');
+      // 判断是否为开发环境
+      const isDev = !app.isPackaged;
       
-      // 如果找不到，使用备用图标
+      let iconPath: string;
+      
+      // Windows: 优先使用 .ico 格式（托盘图标推荐格式）
+      if (process.platform === 'win32') {
+        if (isDev) {
+          // 开发环境：相对于编译后的 dist/main 目录
+          iconPath = path.join(__dirname, '../../assets/icon.ico');
+        } else {
+          // 生产环境：打包后的资源路径
+          iconPath = path.join(process.resourcesPath, 'assets', 'icon.ico');
+        }
+      } else {
+        // macOS/Linux: 使用 PNG 格式
+        if (isDev) {
+          iconPath = path.join(__dirname, '../../assets/icon_32x32.png');
+        } else {
+          iconPath = path.join(process.resourcesPath, 'assets', 'icon_32x32.png');
+        }
+      }
+      
+      console.log('托盘图标路径:', iconPath);
+      console.log('是否为开发环境:', isDev);
+      console.log('当前平台:', process.platform);
+      console.log('文件是否存在:', fs.existsSync(iconPath));
+      
+      // 检查图标文件是否存在
       if (!fs.existsSync(iconPath)) {
-        iconPath = path.join(__dirname, '../../assets/icon_32x32.png');
+        console.error('托盘图标文件不存在:', iconPath);
+        console.error('__dirname:', __dirname);
+        console.error('process.resourcesPath:', process.resourcesPath);
+        return;
       }
       
       const icon = nativeImage.createFromPath(iconPath);
-      this.tray = new Tray(icon.resize({ width: 16, height: 16 }));
+      
+      // Windows 托盘图标通常是 16x16，.ico 文件已包含多种尺寸
+      // macOS/Linux 需要手动调整大小
+      if (process.platform === 'win32') {
+        this.tray = new Tray(icon);
+      } else {
+        this.tray = new Tray(icon.resize({ width: 16, height: 16 }));
+      }
       
       const contextMenu = Menu.buildFromTemplate([
         {
