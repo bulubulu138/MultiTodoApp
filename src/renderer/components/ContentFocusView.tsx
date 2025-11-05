@@ -1,6 +1,6 @@
 import { Todo, TodoRelation } from '../../shared/types';
 import React, { useState, useMemo, useCallback, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
-import { Divider, Button, Checkbox, Space, Spin, Empty, App, InputNumber, Tag } from 'antd';
+import { Divider, Button, Checkbox, Space, Spin, Empty, App, InputNumber, Tag, Tooltip } from 'antd';
 import { SaveOutlined, EyeOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import RichTextEditor from './RichTextEditor';
 import RelationIndicators from './RelationIndicators';
@@ -404,6 +404,13 @@ const ContentFocusItem = React.memo(
               </Tag>
             )}
             
+            {/* 分组标签 */}
+            {isGroupStart && isInGroup && (
+              <Tag color="orange" style={{ margin: 0, fontSize: 11, padding: '0 4px' }}>
+                并列分组
+              </Tag>
+            )}
+            
             <Button
               type="link"
               size="small"
@@ -432,23 +439,42 @@ const ContentFocusItem = React.memo(
             <Space size={4} style={{ fontSize: 12 }}>
               <span style={{ color: '#999' }}>序号:</span>
               {editingOrder !== undefined ? (
-                <InputNumber
-                  size="small"
-                  value={editingOrder}
-                  onChange={(value) => setEditingOrder(value ?? undefined)}
-                  onPressEnter={handleOrderSave}
-                  onBlur={handleOrderSave}
-                  min={0}
-                  disabled={savingOrder}
-                  style={{ width: 70 }}
-                  placeholder="设置序号"
-                />
+                <Tooltip title={
+                  isInGroup && !isGroupStart 
+                    ? "分组内待办的序号由第一个待办统一控制" 
+                    : "输入序号后按回车或点击其他地方保存"
+                }>
+                  <InputNumber
+                    size="small"
+                    value={editingOrder}
+                    onChange={(value) => setEditingOrder(value ?? undefined)}
+                    onPressEnter={handleOrderSave}
+                    onBlur={handleOrderSave}
+                    min={0}
+                    disabled={savingOrder || (isInGroup && !isGroupStart)}
+                    style={{ 
+                      width: 70,
+                      opacity: (isInGroup && !isGroupStart) ? 0.5 : 1
+                    }}
+                    placeholder="设置序号"
+                  />
+                </Tooltip>
               ) : (
-                <span 
-                  onClick={() => setEditingOrder(currentDisplayOrder)}
-                  style={{ 
-                    cursor: 'pointer', 
-                    color: currentDisplayOrder !== undefined ? '#1890ff' : '#ccc',
+                <Tooltip title={
+                  isInGroup && !isGroupStart 
+                    ? "分组内待办的序号由第一个待办统一控制" 
+                    : "点击编辑序号"
+                }>
+                  <span 
+                    onClick={() => {
+                      if (!(isInGroup && !isGroupStart)) {
+                        setEditingOrder(currentDisplayOrder);
+                      }
+                    }}
+                    style={{ 
+                      cursor: (isInGroup && !isGroupStart) ? 'not-allowed' : 'pointer', 
+                      color: currentDisplayOrder !== undefined ? '#1890ff' : '#ccc',
+                      opacity: (isInGroup && !isGroupStart) ? 0.5 : 1,
                     minWidth: 20,
                     textAlign: 'center',
                     display: 'inline-block'
@@ -456,6 +482,7 @@ const ContentFocusItem = React.memo(
                 >
                   {currentDisplayOrder ?? '-'}
                 </span>
+                </Tooltip>
               )}
             </Space>
             
