@@ -18,6 +18,7 @@ class Application {
   private keywordProcessor: KeywordProcessor | null = null;
   private tray: Tray | null = null;
   private isQuitting: boolean = false;
+  private hasShownTrayNotification: boolean = false;
 
   constructor() {
     this.dbManager = new DatabaseManager();
@@ -88,9 +89,25 @@ class Application {
 
     // 修改窗口关闭行为：不退出应用，而是最小化到托盘
     this.mainWindow.on('close', (event) => {
+      console.log('=== Window close event triggered ===');
+      console.log('isQuitting:', this.isQuitting);
+      console.log('Platform:', process.platform);
+      
       if (!this.isQuitting) {
         event.preventDefault();
         this.mainWindow?.hide();
+        console.log('Window hidden to tray');
+        
+        // 显示提示消息（仅首次）
+        if (this.tray && !this.hasShownTrayNotification) {
+          this.tray.displayBalloon?.({
+            title: 'MultiTodo',
+            content: '应用已最小化到系统托盘，点击图标可重新打开'
+          });
+          this.hasShownTrayNotification = true;
+        }
+      } else {
+        console.log('Quitting application');
       }
     });
 
@@ -703,7 +720,9 @@ class Application {
 
     // 退出前清理
     app.on('before-quit', () => {
+      console.log('=== Before quit event ===');
       this.isQuitting = true;
+      console.log('isQuitting set to true');
     });
 
     // 注销全局快捷键并停止备份
@@ -723,10 +742,23 @@ class Application {
       }
     });
 
-    // Windows/Linux: 关闭所有窗口后退出（但托盘除外）
+    // 处理所有窗口关闭事件
     app.on('window-all-closed', () => {
-      // 不自动退出，因为有托盘图标
-      // 用户需要从托盘菜单选择"退出"
+      console.log('=== All windows closed ===');
+      console.log('Platform:', process.platform);
+      console.log('isQuitting:', this.isQuitting);
+      
+      // 不自动退出应用
+      // - Windows/Linux: 应用保留在系统托盘中
+      // - macOS: 应用保留在 Dock 中
+      // 用户需要从托盘菜单或 Dock 菜单选择"退出"才能真正退出
+      if (process.platform !== 'darwin') {
+        // Windows/Linux: 有托盘图标，不退出
+        console.log('Keeping app running in system tray');
+      } else {
+        // macOS: 保持在 Dock，不退出
+        console.log('Keeping app running in Dock');
+      }
     });
   }
 }
