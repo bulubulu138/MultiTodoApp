@@ -54,21 +54,23 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
       let targetId = targetTodo.id;
       let relationType = newRelationType;
 
-      // 智能处理关系方向
+      // 处理关系方向和类型
       if (newRelationType === 'extends') {
-        // 用户选择 "延伸"，实际存储为 background 关系，但方向相反
-        // 当前todo extends targetTodo => targetTodo background 当前todo
-        sourceId = targetTodo.id;
-        targetId = todo.id;
-        relationType = 'background';
+        // 当前todo extends targetTodo
+        // 含义：当前todo 扩展自 targetTodo，targetTodo 是基础
+        // 存储：source=当前todo, target=targetTodo, type='extends'
+        sourceId = todo.id;
+        targetId = targetTodo.id;
+        relationType = 'extends';
       } else if (newRelationType === 'background') {
-        // 用户选择 "背景"，正常存储
-        // targetTodo background 当前todo => source=targetTodo, target=当前todo
+        // targetTodo background 当前todo
+        // 含义：targetTodo 是当前todo的背景，当前todo 需要 targetTodo 提供上下文
+        // 存储：source=targetTodo, target=当前todo, type='background'
         sourceId = targetTodo.id;
         targetId = todo.id;
         relationType = 'background';
       } else if (newRelationType === 'parallel') {
-        // 并列关系，保持原样（双向查询时会自动匹配）
+        // 并列关系，保持原样（无方向性，双向查询时会自动匹配）
         sourceId = todo.id;
         targetId = targetTodo.id;
         relationType = 'parallel';
