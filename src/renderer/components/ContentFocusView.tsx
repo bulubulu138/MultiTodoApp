@@ -4,6 +4,7 @@ import { Divider, Button, Checkbox, Space, Spin, Empty, App, InputNumber, Tag, T
 import { SaveOutlined, EyeOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import RichTextEditor from './RichTextEditor';
 import RelationIndicators from './RelationIndicators';
+import { formatCompletedTime } from '../utils/timeFormatter';
 
 interface ContentFocusViewProps {
   todos: Todo[];
@@ -396,6 +397,13 @@ const ContentFocusItem = React.memo(
             >
               {todo.status === 'completed' ? '已完成' : '标记完成'}
             </Checkbox>
+            
+            {/* 完成时间显示 */}
+            {todo.status === 'completed' && todo.completedAt && (
+              <span style={{ fontSize: 11, color: '#52c41a' }}>
+                {formatCompletedTime(todo.completedAt)}完成
+              </span>
+            )}
             
             {/* 并列待办标识 */}
             {hasParallel && (

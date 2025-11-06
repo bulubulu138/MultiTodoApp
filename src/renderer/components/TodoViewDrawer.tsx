@@ -425,6 +425,14 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
                 </Space>
               </Descriptions.Item>
             )}
+            {todo.completedAt && (
+              <Descriptions.Item label="完成时间" span={2}>
+                <Space>
+                  <ClockCircleOutlined style={{ color: '#52c41a' }} />
+                  {formatTime(todo.completedAt)}
+                </Space>
+              </Descriptions.Item>
+            )}
             {todo.startTime && (
               <Descriptions.Item label="开始时间" span={2}>
                 <Space>

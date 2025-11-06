@@ -1,7 +1,7 @@
 import { Todo, TodoRelation } from '../../shared/types';
 import React, { useState, useMemo, useCallback } from 'react';
 import { List, Card, Tag, Button, Space, Popconfirm, Select, Typography, Image, Tooltip, App, InputNumber } from 'antd';
-import { EditOutlined, DeleteOutlined, LinkOutlined, EyeOutlined, EyeInvisibleOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, LinkOutlined, EyeOutlined, EyeInvisibleOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 import { SortOption, ViewMode } from './Toolbar';
 import RelationsModal from './RelationsModal';
@@ -10,6 +10,7 @@ import ContentFocusView from './ContentFocusView';
 import RelationIndicators from './RelationIndicators';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { formatCompletedTime } from '../utils/timeFormatter';
 import dayjs from 'dayjs';
 
 const { Text, Paragraph } = Typography;
@@ -701,6 +702,11 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                     <span>创建: {formatCompactTime(todo.createdAt)}</span>
                     {todo.updatedAt !== todo.createdAt && (
                       <span>更新: {formatCompactTime(todo.updatedAt)}</span>
+                    )}
+                    {todo.status === 'completed' && todo.completedAt && (
+                      <span style={{ color: '#52c41a' }}>
+                        <CheckCircleOutlined /> 完成于 {formatCompletedTime(todo.completedAt)}
+                      </span>
                     )}
                   </Space>
                 </div>
