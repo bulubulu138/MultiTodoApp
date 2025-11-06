@@ -91,12 +91,40 @@ export class BackupManager {
       const filepath = path.join(this.backupDir, file);
       const stats = await fs.promises.stat(filepath);
       
+      // 从文件名解析真实的创建时间
+      // 文件名格式: todo_app_backup_YYYYMMDD_HHMMSS.db
+      let timestamp: number;
+      let createdAt: string;
+      
+      const match = file.match(/todo_app_backup_(\d{8})_(\d{6})\.db/);
+      if (match) {
+        // 成功从文件名解析时间
+        const dateStr = match[1]; // YYYYMMDD
+        const timeStr = match[2]; // HHMMSS
+        
+        const year = parseInt(dateStr.substr(0, 4));
+        const month = parseInt(dateStr.substr(4, 2)) - 1; // 月份从0开始
+        const day = parseInt(dateStr.substr(6, 2));
+        const hour = parseInt(timeStr.substr(0, 2));
+        const minute = parseInt(timeStr.substr(2, 2));
+        const second = parseInt(timeStr.substr(4, 2));
+        
+        const createdTime = new Date(year, month, day, hour, minute, second);
+        timestamp = createdTime.getTime();
+        createdAt = createdTime.toISOString();
+      } else {
+        // 解析失败，使用文件的 birthtime（创建时间），如果不可用则使用 mtime
+        timestamp = stats.birthtimeMs || stats.mtimeMs;
+        createdAt = new Date(stats.birthtime || stats.mtime).toISOString();
+        console.warn(`无法从文件名解析时间: ${file}，使用文件系统时间`);
+      }
+      
       backups.push({
         filename: file,
         filepath,
-        timestamp: stats.mtimeMs,
+        timestamp,
         size: stats.size,
-        createdAt: new Date(stats.mtime).toISOString()
+        createdAt
       });
     }
     
