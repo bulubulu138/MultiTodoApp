@@ -470,7 +470,8 @@ const ContentFocusItem = React.memo(
                       if (!!(isInGroup && !isGroupStart)) {
                         return; // 禁用点击
                       }
-                      setEditingOrder(currentDisplayOrder);
+                      // 如果当前没有序号，设置为 0 作为默认值
+                      setEditingOrder(currentDisplayOrder ?? 0);
                     }}
                     style={{ 
                       cursor: !!(isInGroup && !isGroupStart) ? 'not-allowed' : 'pointer', 
