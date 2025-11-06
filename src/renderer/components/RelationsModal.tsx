@@ -76,11 +76,11 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
         relationType = 'parallel';
       }
 
-      // 检查关系是否已存在
-      const exists = await window.electronAPI.relations.exists(
-        sourceId,
-        targetId,
-        relationType
+      // 性能优化：使用客户端内存中的关系数据检查，避免数据库查询
+      const exists = relations.some(r => 
+        r.source_id === sourceId && 
+        r.target_id === targetId && 
+        r.relation_type === relationType
       );
 
       if (exists) {
@@ -90,10 +90,10 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
 
       // 对于并列关系，也要检查反向是否存在
       if (relationType === 'parallel') {
-        const reverseExists = await window.electronAPI.relations.exists(
-          targetId,
-          sourceId,
-          relationType
+        const reverseExists = relations.some(r =>
+          r.source_id === targetId && 
+          r.target_id === sourceId && 
+          r.relation_type === relationType
         );
         if (reverseExists) {
           message.warning('该关系已存在');
@@ -101,44 +101,66 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
         }
       }
 
-      // 创建关联关系
-      await window.electronAPI.relations.create({
+      // 乐观更新：先更新 UI，提升响应速度
+      const tempRelation: TodoRelation = {
+        id: Date.now(), // 临时 ID
         source_id: sourceId,
         target_id: targetId,
         relation_type: relationType
-      });
-
-      // 如果是并列关系，自动同步displayOrder
-      if (relationType === 'parallel') {
-        const sourceTodo = todos.find(t => t.id === sourceId);
-        const targetTodoItem = todos.find(t => t.id === targetId);
-        
-        if (sourceTodo && targetTodoItem) {
-          // 使用较小的displayOrder，或者如果都没有则使用较小的ID
-          const syncOrder = sourceTodo.displayOrder ?? targetTodoItem.displayOrder ?? Math.min(sourceId, targetId);
-          
-          // 更新两个待办的displayOrder
-          const updates: Promise<void>[] = [];
-          if (sourceTodo.displayOrder !== syncOrder) {
-            updates.push(window.electronAPI.todo.update(sourceId, { displayOrder: syncOrder }));
-          }
-          if (targetTodoItem.displayOrder !== syncOrder) {
-            updates.push(window.electronAPI.todo.update(targetId, { displayOrder: syncOrder }));
-          }
-          
-          if (updates.length > 0) {
-            await Promise.all(updates);
-            message.info(`已自动同步并列待办的显示序号为 ${syncOrder}`);
-          }
-        }
-      }
-
-      // 重新加载关系列表
-      await loadRelations();
-      await onRelationsChange?.(); // Refresh global relations state
+      };
+      setRelations([...relations, tempRelation]);
       setShowSearchModal(false);
       message.success('关联关系添加成功');
+
+      // 后台创建关系
+      try {
+        const createdRelation = await window.electronAPI.relations.create({
+          source_id: sourceId,
+          target_id: targetId,
+          relation_type: relationType
+        });
+
+        // 如果是并列关系，自动同步displayOrder
+        if (relationType === 'parallel') {
+          const sourceTodo = todos.find(t => t.id === sourceId);
+          const targetTodoItem = todos.find(t => t.id === targetId);
+          
+          if (sourceTodo && targetTodoItem) {
+            // 使用较小的displayOrder，或者如果都没有则使用较小的ID
+            const syncOrder = sourceTodo.displayOrder ?? targetTodoItem.displayOrder ?? Math.min(sourceId, targetId);
+            
+            // 更新两个待办的displayOrder
+            const updates: Promise<void>[] = [];
+            if (sourceTodo.displayOrder !== syncOrder) {
+              updates.push(window.electronAPI.todo.update(sourceId, { displayOrder: syncOrder }));
+            }
+            if (targetTodoItem.displayOrder !== syncOrder) {
+              updates.push(window.electronAPI.todo.update(targetId, { displayOrder: syncOrder }));
+            }
+            
+            if (updates.length > 0) {
+              await Promise.all(updates);
+              message.info(`已自动同步并列待办的显示序号为 ${syncOrder}`);
+            }
+          }
+        }
+
+        // 后台刷新全局关系状态
+        await onRelationsChange?.();
+      } catch (error: any) {
+        // 后台创建失败，回滚 UI 更新
+        setRelations(relations);
+        setShowSearchModal(true);
+        
+        if (error.message && error.message.includes('already exists')) {
+          message.warning('该关系已存在');
+        } else {
+          message.error('添加关联关系失败');
+        }
+        console.error('Error adding relation:', error);
+      }
     } catch (error: any) {
+      // 前置检查失败
       if (error.message && error.message.includes('already exists')) {
         message.warning('该关系已存在');
       } else {

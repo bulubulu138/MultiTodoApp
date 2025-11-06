@@ -29,21 +29,38 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [filteredTodos, setFilteredTodos] = useState<Todo[]>([]);
 
-  // Extract all unique tags from todos - 仅在visible时计算
+  // 性能优化：预构建搜索索引，避免在过滤时重复解析
+  const searchIndex = useMemo(() => {
+    if (!visible) return [];
+    return todos.map(todo => {
+      if (!todo || !todo.id) return null;
+      return {
+        id: todo.id,
+        todo: todo,
+        searchText: `${todo.title || ''} ${todo.content || ''}`.toLowerCase(),
+        status: todo.status,
+        priority: todo.priority,
+        tags: todo.tags ? todo.tags.split(',').map(t => t.trim()).filter(Boolean) : []
+      };
+    }).filter(Boolean) as Array<{
+      id: number;
+      todo: Todo;
+      searchText: string;
+      status: string;
+      priority: string;
+      tags: string[];
+    }>;
+  }, [todos, visible]);
+
+  // Extract all unique tags from todos - 从搜索索引中提取，避免重复解析
   const allTags = useMemo(() => {
     if (!visible) return [];
     const tagSet = new Set<string>();
-    todos.forEach(todo => {
-      // 添加空值检查
-      if (todo && todo.tags) {
-        todo.tags.split(',').forEach(tag => {
-          const trimmed = tag.trim();
-          if (trimmed) tagSet.add(trimmed);
-        });
-      }
+    searchIndex.forEach(item => {
+      item.tags.forEach(tag => tagSet.add(tag));
     });
     return Array.from(tagSet).sort();
-  }, [todos, visible]);
+  }, [searchIndex, visible]);
 
   // 搜索防抖 - 避免频繁触发过滤计算
   useEffect(() => {
@@ -53,7 +70,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
     return () => clearTimeout(timer);
   }, [searchText]);
 
-  // Apply all filters - 仅在visible时执行
+  // 性能优化：使用预构建的搜索索引进行过滤，避免重复解析
   useEffect(() => {
     // 关闭时清空状态，下次打开重新计算
     if (!visible) {
@@ -66,38 +83,41 @@ const SearchModal: React.FC<SearchModalProps> = ({
       return;
     }
 
-    // 添加空值过滤
-    let filtered = todos.filter(todo => todo && todo.id);
+    // 使用预构建的搜索索引进行快速过滤
+    let filteredIndex = searchIndex;
 
-    // 1. Text search (title and content) - 使用防抖后的搜索文本
+    // 1. Text search - 直接使用预构建的 searchText
     if (debouncedSearchText.trim()) {
-      filtered = filtered.filter(todo =>
-        todo.title?.toLowerCase().includes(debouncedSearchText.toLowerCase()) ||
-        todo.content?.toLowerCase().includes(debouncedSearchText.toLowerCase())
+      const searchLower = debouncedSearchText.toLowerCase();
+      filteredIndex = filteredIndex.filter(item =>
+        item.searchText.includes(searchLower)
       );
     }
 
     // 2. Status filter
     if (statusFilter.length > 0) {
-      filtered = filtered.filter(todo => statusFilter.includes(todo.status));
+      filteredIndex = filteredIndex.filter(item => 
+        statusFilter.includes(item.status)
+      );
     }
 
     // 3. Priority filter
     if (priorityFilter.length > 0) {
-      filtered = filtered.filter(todo => priorityFilter.includes(todo.priority));
+      filteredIndex = filteredIndex.filter(item => 
+        priorityFilter.includes(item.priority)
+      );
     }
 
-    // 4. Tag filter (any match)
+    // 4. Tag filter - 直接使用预解析的 tags 数组
     if (tagFilter.length > 0) {
-      filtered = filtered.filter(todo => {
-        if (!todo.tags) return false;
-        const todoTags = todo.tags.split(',').map(t => t.trim()).filter(Boolean);
-        return tagFilter.some(filterTag => todoTags.includes(filterTag));
-      });
+      filteredIndex = filteredIndex.filter(item =>
+        tagFilter.some(filterTag => item.tags.includes(filterTag))
+      );
     }
 
-    setFilteredTodos(filtered);
-  }, [visible, debouncedSearchText, statusFilter, priorityFilter, tagFilter, todos]);
+    // 提取 Todo 对象
+    setFilteredTodos(filteredIndex.map(item => item.todo));
+  }, [visible, debouncedSearchText, statusFilter, priorityFilter, tagFilter, searchIndex]);
 
   const getStatusColor = (status: string) => {
     switch (status) {

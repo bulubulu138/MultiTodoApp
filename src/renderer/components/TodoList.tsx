@@ -319,7 +319,37 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
     }
   };
 
-  // 使用 DFS 构建并列关系分组 Map
+  // 性能优化：预计算关系映射，避免在 renderItem 中重复过滤
+  const relationsByTodo = useMemo(() => {
+    const map = new Map<number, TodoRelation[]>();
+    relations.forEach(r => {
+      // 为 source_id 添加关系
+      if (!map.has(r.source_id)) map.set(r.source_id, []);
+      map.get(r.source_id)!.push(r);
+      
+      // 为 target_id 添加关系
+      if (!map.has(r.target_id)) map.set(r.target_id, []);
+      map.get(r.target_id)!.push(r);
+    });
+    return map;
+  }, [relations]);
+
+  // 性能优化：预计算并列关系索引，避免重复过滤
+  const parallelRelationsByTodo = useMemo(() => {
+    const map = new Map<number, TodoRelation[]>();
+    relations.forEach(r => {
+      if (r.relation_type === 'parallel') {
+        if (!map.has(r.source_id)) map.set(r.source_id, []);
+        map.get(r.source_id)!.push(r);
+        
+        if (!map.has(r.target_id)) map.set(r.target_id, []);
+        map.get(r.target_id)!.push(r);
+      }
+    });
+    return map;
+  }, [relations]);
+
+  // 使用 DFS 构建并列关系分组 Map（优化：使用预计算的并列关系索引）
   const parallelGroups = useMemo(() => {
     const groups = new Map<number, Set<number>>();
     const visited = new Set<number>();
@@ -329,21 +359,18 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
       visited.add(todoId);
       groupSet.add(todoId);
       
-      // 找到所有与该 todo 有并列关系的其他 todo
-      const relatedIds = relations
-        .filter(r => r.relation_type === 'parallel')
-        .filter(r => r.source_id === todoId || r.target_id === todoId)
-        .map(r => r.source_id === todoId ? r.target_id : r.source_id);
+      // 优化：直接从预计算的并列关系索引获取
+      const parallelRels = parallelRelationsByTodo.get(todoId) || [];
+      const relatedIds = parallelRels.map(r => 
+        r.source_id === todoId ? r.target_id : r.source_id
+      );
       
       relatedIds.forEach(relatedId => dfs(relatedId, groupSet));
     };
     
     todos.forEach(todo => {
       if (!visited.has(todo.id!)) {
-        const parallelRels = relations.filter(r =>
-          r.relation_type === 'parallel' &&
-          (r.source_id === todo.id || r.target_id === todo.id)
-        );
+        const parallelRels = parallelRelationsByTodo.get(todo.id!) || [];
         
         if (parallelRels.length > 0) {
           const groupSet = new Set<number>();
@@ -354,7 +381,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
     });
     
     return groups;
-  }, [todos, relations]);
+  }, [todos, parallelRelationsByTodo]);
 
   // 如果是内容专注模式，使用专用组件
   if (viewMode === 'content-focus') {
@@ -388,6 +415,9 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
       loading={loading}
       dataSource={todos}
       rowKey={(todo) => `todo-${todo.id}`}
+      pagination={false}
+      virtual
+      style={{ height: 'calc(100vh - 280px)', overflow: 'auto' }}
       renderItem={(todo, index) => {
         // Data validation guard
         if (!todo || !todo.id) return null;
@@ -397,11 +427,8 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
           ? editingOrder[todo.id!] 
           : (todo.displayOrders && todo.displayOrders[activeTab]);
         
-        // 检查是否是并列待办
-        const parallelRelations = relations.filter(r => 
-          r.relation_type === 'parallel' && 
-          (r.source_id === todo.id || r.target_id === todo.id)
-        );
+        // 性能优化：使用预计算的并列关系索引，避免重复过滤
+        const parallelRelations = parallelRelationsByTodo.get(todo.id!) || [];
         const hasParallel = parallelRelations.length > 0;
         
         // 检测分组边界（仅在手动排序模式下）
