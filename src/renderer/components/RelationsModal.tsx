@@ -106,7 +106,8 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
         id: Date.now(), // 临时 ID
         source_id: sourceId,
         target_id: targetId,
-        relation_type: relationType
+        relation_type: relationType,
+        created_at: new Date().toISOString() // 添加创建时间
       };
       setRelations([...relations, tempRelation]);
       setShowSearchModal(false);
