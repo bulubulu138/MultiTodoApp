@@ -89,6 +89,13 @@
       "!node_modules/**/*.d.ts",
       "!node_modules/.bin"
     ],
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets",
+        "filter": ["**/*"]
+      }
+    ],
     "asarUnpack": [
       "node_modules/better-sqlite3/**/*"
     ],

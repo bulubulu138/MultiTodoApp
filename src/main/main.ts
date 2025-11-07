@@ -180,40 +180,56 @@ class Application {
       // 判断是否为开发环境
       const isDev = !app.isPackaged;
       
-      let iconPath: string;
+      console.log('=== 创建系统托盘 ===');
+      console.log('是否为开发环境:', isDev);
+      console.log('当前平台:', process.platform);
+      console.log('__dirname:', __dirname);
+      console.log('process.resourcesPath:', process.resourcesPath);
       
-      // Windows: 优先使用 .ico 格式（托盘图标推荐格式）
-      if (process.platform === 'win32') {
-        if (isDev) {
-          // 开发环境：相对于编译后的 dist/main 目录
-          iconPath = path.join(__dirname, '../../assets/icon.ico');
-        } else {
-          // 生产环境：打包后的资源路径
-          iconPath = path.join(process.resourcesPath, 'assets', 'icon.ico');
-        }
-      } else {
-        // macOS/Linux: 使用 PNG 格式
-        if (isDev) {
-          iconPath = path.join(__dirname, '../../assets/icon_32x32.png');
-        } else {
-          iconPath = path.join(process.resourcesPath, 'assets', 'icon_32x32.png');
+      // 构建可能的图标路径列表（Windows 优先使用 .ico，macOS/Linux 使用 .png）
+      const iconFileName = process.platform === 'win32' ? 'icon.ico' : 'icon_32x32.png';
+      
+      const possiblePaths = isDev 
+        ? [
+            path.join(__dirname, '../../assets', iconFileName),
+            path.join(process.cwd(), 'assets', iconFileName)
+          ]
+        : [
+            path.join(process.resourcesPath, 'assets', iconFileName),
+            path.join(process.resourcesPath, iconFileName),
+            path.join(__dirname, '../../assets', iconFileName),
+            path.join(app.getAppPath(), 'assets', iconFileName)
+          ];
+      
+      console.log('尝试查找图标文件，候选路径:', possiblePaths);
+      
+      // 查找第一个存在的图标文件
+      let iconPath = '';
+      for (const testPath of possiblePaths) {
+        console.log(`检查路径: ${testPath} - 存在: ${fs.existsSync(testPath)}`);
+        if (fs.existsSync(testPath)) {
+          iconPath = testPath;
+          console.log('✓ 找到图标文件:', iconPath);
+          break;
         }
       }
       
-      console.log('托盘图标路径:', iconPath);
-      console.log('是否为开发环境:', isDev);
-      console.log('当前平台:', process.platform);
-      console.log('文件是否存在:', fs.existsSync(iconPath));
-      
-      // 检查图标文件是否存在
-      if (!fs.existsSync(iconPath)) {
-        console.error('托盘图标文件不存在:', iconPath);
-        console.error('__dirname:', __dirname);
-        console.error('process.resourcesPath:', process.resourcesPath);
+      // 如果没有找到图标文件，记录错误并返回
+      if (!iconPath) {
+        console.error('❌ 未找到托盘图标文件');
+        console.error('已尝试的所有路径:', possiblePaths);
         return;
       }
       
       const icon = nativeImage.createFromPath(iconPath);
+      
+      // 验证图标是否成功加载
+      if (icon.isEmpty()) {
+        console.error('❌ 图标加载失败，图标为空');
+        return;
+      }
+      
+      console.log('图标尺寸:', icon.getSize());
       
       // Windows 托盘图标通常是 16x16，.ico 文件已包含多种尺寸
       // macOS/Linux 需要手动调整大小
@@ -258,7 +274,7 @@ class Application {
         }
       });
       
-      console.log('系统托盘创建成功');
+      console.log('✓ 系统托盘创建成功');
     } catch (error) {
       console.error('创建系统托盘失败:', error);
     }
