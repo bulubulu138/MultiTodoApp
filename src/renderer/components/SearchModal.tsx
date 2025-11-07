@@ -117,7 +117,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
     // 提取 Todo 对象
     setFilteredTodos(filteredIndex.map(item => item.todo));
-  }, [visible, debouncedSearchText, statusFilter, priorityFilter, tagFilter, searchIndex]);
+  }, [visible, debouncedSearchText, statusFilter, priorityFilter, tagFilter, todos]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
