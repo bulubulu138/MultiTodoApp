@@ -119,6 +119,29 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.toolbar-left {
+  flex: 0 1 auto;
+}
+
+.toolbar-right {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+
+/* 工具栏搜索框 */
+.toolbar-search {
+  width: 250px;
+  min-width: 150px;
+}
+
+/* 工具栏排序选择器 */
+.toolbar-sort-select {
+  width: 180px;
+  min-width: 120px;
 }
 
 /* 内容区域 - 移除硬编码背景色 */
@@ -995,19 +1018,147 @@ body {
   will-change: auto;
 }
 
-/* 响应式设计 */
-@media (max-width: 768px) {
+/* ============================================
+   响应式设计 - 多断点适配
+   ============================================ */
+
+/* 中等屏幕 (768px - 1199px) - 隐藏部分按钮文字 */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .toolbar-search {
+    width: 180px;
+  }
+  
+  .toolbar-sort-select {
+    width: 150px;
+  }
+  
+  /* 隐藏次要按钮的文字，只保留图标 */
+  .toolbar-btn-with-text .btn-text {
+    display: none;
+  }
+  
+  /* 主要按钮保持文字显示 */
+  .btn-text-always {
+    display: inline;
+  }
+}
+
+/* 小屏幕 (481px - 767px) - 垂直布局 */
+@media (min-width: 481px) and (max-width: 767px) {
   .toolbar {
     flex-direction: column;
     gap: 12px;
+    align-items: stretch;
+  }
+  
+  .toolbar-left,
+  .toolbar-right {
+    width: 100%;
+  }
+  
+  .toolbar-search {
+    width: 100%;
+  }
+  
+  .toolbar-sort-select {
+    width: 100%;
+  }
+  
+  .toolbar-right {
+    justify-content: flex-start;
+  }
+  
+  /* 隐藏次要按钮的文字 */
+  .toolbar-btn-with-text .btn-text {
+    display: none;
+  }
+  
+  .content-area {
+    padding: 12px;
+  }
+  
+  .todo-card {
+    margin-bottom: 10px;
+  }
+  
+  .status-tabs {
+    padding: 8px 12px 0 12px;
+  }
+  
+  .status-tabs .ant-tabs-tab {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+}
+
+/* 超小屏幕 (≤480px) - 极简布局 */
+@media (max-width: 480px) {
+  .toolbar {
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    align-items: stretch;
+  }
+  
+  .toolbar-left,
+  .toolbar-right {
+    width: 100%;
+  }
+  
+  .toolbar-search {
+    width: 100%;
+  }
+  
+  .toolbar-sort-select {
+    width: 100%;
+  }
+  
+  .toolbar-right {
+    justify-content: flex-start;
+  }
+  
+  .toolbar-right .ant-space {
+    width: 100%;
+  }
+  
+  /* 所有按钮全宽显示 */
+  .toolbar-right .ant-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  /* 隐藏次要按钮的文字 */
+  .toolbar-btn-with-text .btn-text {
+    display: none;
   }
   
   .content-area {
     padding: 8px;
+    height: calc(100vh - 65px);
   }
   
   .todo-card {
-    margin-bottom: 12px;
+    margin-bottom: 8px;
+  }
+  
+  .status-tabs {
+    padding: 6px 8px 0 8px;
+  }
+  
+  .status-tabs .ant-tabs-tab {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+  
+  /* 卡片内容字体缩小 */
+  .todo-card .ant-card-body {
+    padding: 8px;
+    font-size: 13px;
+  }
+  
+  /* 专注视图优化 */
+  .content-focus-view {
+    padding: 12px;
   }
 }
 

@@ -51,21 +51,21 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
 }) => {
   return (
     <div className="toolbar">
-      <div>
+      <div className="toolbar-left">
         <Search
           placeholder="搜索标题或内容..."
           value={searchText}
           onChange={(e) => onSearchChange?.(e.target.value)}
-          style={{ width: 250 }}
+          className="toolbar-search"
           allowClear
         />
       </div>
       
-      <Space size="middle">
+      <Space size="middle" className="toolbar-right" wrap>
         <Select
           value={sortOption}
           onChange={onSortChange}
-          style={{ width: 180 }}
+          className="toolbar-sort-select"
           suffixIcon={<SortAscendingOutlined />}
         >
           <Option value="manual">手动排序</Option>
@@ -98,47 +98,61 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
           />
         </Tooltip>
         
-        <Button
-          icon={<ExportOutlined />}
-          onClick={onShowExport}
-        >
-          导出
-        </Button>
+        <Tooltip title="导出">
+          <Button
+            icon={<ExportOutlined />}
+            onClick={onShowExport}
+            className="toolbar-btn-with-text"
+          >
+            <span className="btn-text">导出</span>
+          </Button>
+        </Tooltip>
         
-        <Button
-          icon={<BulbOutlined />}
-          onClick={onShowNotes}
-        >
-          心得
-        </Button>
+        <Tooltip title="心得">
+          <Button
+            icon={<BulbOutlined />}
+            onClick={onShowNotes}
+            className="toolbar-btn-with-text"
+          >
+            <span className="btn-text">心得</span>
+          </Button>
+        </Tooltip>
         
-        <Button
-          icon={<CalendarOutlined />}
-          onClick={onShowCalendar}
-        >
-          日历
-        </Button>
+        <Tooltip title="日历">
+          <Button
+            icon={<CalendarOutlined />}
+            onClick={onShowCalendar}
+            className="toolbar-btn-with-text"
+          >
+            <span className="btn-text">日历</span>
+          </Button>
+        </Tooltip>
         
-        <Button
-          icon={<TagsOutlined />}
-          onClick={onShowCustomTabManager}
-        >
-          管理Tab
-        </Button>
+        <Tooltip title="管理Tab">
+          <Button
+            icon={<TagsOutlined />}
+            onClick={onShowCustomTabManager}
+            className="toolbar-btn-with-text"
+          >
+            <span className="btn-text">管理Tab</span>
+          </Button>
+        </Tooltip>
         
         <Button
           type="primary"
           icon={<PlusOutlined />}
           onClick={onAddTodo}
+          className="toolbar-btn-primary"
         >
-          新建待办
+          <span className="btn-text-always">新建待办</span>
         </Button>
         
         <Button
           icon={<SettingOutlined />}
           onClick={onShowSettings}
+          className="toolbar-btn-settings"
         >
-          设置
+          <span className="btn-text-always">设置</span>
         </Button>
       </Space>
     </div>
