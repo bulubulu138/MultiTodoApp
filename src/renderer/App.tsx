@@ -8,7 +8,6 @@ import TodoList from './components/TodoList';
 import TodoForm from './components/TodoForm';
 import Toolbar, { SortOption, ViewMode } from './components/Toolbar';
 import SettingsModal from './components/SettingsModal';
-import SearchModal from './components/SearchModal';
 import ExportModal from './components/ExportModal';
 import TodoViewDrawer from './components/TodoViewDrawer';
 import NotesDrawer from './components/NotesDrawer';
@@ -44,7 +43,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showViewDrawer, setShowViewDrawer] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
@@ -59,6 +57,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const [customTabs, setCustomTabs] = useState<CustomTab[]>([]);
   const [quickCreateContent, setQuickCreateContent] = useState<string | null>(null);
   const [showHotkeyGuide, setShowHotkeyGuide] = useState(false);
+  const [searchText, setSearchText] = useState<string>('');
+  const [debouncedSearchText, setDebouncedSearchText] = useState<string>('');
   
   // 保存状态追踪（用于专注模式的乐观更新）
   const savingTodosRef = useRef<Set<number>>(new Set());
@@ -107,6 +107,14 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       }, 1000);
     }
   }, []);
+
+  // 搜索防抖 - 避免频繁触发过滤计算
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchText(searchText);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchText]);
 
   // 监听页面可见性变化，页面隐藏时自动保存
   useEffect(() => {
@@ -696,6 +704,16 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       filtered = activeTab === 'all' ? validTodos : validTodos.filter(todo => todo.status === activeTab);
     }
     
+    // 应用搜索过滤（搜索标题和内容）
+    if (debouncedSearchText.trim()) {
+      const searchLower = debouncedSearchText.toLowerCase();
+      filtered = filtered.filter(todo => {
+        const titleMatch = todo.title?.toLowerCase().includes(searchLower);
+        const contentMatch = todo.content?.toLowerCase().includes(searchLower);
+        return titleMatch || contentMatch;
+      });
+    }
+    
     // 构建并列分组（用于所有排序模式）
     const parallelGroups = buildParallelGroups(filtered, relations);
     
@@ -799,7 +817,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     })));
     
     return result;
-  }, [todos, activeTab, tabSettings, relations, getCurrentTabSettings]);
+  }, [todos, activeTab, tabSettings, relations, getCurrentTabSettings, debouncedSearchText]);
 
   // Tab配置
   const tabItems = useMemo(() => {
@@ -883,7 +901,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         <Toolbar
           onAddTodo={() => setShowForm(true)}
         onShowSettings={() => setShowSettings(true)}
-        onShowSearch={() => setShowSearch(true)}
         onShowExport={() => setShowExport(true)}
         onShowNotes={() => setShowNotes(true)}
         onShowCalendar={() => setShowCalendar(true)}
@@ -892,6 +909,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         onSortChange={handleSortChange}
         viewMode={currentTabSettings.viewMode}
         onViewModeChange={handleViewModeChange}
+        searchText={searchText}
+        onSearchChange={setSearchText}
       />
         
         <Content className="content-area">
@@ -963,17 +982,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
           relations={relations}
         />
       )}
-
-      <SearchModal
-        visible={showSearch}
-        todos={todos}
-        onClose={() => setShowSearch(false)}
-        onSelectTodo={(todo) => {
-          setShowSearch(false);
-          handleEditTodo(todo);
-        }}
-        onViewTodo={handleViewTodo}
-      />
 
       <ExportModal
         visible={showExport}

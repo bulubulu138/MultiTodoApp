@@ -1,9 +1,10 @@
 import React from 'react';
-import { Button, Space, Select, Tooltip, Segmented } from 'antd';
-import { PlusOutlined, SettingOutlined, ExportOutlined, SearchOutlined, BulbOutlined, CalendarOutlined, SortAscendingOutlined, TagsOutlined, UnorderedListOutlined, AlignLeftOutlined } from '@ant-design/icons';
+import { Button, Space, Select, Tooltip, Segmented, Input } from 'antd';
+import { PlusOutlined, SettingOutlined, ExportOutlined, BulbOutlined, CalendarOutlined, SortAscendingOutlined, TagsOutlined, UnorderedListOutlined, AlignLeftOutlined, SearchOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 
 const { Option } = Select;
+const { Search } = Input;
 
 export type SortOption = 
   | 'createdAt-desc' 
@@ -22,7 +23,6 @@ interface ToolbarProps {
   onAddTodo: () => void;
   onShowSettings: () => void;
   onShowExport: () => void;
-  onShowSearch: () => void;
   onShowNotes: () => void;
   onShowCalendar: () => void;
   onShowCustomTabManager: () => void;
@@ -30,6 +30,8 @@ interface ToolbarProps {
   onSortChange?: (option: SortOption) => void;
   viewMode?: ViewMode;
   onViewModeChange?: (mode: ViewMode) => void;
+  searchText?: string;
+  onSearchChange?: (value: string) => void;
 }
 
 // 性能优化：使用 React.memo 避免不必要的重渲染
@@ -37,19 +39,26 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
   onAddTodo,
   onShowSettings,
   onShowExport,
-  onShowSearch,
   onShowCustomTabManager,
   onShowNotes,
   onShowCalendar,
   sortOption = 'createdAt-desc',
   onSortChange,
   viewMode = 'card',
-  onViewModeChange
+  onViewModeChange,
+  searchText = '',
+  onSearchChange
 }) => {
   return (
     <div className="toolbar">
       <div>
-        <h2 style={{ margin: 0, color: '#1890ff' }}>多功能待办工具</h2>
+        <Search
+          placeholder="搜索标题或内容..."
+          value={searchText}
+          onChange={(e) => onSearchChange?.(e.target.value)}
+          style={{ width: 250 }}
+          allowClear
+        />
       </div>
       
       <Space size="middle">
@@ -88,13 +97,6 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
             ]}
           />
         </Tooltip>
-        
-        <Button
-          icon={<SearchOutlined />}
-          onClick={onShowSearch}
-        >
-          搜索
-        </Button>
         
         <Button
           icon={<ExportOutlined />}
