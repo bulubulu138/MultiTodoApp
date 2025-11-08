@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Modal, List, Card, Button, Space, Tag, Select, App, Typography, Segmented, Timeline } from 'antd';
 import { LinkOutlined, DeleteOutlined, PlusOutlined, ClockCircleOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { Todo, TodoRelation } from '../../shared/types';
-import SearchModal from './SearchModal';
 
 const { Option } = Select;
 const { Text } = Typography;
@@ -24,7 +23,7 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
 }) => {
   const { message } = App.useApp();
   const [relations, setRelations] = useState<TodoRelation[]>([]);
-  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [selectedTodoId, setSelectedTodoId] = useState<number | null>(null);
   const [newRelationType, setNewRelationType] = useState<'extends' | 'background' | 'parallel'>('background');
   const [viewMode, setViewMode] = useState<'timeline' | 'list'>('timeline');
 
@@ -46,8 +45,17 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
     }
   };
 
-  const handleAddRelation = async (targetTodo: Todo) => {
-    if (!todo?.id || !targetTodo.id) return;
+  const handleAddRelation = async () => {
+    if (!todo?.id || !selectedTodoId) {
+      message.warning('请先选择要关联的待办事项');
+      return;
+    }
+    
+    const targetTodo = todos.find(t => t.id === selectedTodoId);
+    if (!targetTodo) {
+      message.error('选择的待办事项不存在');
+      return;
+    }
 
     try {
       let sourceId = todo.id;
@@ -110,7 +118,7 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
         created_at: new Date().toISOString() // 添加创建时间
       };
       setRelations([...relations, tempRelation]);
-      setShowSearchModal(false);
+      setSelectedTodoId(null);
       message.success('关联关系添加成功');
 
       // 后台创建关系
@@ -151,7 +159,6 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
       } catch (error: any) {
         // 后台创建失败，回滚 UI 更新
         setRelations(relations);
-        setShowSearchModal(true);
         
         if (error.message && error.message.includes('already exists')) {
           message.warning('该关系已存在');
@@ -295,10 +302,28 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
               <Option value="extends">延伸</Option>
               <Option value="parallel">并列</Option>
             </Select>
+            <Select
+              placeholder="选择待办事项"
+              value={selectedTodoId}
+              onChange={setSelectedTodoId}
+              style={{ width: 250 }}
+              showSearch
+              optionFilterProp="children"
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={todos
+                .filter(t => t.id !== todo.id) // 排除当前待办
+                .map(t => ({
+                  value: t.id,
+                  label: t.title
+                }))}
+            />
             <Button
               type="primary"
               icon={<PlusOutlined />}
-              onClick={() => setShowSearchModal(true)}
+              onClick={handleAddRelation}
+              disabled={!selectedTodoId}
             >
               添加关联
             </Button>
@@ -458,13 +483,6 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
           />
         )}
       </Modal>
-
-      <SearchModal
-        visible={showSearchModal}
-        todos={todos.filter(t => t.id !== todo.id)} // 排除当前待办事项
-        onClose={() => setShowSearchModal(false)}
-        onSelectTodo={handleAddRelation}
-      />
     </>
   );
 };
