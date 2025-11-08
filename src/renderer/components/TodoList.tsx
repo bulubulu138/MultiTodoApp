@@ -416,9 +416,6 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
       dataSource={todos}
       rowKey={(todo) => `todo-${todo.id}`}
       pagination={false}
-      // @ts-ignore - Ant Design List 支持 virtual 属性，但类型定义可能滞后
-      virtual
-      style={{ height: 'calc(100vh - 280px)', overflow: 'auto' }}
       renderItem={(todo, index) => {
         // Data validation guard
         if (!todo || !todo.id) return null;

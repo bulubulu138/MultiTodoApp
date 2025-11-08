@@ -91,8 +91,8 @@ const RelationIndicators: React.FC<RelationIndicatorsProps> = ({
   
   return (
     <Space size={0} style={{ fontSize: fontSize }}>
-      {renderIndicator('extends', <FileTextOutlined />, '#52c41a', '背景')}
-      {renderIndicator('background', <ArrowRightOutlined />, '#1890ff', '延伸')}
+      {renderIndicator('extends', <ArrowRightOutlined />, '#1890ff', '延伸')}
+      {renderIndicator('background', <FileTextOutlined />, '#52c41a', '背景')}
       {renderIndicator('parallel', <BranchesOutlined />, '#fa8c16', '并列')}
     </Space>
   );
