@@ -1,4 +1,4 @@
-// 数据库管理器 - 使用 better-sqlite3
+// Database manager - using better-sqlite3
 import Database from 'better-sqlite3';
 import * as path from 'path';
 import { app } from 'electron';
@@ -434,19 +434,19 @@ export class DatabaseManager {
         const searchKeyword = keyword.trim();
         const query = `%${searchKeyword}%`;
 
-        // 优化查询：使用更高效的SQL，并限制结果数量
+        // Optimize query: use more efficient SQL and limit results
         const rows = this.db!.prepare(
           `SELECT * FROM todos
            WHERE title LIKE ? OR content LIKE ?
            ORDER BY
-             CASE WHEN title LIKE ? THEN 1 ELSE 2 END, -- 标题匹配优先
+             CASE WHEN title LIKE ? THEN 1 ELSE 2 END
              createdAt DESC
-           LIMIT 1000` -- 限制最大结果数，避免性能问题
+           LIMIT 1000`
         ).all(query, query, query) as any[];
 
         resolve(rows.map(row => this.parseTodo(row)));
       } catch (error) {
-        console.error('搜索失败:', error);
+        console.error('Search failed:', error);
         reject(error);
       }
     });

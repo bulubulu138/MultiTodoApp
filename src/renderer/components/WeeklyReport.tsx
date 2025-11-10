@@ -134,7 +134,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
           <Space direction="vertical" size={4} style={{ width: '100%' }}>
             <Space>
               <Text strong style={{ fontSize: '14px' }}>{todo.title}</Text>
-              <Tag color={getPriorityColor(todo.priority)} size="small">
+              <Tag color={getPriorityColor(todo.priority)}>
                 {getPriorityText(todo.priority)}
               </Tag>
             </Space>
@@ -147,7 +147,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
                 耗时: <Text code>{duration}</Text>
               </Text>
               {deadlineStatus.text && (
-                <Tag color={deadlineStatus.color} size="small">
+                <Tag color={deadlineStatus.color}>
                   {deadlineStatus.text}
                 </Tag>
               )}
@@ -166,7 +166,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
             {todo.tags && todo.tags.trim().length > 0 && (
               <div style={{ marginTop: 4 }}>
                 {todo.tags.split(',').map((tag, idx) => (
-                  <Tag key={idx} size="small" style={{ fontSize: '11px' }}>
+                  <Tag key={idx} style={{ fontSize: '11px' }}>
                     🏷️ {tag.trim()}
                   </Tag>
                 ))}
@@ -358,7 +358,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
                       <Badge count={index + 1} style={{ backgroundColor: '#52c41a' }} />
                       <Text strong>{todo.title}</Text>
                       <Tag color="gold">评分: {qualityScore}分</Tag>
-                      <Tag color={getPriorityColor(todo.priority)} size="small">
+                      <Tag color={getPriorityColor(todo.priority)}>
                         {getPriorityText(todo.priority)}
                       </Tag>
                     </Space>

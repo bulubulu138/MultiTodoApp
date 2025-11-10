@@ -781,7 +781,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       if (searchCacheRef.current.size >= 50) {
         // 删除最旧的缓存项
         const firstKey = searchCacheRef.current.keys().next().value;
-        searchCacheRef.current.delete(firstKey);
+        if (firstKey !== undefined) {
+          searchCacheRef.current.delete(firstKey);
+        }
       }
       searchCacheRef.current.set(cacheKey, [...filtered]);
     }
