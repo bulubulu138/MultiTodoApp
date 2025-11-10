@@ -70,6 +70,14 @@ export class DatabaseManager {
       `CREATE INDEX IF NOT EXISTS idx_relations_source ON todo_relations(source_id)`,
       `CREATE INDEX IF NOT EXISTS idx_relations_target ON todo_relations(target_id)`,
       `CREATE INDEX IF NOT EXISTS idx_relations_type ON todo_relations(relation_type)`,
+
+      // 优化：为搜索字段添加索引，提升搜索性能
+      `CREATE INDEX IF NOT EXISTS idx_todos_title ON todos(title)`,
+      `CREATE INDEX IF NOT EXISTS idx_todos_content ON todos(content)`,
+      `CREATE INDEX IF NOT EXISTS idx_todos_status ON todos(status)`,
+      `CREATE INDEX IF NOT EXISTS idx_todos_created_at ON todos(createdAt)`,
+      `CREATE INDEX IF NOT EXISTS idx_todos_priority ON todos(priority)`,
+      `CREATE INDEX IF NOT EXISTS idx_todos_completed_at ON todos(completedAt)`,
       
       `CREATE TABLE IF NOT EXISTS notes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -417,13 +425,104 @@ export class DatabaseManager {
   public searchTodos(keyword: string): Promise<Todo[]> {
     return new Promise((resolve, reject) => {
       try {
-        const query = `%${keyword}%`;
+        // 性能优化：限制搜索关键词长度
+        if (!keyword || keyword.trim().length === 0) {
+          resolve([]);
+          return;
+        }
+
+        const searchKeyword = keyword.trim();
+        const query = `%${searchKeyword}%`;
+
+        // 优化查询：使用更高效的SQL，并限制结果数量
         const rows = this.db!.prepare(
-          'SELECT * FROM todos WHERE title LIKE ? OR content LIKE ? ORDER BY createdAt DESC'
-        ).all(query, query) as any[];
-        
+          `SELECT * FROM todos
+           WHERE title LIKE ? OR content LIKE ?
+           ORDER BY
+             CASE WHEN title LIKE ? THEN 1 ELSE 2 END, -- 标题匹配优先
+             createdAt DESC
+           LIMIT 1000` -- 限制最大结果数，避免性能问题
+        ).all(query, query, query) as any[];
+
         resolve(rows.map(row => this.parseTodo(row)));
       } catch (error) {
+        console.error('搜索失败:', error);
+        reject(error);
+      }
+    });
+  }
+
+  // 新增：高级搜索方法（支持多条件过滤）
+  public advancedSearch(options: {
+    keyword?: string;
+    status?: string;
+    priority?: string;
+    tags?: string[];
+    dateRange?: {
+      start?: string;
+      end?: string;
+    };
+    limit?: number;
+  }): Promise<Todo[]> {
+    return new Promise((resolve, reject) => {
+      try {
+        const conditions = [];
+        const params = [];
+
+        // 关键词搜索
+        if (options.keyword && options.keyword.trim()) {
+          const keyword = options.keyword.trim();
+          const query = `%${keyword}%`;
+          conditions.push('(title LIKE ? OR content LIKE ?)');
+          params.push(query, query);
+        }
+
+        // 状态过滤
+        if (options.status) {
+          conditions.push('status = ?');
+          params.push(options.status);
+        }
+
+        // 优先级过滤
+        if (options.priority) {
+          conditions.push('priority = ?');
+          params.push(options.priority);
+        }
+
+        // 标签过滤
+        if (options.tags && options.tags.length > 0) {
+          const tagConditions = options.tags.map(() => 'tags LIKE ?').join(' OR ');
+          conditions.push(`(${tagConditions})`);
+          options.tags.forEach(tag => params.push(`%${tag}%`));
+        }
+
+        // 日期范围过滤
+        if (options.dateRange) {
+          if (options.dateRange.start) {
+            conditions.push('createdAt >= ?');
+            params.push(options.dateRange.start);
+          }
+          if (options.dateRange.end) {
+            conditions.push('createdAt <= ?');
+            params.push(options.dateRange.end);
+          }
+        }
+
+        // 构建完整查询
+        let query = 'SELECT * FROM todos';
+        if (conditions.length > 0) {
+          query += ' WHERE ' + conditions.join(' AND ');
+        }
+
+        // 添加排序和限制
+        query += ' ORDER BY createdAt DESC';
+        const limit = options.limit || 1000;
+        query += ` LIMIT ${limit}`;
+
+        const rows = this.db!.prepare(query).all(...params) as any[];
+        resolve(rows.map(row => this.parseTodo(row)));
+      } catch (error) {
+        console.error('高级搜索失败:', error);
         reject(error);
       }
     });

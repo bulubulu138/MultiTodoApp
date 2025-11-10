@@ -7,7 +7,7 @@ import { Todo, TodoRelation } from '../../shared/types';
 import { SortOption } from '../components/Toolbar';
 
 /**
- * 使用 DFS 构建并列关系分组
+ * 使用迭代算法构建并列关系分组（性能优化版）
  * 返回 Map: todoId -> Set<todoId> (该待办所属的分组)
  */
 export function buildParallelGroups(
@@ -17,34 +17,52 @@ export function buildParallelGroups(
   const groups = new Map<number, Set<number>>();
   const visited = new Set<number>();
 
-  const dfs = (todoId: number, groupSet: Set<number>) => {
-    if (visited.has(todoId)) return;
-    visited.add(todoId);
-    groupSet.add(todoId);
+  // 预处理并列关系，构建邻接表
+  const parallelRelations = relations.filter(r => r.relation_type === 'parallel');
+  const adjacencyMap = new Map<number, Set<number>>();
 
-    // 找到所有与该 todo 有并列关系的其他 todo
-    const relatedIds = relations
-      .filter(r => r.relation_type === 'parallel')
-      .filter(r => r.source_id === todoId || r.target_id === todoId)
-      .map(r => (r.source_id === todoId ? r.target_id : r.source_id));
+  parallelRelations.forEach(r => {
+    if (!adjacencyMap.has(r.source_id)) {
+      adjacencyMap.set(r.source_id, new Set());
+    }
+    if (!adjacencyMap.has(r.target_id)) {
+      adjacencyMap.set(r.target_id, new Set());
+    }
+    adjacencyMap.get(r.source_id)!.add(r.target_id);
+    adjacencyMap.get(r.target_id)!.add(r.source_id);
+  });
 
-    relatedIds.forEach(relatedId => dfs(relatedId, groupSet));
-  };
-
+  // 使用迭代BFS替代递归DFS
   todos.forEach(todo => {
-    if (!visited.has(todo.id!)) {
-      const parallelRels = relations.filter(
-        r =>
-          r.relation_type === 'parallel' &&
-          (r.source_id === todo.id || r.target_id === todo.id)
-      );
+    const todoId = todo.id!;
+    if (visited.has(todoId)) return;
 
-      if (parallelRels.length > 0) {
-        const groupSet = new Set<number>();
-        dfs(todo.id!, groupSet);
-        groupSet.forEach(id => groups.set(id, groupSet));
+    // 检查是否有并列关系
+    if (!adjacencyMap.has(todoId)) return;
+
+    const groupSet = new Set<number>();
+    const stack = [todoId];
+
+    while (stack.length > 0) {
+      const currentId = stack.pop()!;
+      if (visited.has(currentId)) continue;
+
+      visited.add(currentId);
+      groupSet.add(currentId);
+
+      // 添加所有相邻节点到栈中
+      const neighbors = adjacencyMap.get(currentId);
+      if (neighbors) {
+        neighbors.forEach(neighborId => {
+          if (!visited.has(neighborId)) {
+            stack.push(neighborId);
+          }
+        });
       }
     }
+
+    // 为组内所有成员设置分组
+    groupSet.forEach(id => groups.set(id, groupSet));
   });
 
   return groups;
@@ -129,43 +147,55 @@ export function sortWithGroups(
   return sortedGroups.flatMap(([_, todos]) => todos);
 }
 
+// 缓存时间戳以提升性能
+const timestampCache = new Map<string, number>();
+
+function getTimestamp(dateString: string): number {
+  if (timestampCache.has(dateString)) {
+    return timestampCache.get(dateString)!;
+  }
+
+  const timestamp = new Date(dateString).getTime();
+  timestampCache.set(dateString, timestamp);
+  return timestamp;
+}
+
 /**
- * 获取排序比较器
+ * 获取排序比较器（性能优化版）
  */
 export function getSortComparator(sortOption: SortOption): (a: Todo, b: Todo) => number {
   switch (sortOption) {
     case 'createdAt-asc':
-      return (a, b) =>
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      return (a, b) => getTimestamp(a.createdAt) - getTimestamp(b.createdAt);
     case 'createdAt-desc':
-      return (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      return (a, b) => getTimestamp(b.createdAt) - getTimestamp(a.createdAt);
     case 'updatedAt-asc':
-      return (a, b) =>
-        new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+      return (a, b) => getTimestamp(a.updatedAt) - getTimestamp(b.updatedAt);
     case 'updatedAt-desc':
-      return (a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      return (a, b) => getTimestamp(b.updatedAt) - getTimestamp(a.updatedAt);
     case 'deadline-asc':
       return (a, b) => {
         if (!a.deadline && !b.deadline) return 0;
         if (!a.deadline) return 1;
         if (!b.deadline) return -1;
-        return (
-          new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
-        );
+        return getTimestamp(a.deadline) - getTimestamp(b.deadline);
       };
     case 'deadline-desc':
       return (a, b) => {
         if (!a.deadline && !b.deadline) return 0;
         if (!a.deadline) return 1;
         if (!b.deadline) return -1;
-        return (
-          new Date(b.deadline).getTime() - new Date(a.deadline).getTime()
-        );
+        return getTimestamp(b.deadline) - getTimestamp(a.deadline);
       };
     default:
       return () => 0;
   }
+}
+
+/**
+ * 清理时间戳缓存（用于内存管理）
+ */
+export function clearTimestampCache(): void {
+  timestampCache.clear();
 }
 

@@ -1,11 +1,13 @@
 import React from 'react';
-import { Card, Row, Col, Statistic, List, Tag, Empty, Typography, Space, Table } from 'antd';
-import { CheckCircleOutlined, ClockCircleOutlined, FileAddOutlined, RiseOutlined } from '@ant-design/icons';
+import { Card, Row, Col, Statistic, List, Tag, Empty, Typography, Space, Table, Collapse, Timeline, Badge } from 'antd';
+import { CheckCircleOutlined, ClockCircleOutlined, FileAddOutlined, RiseOutlined, TrophyOutlined, FireOutlined } from '@ant-design/icons';
 import { WeeklyStats } from '../utils/reportGenerator';
 import { Todo } from '../../shared/types';
 import { useThemeColors } from '../hooks/useThemeColors';
+import dayjs from 'dayjs';
 
 const { Text, Title } = Typography;
+const { Panel } = Collapse;
 
 interface WeeklyReportProps {
   stats: WeeklyStats;
@@ -52,6 +54,43 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
     }
   };
 
+  // 计算任务耗时
+  const calculateTaskDuration = (todo: Todo): string => {
+    if (!todo.createdAt || !todo.completedAt) return '未知';
+
+    const start = dayjs(todo.createdAt);
+    const end = dayjs(todo.completedAt);
+    const durationMs = end.diff(start);
+
+    const hours = Math.floor(durationMs / (1000 * 60 * 60));
+    const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (hours > 0) {
+      return `${hours}h${minutes > 0 ? minutes + 'm' : ''}`;
+    } else if (minutes > 0) {
+      return `${minutes}m`;
+    } else {
+      return '<1m';
+    }
+  };
+
+  // 获取截止时间状态
+  const getDeadlineStatus = (todo: Todo): { text: string; color: string } => {
+    if (!todo.deadline || !todo.completedAt) return { text: '', color: '' };
+
+    const deadline = dayjs(todo.deadline);
+    const completedAt = dayjs(todo.completedAt);
+    const diffHours = deadline.diff(completedAt, 'hour');
+
+    if (diffHours > 0) {
+      return { text: `🎉 提前${diffHours}h`, color: 'green' };
+    } else if (diffHours >= -24) {
+      return { text: '✅ 按时', color: 'blue' };
+    } else {
+      return { text: `⚠️ 延期${Math.abs(diffHours)}h`, color: 'red' };
+    }
+  };
+
   // 每日统计表格列
   const dailyColumns = [
     {
@@ -79,6 +118,65 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
       ),
     },
   ];
+
+  // 渲染完成的任务详细信息
+  const renderCompletedTodoItem = (todo: Todo, index: number) => {
+    const deadlineStatus = getDeadlineStatus(todo);
+    const duration = calculateTaskDuration(todo);
+
+    return (
+      <Timeline.Item
+        key={todo.id}
+        color="green"
+        dot={<CheckCircleOutlined />}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Space direction="vertical" size={4} style={{ width: '100%' }}>
+            <Space>
+              <Text strong style={{ fontSize: '14px' }}>{todo.title}</Text>
+              <Tag color={getPriorityColor(todo.priority)} size="small">
+                {getPriorityText(todo.priority)}
+              </Tag>
+            </Space>
+
+            <Space size="small">
+              <Text type="secondary" style={{ fontSize: '12px' }}>
+                完成时间: {dayjs(todo.completedAt).format('MM-DD HH:mm')}
+              </Text>
+              <Text type="secondary" style={{ fontSize: '12px' }}>
+                耗时: <Text code>{duration}</Text>
+              </Text>
+              {deadlineStatus.text && (
+                <Tag color={deadlineStatus.color} size="small">
+                  {deadlineStatus.text}
+                </Tag>
+              )}
+            </Space>
+
+            {todo.content && todo.content.trim().length > 0 && (
+              <Text
+                type="secondary"
+                style={{ fontSize: '12px', display: 'block', marginTop: 4 }}
+                ellipsis={{ tooltip: todo.content }}
+              >
+                {todo.content}
+              </Text>
+            )}
+
+            {todo.tags && todo.tags.trim().length > 0 && (
+              <div style={{ marginTop: 4 }}>
+                {todo.tags.split(',').map((tag, idx) => (
+                  <Tag key={idx} size="small" style={{ fontSize: '11px' }}>
+                    🏷️ {tag.trim()}
+                  </Tag>
+                ))}
+              </div>
+            )}
+          </Space>
+        </div>
+      </Timeline.Item>
+    );
+  };
 
   const dailyDataSource = Object.values(stats.dailyStats).map((day, index) => ({
     key: day.date,
@@ -118,7 +216,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
     <div style={{ padding: '0 8px' }}>
       {/* 概览统计 */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col span={6}>
+        <Col span={4}>
           <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
             <Statistic
               title="创建待办"
@@ -129,7 +227,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
             />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col span={4}>
           <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
             <Statistic
               title="完成待办"
@@ -140,7 +238,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
             />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col span={4}>
           <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
             <Statistic
               title="完成率"
@@ -150,7 +248,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
             />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col span={4}>
           <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
             <Statistic
               title="日均完成"
@@ -158,6 +256,28 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
               prefix={<RiseOutlined />}
               suffix="个"
               valueStyle={{ color: '#722ed1' }}
+            />
+          </Card>
+        </Col>
+        <Col span={4}>
+          <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
+            <Statistic
+              title="质量评分"
+              value={stats.qualityMetrics.avgQualityScore}
+              prefix={<TrophyOutlined />}
+              suffix="分"
+              valueStyle={{ color: '#fa541c' }}
+            />
+          </Card>
+        </Col>
+        <Col span={4}>
+          <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
+            <Statistic
+              title="高质量任务"
+              value={stats.qualityMetrics.highQualityCount}
+              prefix={<FireOutlined />}
+              suffix="个"
+              valueStyle={{ color: '#13c2c2' }}
             />
           </Card>
         </Col>
@@ -181,14 +301,84 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
         />
       </Card>
 
-      {/* 重要完成项 */}
+      {/* 本周已完成任务（按时间排序） */}
+      {stats.completed.length > 0 && (
+        <>
+          <Title level={5} style={{ color: colors.textPrimary }}>
+            ✅ 本周已完成任务（按完成时间顺序）
+          </Title>
+          <Card
+            bordered={false}
+            style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
+            bodyStyle={{ padding: '16px' }}
+          >
+            <Collapse
+              ghost
+              items={[
+                {
+                  key: 'completed-tasks',
+                  label: (
+                    <Space>
+                      <Text>查看所有 {stats.completed.length} 个已完成任务</Text>
+                      <Badge count={stats.completed.length} showZero />
+                    </Space>
+                  ),
+                  children: (
+                    <Timeline style={{ marginTop: 16 }}>
+                      {stats.completed.map(renderCompletedTodoItem)}
+                    </Timeline>
+                  ),
+                }
+              ]}
+              defaultActiveKey={[]}
+            />
+          </Card>
+        </>
+      )}
+
+      {/* 高质量任务展示 */}
+      {stats.completedByQuality.length > 0 && (
+        <>
+          <Title level={5} style={{ color: colors.textPrimary }}>
+            🌟 本周高质量任务（按质量评分排序）
+          </Title>
+          <Card
+            bordered={false}
+            style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
+            bodyStyle={{ padding: '12px' }}
+          >
+            <List
+              size="small"
+              dataSource={stats.completedByQuality.slice(0, 5)}
+              renderItem={(todo, index) => {
+                const qualityScore = (todo as any).qualityScore || 0;
+                return (
+                  <List.Item>
+                    <Space>
+                      <Badge count={index + 1} style={{ backgroundColor: '#52c41a' }} />
+                      <Text strong>{todo.title}</Text>
+                      <Tag color="gold">评分: {qualityScore}分</Tag>
+                      <Tag color={getPriorityColor(todo.priority)} size="small">
+                        {getPriorityText(todo.priority)}
+                      </Tag>
+                    </Space>
+                  </List.Item>
+                );
+              }}
+              locale={{ emptyText: <Empty description="暂无数据" /> }}
+            />
+          </Card>
+        </>
+      )}
+
+      {/* 重要完成项（保留原有功能） */}
       {stats.highPriorityCompleted.length > 0 && (
         <>
           <Title level={5} style={{ color: colors.textPrimary }}>
             ⭐ 重要完成项（高优先级）
           </Title>
-          <Card 
-            bordered={false} 
+          <Card
+            bordered={false}
             style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
             bodyStyle={{ padding: '12px' }}
           >

@@ -59,7 +59,11 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const [showHotkeyGuide, setShowHotkeyGuide] = useState(false);
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearchText, setDebouncedSearchText] = useState<string>('');
-  
+
+  // 搜索结果缓存 - 提升搜索性能
+  const searchCacheRef = useRef<Map<string, Todo[]>>(new Map());
+  const searchInputTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // 保存状态追踪（用于专注模式的乐观更新）
   const savingTodosRef = useRef<Set<number>>(new Set());
   const pendingSavesRef = useRef<Map<number, Promise<void>>>(new Map());
@@ -77,7 +81,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   // 监听快速创建待办事件
   useEffect(() => {
     const handleQuickCreate = (data: { content: string }) => {
-      console.log('收到快速创建事件:', data);
       // 打开创建表单
       setShowForm(true);
       setEditingTodo(null); // 确保是创建模式
@@ -108,13 +111,28 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     }
   }, []);
 
-  // 搜索防抖 - 避免频繁触发过滤计算
+  // 搜索防抖 - 优化到200ms，提升响应速度
   useEffect(() => {
-    const timer = setTimeout(() => {
+    // 清除之前的定时器
+    if (searchInputTimerRef.current) {
+      clearTimeout(searchInputTimerRef.current);
+    }
+
+    searchInputTimerRef.current = setTimeout(() => {
       setDebouncedSearchText(searchText);
-    }, 300);
-    return () => clearTimeout(timer);
+    }, 200); // 优化：从300ms减少到200ms
+
+    return () => {
+      if (searchInputTimerRef.current) {
+        clearTimeout(searchInputTimerRef.current);
+      }
+    };
   }, [searchText]);
+
+  // 清理搜索缓存（当待办数据变化时）
+  useEffect(() => {
+    searchCacheRef.current.clear();
+  }, [todos]);
 
   // 监听页面可见性变化，页面隐藏时自动保存
   useEffect(() => {
@@ -307,10 +325,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     saveTabSettings(newSettings);
   }, [tabSettings, activeTab, getCurrentTabSettings]);
 
-  // 监听 Tab 切换，输出当前设置（便于调试）
+  // 监听 Tab 切换
   useEffect(() => {
     const settings = getCurrentTabSettings();
-    console.log(`[Tab切换] ${activeTab}:`, settings);
+    // Tab切换逻辑处理
   }, [activeTab, getCurrentTabSettings]);
 
   const handleCreateTodo = async (
@@ -535,13 +553,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         throw new Error('Todo not found');
       }
       
-      console.log('[DEBUG] 更新序号:', {
-        todoId: id,
-        tabKey,
-        displayOrder,
-        currentDisplayOrders: todo.displayOrders
-      });
-      
       // 更新指定 tab 的序号
       const newDisplayOrders = { ...(todo.displayOrders || {}) };
       if (displayOrder === null) {
@@ -549,13 +560,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       } else {
         newDisplayOrders[tabKey] = displayOrder;
       }
-      
-      console.log('[DEBUG] 新的 displayOrders:', newDisplayOrders);
-      
+
       await window.electronAPI.todo.update(id, { displayOrders: newDisplayOrders });
       await loadTodos();
-      
-      console.log('[DEBUG] 数据已重新加载');
       message.success('排序已更新');
     } catch (error) {
       message.error('更新排序失败');
@@ -686,9 +693,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     // 获取当前 Tab 的排序设置
     const currentSettings = getCurrentTabSettings();
     const sortOption = currentSettings.sortOption;
-    
+
     const validTodos = todos.filter(todo => todo && todo.id);
-    
+
     // 处理自定义标签Tab
     let filtered: Todo[];
     if (activeTab.startsWith('tag:')) {
@@ -703,52 +710,95 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     } else {
       filtered = activeTab === 'all' ? validTodos : validTodos.filter(todo => todo.status === activeTab);
     }
-    
-    // 应用搜索过滤（搜索标题和内容）
+
+    // 应用搜索过滤（带缓存优化）
     if (debouncedSearchText.trim()) {
       const searchLower = debouncedSearchText.toLowerCase();
+      const cacheKey = `${activeTab}-${sortOption}-${searchLower}`;
+
+      // 检查缓存
+      if (searchCacheRef.current.has(cacheKey)) {
+        const cachedResult = searchCacheRef.current.get(cacheKey)!;
+
+        // 构建并列分组（用于所有排序模式）
+        const parallelGroups = buildParallelGroups(cachedResult, relations);
+
+        // 如果是手动排序，应用手动排序逻辑
+        if (sortOption === 'manual') {
+          // 分为有序号和无序号两组
+          const withOrder = cachedResult.filter(todo =>
+            todo.displayOrders && todo.displayOrders[activeTab] != null
+          );
+          const withoutOrder = cachedResult.filter(todo =>
+            !todo.displayOrders || todo.displayOrders[activeTab] == null
+          );
+
+          const manualComparator = (a: Todo, b: Todo) => {
+            const orderA = a.displayOrders?.[activeTab];
+            const orderB = b.displayOrders?.[activeTab];
+            if (orderA != null && orderB != null) {
+              if (orderA !== orderB) return orderA - orderB;
+            }
+            return (a.id || 0) - (b.id || 0);
+          };
+
+          const groupRepresentatives = selectGroupRepresentatives(parallelGroups, cachedResult, manualComparator);
+          const sorted = sortWithGroups(withOrder, parallelGroups, groupRepresentatives, (a, b) => {
+            const orderA = a.displayOrders![activeTab]!;
+            const orderB = b.displayOrders![activeTab]!;
+            if (orderA !== orderB) return orderA - orderB;
+            return (a.id || 0) - (b.id || 0);
+          });
+
+          const sortedWithoutOrder = sortWithGroups(withoutOrder, parallelGroups, groupRepresentatives, (a, b) => {
+            const aTime = new Date(a.createdAt).getTime();
+            const bTime = new Date(b.createdAt).getTime();
+            return bTime - aTime;
+          });
+
+          return [...sorted, ...sortedWithoutOrder];
+        }
+
+        // 其他排序模式
+        const comparator = getSortComparator(sortOption);
+        const groupRepresentatives = selectGroupRepresentatives(parallelGroups, cachedResult, comparator);
+        return sortWithGroups(cachedResult, parallelGroups, groupRepresentatives, comparator);
+      }
+
+      // 缓存未命中，执行搜索
+      const searchStartTime = performance.now();
+
       filtered = filtered.filter(todo => {
         const titleMatch = todo.title?.toLowerCase().includes(searchLower);
         const contentMatch = todo.content?.toLowerCase().includes(searchLower);
         return titleMatch || contentMatch;
       });
+
+      const searchEndTime = performance.now();
+      console.log(`[搜索] 搜索耗时: ${(searchEndTime - searchStartTime).toFixed(2)}ms, 结果数量: ${filtered.length}`);
+
+      // 缓存搜索结果（限制缓存大小）
+      if (searchCacheRef.current.size >= 50) {
+        // 删除最旧的缓存项
+        const firstKey = searchCacheRef.current.keys().next().value;
+        searchCacheRef.current.delete(firstKey);
+      }
+      searchCacheRef.current.set(cacheKey, [...filtered]);
     }
     
     // 构建并列分组（用于所有排序模式）
     const parallelGroups = buildParallelGroups(filtered, relations);
     
-    console.log('[DEBUG] parallelGroups size:', parallelGroups.size);
-    if (parallelGroups.size > 0) {
-      console.log('[DEBUG] parallelGroups:', Array.from(parallelGroups.entries()).map(([id, set]) => ({
-        todoId: id,
-        groupIds: Array.from(set)
-      })));
-    }
-    
     // 手动排序模式（使用新的 displayOrders）
     if (sortOption === 'manual') {
-      console.log('[DEBUG] 手动排序模式, activeTab:', activeTab);
-      console.log('[DEBUG] filtered todos:', filtered.map(t => ({ 
-        id: t.id, 
-        title: t.title, 
-        displayOrders: t.displayOrders 
-      })));
-      
       // 分为有序号和无序号两组（检查当前 tab 的序号）
-      const withOrder = filtered.filter(todo => 
+      const withOrder = filtered.filter(todo =>
         todo.displayOrders && todo.displayOrders[activeTab] != null
       );
-      const withoutOrder = filtered.filter(todo => 
+      const withoutOrder = filtered.filter(todo =>
         !todo.displayOrders || todo.displayOrders[activeTab] == null
       );
-      
-      console.log('[DEBUG] withOrder count:', withOrder.length);
-      console.log('[DEBUG] withoutOrder count:', withoutOrder.length);
-      console.log('[DEBUG] withOrder todos:', withOrder.map(t => ({
-        id: t.id,
-        order: t.displayOrders![activeTab]
-      })));
-      
+
       // 手动排序模式：使用序号比较器选择代表（序号相同时用 ID）
       const manualComparator = (a: Todo, b: Todo) => {
         const orderA = a.displayOrders?.[activeTab];
@@ -761,8 +811,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         return (a.id || 0) - (b.id || 0);
       };
       const groupRepresentatives = selectGroupRepresentatives(parallelGroups, filtered, manualComparator);
-      console.log('[DEBUG] groupRepresentatives size:', groupRepresentatives.size);
-      
+
       // 使用分组排序（保持并列待办在一起）
       const sorted = sortWithGroups(withOrder, parallelGroups, groupRepresentatives, (a, b) => {
         const orderA = a.displayOrders![activeTab]!;
@@ -770,53 +819,27 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         if (orderA !== orderB) return orderA - orderB;
         return (a.id || 0) - (b.id || 0);
       });
-      
-      console.log('[DEBUG] sorted (有序号):', sorted.map(t => ({
-        id: t.id,
-        order: t.displayOrders![activeTab]
-      })));
-      
+
       // 无序号的按创建时间降序排序（也保持分组）
       const sortedWithoutOrder = sortWithGroups(withoutOrder, parallelGroups, groupRepresentatives, (a, b) => {
         const aTime = new Date(a.createdAt).getTime();
         const bTime = new Date(b.createdAt).getTime();
         return bTime - aTime;
       });
-      
-      console.log('[DEBUG] sortedWithoutOrder (无序号):', sortedWithoutOrder.map(t => t.id));
-      
+
       // 合并：有序号的在前，无序号的在后
-      const result = [...sorted, ...sortedWithoutOrder];
-      console.log('[DEBUG] 排序后结果:', result.map(t => ({
-        id: t.id,
-        title: t.title.substring(0, 10),
-        order: t.displayOrders?.[activeTab]
-      })));
-      return result;
+      return [...sorted, ...sortedWithoutOrder];
     }
-    
+
     // 其他排序模式：直接使用分组排序
-    // 不再分为逾期/活跃/已完成三组，避免拆散并列待办
-    console.log('[DEBUG] 非手动排序模式, sortOption:', sortOption);
-    
     // 获取排序比较器
     const comparator = getSortComparator(sortOption);
-    
+
     // 使用时间比较器选择代表
     const groupRepresentatives = selectGroupRepresentatives(parallelGroups, filtered, comparator);
-    console.log('[DEBUG] groupRepresentatives size:', groupRepresentatives.size);
-    
+
     // 直接对所有待办进行分组排序
-    const result = sortWithGroups(filtered, parallelGroups, groupRepresentatives, comparator);
-    
-    console.log('[DEBUG] 排序后结果:', result.map(t => ({
-      id: t.id,
-      title: t.title.substring(0, 10),
-      createdAt: t.createdAt,
-      status: t.status
-    })));
-    
-    return result;
+    return sortWithGroups(filtered, parallelGroups, groupRepresentatives, comparator);
   }, [todos, activeTab, tabSettings, relations, getCurrentTabSettings, debouncedSearchText]);
 
   // Tab配置
@@ -860,15 +883,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
           const tags = todo.tags.split(',')
             .map(t => t.trim().toLowerCase())
             .filter(Boolean);
-          const matches = tags.includes(targetTag);
-          
-          // 调试日志
-          console.log(`[Tab ${tab.label}] tag="${tagValue}", todo ${todo.id} tags=[${todo.tags}], matches=${matches}`);
-          
-          return matches;
+          return tags.includes(targetTag);
         }).length;
-
-        console.log(`[Tab ${tab.label}] Final count: ${count}`);
 
         return {
           key: `tag:${tagValue}`,
