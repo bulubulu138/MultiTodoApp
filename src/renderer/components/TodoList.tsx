@@ -31,6 +31,7 @@ interface TodoListProps {
   onUpdateDisplayOrder?: (id: number, tabKey: string, order: number | null) => Promise<void>; // 更新显示序号
   viewMode?: ViewMode; // 视图模式
   onUpdateInPlace?: (id: number, updates: Partial<Todo>) => void; // 专注模式专用：乐观更新
+  enableVirtualScroll?: boolean; // 是否启用虚拟滚动
 }
 
 // 性能优化：使用 React.memo 避免不必要的重渲染
@@ -48,7 +49,8 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   activeTab,
   onUpdateDisplayOrder,
   viewMode = 'card',
-  onUpdateInPlace
+  onUpdateInPlace,
+  enableVirtualScroll = false
 }) => {
   const { message } = App.useApp();
   const colors = useThemeColors();
@@ -398,6 +400,11 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
       />
     );
   }
+
+  // 虚拟滚动功能暂时禁用，后续优化
+  // if (enableVirtualScroll && todos.length > 20) {
+  //   // 虚拟滚动实现
+  // }
 
   return (
     <>
