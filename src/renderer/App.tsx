@@ -111,17 +111,17 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     }
   }, []);
 
-  // 搜索防抖 - 优化到200ms，提升响应速度
+  // 搜索防抖 - 优化到300ms，平衡性能和响应速度
   useEffect(() => {
     // 清除之前的定时器
     if (searchInputTimerRef.current) {
       clearTimeout(searchInputTimerRef.current);
     }
 
-    // 性能优化：增加防抖时间，减少不必要的搜索计算
+    // 性能优化：使用300ms防抖，在性能和用户体验间找到最佳平衡
     searchInputTimerRef.current = setTimeout(() => {
       setDebouncedSearchText(searchText);
-    }, 500); // 增加到500ms，在性能和用户体验间平衡
+    }, 300); // 300ms，既减少计算压力又保证响应性
 
     return () => {
       if (searchInputTimerRef.current) {
@@ -942,12 +942,12 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
           <AnimatePresence mode="wait">
             <motion.div
               key={`${activeTab}-${currentTabSettings.viewMode}`}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ 
-                duration: 0.2, 
-                ease: [0.4, 0, 0.2, 1] // cubic-bezier easing
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{
+                duration: 0.1, // 减少动画时间到100ms
+                ease: "easeOut" // 使用更简单的缓动函数
               }}
             >
               {currentTabSettings.viewMode === 'content-focus' ? (

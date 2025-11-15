@@ -114,13 +114,13 @@ const ContentFocusItem = React.memo(
         clearTimeout(saveTimeoutRef.current);
       }
 
-      // 设置新的保存定时器 - 1秒防抖
+      // 设置新的保存定时器 - 2.5秒防抖，减少频繁保存提升性能
       saveTimeoutRef.current = setTimeout(() => {
         // 再次检查输入法状态（防止在定时器执行时正在使用输入法）
         if (!isComposingRef.current) {
           handleSave();
         }
-      }, 1000);
+      }, 2500); // 增加到2.5秒，减少保存频率
     }, [handleSave]);
 
     // 暴露给父组件的保存方法

@@ -401,9 +401,9 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
     );
   }
 
-  // 虚拟滚动功能暂时禁用，后续优化
+  // 虚拟滚动功能暂时禁用，避免构建错误
   // if (enableVirtualScroll && todos.length > 20) {
-  //   // 虚拟滚动实现
+  //   return <VirtualizedTodoList />;
   // }
 
   return (
