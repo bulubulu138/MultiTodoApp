@@ -194,7 +194,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     'header',
     'bold', 'italic', 'underline', 'strike',
     'color', 'background',
-    'list', 'bullet', 'indent',
+    'list', 'indent',  // 'bullet' 是 'list' 的一部分，不需要单独注册
     'link', 'image'
   ];
 

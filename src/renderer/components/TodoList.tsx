@@ -559,7 +559,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                   flex: 1,
                   borderLeft: hasParallel ? '4px solid #fa8c16' : undefined
                 }}
-                bodyStyle={{ padding: '8px' }}
+                styles={{ body: { padding: '8px' } }}
                 bordered={false}
               >
               {/* 标题行：标题 + 标签 + 操作按钮 */}
@@ -698,20 +698,9 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                 </div>
               )}
 
-              {/* 内容预览 - 仅显示第一行纯文本 */}
+              {/* 内容预览 - 使用优化的纯文本显示 */}
               {todo.content && (
-                <div 
-                  className="todo-content-preview"
-                  style={{
-                    marginBottom: 6,
-                    color: '#666',
-                    fontSize: 13,
-                    lineHeight: '20px',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
+                <div style={{ marginBottom: 6 }}>
                   {getFirstLine(extractPlainText(todo.content))}
                 </div>
               )}

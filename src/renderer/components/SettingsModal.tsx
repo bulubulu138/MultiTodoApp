@@ -504,7 +504,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       okText={activeTab === 'general' || activeTab === 'ai' ? '保存' : '关闭'}
       cancelText={(activeTab === 'general' || activeTab === 'ai') ? '取消' : undefined}
       width={800}
-      bodyStyle={{ padding: '16px 24px' }}
+      styles={{ body: { padding: '16px 24px' } }}
     >
       <Tabs
         activeKey={activeTab}

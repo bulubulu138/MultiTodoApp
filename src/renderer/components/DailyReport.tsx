@@ -154,7 +154,7 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
           <Card 
             bordered={false} 
             style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
-            bodyStyle={{ padding: '12px' }}
+            styles={{ body: { padding: '12px' } }}
           >
             <List
               size="small"
@@ -175,7 +175,7 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
           <Card 
             bordered={false} 
             style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
-            bodyStyle={{ padding: '12px' }}
+            styles={{ body: { padding: '12px' } }}
           >
             <List
               size="small"
@@ -196,7 +196,7 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
           <Card 
             bordered={false} 
             style={{ marginBottom: 16, backgroundColor: colors.cardBg, borderLeft: '3px solid #ff4d4f' }}
-            bodyStyle={{ padding: '12px' }}
+            styles={{ body: { padding: '12px' } }}
           >
             <List
               size="small"
@@ -217,7 +217,7 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
           <Card 
             bordered={false} 
             style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
-            bodyStyle={{ padding: '12px' }}
+            styles={{ body: { padding: '12px' } }}
           >
             <List
               size="small"

@@ -290,7 +290,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
       <Card 
         bordered={false} 
         style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
-        bodyStyle={{ padding: '12px' }}
+        styles={{ body: { padding: '12px' } }}
       >
         <Table
           size="small"
@@ -310,7 +310,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
           <Card
             bordered={false}
             style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
-            bodyStyle={{ padding: '16px' }}
+            styles={{ body: { padding: '16px' } }}
           >
             <Collapse
               ghost
@@ -345,7 +345,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
           <Card
             bordered={false}
             style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
-            bodyStyle={{ padding: '12px' }}
+            styles={{ body: { padding: '12px' } }}
           >
             <List
               size="small"
@@ -380,7 +380,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
           <Card
             bordered={false}
             style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
-            bodyStyle={{ padding: '12px' }}
+            styles={{ body: { padding: '12px' } }}
           >
             <List
               size="small"
@@ -401,7 +401,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
           <Card 
             bordered={false} 
             style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
-            bodyStyle={{ padding: '12px' }}
+            styles={{ body: { padding: '12px' } }}
           >
             <List
               size="small"
@@ -420,7 +420,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
       <Card 
         bordered={false} 
         style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
-        bodyStyle={{ padding: '16px' }}
+        styles={{ body: { padding: '16px' } }}
       >
         <Space direction="vertical" size={12}>
           <Text>

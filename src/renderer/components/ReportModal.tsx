@@ -174,7 +174,7 @@ const ReportModal: React.FC<ReportModalProps> = ({
         </Button>,
       ]}
       style={{ top: 20 }}
-      bodyStyle={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', padding: '16px' }}
+      styles={{ body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', padding: '16px' } }}
     >
       {/* 控制栏 */}
       <Space direction="vertical" size={16} style={{ width: '100%', marginBottom: 16 }}>
