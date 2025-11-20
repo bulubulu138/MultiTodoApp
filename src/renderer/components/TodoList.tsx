@@ -8,6 +8,7 @@ import RelationsModal from './RelationsModal';
 import RelationContext from './RelationContext';
 import ContentFocusView from './ContentFocusView';
 import RelationIndicators from './RelationIndicators';
+import VirtualizedTodoList from './VirtualizedTodoList';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { formatCompletedTime } from '../utils/timeFormatter';
@@ -50,7 +51,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   onUpdateDisplayOrder,
   viewMode = 'card',
   onUpdateInPlace,
-  enableVirtualScroll = false
+  enableVirtualScroll = true // 默认启用虚拟滚动以提升性能
 }) => {
   const { message } = App.useApp();
   const colors = useThemeColors();
@@ -401,10 +402,27 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
     );
   }
 
-  // 虚拟滚动功能暂时禁用，避免构建错误
-  // if (enableVirtualScroll && todos.length > 20) {
-  //   return <VirtualizedTodoList />;
-  // }
+  // 启用虚拟滚动来处理大量任务
+  if (enableVirtualScroll && todos.length > 50) {
+    return (
+      <VirtualizedTodoList
+        todos={todos}
+        allTodos={allTodos}
+        loading={loading}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onStatusChange={onStatusChange}
+        onView={onView}
+        relations={relations}
+        onRelationsChange={onRelationsChange}
+        sortOption={sortOption}
+        activeTab={activeTab}
+        onUpdateDisplayOrder={onUpdateDisplayOrder}
+        viewMode={viewMode}
+        onUpdateInPlace={onUpdateInPlace}
+      />
+    );
+  }
 
   return (
     <>
@@ -771,6 +789,16 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
       }}
     />
     </>
+  );
+}, (prevProps, nextProps) => {
+  // 自定义比较函数，只在关键 props 改变时重新渲染
+  return (
+    prevProps.todos.length === nextProps.todos.length &&
+    prevProps.loading === nextProps.loading &&
+    prevProps.activeTab === nextProps.activeTab &&
+    prevProps.sortOption === nextProps.sortOption &&
+    prevProps.viewMode === nextProps.viewMode &&
+    prevProps.enableVirtualScroll === nextProps.enableVirtualScroll
   );
 });
 

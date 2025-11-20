@@ -236,6 +236,126 @@ export class DatabaseManager {
     }
   }
 
+  // 批量操作
+  public bulkUpdateTodos(updates: Array<{id: number; updates: Partial<Todo>}>): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        const transaction = this.db!.transaction(() => {
+          const updateStmt = this.db!.prepare(`
+            UPDATE todos
+            SET
+              title = COALESCE(?, title),
+              content = COALESCE(?, content),
+              status = COALESCE(?, status),
+              priority = COALESCE(?, priority),
+              tags = COALESCE(?, tags),
+              imageUrl = COALESCE(?, imageUrl),
+              images = COALESCE(?, images),
+              startTime = COALESCE(?, startTime),
+              deadline = COALESCE(?, deadline),
+              displayOrders = COALESCE(?, displayOrders),
+              completedAt = CASE
+                WHEN COALESCE(?, status) = 'completed' THEN COALESCE(?, completedAt)
+                WHEN COALESCE(?, status) != 'completed' THEN NULL
+                ELSE completedAt
+              END,
+              updatedAt = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `);
+
+          updates.forEach(({ id, updates }) => {
+            updateStmt.run(
+              updates.title || null,
+              updates.content || null,
+              updates.status || null,
+              updates.priority || null,
+              updates.tags || null,
+              updates.imageUrl || null,
+              updates.images || null,
+              updates.startTime || null,
+              updates.deadline || null,
+              updates.displayOrders ? JSON.stringify(updates.displayOrders) : null,
+              updates.status || null,
+              updates.status === 'completed' ? (updates.completedAt || new Date().toISOString()) : null,
+              updates.status || null,
+              id
+            );
+          });
+        });
+
+        transaction();
+        console.log(`[批量更新] 成功更新 ${updates.length} 个待办事项`);
+        resolve();
+      } catch (error) {
+        console.error('[批量更新] 更新失败:', error);
+        reject(error);
+      }
+    });
+  }
+
+  public bulkUpdateDisplayOrders(updates: Array<{id: number; tabKey: string; displayOrder: number}>): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        const transaction = this.db!.transaction(() => {
+          updates.forEach(({ id, tabKey, displayOrder }) => {
+            // 获取当前的 displayOrders
+            const currentTodo = this.db!.prepare('SELECT displayOrders FROM todos WHERE id = ?').get(id) as any;
+            let displayOrders: {[key: string]: number} = {};
+
+            if (currentTodo && currentTodo.displayOrders) {
+              try {
+                displayOrders = JSON.parse(currentTodo.displayOrders);
+              } catch (e) {
+                console.error('解析 displayOrders 失败:', e);
+              }
+            }
+
+            // 更新指定 tab 的序号
+            displayOrders[tabKey] = displayOrder;
+
+            // 保存更新
+            this.db!.prepare('UPDATE todos SET displayOrders = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?')
+              .run(JSON.stringify(displayOrders), id);
+          });
+        });
+
+        transaction();
+        console.log(`[批量更新] 成功更新 ${updates.length} 个待办事项的显示序号`);
+        resolve();
+      } catch (error) {
+        console.error('[批量更新] 更新显示序号失败:', error);
+        reject(error);
+      }
+    });
+  }
+
+  public bulkDeleteTodos(ids: number[]): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        const transaction = this.db!.transaction(() => {
+          // 首先删除相关的关联关系
+          const deleteRelationsStmt = this.db!.prepare('DELETE FROM todo_relations WHERE source_id = ? OR target_id = ?');
+          ids.forEach(id => {
+            deleteRelationsStmt.run(id, id);
+          });
+
+          // 然后删除待办事项
+          const deleteStmt = this.db!.prepare('DELETE FROM todos WHERE id = ?');
+          ids.forEach(id => {
+            deleteStmt.run(id);
+          });
+        });
+
+        transaction();
+        console.log(`[批量删除] 成功删除 ${ids.length} 个待办事项`);
+        resolve();
+      } catch (error) {
+        console.error('[批量删除] 删除失败:', error);
+        reject(error);
+      }
+    });
+  }
+
   // Todo操作
   public createTodo(todo: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'>): Promise<Todo> {
     return new Promise((resolve, reject) => {

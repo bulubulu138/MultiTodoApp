@@ -395,6 +395,14 @@ class Application {
       return await this.dbManager.batchUpdateDisplayOrders(updates);
     });
 
+    ipcMain.handle('todo:bulkUpdateTodos', async (_, updates: Array<{id: number; updates: any}>) => {
+      return await this.dbManager.bulkUpdateTodos(updates);
+    });
+
+    ipcMain.handle('todo:bulkDeleteTodos', async (_, ids: number[]) => {
+      return await this.dbManager.bulkDeleteTodos(ids);
+    });
+
     // 设置相关
     ipcMain.handle('settings:get', async () => {
       return await this.dbManager.getSettings();
