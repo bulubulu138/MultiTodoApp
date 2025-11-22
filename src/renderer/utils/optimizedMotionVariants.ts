@@ -126,19 +126,19 @@ export const optimizedMotionProps: MotionProps = {
   transition: {
     duration: 0.2, // 默认更短的动画时长
     ease: 'easeOut'
-  },
-
-  // 预设的轻量级过渡
-  lightTransition: {
-    duration: 0.15,
-    ease: 'easeOut'
-  },
-
-  // 预设的中等过渡
-  mediumTransition: {
-    duration: 0.25,
-    ease: 'easeOut'
   }
+};
+
+// 预设的轻量级过渡
+export const lightTransition = {
+  duration: 0.15,
+  ease: 'easeOut'
+};
+
+// 预设的中等过渡
+export const mediumTransition = {
+  duration: 0.25,
+  ease: 'easeOut'
 };
 
 // 动画节流 Hook
