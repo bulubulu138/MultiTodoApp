@@ -12,6 +12,7 @@ import RelationIndicators from './RelationIndicators';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { formatCompletedTime } from '../utils/timeFormatter';
+import { optimizedMotionVariants, shouldReduceMotion } from '../utils/optimizedMotionVariants';
 import dayjs from 'dayjs';
 
 const { Text } = Typography;
@@ -184,11 +185,8 @@ const VirtualizedTodoItem = memo<{
   const currentDisplayOrder = editingOrder ?? (todo.displayOrders?.[activeTab]);
 
   return (
-    <motion.div
+    <div
       style={style}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: index * 0.05 }}
     >
       <Card
         className="todo-card"
@@ -416,7 +414,7 @@ const VirtualizedTodoItem = memo<{
           </div>
         )}
       </Card>
-    </motion.div>
+    </div>
   );
 });
 

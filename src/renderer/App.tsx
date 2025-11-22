@@ -16,6 +16,7 @@ import CustomTabManager from './components/CustomTabManager';
 import ContentFocusView, { ContentFocusViewRef } from './components/ContentFocusView';
 import { getTheme, ThemeMode } from './theme/themes';
 import { buildParallelGroups, selectGroupRepresentatives, sortWithGroups, getSortComparator } from './utils/sortWithGroups';
+import { optimizedMotionVariants, useConditionalAnimation, shouldReduceMotion, useMotionPerformanceMonitor } from './utils/optimizedMotionVariants';
 import dayjs from 'dayjs';
 
 const { Content } = Layout;
@@ -70,6 +71,15 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   
   // ContentFocusView 的 ref，用于切换视图时保存
   const contentFocusRef = useRef<ContentFocusViewRef>(null);
+
+  // 性能监控 - 仅在开发环境启用
+  const { startMonitoring } = useMotionPerformanceMonitor();
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      const cleanup = startMonitoring();
+      return cleanup;
+    }
+  }, [startMonitoring]);
 
   // 加载数据
   useEffect(() => {
@@ -939,16 +949,13 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
           size="large"
         />
         <div style={{ marginTop: 16, position: 'relative' }}>
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="sync">
             <motion.div
               key={`${activeTab}-${currentTabSettings.viewMode}`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{
-                duration: 0.1, // 减少动画时间到100ms
-                ease: "easeOut" // 使用更简单的缓动函数
-              }}
+              variants={shouldReduceMotion() ? {} : optimizedMotionVariants.pageTransition}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
             >
               {currentTabSettings.viewMode === 'content-focus' ? (
                 <ContentFocusView

@@ -1,121 +1,114 @@
 import { Variants, MotionProps } from 'framer-motion';
 import { useRef, useCallback } from 'react';
 
-// 性能优化的动画变体配置
+// 极简性能优化的动画变体配置 - Notion级别丝滑体验
 export const optimizedMotionVariants = {
-  // 轻量级页面切换动画
+  // 极简页面切换动画 - 仅opacity
   pageTransition: {
     hidden: { opacity: 0 },
     visible: { opacity: 1 },
     exit: { opacity: 0 }
   },
 
-  // 简化的列表项动画
+  // 极简列表项动画 - 移除hover效果减少性能损耗
   listItem: {
-    hidden: { opacity: 0, y: 10 },
+    hidden: { opacity: 0 }, // 移除y变换
     visible: {
       opacity: 1,
-      y: 0,
       transition: {
-        duration: 0.2, // 减少动画时长
+        duration: 0.15, // 进一步减少时长
         ease: 'easeOut'
       }
-    },
-    hover: {
-      scale: 1.01, // 减少缩放幅度
-      transition: {
-        duration: 0.15
-      }
     }
+    // 完全移除hover效果以提升性能
   },
 
-  // 简化的卡片动画
+  // 极简卡片动画 - 仅opacity
   card: {
-    hidden: { opacity: 0, y: 20 },
+    hidden: { opacity: 0 }, // 移除y变换
     visible: {
       opacity: 1,
-      y: 0,
       transition: {
-        duration: 0.3,
+        duration: 0.15, // 大幅减少时长
         ease: 'easeOut'
       }
     }
   },
 
-  // 简化的模态框动画
+  // 极简模态框动画 - 最小化scale变化
   modal: {
     hidden: {
       opacity: 0,
-      scale: 0.95
+      scale: 0.98 // 减少scale变化
     },
     visible: {
       opacity: 1,
       scale: 1,
       transition: {
-        duration: 0.25,
+        duration: 0.15, // 大幅减少时长
         ease: 'easeOut'
       }
     },
     exit: {
       opacity: 0,
-      scale: 0.95,
+      scale: 0.98,
       transition: {
-        duration: 0.2
+        duration: 0.1 // 更快的退出动画
       }
     }
   },
 
-  // 最小化按钮动画
+  // 极简按钮动画 - 仅关键交互
   button: {
     hover: {
-      scale: 1.02, // 极小的缩放
+      scale: 1.005, // 极小的缩放
       transition: {
-        duration: 0.1
+        duration: 0.08 // 更快响应
       }
     },
     tap: {
-      scale: 0.98,
+      scale: 0.995,
       transition: {
-        duration: 0.05
+        duration: 0.04 // 更快的触感反馈
       }
     }
   },
 
-  // 简化的加载动画
+  // 极简加载动画 - 仅opacity
   loading: {
     initial: { opacity: 0 },
     animate: { opacity: 1 },
     exit: { opacity: 0 }
   },
 
-  // 简化的通知动画
+  // 极简通知动画 - 最小化变换
   notification: {
     initial: {
       opacity: 0,
-      y: -20,
-      scale: 0.95
+      y: -10, // 减少移动距离
+      scale: 0.98 // 减少scale变化
     },
     animate: {
       opacity: 1,
       y: 0,
       scale: 1,
       transition: {
-        duration: 0.3,
+        duration: 0.15, // 大幅减少时长
         ease: 'easeOut'
       }
     },
     exit: {
       opacity: 0,
-      y: -20,
-      scale: 0.95,
+      y: -10,
+      scale: 0.98,
       transition: {
-        duration: 0.2
+        duration: 0.1 // 更快的退出动画
       }
     }
   }
 } as const;
 
-// 性能优化的动画属性
+// 极简性能优化的动画属性 - 默认设置
 export const optimizedMotionProps: MotionProps = {
   // 使用 transform 而不是 layout 属性
   transformTemplate: (value) => String(value),
@@ -124,20 +117,20 @@ export const optimizedMotionProps: MotionProps = {
   initial: false,
   animate: true,
   transition: {
-    duration: 0.2, // 默认更短的动画时长
+    duration: 0.1, // 极短默认动画时长
     ease: 'easeOut'
   }
 };
 
-// 预设的轻量级过渡
+// 极简轻量级过渡 - 用于快速交互
 export const lightTransition = {
-  duration: 0.15,
+  duration: 0.08, // 更快的过渡
   ease: 'easeOut'
 };
 
-// 预设的中等过渡
+// 极简中等过渡 - 用于一般动画
 export const mediumTransition = {
-  duration: 0.25,
+  duration: 0.12, // 仍然很快
   ease: 'easeOut'
 };
 
