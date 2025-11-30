@@ -281,6 +281,9 @@ class IconGenerator:
         """使用 iconutil 创建 .icns 文件"""
         self.log("使用 iconutil 创建 .icns 文件...")
 
+        # 定义输出路径（必须在引用之前）
+        icns_path = self.assets_dir / "icon.icns"
+
         # 调试信息
         self.log(f"当前工作目录: {os.getcwd()}")
         self.log(f"assets目录: {self.assets_dir}")
@@ -297,8 +300,6 @@ class IconGenerator:
         if "iconutil" not in self.available_tools:
             self.log("iconutil 不可用，无法创建 .icns 文件", "ERROR")
             return False
-
-        icns_path = self.assets_dir / "icon.icns"
 
         try:
             result = subprocess.run([
