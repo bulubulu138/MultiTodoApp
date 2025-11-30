@@ -24,12 +24,14 @@ jobs:
           - os: windows-latest
             platform: win
             arch: x64
-          - os: macos-latest
+          - os: macos-13  # Intel runners for x64 builds
             platform: mac
             arch: x64
-          - os: macos-latest
+            target_arch: x64
+          - os: macos-latest  # Apple Silicon runners for arm64 builds
             platform: mac
             arch: arm64
+            target_arch: arm64
 
     steps:
       - name: Checkout code
@@ -59,12 +61,53 @@ jobs:
       - name: Rebuild native modules for Electron
         run: |
           echo "Rebuilding native modules for Electron from source..."
-          npx electron-rebuild -f -w better-sqlite3 -v --prebuild-tag-prefix disabled
-          
+
+          if [ "${{ matrix.platform }}" = "mac" ]; then
+            echo "Rebuilding for ${{ matrix.target_arch }} architecture..."
+            npx electron-rebuild -f -w better-sqlite3 -v --prebuild-tag-prefix disabled \
+              --arch=${{ matrix.target_arch }}
+          else
+            echo "Rebuilding for Windows..."
+            npx electron-rebuild -f -w better-sqlite3 -v --prebuild-tag-prefix disabled
+          fi
+
           echo "Checking build result..."
           ls -lh node_modules/better-sqlite3/build/Release/
         env:
           npm_config_msvs_version: ${{ matrix.platform == 'win' && '2019' || '' }}
+        shell: bash
+
+    - name: Verify native module architecture (macOS)
+      if: matrix.platform == 'mac'
+      run: |
+        echo "=== Native Module Architecture Verification ==="
+        if [ -f "node_modules/better-sqlite3/build/Release/better_sqlite3.node" ]; then
+          echo "✅ Native module found"
+          file node_modules/better-sqlite3/build/Release/better_sqlite3.node
+          echo "Target architecture: ${{ matrix.target_arch }}"
+
+          # Additional verification for architecture
+          if [ "${{ matrix.target_arch }}" = "x64" ]; then
+            echo "Verifying x64 architecture..."
+            if file node_modules/better-sqlite3/build/Release/better_sqlite3.node | grep -q "x86_64"; then
+              echo "✅ x64 architecture verification passed"
+            else
+              echo "❌ x64 architecture verification failed"
+              exit 1
+            fi
+          elif [ "${{ matrix.target_arch }}" = "arm64" ]; then
+            echo "Verifying arm64 architecture..."
+            if file node_modules/better-sqlite3/build/Release/better_sqlite3.node | grep -q "arm64"; then
+              echo "✅ arm64 architecture verification passed"
+            else
+              echo "❌ arm64 architecture verification failed"
+              exit 1
+            fi
+          fi
+        else
+          echo "❌ Native module not found"
+          exit 1
+        fi
         shell: bash
 
       # 注意：不在此处运行 npm run verify
