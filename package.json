@@ -141,7 +141,7 @@
           ]
         }
       ],
-      "icon": "assets/icon_512x512.png",
+      "icon": "assets/icon.icns",
       "category": "public.app-category.productivity",
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "identity": null,

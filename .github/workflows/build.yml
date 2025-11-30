@@ -72,8 +72,56 @@ jobs:
       # MODULE_VERSION 不同：Node.js 20 (115) vs Electron 27 (127)
       # 如果原生模块有问题，后续的 build 和 dist 步骤会失败
 
+      - name: Create macOS icons
+        if: matrix.platform == 'mac'
+        run: |
+          echo "Creating macOS .icns file from PNG icons..."
+          cd assets
+          python3 create_icns.py
+          if [ -f "icon.icns" ]; then
+            echo "✅ icon.icns created successfully"
+            ls -la icon.icns
+          else
+            echo "❌ Failed to create icon.icns"
+            exit 1
+          fi
+        shell: bash
+
       - name: Build application
         run: npm run build
+
+      - name: Verify build output (macOS)
+        if: matrix.platform == 'mac'
+        run: |
+          echo "Verifying build output structure..."
+
+          # Check if icon.icns exists
+          if [ -f "assets/icon.icns" ]; then
+            echo "✅ icon.icns exists"
+            file assets/icon.icns
+          else
+            echo "❌ icon.icns missing"
+            exit 1
+          fi
+
+          # Check if build directory exists and has main.js
+          if [ -f "dist/main/main.js" ]; then
+            echo "✅ Main process built successfully"
+            ls -la dist/main/
+          else
+            echo "❌ Main process build failed"
+            exit 1
+          fi
+
+          # Check if renderer build exists
+          if [ -d "dist/renderer" ] && [ "$(ls -A dist/renderer/)" ]; then
+            echo "✅ Renderer process built successfully"
+            ls -la dist/renderer/
+          else
+            echo "❌ Renderer process build failed"
+            exit 1
+          fi
+        shell: bash
 
       - name: Package application (Windows)
         if: matrix.platform == 'win'
@@ -100,6 +148,73 @@ jobs:
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+
+      - name: Verify app bundle structure (macOS)
+        if: matrix.platform == 'mac'
+        run: |
+          echo "Verifying app bundle structure..."
+
+          # Find the built app bundle
+          APP_BUNDLE=$(find release -name "*.app" -type d | head -1)
+          if [ -z "$APP_BUNDLE" ]; then
+            echo "❌ No .app bundle found in release directory"
+            ls -la release/
+            exit 1
+          fi
+
+          echo "Found app bundle: $APP_BUNDLE"
+
+          # Check app bundle structure
+          CONTENTS_DIR="$APP_BUNDLE/Contents"
+          REQUIRED_DIRS=("MacOS" "Resources" "Frameworks")
+          REQUIRED_FILES=("Info.plist" "MacOS/MultiTodo")
+
+          echo "Checking Contents directory structure..."
+          if [ -d "$CONTENTS_DIR" ]; then
+            echo "✅ Contents directory exists"
+            ls -la "$CONTENTS_DIR"
+          else
+            echo "❌ Contents directory missing"
+            exit 1
+          fi
+
+          # Check required directories
+          for dir in "${REQUIRED_DIRS[@]}"; do
+            if [ -d "$CONTENTS_DIR/$dir" ]; then
+              echo "✅ $dir directory exists"
+            else
+              echo "❌ $dir directory missing"
+              exit 1
+            fi
+          done
+
+          # Check required files
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [ -f "$CONTENTS_DIR/$file" ]; then
+              echo "✅ $file exists"
+              file "$CONTENTS_DIR/$file"
+            else
+              echo "❌ $file missing"
+              exit 1
+            fi
+          done
+
+          # Check for icon resources
+          if [ -f "$CONTENTS_DIR/Resources/icon.icns" ]; then
+            echo "✅ icon.icns exists in Resources"
+            file "$CONTENTS_DIR/Resources/icon.icns"
+          else
+            echo "❌ icon.icns missing from Resources"
+            echo "Available Resources:"
+            ls -la "$CONTENTS_DIR/Resources/" || echo "Resources directory not accessible"
+          fi
+
+          # Check code signature (even with null identity)
+          echo "Checking code signature..."
+          codesign -dv --verbose=4 "$APP_BUNDLE" || echo "Code signature check returned non-zero (expected for null identity)"
+
+          echo "✅ App bundle verification completed"
+        shell: bash
 
       - name: Upload artifacts (Windows)
         if: matrix.platform == 'win'
