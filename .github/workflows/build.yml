@@ -77,43 +77,43 @@ jobs:
           npm_config_msvs_version: ${{ matrix.platform == 'win' && '2019' || '' }}
         shell: bash
 
-    - name: Verify native module architecture (macOS)
-      if: matrix.platform == 'mac'
-      run: |
-        echo "=== Native Module Architecture Verification ==="
-        if [ -f "node_modules/better-sqlite3/build/Release/better_sqlite3.node" ]; then
-          echo "✅ Native module found"
-          file node_modules/better-sqlite3/build/Release/better_sqlite3.node
-          echo "Target architecture: ${{ matrix.target_arch }}"
+      - name: Verify native module architecture (macOS)
+        if: matrix.platform == 'mac'
+        run: |
+          echo "=== Native Module Architecture Verification ==="
+          if [ -f "node_modules/better-sqlite3/build/Release/better_sqlite3.node" ]; then
+            echo "✅ Native module found"
+            file node_modules/better-sqlite3/build/Release/better_sqlite3.node
+            echo "Target architecture: ${{ matrix.target_arch }}"
 
-          # Additional verification for architecture
-          if [ "${{ matrix.target_arch }}" = "x64" ]; then
-            echo "Verifying x64 architecture..."
-            if file node_modules/better-sqlite3/build/Release/better_sqlite3.node | grep -q "x86_64"; then
-              echo "✅ x64 architecture verification passed"
-            else
-              echo "❌ x64 architecture verification failed"
-              exit 1
+            # Additional verification for architecture
+            if [ "${{ matrix.target_arch }}" = "x64" ]; then
+              echo "Verifying x64 architecture..."
+              if file node_modules/better-sqlite3/build/Release/better_sqlite3.node | grep -q "x86_64"; then
+                echo "✅ x64 architecture verification passed"
+              else
+                echo "❌ x64 architecture verification failed"
+                exit 1
+              fi
+            elif [ "${{ matrix.target_arch }}" = "arm64" ]; then
+              echo "Verifying arm64 architecture..."
+              if file node_modules/better-sqlite3/build/Release/better_sqlite3.node | grep -q "arm64"; then
+                echo "✅ arm64 architecture verification passed"
+              else
+                echo "❌ arm64 architecture verification failed"
+                exit 1
+              fi
             fi
-          elif [ "${{ matrix.target_arch }}" = "arm64" ]; then
-            echo "Verifying arm64 architecture..."
-            if file node_modules/better-sqlite3/build/Release/better_sqlite3.node | grep -q "arm64"; then
-              echo "✅ arm64 architecture verification passed"
-            else
-              echo "❌ arm64 architecture verification failed"
-              exit 1
-            fi
+          else
+            echo "❌ Native module not found"
+            exit 1
           fi
-        else
-          echo "❌ Native module not found"
-          exit 1
-        fi
         shell: bash
 
-      # 注意：不在此处运行 npm run verify
-      # 原因：verify 脚本在 Node.js 环境运行，但 better-sqlite3 已为 Electron 编译
-      # MODULE_VERSION 不同：Node.js 20 (115) vs Electron 27 (127)
-      # 如果原生模块有问题，后续的 build 和 dist 步骤会失败
+        # 注意：不在此处运行 npm run verify
+    # 原因：verify 脚本在 Node.js 环境运行，但 better-sqlite3 已为 Electron 编译
+    # MODULE_VERSION 不同：Node.js 20 (115) vs Electron 27 (127)
+    # 如果原生模块有问题，后续的 build 和 dist 步骤会失败
 
       - name: Create macOS icons
         if: matrix.platform == 'mac'
