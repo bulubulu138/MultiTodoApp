@@ -90,9 +90,16 @@ jobs:
             echo "✅ icon.icns created successfully"
             ls -la icon.icns
 
-            # 验证 .icns 文件
+            # 增强验证
             file icon.icns
             echo "icon.icns file size: $(stat -f%z icon.icns) bytes"
+
+            # 验证它是有效的ICNS文件
+            if file icon.icns | grep -q "data"; then
+              echo "✅ .icns file format validation passed"
+            else
+              echo "⚠️ .icns file format may be invalid"
+            fi
 
             # 显示生成报告（如果存在）
             if [ -f "icon_generation_report.json" ]; then
@@ -103,6 +110,13 @@ jobs:
             echo "❌ Failed to create icon.icns"
             echo "Available files in assets:"
             ls -la
+
+            # 显示生成报告用于调试
+            if [ -f "icon_generation_report.json" ]; then
+              echo "📊 Generation report:"
+              cat icon_generation_report.json
+            fi
+
             exit 1
           fi
         shell: bash

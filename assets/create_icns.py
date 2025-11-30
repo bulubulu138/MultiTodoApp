@@ -281,6 +281,19 @@ class IconGenerator:
         """使用 iconutil 创建 .icns 文件"""
         self.log("使用 iconutil 创建 .icns 文件...")
 
+        # 调试信息
+        self.log(f"当前工作目录: {os.getcwd()}")
+        self.log(f"assets目录: {self.assets_dir}")
+        self.log(f"iconset目录: {iconset_dir}")
+        self.log(f"预期输出路径: {icns_path}")
+
+        # 列出iconset内容
+        if iconset_dir.exists():
+            iconset_files = list(iconset_dir.glob("*"))
+            self.log(f"iconset文件数量: {len(iconset_files)}")
+            for f in iconset_files:
+                self.log(f"  - {f.name} ({f.stat().st_size} bytes)")
+
         if "iconutil" not in self.available_tools:
             self.log("iconutil 不可用，无法创建 .icns 文件", "ERROR")
             return False
@@ -289,22 +302,32 @@ class IconGenerator:
 
         try:
             result = subprocess.run([
-                "iconutil", "-c", "icns", str(iconset_dir)
+                "iconutil", "-c", "icns", str(iconset_dir), "-o", str(icns_path)
             ], capture_output=True, text=True, cwd=self.assets_dir)
 
             if result.returncode == 0:
-                self.log(f"✓ 成功创建 {icns_path}")
+                self.log(f"✓ iconutil 命令执行成功")
 
-                # 验证文件
-                if icns_path.exists():
-                    file_size = icns_path.stat().st_size
-                    self.log(f"✓ .icns 文件大小: {file_size:,} bytes")
-                    return True
-                else:
-                    self.log("❌ .icns 文件未生成", "ERROR")
+                # 关键验证：检查文件是否真的创建了
+                if not icns_path.exists():
+                    self.log(f"❌ iconutil 报告成功但文件不存在: {icns_path}", "ERROR")
+                    self.log(f"当前工作目录: {os.getcwd()}")
+                    self.log(f"assets目录内容: {list(self.assets_dir.glob('*'))}")
                     return False
+
+                # 验证文件有内容
+                if icns_path.stat().st_size == 0:
+                    self.log(f"❌ .icns 文件为空", "ERROR")
+                    return False
+
+                file_size = icns_path.stat().st_size
+                self.log(f"✓ 成功创建 {icns_path} ({file_size:,} bytes)")
+                return True
             else:
                 self.log(f"❌ iconutil 失败: {result.stderr}", "ERROR")
+                self.log(f"返回码: {result.returncode}")
+                if result.stdout:
+                    self.log(f"标准输出: {result.stdout}")
                 return False
 
         except Exception as e:
