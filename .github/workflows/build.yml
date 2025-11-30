@@ -77,12 +77,32 @@ jobs:
         run: |
           echo "Creating macOS .icns file from PNG icons..."
           cd assets
+
+          # 显示可用图标文件
+          echo "Available icon files:"
+          ls -la icon_*.png || echo "No icon files found"
+
+          # 运行图标生成脚本
           python3 create_icns.py
+
+          # 检查结果
           if [ -f "icon.icns" ]; then
             echo "✅ icon.icns created successfully"
             ls -la icon.icns
+
+            # 验证 .icns 文件
+            file icon.icns
+            echo "icon.icns file size: $(stat -f%z icon.icns) bytes"
+
+            # 显示生成报告（如果存在）
+            if [ -f "icon_generation_report.json" ]; then
+              echo "📊 Generation report:"
+              cat icon_generation_report.json
+            fi
           else
             echo "❌ Failed to create icon.icns"
+            echo "Available files in assets:"
+            ls -la
             exit 1
           fi
         shell: bash
