@@ -39,6 +39,11 @@ npm run dist:mac              # Build macOS DMG
 npm run lint                  # Run ESLint (if configured)
 ```
 
+### Configuration Files
+- **TypeScript Configs**: `tsconfig.json` (base), `tsconfig.main.json` (main process), renderer uses webpack ts-loader
+- **Webpack Config**: `webpack.renderer.config.js` - targets web environment with Node.js polyfills, filesystem caching enabled
+- **Build Config**: electron-builder configuration in `package.json` with platform-specific settings
+
 ## Architecture Overview
 
 This is an Electron desktop application with a React frontend for task management with AI features, featuring a sophisticated local-first architecture with SQLite database and optional AI integration.
@@ -53,26 +58,31 @@ This is an Electron desktop application with a React frontend for task managemen
 - **Service-Oriented**: Modular services in `src/main/services/` (DatabaseManager, AIService, KeywordExtractor)
 - **Performance-Optimized**: React virtualization, LRU caching, debounced search, batch database operations
 - **Hybrid View Architecture**: Separate render paths for card view vs. content focus mode with optimistic updates
+- **Local-First Architecture**: 100% client-side SQLite with optional AI features, no external dependencies
+- **IPC-First Communication**: All data operations go through main process with secure contextBridge
 
 ### Core Components Structure
 
-#### Main Process Services
-- `DatabaseManager.ts`: SQLite database operations using better-sqlite3
-- `AIService.ts`: AI integration for keyword extraction and smart recommendations
-- `KeywordExtractor.ts`: Chinese text segmentation and keyword processing
-- `ImageManager.ts`: Image handling and base64 conversion
-- `BackupManager.ts`: Data backup and restoration
+#### Main Process Services (`src/main/`)
+- `DatabaseManager.ts` (`src/main/database/`): SQLite database operations using better-sqlite3 with automatic migrations, indexing, and batch operations
+- `AIService.ts` (`src/main/services/`): Multi-provider AI integration for keyword extraction and smart recommendations (Kimi, DeepSeek, Doubao, custom)
+- `KeywordExtractor.ts` (`src/main/services/`): Chinese text segmentation and keyword processing using `segment` library
+- `ImageManager.ts` (`src/main/utils/`): Image handling, validation, and base64 conversion with file path sanitization
+- `BackupManager.ts` (`src/main/utils/`): Automated data backup and restoration with retention policies
 
-#### Renderer Components
-- `App.tsx`: Main application with tab management, state, and routing
-- `TodoList.tsx`: Task list with virtualization for performance
-- `TodoForm.tsx`: Task creation/editing with rich text editor
-- `RichTextEditor.tsx`: Quill-based rich text editing with image support
-- `ContentFocusView.tsx`: Distraction-free writing mode
-- `CalendarDrawer.tsx`: Calendar visualization of tasks
-- `WeeklyReport.tsx`, `DailyReport.tsx`, `MonthlyReport.tsx`: Report generation
-- `RelationsModal.tsx`: Task relationship management (dependencies, parallels)
-- `SettingsModal.tsx`: App configuration and AI provider setup
+#### Renderer Components (`src/renderer/components/`)
+- `App.tsx`: Main application with tab management, global state, and routing
+- `TodoList.tsx`: Virtualized task list using react-window for 1000+ todo performance
+- `VirtualizedTodoList.tsx`: Advanced virtualization with grouping and sorting
+- `TodoForm.tsx`: Task creation/editing with rich text editor and validation
+- `RichTextEditor.tsx`: Quill-based rich text editing with image upload and paste support
+- `ContentFocusView.tsx`: Distraction-free writing mode with optimistic updates
+- `CalendarDrawer.tsx`: Calendar visualization of tasks with multiple view sizes
+- `WeeklyReport.tsx`, `DailyReport.tsx`, `MonthlyReport.tsx`: Enhanced report generation with quality scoring
+- `RelationsModal.tsx`: Task relationship management (dependencies, backgrounds, parallels)
+- `SettingsModal.tsx`: App configuration, AI provider setup, and theme management
+- `CustomTabManager.tsx`: Multi-tab interface with independent state per tab
+- `Toolbar.tsx`: Global controls for search, view modes, and bulk operations
 
 ### Key Technical Details
 
@@ -109,10 +119,13 @@ settings: Key-value configuration storage
 - **Optimistic updates** in content focus mode with backend sync
 
 #### Build System
-- **TypeScript compilation** for both processes with separate tsconfig files
-- **Webpack 5** for renderer bundling with Node.js polyfills
-- **electron-builder** for cross-platform packaging with platform-specific configs
-- **Native module support** requiring `npm run rebuild` for better-sqlite3
+- **Dual TypeScript compilation**: Separate configs for main (`tsconfig.main.json`) and renderer processes (via webpack ts-loader)
+- **Webpack 5** for renderer bundling with Node.js polyfills, file system caching, cheap source maps, and web target environment
+- **electron-builder** for cross-platform packaging with platform-specific configs (Windows NSIS, macOS DMG)
+- **Native module support**: `better-sqlite3` requires `npm run rebuild` after installation, verification via `npm run verify`
+- **Pre-build checks**: `npm run prebuild` validates native modules before building
+- **Optimization**: Production builds remove development logs and enable webpack optimizations
+- **Asset handling**: Icons and resources in `assets/` directory with platform-specific formats (ICO, ICNS, PNG)
 
 #### Security & Privacy Architecture
 - **Sandboxing**: Production-mode CSP with relaxed dev mode
@@ -123,16 +136,21 @@ settings: Key-value configuration storage
 ### Development Notes
 
 #### Critical Development Patterns
-- **Always use batch operations** when updating multiple todos to maintain performance
-- **Implement proper memoization** for expensive computations in list components
-- **Use content hashing** when creating todos to prevent duplicates
+- **Always use batch operations** when updating multiple todos to maintain performance - use `DatabaseManager.batchUpdateTodos()`
+- **Implement proper memoization** for expensive computations in list components - use `React.memo`, `useMemo`, `useCallback`
+- **Use content hashing** when creating todos to prevent duplicates - hash includes title + content + timestamp
 - **Test with large datasets** (>1000 todos) to verify performance optimizations
+- **Animation performance monitoring** - conditionally disable animations on low-end devices using `EnhancedAnimations.tsx`
+- **Search optimization patterns** - implement LRU caching, title matching priority, and debounced filtering (200ms)
+- **Iterative algorithms** - avoid recursion for large datasets to prevent stack overflow (see grouping algorithms)
+- **IPC channel patterns** - use consistent naming: `todos:getAll`, `todos:create`, `todos:update`, `todos:delete`
 
 #### Native Dependencies
-- `better-sqlite3`: Requires rebuild after installation (`npm run rebuild`)
+- `better-sqlite3`: Requires rebuild after installation (`npm run rebuild`), verify with `npm run verify`
 - Database files stored in app's user data directory:
-  - Windows: `%APPDATA%\MultiTodo\`
-  - macOS: `~/Library/Application Support/MultiTodo/`
+  - Windows: `%APPDATA%\MultiTodo\database.db`
+  - macOS: `~/Library/Application Support/MultiTodo/database.db`
+- Native module pre-build verification in `scripts/verify-native-modules.js` and `scripts/prebuild-check.js`
 
 #### AI Integration Architecture
 - **Multi-provider abstraction** in `AIService.ts` with pluggable providers
@@ -141,28 +159,81 @@ settings: Key-value configuration storage
 - **Supported providers**: Kimi, DeepSeek, Doubao, custom endpoints
 
 #### Unique UI Architecture
-- **Hybrid view system**: Card view for browsing, Content focus view for writing
-- **Multi-tab interface**: Status-based tabs + custom user-defined tag tabs
-- **Per-tab state**: Independent sorting, filtering, and display order per tab
-- **Global shortcut system**: `Cmd/Ctrl+Shift+T` for quick todo creation
+- **Hybrid view system**: Card view for browsing with comprehensive information, Content focus view for distraction-free writing with optimistic updates
+- **Multi-tab interface**: Status-based tabs (Pending, In Progress, Completed, Paused) + custom user-defined tag tabs
+- **Per-tab state**: Independent sorting, filtering, and display order per tab using `displayOrders` object in database
+- **Global shortcut system**: `Cmd/Ctrl+Shift+T` for quick todo creation with clipboard integration
+- **Virtualized rendering**: Uses react-window for handling 1000+ todos without performance degradation
+- **Animation system**: Performance-aware animations with automatic disabling on low-end devices
 
 #### Data Flow Patterns
-- **IPC-first architecture**: All data operations go through main process
-- **Optimistic updates**: Content focus mode updates local state immediately
-- **Content hashing**: SHA256-based duplicate detection system
-- **Export system**: JSON and plain text export formats
+- **IPC-first architecture**: All data operations go through main process via secure contextBridge
+- **Optimistic updates**: Content focus mode updates local state immediately with backend sync
+- **Content hashing**: SHA256-based duplicate detection system using title + content + timestamp
+- **Export system**: JSON and plain text export formats with batch processing
+- **Image pipeline**: File upload → validation → base64 conversion → database storage
+- **AI processing queue**: Async keyword extraction with non-blocking queuing system
+- **Database connection pooling**: Single SQLite connection with WAL mode for concurrent access
 
 #### Extension Points
-- **Add AI providers**: Extend `AIService.ts` with new provider classes
-- **Custom export formats**: Extend export functionality in `ExportModal.tsx`
-- **Theme development**: Add themes in `src/renderer/theme/themes.ts`
-- **Relation types**: Expand `TodoRelation` interface for new relationship types
+- **Add AI providers**: Extend `AIService.ts` with new provider classes implementing the `AIProvider` interface, add to `AI_PROVIDERS` mapping
+- **Custom export formats**: Extend export functionality in `ExportModal.tsx` by adding new format handlers to the export switch statement
+- **Theme development**: Add themes in `src/renderer/theme/themes.ts` following the existing theme structure with CSS variables
+- **Relation types**: Expand `TodoRelation` interface in `src/shared/types.ts` and update `RelationsModal.tsx` UI components
+- **Custom components**: Add to `src/renderer/components/` and follow the memoization patterns using `React.memo`
+- **Database migrations**: Add new migration functions to `DatabaseManager.ts` following the existing version pattern
+- **IPC channels**: Add new handlers to `preload.ts` and corresponding main process handlers with consistent naming
 
 ## Important Development Considerations
 
-- The app supports both Windows and macOS with platform-specific configurations
-- Global hotkey (`Ctrl/Cmd+Shift+T`) requires system permissions
-- Image handling converts files to base64 for database storage
-- Rich text content is stored as HTML with sanitization
-- Task relationships support complex dependency graphs
-- Search functionality works across titles, content, and metadata
+### Platform-Specific Details
+- The app supports both Windows and macOS with platform-specific configurations in `package.json`
+- Global hotkey (`Ctrl/Cmd+Shift+T`) requires system permissions and is registered in `main.ts`
+- Database files stored in app's user data directory:
+  - Windows: `%APPDATA%\MultiTodo\database.db`
+  - macOS: `~/Library/Application Support/MultiTodo/database.db`
+
+### File Structure and Key Paths
+```
+src/
+├── main/
+│   ├── main.ts                 # App entry point, window management, global shortcuts
+│   ├── preload.ts              # IPC bridge, contextBridge setup
+│   ├── database/
+│   │   └── DatabaseManager.ts  # SQLite operations, migrations, indexing
+│   ├── services/
+│   │   ├── AIService.ts        # AI provider abstraction and implementation
+│   │   ├── KeywordExtractor.ts # Chinese text segmentation
+│   │   └── KeywordProcessor.ts # Keyword processing and scoring
+│   └── utils/
+│       ├── ImageManager.ts     # Image handling and validation
+│       ├── hashUtils.ts        # SHA256 content hashing
+│       └── BackupManager.ts    # Data backup and restoration
+├── renderer/
+│   ├── App.tsx                 # Root component with tab management
+│   ├── components/             # React components with memoization
+│   ├── hooks/
+│   │   └── useThemeColors.ts   # Theme management
+│   ├── theme/
+│   │   └── themes.ts           # Theme definitions and CSS variables
+│   └── utils/
+│       ├── copyTodo.ts         # Todo duplication functionality
+│       ├── reportGenerator.ts  # Report generation logic
+│       └── sortWithGroups.ts   # Grouping and sorting algorithms
+└── shared/
+    └── types.ts                # Shared TypeScript interfaces
+```
+
+### Data Handling Patterns
+- Image handling converts files to base64 for database storage with size limits and validation
+- Rich text content is stored as HTML with sanitization using DOMPurify
+- Task relationships support complex dependency graphs with circular reference detection
+- Search functionality works across titles, content, and metadata with title matching priority
+- Content hash includes title + content + timestamp for SHA256-based duplicate detection
+
+### Performance Considerations
+- All database operations use the main process through IPC to maintain data consistency
+- Batch operations are critical for multi-todo updates to maintain performance
+- Virtual rendering is essential for handling 1000+ todos without performance degradation
+- Animation performance monitoring automatically disables effects on low-end devices
+- Search uses 200ms debouncing with LRU caching to avoid redundant computations
