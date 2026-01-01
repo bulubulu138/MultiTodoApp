@@ -96,23 +96,32 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
   });
 
   // 5. 当持久化数据变化时，更新运行时数据
-  // 使用 setNodes 的函数式更新，保留拖动状态
+  // 使用 setNodes 的函数式更新，保留拖动状态和位置
   useEffect(() => {
     setRuntimeNodes((currentNodes) => {
       const newNodes = toRuntimeNodes(domainNodes);
       
-      // 如果有节点正在拖动，保留其位置和拖动状态
+      // 创建当前节点的 Map 以便快速查找
+      const currentNodesMap = new Map(currentNodes.map(n => [n.id, n]));
+      
+      // 更新节点，保留运行时状态
       const updatedNodes = newNodes.map(newNode => {
-        const currentNode = currentNodes.find(n => n.id === newNode.id);
-        if (currentNode && (currentNode.dragging || currentNode.selected)) {
-          // 保留拖动中的节点位置和状态
+        const currentNode = currentNodesMap.get(newNode.id);
+        
+        if (currentNode) {
+          // 节点已存在，保留其运行时状态
           return {
             ...newNode,
-            position: currentNode.position,
+            // 如果节点正在拖动或被选中，保留其当前位置
+            position: (currentNode.dragging || currentNode.selected) 
+              ? currentNode.position 
+              : newNode.position,
             dragging: currentNode.dragging,
             selected: currentNode.selected
           };
         }
+        
+        // 新节点，直接使用
         return newNode;
       });
       

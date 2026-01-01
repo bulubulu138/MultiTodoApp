@@ -216,13 +216,13 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
           break;
         }
         case 'mermaid': {
-          const result = MermaidExporter.export(currentFlowchart, nodes, edges);
+          const result = MermaidExporter.export(currentFlowchart, nodes, edges, todos);
           ExportService.downloadFile(result.content, result.filename, 'text/plain');
           message.success('导出成功');
           break;
         }
         case 'text': {
-          const result = TextExporter.export(currentFlowchart, nodes, edges);
+          const result = TextExporter.export(currentFlowchart, nodes, edges, todos);
           ExportService.downloadFile(result.content, result.filename, 'text/plain');
           message.success('导出成功');
           break;
@@ -246,7 +246,7 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
       message.error(`导出失败: ${error instanceof Error ? error.message : '未知错误'}`);
       console.error('Export error:', error);
     }
-  }, [currentFlowchart, nodes, edges]);
+  }, [currentFlowchart, nodes, edges, todos, message]);
 
   // 分享
   const handleShare = useCallback(async (action: 'link' | 'image') => {
