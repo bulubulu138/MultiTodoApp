@@ -12,6 +12,7 @@ import ExportModal from './components/ExportModal';
 import TodoViewDrawer from './components/TodoViewDrawer';
 import NotesDrawer from './components/NotesDrawer';
 import CalendarDrawer from './components/CalendarDrawer';
+import { FlowchartDrawer } from './components/flowchart/FlowchartDrawer';
 import CustomTabManager from './components/CustomTabManager';
 import ContentFocusView, { ContentFocusViewRef } from './components/ContentFocusView';
 import { getTheme, ThemeMode } from './theme/themes';
@@ -48,6 +49,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const [showViewDrawer, setShowViewDrawer] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showFlowchart, setShowFlowchart] = useState(false);
   const [showCustomTabManager, setShowCustomTabManager] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [viewingTodo, setViewingTodo] = useState<Todo | null>(null);
@@ -931,6 +933,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         onShowExport={() => setShowExport(true)}
         onShowNotes={() => setShowNotes(true)}
         onShowCalendar={() => setShowCalendar(true)}
+        onShowFlowchart={() => setShowFlowchart(true)}
         onShowCustomTabManager={() => setShowCustomTabManager(true)}
         sortOption={currentTabSettings.sortOption}
         onSortChange={handleSortChange}
@@ -1046,6 +1049,12 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         onClose={() => setShowCalendar(false)}
         onSelectTodo={handleEditTodo}
         viewSize={(settings.calendarViewSize as CalendarViewSize) || 'compact'}
+      />
+
+      <FlowchartDrawer
+        visible={showFlowchart}
+        todos={todos}
+        onClose={() => setShowFlowchart(false)}
       />
 
       <CustomTabManager
