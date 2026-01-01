@@ -96,7 +96,7 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
   });
 
   // 5. 当持久化数据变化时，更新运行时数据
-  // 使用 setNodes 的函数式更新，保留拖动状态和位置
+  // 关键修复：完全保留节点位置，只更新数据内容
   useEffect(() => {
     setRuntimeNodes((currentNodes) => {
       const newNodes = toRuntimeNodes(domainNodes);
@@ -104,20 +104,20 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
       // 创建当前节点的 Map 以便快速查找
       const currentNodesMap = new Map(currentNodes.map(n => [n.id, n]));
       
-      // 更新节点，保留运行时状态
+      // 更新策略：
+      // 1. 对于已存在的节点：完全保留其位置、选中状态、拖动状态
+      // 2. 对于新节点：使用持久化层的位置
       const updatedNodes = newNodes.map(newNode => {
         const currentNode = currentNodesMap.get(newNode.id);
         
         if (currentNode) {
-          // 节点已存在，保留其运行时状态
+          // 节点已存在，保留所有运行时状态，只更新 data
           return {
             ...newNode,
-            // 如果节点正在拖动或被选中，保留其当前位置
-            position: (currentNode.dragging || currentNode.selected) 
-              ? currentNode.position 
-              : newNode.position,
-            dragging: currentNode.dragging,
-            selected: currentNode.selected
+            position: currentNode.position, // 保留当前位置
+            selected: currentNode.selected, // 保留选中状态
+            dragging: currentNode.dragging, // 保留拖动状态
+            data: newNode.data // 更新数据（label、resolvedTodo 等）
           };
         }
         
@@ -282,7 +282,21 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     setEditingNode(null);
   }, [editingNode, applyPatches]);
 
-  // 9. 处理拖拽放置
+  // 9. 初始化标志 - 用于控制 fitView
+  const isInitializedRef = useRef(false);
+
+  // 9.1 初始化时执行 fitView
+  useEffect(() => {
+    if (!isInitializedRef.current && runtimeNodes.length > 0) {
+      // 延迟执行 fitView，确保节点已渲染
+      setTimeout(() => {
+        reactFlowInstance.fitView({ padding: 0.2, duration: 200 });
+        isInitializedRef.current = true;
+      }, 100);
+    }
+  }, [runtimeNodes.length, reactFlowInstance]);
+
+  // 9.2 处理拖拽放置
   const handleDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
 
@@ -595,7 +609,6 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
         onNodeDoubleClick={handleNodeDoubleClick}
         onNodeContextMenu={handleNodeContextMenu}
         nodeTypes={nodeTypes}
-        fitView
         attributionPosition="bottom-left"
       >
         <Background />

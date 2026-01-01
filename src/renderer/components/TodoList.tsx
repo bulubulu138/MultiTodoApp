@@ -8,9 +8,11 @@ import RelationsModal from './RelationsModal';
 import RelationContext from './RelationContext';
 import ContentFocusView from './ContentFocusView';
 import RelationIndicators from './RelationIndicators';
+import { FlowchartIndicator } from './FlowchartIndicator';
 import VirtualizedTodoList from './VirtualizedTodoList';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { useFlowchartAssociations } from '../hooks/useFlowchartAssociations';
 import { formatCompletedTime } from '../utils/timeFormatter';
 import dayjs from 'dayjs';
 
@@ -33,6 +35,7 @@ interface TodoListProps {
   viewMode?: ViewMode; // 视图模式
   onUpdateInPlace?: (id: number, updates: Partial<Todo>) => void; // 专注模式专用：乐观更新
   enableVirtualScroll?: boolean; // 是否启用虚拟滚动
+  onNavigateToFlowchart?: (flowchartId: string, nodeId: string) => void; // 跳转到流程图
 }
 
 // 性能优化：使用 React.memo 避免不必要的重渲染
@@ -51,7 +54,8 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   onUpdateDisplayOrder,
   viewMode = 'card',
   onUpdateInPlace,
-  enableVirtualScroll = true // 默认启用虚拟滚动以提升性能
+  enableVirtualScroll = true, // 默认启用虚拟滚动以提升性能
+  onNavigateToFlowchart
 }) => {
   const { message } = App.useApp();
   const colors = useThemeColors();
@@ -60,6 +64,10 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   const [expandedRelations, setExpandedRelations] = useState<Set<number>>(new Set());
   const [editingOrder, setEditingOrder] = useState<{[key: number]: number | null}>({});
   const [savingOrder, setSavingOrder] = useState<Set<number>>(new Set());
+  
+  // 获取所有待办的流程图关联数据
+  const todoIds = useMemo(() => todos.map(t => t.id!).filter(id => id !== undefined), [todos]);
+  const { associationsByTodo, loading: associationsLoading } = useFlowchartAssociations(todoIds);
   
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -609,6 +617,16 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                         size="small"
                         showLabels={false}
                         onViewRelations={() => onView(todo)}
+                      />
+                    )}
+                    {/* 流程图关联指示器 */}
+                    {todo.id && onNavigateToFlowchart && (
+                      <FlowchartIndicator
+                        todoId={todo.id}
+                        associations={associationsByTodo.get(todo.id) || []}
+                        onNavigate={onNavigateToFlowchart}
+                        size="small"
+                        showLabel={false}
                       />
                     )}
                     {renderTags(todo.tags)}

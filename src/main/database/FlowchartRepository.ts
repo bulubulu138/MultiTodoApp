@@ -318,4 +318,166 @@ export class FlowchartRepository {
       `).run(...values);
     }
   }
+
+  /**
+   * 查询单个待办关联的流程图节点
+   * @param todoId 待办任务 ID（字符串格式）
+   * @returns 关联的流程图节点信息数组
+   */
+  queryNodesByTodoId(todoId: string): Array<{
+    flowchartId: string;
+    flowchartName: string;
+    nodeId: string;
+    nodeLabel: string;
+  }> {
+    try {
+      const rows = this.db.prepare(`
+        SELECT 
+          f.id as flowchartId,
+          f.name as flowchartName,
+          n.id as nodeId,
+          json_extract(n.data, '$.label') as nodeLabel
+        FROM flowchart_nodes n
+        INNER JOIN flowcharts f ON n.flowchart_id = f.id
+        WHERE json_extract(n.data, '$.todoId') = ?
+        ORDER BY f.updated_at DESC
+      `).all(todoId) as any[];
+
+      return rows.map(row => ({
+        flowchartId: row.flowchartId,
+        flowchartName: row.flowchartName,
+        nodeId: row.nodeId,
+        nodeLabel: row.nodeLabel || 'Untitled Node'
+      }));
+    } catch (error) {
+      console.error('Error querying nodes by todoId:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 批量查询多个待办关联的流程图节点
+   * @param todoIds 待办任务 ID 数组（字符串格式）
+   * @returns Map<todoId, associations[]>
+   */
+  queryNodesByTodoIds(todoIds: string[]): Map<string, Array<{
+    flowchartId: string;
+    flowchartName: string;
+    nodeId: string;
+    nodeLabel: string;
+  }>> {
+    const result = new Map<string, Array<{
+      flowchartId: string;
+      flowchartName: string;
+      nodeId: string;
+      nodeLabel: string;
+    }>>();
+
+    // 如果没有待办 ID，直接返回空 Map
+    if (!todoIds || todoIds.length === 0) {
+      return result;
+    }
+
+    try {
+      // 构建 IN 子句的占位符
+      const placeholders = todoIds.map(() => '?').join(', ');
+      
+      const rows = this.db.prepare(`
+        SELECT 
+          json_extract(n.data, '$.todoId') as todoId,
+          f.id as flowchartId,
+          f.name as flowchartName,
+          n.id as nodeId,
+          json_extract(n.data, '$.label') as nodeLabel
+        FROM flowchart_nodes n
+        INNER JOIN flowcharts f ON n.flowchart_id = f.id
+        WHERE json_extract(n.data, '$.todoId') IN (${placeholders})
+        ORDER BY f.updated_at DESC
+      `).all(...todoIds) as any[];
+
+      // 按 todoId 分组
+      rows.forEach(row => {
+        const todoId = row.todoId;
+        if (!result.has(todoId)) {
+          result.set(todoId, []);
+        }
+        result.get(todoId)!.push({
+          flowchartId: row.flowchartId,
+          flowchartName: row.flowchartName,
+          nodeId: row.nodeId,
+          nodeLabel: row.nodeLabel || 'Untitled Node'
+        });
+      });
+
+      return result;
+    } catch (error) {
+      console.error('Error querying nodes by todoIds:', error);
+      return result;
+    }
+  }
+
+  /**
+   * 清理无效的 todoId 引用
+   * 当待办被删除时调用，将节点中的 todoId 设置为 null
+   * @param todoId 待办任务 ID（字符串格式）
+   */
+  cleanupInvalidTodoReferences(todoId: string): void {
+    try {
+      // 查找所有引用该待办的节点
+      const nodes = this.db.prepare(`
+        SELECT id, flowchart_id, data 
+        FROM flowchart_nodes 
+        WHERE json_extract(data, '$.todoId') = ?
+      `).all(todoId) as any[];
+
+      if (nodes.length === 0) {
+        return;
+      }
+
+      console.log(`Cleaning up ${nodes.length} node(s) referencing deleted todo ${todoId}`);
+
+      // 使用事务确保原子性
+      const transaction = this.db.transaction(() => {
+        const now = Date.now();
+        
+        nodes.forEach(node => {
+          const data = JSON.parse(node.data);
+          // 移除 todoId 引用
+          delete data.todoId;
+          
+          // 更新节点数据
+          this.db.prepare(`
+            UPDATE flowchart_nodes 
+            SET data = ?, updated_at = ? 
+            WHERE id = ?
+          `).run(JSON.stringify(data), now, node.id);
+        });
+      });
+
+      transaction();
+    } catch (error) {
+      console.error('Error cleaning up invalid todo references:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 创建数据库索引以优化查询性能
+   * 应该在数据库初始化时调用
+   */
+  createIndexes(): void {
+    try {
+      // 为 todoId 创建索引（使用 JSON 提取）
+      // 注意：SQLite 的 JSON 索引需要使用表达式索引
+      this.db.prepare(`
+        CREATE INDEX IF NOT EXISTS idx_flowchart_nodes_todo_id 
+        ON flowchart_nodes(json_extract(data, '$.todoId'))
+      `).run();
+
+      console.log('Flowchart indexes created successfully');
+    } catch (error) {
+      console.error('Error creating flowchart indexes:', error);
+      // 不抛出错误，因为索引可能已存在
+    }
+  }
 }

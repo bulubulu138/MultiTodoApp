@@ -290,3 +290,14 @@ export interface ExportResult {
   content: string;
   filename: string;
 }
+
+// ============================================
+// 流程图关联类型 (Flowchart Association Types)
+// ============================================
+
+export interface FlowchartAssociation {
+  flowchartId: string;
+  flowchartName: string;
+  nodeId: string;
+  nodeLabel: string;
+}

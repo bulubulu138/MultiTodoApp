@@ -76,6 +76,16 @@ export interface ElectronAPI {
     restore: (backupPath: string) => Promise<void>;
   };
   
+  // 流程图API
+  flowchart: {
+    getAssociationsByTodoIds: (todoIds: number[]) => Promise<Record<string, Array<{
+      flowchartId: string;
+      flowchartName: string;
+      nodeId: string;
+      nodeLabel: string;
+    }>>>;
+  };
+  
   // Shell API
   openExternal: (url: string) => Promise<{success: boolean; error?: string}>;
   
@@ -145,6 +155,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     list: () => ipcRenderer.invoke('backup:list'),
     create: () => ipcRenderer.invoke('backup:create'),
     restore: (backupPath: string) => ipcRenderer.invoke('backup:restore', backupPath),
+  },
+  flowchart: {
+    getAssociationsByTodoIds: (todoIds: number[]) => 
+      ipcRenderer.invoke('flowchart:getAssociationsByTodoIds', todoIds),
   },
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
   

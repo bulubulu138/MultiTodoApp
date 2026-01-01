@@ -18,6 +18,10 @@ export class DatabaseManager {
     return this.dbPath;
   }
 
+  public getDb(): Database.Database | null {
+    return this.db;
+  }
+
   public async initialize(): Promise<void> {
     try {
       this.db = new Database(this.dbPath);
@@ -140,6 +144,21 @@ export class DatabaseManager {
     
     // 执行表迁移
     await this.migrateTodosTable();
+    
+    // 创建流程图查询索引
+    await this.createFlowchartIndexes();
+  }
+
+  private async createFlowchartIndexes(): Promise<void> {
+    try {
+      const { FlowchartRepository } = await import('./FlowchartRepository');
+      const flowchartRepo = new FlowchartRepository(this.db!);
+      flowchartRepo.createIndexes();
+      console.log('Flowchart query indexes created');
+    } catch (error) {
+      console.error('Error creating flowchart indexes:', error);
+      // 不抛出错误，因为这不是致命错误
+    }
   }
 
   private async migrateTodosTable(): Promise<void> {

@@ -676,6 +676,49 @@ class Application {
         return { success: false, error: (error as Error).message };
       }
     });
+
+    // 流程图关联查询相关
+    ipcMain.handle('flowchart:getAssociationsByTodoIds', async (_, todoIds: number[]) => {
+      try {
+        // 导入 FlowchartRepository
+        const { FlowchartRepository } = await import('./database/FlowchartRepository');
+        
+        // 获取数据库实例
+        const db = this.dbManager.getDb();
+        if (!db) {
+          console.error('Database not initialized');
+          return {};
+        }
+        
+        // 创建 FlowchartRepository 实例
+        const flowchartRepo = new FlowchartRepository(db);
+        
+        // 将数字 ID 转换为字符串（因为 todoId 在节点中存储为字符串）
+        const todoIdStrings = todoIds.map(id => id.toString());
+        
+        // 批量查询关联数据
+        const associations = flowchartRepo.queryNodesByTodoIds(todoIdStrings);
+        
+        // 转换 Map 为普通对象以便序列化
+        const result: Record<string, Array<{
+          flowchartId: string;
+          flowchartName: string;
+          nodeId: string;
+          nodeLabel: string;
+        }>> = {};
+        
+        associations.forEach((value, key) => {
+          result[key] = value;
+        });
+        
+        console.log(`[Flowchart Associations] Queried ${todoIds.length} todos, found ${Object.keys(result).length} with associations`);
+        
+        return result;
+      } catch (error) {
+        console.error('Error getting flowchart associations:', error);
+        return {};
+      }
+    });
   }
 
   public async initialize(): Promise<void> {
