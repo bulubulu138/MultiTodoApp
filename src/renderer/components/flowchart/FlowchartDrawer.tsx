@@ -85,12 +85,15 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
           message.error('加载流程图失败');
           onClose();
         }
-      } else if (!currentFlowchart) {
-        // 创建新流程图，显示模板选择
+      } else {
+        // 创建新流程图：清除状态并显示模板选择
+        setCurrentFlowchart(null);
+        setNodes([]);
+        setEdges([]);
         setShowTemplateModal(true);
       }
     }
-  }, [visible, flowchartId, currentFlowchart, message, onClose]);
+  }, [visible, flowchartId, message, onClose]);
 
   // 从模板创建流程图 - 第一步：显示名称输入框
   const handleCreateFromTemplate = useCallback((template: FlowchartTemplate) => {

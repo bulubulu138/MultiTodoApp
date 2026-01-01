@@ -53,6 +53,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const [showFlowchart, setShowFlowchart] = useState(false);
   const [currentFlowchartId, setCurrentFlowchartId] = useState<string | null>(null);
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
+  const [flowchartDrawerKey, setFlowchartDrawerKey] = useState(0);
   const [showCustomTabManager, setShowCustomTabManager] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [viewingTodo, setViewingTodo] = useState<Todo | null>(null);
@@ -927,6 +928,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   // 创建新流程图
   const handleCreateNewFlowchart = useCallback(() => {
     setCurrentFlowchartId(null);
+    setHighlightedNodeId(null);
+    setFlowchartDrawerKey(prev => prev + 1); // 强制重新挂载FlowchartDrawer
     setShowFlowchart(true);
   }, []);
 
@@ -1130,6 +1133,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       />
 
       <FlowchartDrawer
+        key={flowchartDrawerKey}
         visible={showFlowchart}
         todos={todos}
         onClose={handleCloseFlowchart}
