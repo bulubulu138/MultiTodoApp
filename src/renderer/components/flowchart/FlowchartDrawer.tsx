@@ -69,24 +69,42 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
     if (visible) {
       if (flowchartId) {
         // 加载特定的流程图
+        console.log(`[加载] 尝试加载流程图 ID: ${flowchartId}`);
         try {
           const key = `flowchart_${flowchartId}`;
-          const data = JSON.parse(localStorage.getItem(key) || '{}');
+          console.log(`[加载] localStorage key: ${key}`);
+          
+          const rawData = localStorage.getItem(key);
+          console.log(`[加载] 原始数据长度: ${rawData?.length || 0}`);
+          
+          const data = JSON.parse(rawData || '{}');
+          
           if (data.schema && data.nodes && data.edges) {
+            console.log(`[加载] 成功加载流程图: ${data.schema.name}`);
+            console.log(`[加载] 流程图ID: ${data.schema.id}`);
+            console.log(`[加载] 节点数: ${data.nodes.length}, 边数: ${data.edges.length}`);
+            console.log(`[加载] 节点ID列表:`, data.nodes.map((n: any) => n.id).join(', '));
+            
             setCurrentFlowchart(data.schema);
             setNodes(data.nodes);
             setEdges(data.edges);
           } else {
+            console.error(`[加载] 数据不完整:`, { 
+              hasSchema: !!data.schema, 
+              hasNodes: !!data.nodes, 
+              hasEdges: !!data.edges 
+            });
             message.error('流程图数据不存在');
             onClose();
           }
         } catch (error) {
-          console.error('Failed to load flowchart:', error);
+          console.error('[加载] 加载失败:', error);
           message.error('加载流程图失败');
           onClose();
         }
       } else {
         // 创建新流程图：清除状态并显示模板选择
+        console.log('[加载] 创建新流程图，显示模板选择');
         setCurrentFlowchart(null);
         setNodes([]);
         setEdges([]);
@@ -111,12 +129,28 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
       const { schema, nodes: templateNodes, edges: templateEdges } = 
         TemplateService.createFromTemplate(selectedTemplate, nameInputValue.trim());
 
+      console.log(`[创建] 创建新流程图: ${schema.name}`);
+      console.log(`[创建] 流程图ID: ${schema.id}`);
+      console.log(`[创建] 节点数: ${templateNodes.length}, 边数: ${templateEdges.length}`);
+      console.log(`[创建] 节点ID列表:`, templateNodes.map(n => n.id).join(', '));
+
       setCurrentFlowchart(schema);
       setNodes(templateNodes);
       setEdges(templateEdges);
       setShowNameInputModal(false);
       setSelectedTemplate(null);
       setNameInputValue('');
+
+      // 立即保存新创建的流程图
+      const key = `flowchart_${schema.id}`;
+      const data = {
+        schema,
+        nodes: templateNodes,
+        edges: templateEdges,
+        updatedAt: Date.now()
+      };
+      localStorage.setItem(key, JSON.stringify(data));
+      console.log(`[创建] 已保存到 localStorage key: ${key}`);
 
       // 性能监控：检查流程图规模
       PerformanceMonitor.warnLargeFlowchart(templateNodes.length, templateEdges.length);
@@ -126,7 +160,7 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
       console.error('Failed to create flowchart from template:', error);
       message.error('创建流程图失败');
     }
-  }, [selectedTemplate, nameInputValue]);
+  }, [selectedTemplate, nameInputValue, message]);
 
   // 取消名称输入
   const handleCancelNameInput = useCallback(() => {
@@ -148,17 +182,34 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
       PerformanceMonitor.start('flowchart-save');
       
       const key = `flowchart_${currentFlowchart.id}`;
+      
+      // 更新 schema 的 updatedAt
+      const updatedSchema = {
+        ...currentFlowchart,
+        updatedAt: Date.now()
+      };
+      
       const data = {
-        schema: currentFlowchart,
+        schema: updatedSchema,
         nodes,
         edges,
         updatedAt: Date.now()
       };
       
-      console.log(`[保存] 保存流程图 ${currentFlowchart.id} (${currentFlowchart.name})`);
+      console.log(`[保存] 保存流程图到 key: ${key}`);
+      console.log(`[保存] 流程图ID: ${currentFlowchart.id}`);
+      console.log(`[保存] 流程图名称: ${currentFlowchart.name}`);
       console.log(`[保存] 节点数: ${nodes.length}, 边数: ${edges.length}`);
+      console.log(`[保存] 节点ID列表:`, nodes.map(n => n.id).join(', '));
       
       localStorage.setItem(key, JSON.stringify(data));
+      
+      // 验证保存
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        console.log(`[保存] 验证：已保存 ${parsed.nodes.length} 个节点`);
+      }
       
       const duration = PerformanceMonitor.end('flowchart-save');
       if (duration > 500) {
