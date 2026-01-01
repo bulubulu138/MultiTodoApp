@@ -91,3 +91,199 @@ export interface BackupInfo {
   size: number;
   createdAt: string;
 }
+
+// ============================================
+// 流程图类型定义 (Flowchart Types)
+// ============================================
+
+// 节点和边的类型别名
+export type NodeType = 'rectangle' | 'rounded-rectangle' | 'diamond' | 'circle' | 'todo';
+export type EdgeType = 'default' | 'smoothstep' | 'step' | 'straight';
+export type ExportFormat = 'json' | 'mermaid' | 'text' | 'png';
+
+// 节点样式
+export interface NodeStyle {
+  backgroundColor?: string;
+  borderColor?: string;
+  borderWidth?: number;
+  borderStyle?: 'solid' | 'dashed';
+  fontSize?: number;
+}
+
+// 边样式
+export interface EdgeStyle {
+  stroke?: string;
+  strokeWidth?: number;
+  strokeDasharray?: string;
+}
+
+// 视口配置
+export interface ViewportSchema {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
+// ============================================
+// 1️⃣ 持久化层 (Persistence Layer)
+// 纯数据，直接映射数据库，不包含任何运行时状态
+// ============================================
+
+export interface FlowchartSchema {
+  id: string;
+  name: string;
+  description?: string;
+  viewport: ViewportSchema;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface PersistedNodeData {
+  label: string;
+  todoId?: string;  // 只存 ID，不存实体
+  style?: NodeStyle;
+  isLocked?: boolean;
+}
+
+export interface PersistedNode {
+  id: string;
+  type: NodeType;
+  position: { x: number; y: number };
+  data: PersistedNodeData;
+}
+
+export interface PersistedEdge {
+  id: string;
+  source: string;
+  target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
+  type?: EdgeType;
+  label?: string;
+  style?: EdgeStyle;
+}
+
+// ============================================
+// 2️⃣ 业务领域层 (Domain Layer)
+// 包含业务逻辑增强，如关联的 Todo 数据、计算的样式
+// ============================================
+
+export interface ResolvedTodo {
+  title: string;
+  status: Todo['status'];
+  priority: Todo['priority'];
+}
+
+export interface DomainNodeData {
+  label: string;
+  todoId?: string;
+  // 运行时解析的 Todo 数据（通过 selector/hook 计算）
+  resolvedTodo?: ResolvedTodo;
+  // 计算后的样式（基于 Todo 状态）
+  computedStyle?: NodeStyle;
+  // 用户自定义样式（优先级高于计算样式）
+  style?: NodeStyle;
+  isLocked?: boolean;
+}
+
+export interface DomainNode {
+  id: string;
+  type: NodeType;
+  position: { x: number; y: number };
+  data: DomainNodeData;
+}
+
+export interface DomainEdge {
+  id: string;
+  source: string;
+  target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
+  type?: EdgeType;
+  label?: string;
+  style?: EdgeStyle;
+}
+
+export interface FlowchartDomain {
+  schema: FlowchartSchema;
+  nodes: DomainNode[];
+  edges: DomainEdge[];
+}
+
+// ============================================
+// 3️⃣ UI 运行时层 (Runtime Layer)
+// React Flow 使用的格式，包含 UI 状态
+// ============================================
+
+export interface RuntimeNodeData extends DomainNodeData {
+  // UI 特有的临时状态
+  isHovered?: boolean;
+  isDragging?: boolean;
+}
+
+// React Flow Node 格式（简化版，实际使用时会扩展 React Flow 的 Node 类型）
+export interface RuntimeNode {
+  id: string;
+  type: NodeType;
+  position: { x: number; y: number };
+  data: RuntimeNodeData;
+  selected?: boolean;
+  dragging?: boolean;
+}
+
+// React Flow Edge 格式（简化版，实际使用时会扩展 React Flow 的 Edge 类型）
+export interface RuntimeEdge {
+  id: string;
+  source: string;
+  target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
+  type?: EdgeType;
+  label?: string;
+  style?: EdgeStyle;
+  selected?: boolean;
+}
+
+export interface UIState {
+  selectedNodeIds: string[];
+  selectedEdgeIds: string[];
+  isDragging: boolean;
+  isConnecting: boolean;
+  viewport: ViewportSchema;
+}
+
+export interface FlowchartRuntime {
+  nodes: RuntimeNode[];
+  edges: RuntimeEdge[];
+  uiState: UIState;
+}
+
+// ============================================
+// 增量更新模型 (Patch Model)
+// 用于 Undo/Redo、协作、AI 编辑
+// ============================================
+
+export type FlowchartPatch =
+  | { type: 'addNode'; node: PersistedNode }
+  | { type: 'updateNode'; id: string; changes: Partial<PersistedNode> }
+  | { type: 'removeNode'; id: string }
+  | { type: 'addEdge'; edge: PersistedEdge }
+  | { type: 'updateEdge'; id: string; changes: Partial<PersistedEdge> }
+  | { type: 'removeEdge'; id: string }
+  | { type: 'updateViewport'; viewport: ViewportSchema }
+  | { type: 'updateMetadata'; changes: Partial<FlowchartSchema> };
+
+export interface PatchHistory {
+  patches: FlowchartPatch[];
+  currentIndex: number;
+}
+
+// ============================================
+// 导出相关类型
+// ============================================
+
+export interface ExportResult {
+  format: ExportFormat;
+  content: string;
+  filename: string;
+}

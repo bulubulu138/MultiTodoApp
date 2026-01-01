@@ -85,7 +85,53 @@ export class DatabaseManager {
         content TEXT NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
-      )`
+      )`,
+      
+      // 流程图相关表
+      `CREATE TABLE IF NOT EXISTS flowcharts (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        viewport TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      
+      `CREATE INDEX IF NOT EXISTS idx_flowcharts_updated_at ON flowcharts(updated_at)`,
+      
+      `CREATE TABLE IF NOT EXISTS flowchart_nodes (
+        id TEXT PRIMARY KEY,
+        flowchart_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        position TEXT NOT NULL,
+        data TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (flowchart_id) REFERENCES flowcharts(id) ON DELETE CASCADE
+      )`,
+      
+      `CREATE INDEX IF NOT EXISTS idx_flowchart_nodes_flowchart_id ON flowchart_nodes(flowchart_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_flowchart_nodes_updated_at ON flowchart_nodes(updated_at)`,
+      
+      `CREATE TABLE IF NOT EXISTS flowchart_edges (
+        id TEXT PRIMARY KEY,
+        flowchart_id TEXT NOT NULL,
+        source TEXT NOT NULL,
+        target TEXT NOT NULL,
+        source_handle TEXT,
+        target_handle TEXT,
+        type TEXT DEFAULT 'default',
+        label TEXT,
+        style TEXT,
+        connection_hash TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (flowchart_id) REFERENCES flowcharts(id) ON DELETE CASCADE
+      )`,
+      
+      `CREATE INDEX IF NOT EXISTS idx_flowchart_edges_flowchart_id ON flowchart_edges(flowchart_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_flowchart_edges_connection_hash ON flowchart_edges(connection_hash)`,
+      `CREATE INDEX IF NOT EXISTS idx_flowchart_edges_updated_at ON flowchart_edges(updated_at)`
     ];
 
     for (const sql of tables) {
