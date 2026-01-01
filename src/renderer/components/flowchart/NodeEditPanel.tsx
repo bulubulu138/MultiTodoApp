@@ -116,6 +116,7 @@ export const NodeEditPanel: React.FC<NodeEditPanelProps> = ({
           <Input.TextArea
             rows={3}
             placeholder="输入节点文本"
+            onKeyDown={(e) => e.stopPropagation()}
           />
         </Form.Item>
 

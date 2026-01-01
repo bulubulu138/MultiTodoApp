@@ -1,16 +1,19 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { LockOutlined, CheckCircleOutlined, ClockCircleOutlined, PauseCircleOutlined } from '@ant-design/icons';
 import { RuntimeNodeData } from '../../../shared/types';
+import { InlineTextEditor } from './InlineTextEditor';
 
 /**
  * TodoNode - 关联待办任务的节点组件
  * 
  * 从 resolvedTodo 读取数据，不直接依赖 Todo 实体
  * 根据任务状态显示计算后的样式
+ * 支持双击内联编辑
  */
-export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ data, selected }) => {
+export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selected }) => {
   const { label, resolvedTodo, computedStyle, isLocked } = data;
+  const [isEditing, setIsEditing] = useState(false);
 
   // 优先使用任务标题，否则使用节点 label
   const displayLabel = resolvedTodo?.title || label;
@@ -21,6 +24,24 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ data, selected 
     borderColor: '#333',
     borderWidth: 2
   };
+
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    if (!isLocked) {
+      e.stopPropagation();
+      setIsEditing(true);
+    }
+  }, [isLocked]);
+
+  const handleSave = useCallback((newLabel: string) => {
+    window.dispatchEvent(new CustomEvent('node-label-change', {
+      detail: { nodeId: id, newLabel }
+    }));
+    setIsEditing(false);
+  }, [id]);
+
+  const handleCancel = useCallback(() => {
+    setIsEditing(false);
+  }, []);
 
   // 获取状态图标
   const getStatusIcon = () => {
@@ -72,6 +93,24 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ data, selected 
     );
   };
 
+  if (isEditing) {
+    return (
+      <div style={{ minWidth: '150px', maxWidth: '250px' }}>
+        <InlineTextEditor
+          value={label}
+          onSave={handleSave}
+          onCancel={handleCancel}
+          multiline={true}
+          style={{
+            fontSize: style.fontSize || 14,
+            color: '#fff',
+            backgroundColor: style.backgroundColor
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
@@ -87,6 +126,7 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ data, selected 
         color: '#fff',
         fontWeight: 500
       }}
+      onDoubleClick={handleDoubleClick}
     >
       <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
 
@@ -104,7 +144,7 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ data, selected 
       )}
 
       {/* 节点内容 */}
-      <div>
+      <div style={{ cursor: isLocked ? 'default' : 'text' }}>
         <div style={{ 
           fontSize: style.fontSize || 14,
           marginBottom: resolvedTodo ? '6px' : 0,

@@ -29,6 +29,7 @@ import { FlowchartPatchService } from '../services/FlowchartPatchService';
 import { UndoRedoManager } from '../services/UndoRedoManager';
 import { nodeTypes } from './flowchart/nodeTypes';
 import { NodeEditPanel } from './flowchart/NodeEditPanel';
+import { NodeContextMenu } from './flowchart/NodeContextMenu';
 import { wouldCreateCycle } from '../utils/cycleDetection';
 
 interface FlowchartCanvasProps {
@@ -79,6 +80,20 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
 
   // 7. 节点编辑状态
   const [editingNode, setEditingNode] = useState<{ id: string; data: RuntimeNodeData } | null>(null);
+  const [inlineEditingNodeId, setInlineEditingNodeId] = useState<string | null>(null);
+
+  // 8. 右键菜单状态
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    nodeId: string | null;
+  }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    nodeId: null
+  });
 
   // 5. 当持久化数据变化时，更新运行时数据
   // 使用 setNodes 的函数式更新，保留拖动状态
@@ -135,13 +150,109 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     onPatchesApplied(patches);
   }, [persistedNodes, persistedEdges, onPatchesApplied]);
 
-  // 7. 处理节点双击编辑
+  // 7. 处理节点双击编辑 - 启用内联编辑
   const handleNodeDoubleClick = useCallback((_event: React.MouseEvent, node: Node) => {
-    setEditingNode({
-      id: node.id,
-      data: node.data as RuntimeNodeData
+    // 双击启用内联编辑模式
+    setInlineEditingNodeId(node.id);
+  }, []);
+
+  // 7.0 处理内联编辑保存
+  const handleInlineEditSave = useCallback((nodeId: string, newLabel: string) => {
+    const node = persistedNodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    const patch: FlowchartPatch = {
+      type: 'updateNode',
+      id: nodeId,
+      changes: {
+        data: {
+          ...node.data,
+          label: newLabel
+        }
+      }
+    };
+
+    applyPatches([patch]);
+    setInlineEditingNodeId(null);
+  }, [persistedNodes, applyPatches]);
+
+  // 7.1 处理节点右键菜单
+  const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
+    event.preventDefault();
+    setContextMenu({
+      visible: true,
+      x: event.clientX,
+      y: event.clientY,
+      nodeId: node.id
     });
   }, []);
+
+  // 7.2 打开详细编辑抽屉
+  const handleOpenDetailEdit = useCallback(() => {
+    if (!contextMenu.nodeId) return;
+    const node = runtimeNodes.find(n => n.id === contextMenu.nodeId);
+    if (node) {
+      setEditingNode({
+        id: node.id,
+        data: node.data as RuntimeNodeData
+      });
+    }
+  }, [contextMenu.nodeId, runtimeNodes]);
+
+  // 7.3 切换节点锁定状态
+  const handleToggleLock = useCallback(() => {
+    if (!contextMenu.nodeId) return;
+    const node = persistedNodes.find(n => n.id === contextMenu.nodeId);
+    if (!node) return;
+
+    const patch: FlowchartPatch = {
+      type: 'updateNode',
+      id: contextMenu.nodeId,
+      changes: {
+        data: {
+          ...node.data,
+          isLocked: !node.data.isLocked
+        }
+      }
+    };
+
+    applyPatches([patch]);
+  }, [contextMenu.nodeId, persistedNodes, applyPatches]);
+
+  // 7.4 复制节点
+  const handleCopyNode = useCallback(() => {
+    if (!contextMenu.nodeId) return;
+    const node = persistedNodes.find(n => n.id === contextMenu.nodeId);
+    if (!node) return;
+
+    const newNode: PersistedNode = {
+      ...node,
+      id: `node-${Date.now()}`,
+      position: {
+        x: node.position.x + 50,
+        y: node.position.y + 50
+      }
+    };
+
+    const patch: FlowchartPatch = {
+      type: 'addNode',
+      node: newNode
+    };
+
+    applyPatches([patch]);
+  }, [contextMenu.nodeId, persistedNodes, applyPatches]);
+
+  // 7.5 删除节点（从右键菜单）
+  const handleDeleteNode = useCallback(() => {
+    if (!contextMenu.nodeId) return;
+
+    const patch: FlowchartPatch = {
+      type: 'removeNode',
+      id: contextMenu.nodeId
+    };
+
+    applyPatches([patch]);
+  }, [contextMenu.nodeId, applyPatches]);
 
   // 8. 处理节点编辑保存
   const handleNodeEditSave = useCallback((updates: Partial<RuntimeNodeData>) => {
@@ -385,9 +496,20 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     setRuntimeEdges(edges => edges.map(edge => ({ ...edge, selected: true })));
   }, [setRuntimeNodes, setRuntimeEdges]);
 
-  // 17. 键盘快捷键
+  // 17. 键盘快捷键 - 改进：检查编辑状态
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // 检查是否在输入框中
+      const target = event.target as HTMLElement;
+      const isInputField = target.tagName === 'INPUT' || 
+                          target.tagName === 'TEXTAREA' || 
+                          target.isContentEditable;
+
+      // 如果在输入框中，不处理全局快捷键（除了 Escape）
+      if (isInputField && event.key !== 'Escape') {
+        return;
+      }
+
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
       const ctrlKey = isMac ? event.metaKey : event.ctrlKey;
 
@@ -401,21 +523,53 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
         event.preventDefault();
         handleRedo();
       }
-      // Delete 或 Backspace: 删除选中元素
-      else if (event.key === 'Delete' || event.key === 'Backspace') {
+      // Delete 或 Backspace: 删除选中元素（仅在非输入状态）
+      else if ((event.key === 'Delete' || event.key === 'Backspace') && !isInputField) {
         event.preventDefault();
         handleDelete();
       }
       // Ctrl/Cmd+A: 全选
-      else if (ctrlKey && event.key === 'a') {
+      else if (ctrlKey && event.key === 'a' && !isInputField) {
         event.preventDefault();
         handleSelectAll();
+      }
+      // Escape: 关闭上下文菜单和编辑面板
+      else if (event.key === 'Escape') {
+        setContextMenu({ visible: false, x: 0, y: 0, nodeId: null });
+        setEditingNode(null);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleUndo, handleRedo, handleDelete, handleSelectAll]);
+
+  // 18. 监听节点标签变化事件
+  useEffect(() => {
+    const handleNodeLabelChange = (event: Event) => {
+      const customEvent = event as CustomEvent<{ nodeId: string; newLabel: string }>;
+      const { nodeId, newLabel } = customEvent.detail;
+
+      const node = persistedNodes.find(n => n.id === nodeId);
+      if (!node) return;
+
+      const patch: FlowchartPatch = {
+        type: 'updateNode',
+        id: nodeId,
+        changes: {
+          data: {
+            ...node.data,
+            label: newLabel
+          }
+        }
+      };
+
+      applyPatches([patch]);
+    };
+
+    window.addEventListener('node-label-change', handleNodeLabelChange);
+    return () => window.removeEventListener('node-label-change', handleNodeLabelChange);
+  }, [persistedNodes, applyPatches]);
 
   return (
     <div 
@@ -430,6 +584,7 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
         onEdgesChange={handleEdgesChange}
         onConnect={handleConnect}
         onNodeDoubleClick={handleNodeDoubleClick}
+        onNodeContextMenu={handleNodeContextMenu}
         nodeTypes={nodeTypes}
         fitView
         attributionPosition="bottom-left"
@@ -438,6 +593,23 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
         <Controls />
         <MiniMap />
       </ReactFlow>
+
+      <NodeContextMenu
+        visible={contextMenu.visible}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        nodeId={contextMenu.nodeId}
+        isLocked={
+          contextMenu.nodeId
+            ? persistedNodes.find(n => n.id === contextMenu.nodeId)?.data.isLocked || false
+            : false
+        }
+        onOpenDetailEdit={handleOpenDetailEdit}
+        onToggleLock={handleToggleLock}
+        onCopy={handleCopyNode}
+        onDelete={handleDeleteNode}
+        onClose={() => setContextMenu({ visible: false, x: 0, y: 0, nodeId: null })}
+      />
 
       <NodeEditPanel
         visible={!!editingNode}

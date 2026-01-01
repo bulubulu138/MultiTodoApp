@@ -1,13 +1,16 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { LockOutlined } from '@ant-design/icons';
 import { RuntimeNodeData } from '../../../shared/types';
+import { InlineTextEditor } from './InlineTextEditor';
 
 /**
  * CircleNode - 圆形节点组件（用于开始/结束点）
+ * 支持双击内联编辑
  */
-export const CircleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ data, selected }) => {
+export const CircleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selected }) => {
   const { label, computedStyle, isLocked } = data;
+  const [isEditing, setIsEditing] = useState(false);
 
   const style = computedStyle || {
     backgroundColor: '#fff',
@@ -15,8 +18,43 @@ export const CircleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ data, selecte
     borderWidth: 2
   };
 
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    if (!isLocked) {
+      e.stopPropagation();
+      setIsEditing(true);
+    }
+  }, [isLocked]);
+
+  const handleSave = useCallback((newLabel: string) => {
+    window.dispatchEvent(new CustomEvent('node-label-change', {
+      detail: { nodeId: id, newLabel }
+    }));
+    setIsEditing(false);
+  }, [id]);
+
+  const handleCancel = useCallback(() => {
+    setIsEditing(false);
+  }, []);
+
+  if (isEditing) {
+    return (
+      <div style={{ minWidth: '100px', maxWidth: '120px' }}>
+        <InlineTextEditor
+          value={label}
+          onSave={handleSave}
+          onCancel={handleCancel}
+          multiline={false}
+          style={{
+            fontSize: style.fontSize || 12,
+            textAlign: 'center'
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative' }} onDoubleClick={handleDoubleClick}>
       <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
 
       <div
@@ -53,7 +91,8 @@ export const CircleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ data, selecte
             wordBreak: 'break-word',
             textAlign: 'center',
             maxWidth: '60px',
-            padding: '4px'
+            padding: '4px',
+            cursor: isLocked ? 'default' : 'text'
           }}
         >
           {label}
