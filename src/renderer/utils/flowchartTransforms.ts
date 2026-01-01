@@ -1,4 +1,4 @@
-import { Node, Edge } from 'reactflow';
+import { Node, Edge, MarkerType } from 'reactflow';
 import { DomainNode, DomainEdge, RuntimeNode, RuntimeEdge } from '../../shared/types';
 
 /**
@@ -30,24 +30,12 @@ export function toRuntimeEdge(domainEdge: DomainEdge): Edge {
     targetHandle: domainEdge.targetHandle,
     type: domainEdge.type || 'default',
     label: domainEdge.label,
-    style: domainEdge.style
-  };
-
-  // 添加箭头标记
-  if (domainEdge.markerEnd) {
-    edge.markerEnd = {
-      type: domainEdge.markerEnd === 'none' ? undefined : domainEdge.markerEnd
-    };
-  } else {
+    style: domainEdge.style,
     // 默认使用箭头
-    edge.markerEnd = { type: 'arrowclosed' };
-  }
-
-  if (domainEdge.markerStart && domainEdge.markerStart !== 'none') {
-    edge.markerStart = {
-      type: domainEdge.markerStart
-    };
-  }
+    markerEnd: {
+      type: MarkerType.ArrowClosed
+    }
+  };
 
   return edge;
 }
