@@ -7,11 +7,8 @@ import { FlowchartPatch, PatchHistory } from '../../shared/types';
  * 使用 Patch 模型记录所有操作
  */
 export class UndoRedoManager {
-  private history: PatchHistory = {
-    patches: [],
-    currentIndex: -1
-  };
-
+  private history: FlowchartPatch[] = [];
+  private currentIndex: number = -1;
   private maxHistorySize: number = 100;
 
   /**
@@ -21,17 +18,17 @@ export class UndoRedoManager {
    */
   execute(patch: FlowchartPatch, originalData?: any): void {
     // 清除当前位置之后的历史（如果用户在撤销后执行了新操作）
-    if (this.currentIndex < this.history.patches.length - 1) {
-      this.history.patches = this.history.patches.slice(0, this.currentIndex + 1);
+    if (this.currentIndex < this.history.length - 1) {
+      this.history = this.history.slice(0, this.currentIndex + 1);
     }
 
     // 添加新 patch
-    this.history.patches.push(patch);
+    this.history.push(patch);
     this.currentIndex++;
 
     // 限制历史记录大小
-    if (this.history.patches.length > this.maxHistorySize) {
-      this.history.patches.shift();
+    if (this.history.length > this.maxHistorySize) {
+      this.history.shift();
       this.currentIndex--;
     }
   }
@@ -45,7 +42,7 @@ export class UndoRedoManager {
       return null;
     }
 
-    const patch = this.history.patches[this.currentIndex];
+    const patch = this.history[this.currentIndex];
     this.currentIndex--;
     return patch;
   }
@@ -60,7 +57,7 @@ export class UndoRedoManager {
     }
 
     this.currentIndex++;
-    const patch = this.history.patches[this.currentIndex];
+    const patch = this.history[this.currentIndex];
     return patch;
   }
 
@@ -75,31 +72,32 @@ export class UndoRedoManager {
    * 检查是否可以重做
    */
   canRedo(): boolean {
-    return this.currentIndex < this.history.patches.length - 1;
+    return this.currentIndex < this.history.length - 1;
   }
 
   /**
    * 获取当前历史状态
    */
   getHistory(): PatchHistory {
-    return { ...this.history };
+    return {
+      patches: [...this.history],
+      currentIndex: this.currentIndex
+    };
   }
 
   /**
    * 清空历史记录
    */
   clear(): void {
-    this.history = {
-      patches: [],
-      currentIndex: -1
-    };
+    this.history = [];
+    this.currentIndex = -1;
   }
 
   /**
    * 获取历史记录大小
    */
   getHistorySize(): number {
-    return this.history.patches.length;
+    return this.history.length;
   }
 
   /**
@@ -116,9 +114,9 @@ export class UndoRedoManager {
     this.maxHistorySize = size;
     
     // 如果当前历史超过新的限制，裁剪旧记录
-    if (this.history.patches.length > size) {
-      const excess = this.history.patches.length - size;
-      this.history.patches = this.history.patches.slice(excess);
+    if (this.history.length > size) {
+      const excess = this.history.length - size;
+      this.history = this.history.slice(excess);
       this.currentIndex = Math.max(-1, this.currentIndex - excess);
     }
   }
