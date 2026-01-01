@@ -63,6 +63,15 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
   const [persistedNodes, setPersistedNodes] = useState<PersistedNode[]>(initialPersistedNodes);
   const [persistedEdges, setPersistedEdges] = useState<PersistedEdge[]>(initialPersistedEdges);
 
+  // 1.1 监听 props 变化，更新持久化层数据（修复：切换流程图时数据不更新的问题）
+  useEffect(() => {
+    console.log('[FlowchartCanvas] Props changed, updating persisted data');
+    console.log('[FlowchartCanvas] New nodes count:', initialPersistedNodes.length);
+    console.log('[FlowchartCanvas] New edges count:', initialPersistedEdges.length);
+    setPersistedNodes(initialPersistedNodes);
+    setPersistedEdges(initialPersistedEdges);
+  }, [initialPersistedNodes, initialPersistedEdges]);
+
   // 2. 通过 selector 计算业务领域层数据
   const domainNodes = useDomainNodes(persistedNodes, todos);
   const domainEdges = useMemo(() => persistedEdges, [persistedEdges]);
