@@ -12,6 +12,7 @@ import { FlowchartAssociation } from '../../shared/types';
  * - 监听 todoIds 变化，自动重新查询
  * - 提供 refresh 方法手动刷新
  * - 错误处理：查询失败时返回空 Map，不阻塞 UI
+ * - 性能优化：超过 100 个待办时分批查询
  */
 
 interface UseFlowchartAssociationsResult {
@@ -25,12 +26,48 @@ interface UseFlowchartAssociationsResult {
   refresh: () => Promise<void>;
 }
 
+// 批量查询的批次大小
+const BATCH_SIZE = 100;
+
 export function useFlowchartAssociations(
   todoIds: number[]
 ): UseFlowchartAssociationsResult {
   const [associationsData, setAssociationsData] = useState<Record<string, FlowchartAssociation[]>>({});
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
+
+  // 分批查询方法（性能优化）
+  const fetchAssociationsInBatches = useCallback(async (ids: number[]) => {
+    if (!ids || ids.length === 0) {
+      return {};
+    }
+
+    // 如果数量少于批次大小，直接查询
+    if (ids.length <= BATCH_SIZE) {
+      return await window.electronAPI.flowchart.getAssociationsByTodoIds(ids);
+    }
+
+    // 分批查询
+    console.log(`[性能优化] 待办数量 ${ids.length} 超过阈值，使用分批查询`);
+    const batches: number[][] = [];
+    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+      batches.push(ids.slice(i, i + BATCH_SIZE));
+    }
+
+    // 并行执行所有批次
+    const results = await Promise.all(
+      batches.map(batch => window.electronAPI.flowchart.getAssociationsByTodoIds(batch))
+    );
+
+    // 合并结果
+    const merged: Record<string, FlowchartAssociation[]> = {};
+    results.forEach(result => {
+      Object.assign(merged, result);
+    });
+
+    console.log(`[性能优化] 分批查询完成，共 ${batches.length} 批`);
+    return merged;
+  }, []);
 
   // 查询关联数据的核心方法
   const fetchAssociations = useCallback(async (ids: number[]) => {
@@ -44,7 +81,7 @@ export function useFlowchartAssociations(
     setError(null);
 
     try {
-      const result = await window.electronAPI.flowchart.getAssociationsByTodoIds(ids);
+      const result = await fetchAssociationsInBatches(ids);
       setAssociationsData(result);
     } catch (err) {
       console.error('Failed to load flowchart associations:', err);
@@ -54,11 +91,24 @@ export function useFlowchartAssociations(
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchAssociationsInBatches]);
 
   // 监听 todoIds 变化，自动重新查询
   useEffect(() => {
     fetchAssociations(todoIds);
+  }, [todoIds, fetchAssociations]);
+
+  // 监听流程图删除事件，自动刷新关联数据
+  useEffect(() => {
+    const handleFlowchartDeleted = () => {
+      console.log('[useFlowchartAssociations] 检测到流程图删除，刷新关联数据');
+      fetchAssociations(todoIds);
+    };
+
+    window.addEventListener('flowchart-deleted', handleFlowchartDeleted);
+    return () => {
+      window.removeEventListener('flowchart-deleted', handleFlowchartDeleted);
+    };
   }, [todoIds, fetchAssociations]);
 
   // 将 Record 转换为 Map（使用 useMemo 缓存）

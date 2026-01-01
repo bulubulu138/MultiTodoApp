@@ -222,6 +222,7 @@ export interface RuntimeNodeData extends DomainNodeData {
   // UI 特有的临时状态
   isHovered?: boolean;
   isDragging?: boolean;
+  isHighlighted?: boolean;
 }
 
 // React Flow Node 格式（简化版，实际使用时会扩展 React Flow 的 Node 类型）

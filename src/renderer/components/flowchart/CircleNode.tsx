@@ -9,7 +9,7 @@ import { InlineTextEditor } from './InlineTextEditor';
  * 支持双击内联编辑
  */
 export const CircleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selected }) => {
-  const { label, computedStyle, isLocked } = data;
+  const { label, computedStyle, isLocked, isHighlighted } = data;
   const [isEditing, setIsEditing] = useState(false);
 
   const style = computedStyle || {
@@ -36,6 +36,12 @@ export const CircleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, sel
     setIsEditing(false);
   }, []);
 
+  // 高亮样式
+  const highlightStyle = isHighlighted ? {
+    boxShadow: '0 0 0 3px #722ed1, 0 0 20px rgba(114, 46, 209, 0.5)',
+    animation: 'pulse 1s ease-in-out 3'
+  } : {};
+
   if (isEditing) {
     return (
       <div style={{ minWidth: '100px', maxWidth: '120px' }}>
@@ -54,24 +60,34 @@ export const CircleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, sel
   }
 
   return (
-    <div style={{ position: 'relative' }} onDoubleClick={handleDoubleClick}>
-      <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
+    <>
+      <style>
+        {`
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+          }
+        `}
+      </style>
+      <div style={{ position: 'relative' }} onDoubleClick={handleDoubleClick}>
+        <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
 
-      <div
-        style={{
-          width: '80px',
-          height: '80px',
-          borderRadius: '50%',
-          border: `${style.borderWidth}px ${style.borderStyle || 'solid'} ${style.borderColor}`,
-          backgroundColor: style.backgroundColor,
-          boxShadow: selected ? '0 0 0 2px #1890ff' : '0 2px 4px rgba(0,0,0,0.1)',
-          transition: 'all 0.2s',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          position: 'relative'
-        }}
-      >
+        <div
+          style={{
+            width: '80px',
+            height: '80px',
+            borderRadius: '50%',
+            border: `${style.borderWidth}px ${style.borderStyle || 'solid'} ${style.borderColor}`,
+            backgroundColor: style.backgroundColor,
+            boxShadow: selected ? '0 0 0 2px #1890ff' : '0 2px 4px rgba(0,0,0,0.1)',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
+            ...highlightStyle
+          }}
+        >
         {isLocked && (
           <LockOutlined
             style={{
@@ -101,5 +117,6 @@ export const CircleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, sel
 
       <Handle type="source" position={Position.Bottom} style={{ background: '#555' }} />
     </div>
+    </>
   );
 };

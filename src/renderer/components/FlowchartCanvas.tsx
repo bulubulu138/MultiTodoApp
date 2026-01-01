@@ -38,6 +38,8 @@ interface FlowchartCanvasProps {
   persistedEdges: PersistedEdge[];
   todos: Todo[];
   onPatchesApplied: (patches: FlowchartPatch[]) => void;
+  highlightedNodeId?: string | null;
+  onHighlightComplete?: () => void;
 }
 
 /**
@@ -51,7 +53,9 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
   persistedNodes: initialPersistedNodes,
   persistedEdges: initialPersistedEdges,
   todos,
-  onPatchesApplied
+  onPatchesApplied,
+  highlightedNodeId,
+  onHighlightComplete
 }) => {
   // 1. 持久化层数据
   const [persistedNodes, setPersistedNodes] = useState<PersistedNode[]>(initialPersistedNodes);
@@ -136,6 +140,65 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
   // 5.1 监听 Todo 数据变化（实时同步）
   // 当 todos prop 变化时，domainNodes 会自动重新计算（通过 useDomainNodes）
   // 这样就实现了任务数据的实时同步
+
+  // 5.2 高亮节点功能
+  useEffect(() => {
+    if (highlightedNodeId && reactFlowInstance) {
+      // 查找需要高亮的节点
+      const node = runtimeNodes.find(n => n.id === highlightedNodeId);
+      if (!node) {
+        console.warn(`Node ${highlightedNodeId} not found for highlighting`);
+        return;
+      }
+
+      // 调整视口居中到节点
+      const nodeWidth = 150; // 默认节点宽度
+      const nodeHeight = 50; // 默认节点高度
+      
+      reactFlowInstance.setCenter(
+        node.position.x + nodeWidth / 2,
+        node.position.y + nodeHeight / 2,
+        { zoom: 1.2, duration: 800 }
+      );
+
+      // 添加高亮效果（临时修改节点数据）
+      setRuntimeNodes((nds) =>
+        nds.map((n) => {
+          if (n.id === highlightedNodeId) {
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                isHighlighted: true
+              }
+            };
+          }
+          return n;
+        })
+      );
+
+      // 3秒后移除高亮
+      const timer = setTimeout(() => {
+        setRuntimeNodes((nds) =>
+          nds.map((n) => {
+            if (n.id === highlightedNodeId) {
+              return {
+                ...n,
+                data: {
+                  ...n.data,
+                  isHighlighted: false
+                }
+              };
+            }
+            return n;
+          })
+        );
+        onHighlightComplete?.();
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [highlightedNodeId, runtimeNodes, reactFlowInstance, onHighlightComplete, setRuntimeNodes]);
 
   // 6. 应用 Patches
   const applyPatches = useCallback((patches: FlowchartPatch[]) => {

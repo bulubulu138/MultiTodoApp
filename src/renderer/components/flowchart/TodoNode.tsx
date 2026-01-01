@@ -12,7 +12,7 @@ import { InlineTextEditor } from './InlineTextEditor';
  * 支持双击内联编辑
  */
 export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selected }) => {
-  const { label, resolvedTodo, computedStyle, isLocked } = data;
+  const { label, resolvedTodo, computedStyle, isLocked, isHighlighted } = data;
   const [isEditing, setIsEditing] = useState(false);
 
   // 优先使用任务标题，否则使用节点 label
@@ -42,6 +42,12 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selec
   const handleCancel = useCallback(() => {
     setIsEditing(false);
   }, []);
+
+  // 高亮样式
+  const highlightStyle = isHighlighted ? {
+    boxShadow: '0 0 0 3px #722ed1, 0 0 20px rgba(114, 46, 209, 0.5)',
+    animation: 'pulse 1s ease-in-out 3'
+  } : {};
 
   // 获取状态图标
   const getStatusIcon = () => {
@@ -112,22 +118,32 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selec
   }
 
   return (
-    <div
-      style={{
-        padding: '10px 12px',
-        borderRadius: '6px',
-        border: `${style.borderWidth}px ${selected ? 'solid' : 'solid'} ${style.borderColor}`,
-        backgroundColor: style.backgroundColor,
-        minWidth: '150px',
-        maxWidth: '250px',
-        position: 'relative',
-        boxShadow: selected ? '0 0 0 2px #1890ff' : '0 2px 4px rgba(0,0,0,0.1)',
-        transition: 'all 0.2s',
-        color: '#fff',
-        fontWeight: 500
-      }}
-      onDoubleClick={handleDoubleClick}
-    >
+    <>
+      <style>
+        {`
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+          }
+        `}
+      </style>
+      <div
+        style={{
+          padding: '10px 12px',
+          borderRadius: '6px',
+          border: `${style.borderWidth}px ${selected ? 'solid' : 'solid'} ${style.borderColor}`,
+          backgroundColor: style.backgroundColor,
+          minWidth: '150px',
+          maxWidth: '250px',
+          position: 'relative',
+          boxShadow: selected ? '0 0 0 2px #1890ff' : '0 2px 4px rgba(0,0,0,0.1)',
+          transition: 'all 0.2s',
+          color: '#fff',
+          fontWeight: 500,
+          ...highlightStyle
+        }}
+        onDoubleClick={handleDoubleClick}
+      >
       <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
 
       {/* 锁定图标 */}
@@ -180,5 +196,6 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selec
 
       <Handle type="source" position={Position.Bottom} style={{ background: '#555' }} />
     </div>
+    </>
   );
 };

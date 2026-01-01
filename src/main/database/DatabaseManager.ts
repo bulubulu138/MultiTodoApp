@@ -395,7 +395,7 @@ export class DatabaseManager {
   }
 
   public bulkDeleteTodos(ids: number[]): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
         const transaction = this.db!.transaction(() => {
           // 首先删除相关的关联关系
@@ -413,6 +413,20 @@ export class DatabaseManager {
 
         transaction();
         console.log(`[批量删除] 成功删除 ${ids.length} 个待办事项`);
+        
+        // 异步清理流程图节点引用（不阻塞删除操作）
+        try {
+          const { FlowchartRepository } = await import('./FlowchartRepository');
+          const flowchartRepo = new FlowchartRepository(this.db!);
+          for (const id of ids) {
+            await flowchartRepo.cleanupInvalidTodoReferences(String(id));
+          }
+          console.log(`[数据一致性] 已清理 ${ids.length} 个待办的流程图节点引用`);
+        } catch (cleanupError) {
+          // 清理失败不影响删除操作
+          console.error('[数据一致性] 批量清理流程图节点引用失败:', cleanupError);
+        }
+        
         resolve();
       } catch (error) {
         console.error('[批量删除] 删除失败:', error);
@@ -597,9 +611,31 @@ export class DatabaseManager {
   }
 
   public deleteTodo(id: number): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
-        this.db!.prepare('DELETE FROM todos WHERE id = ?').run(id);
+        // 使用事务确保原子性
+        const transaction = this.db!.transaction(() => {
+          // 1. 删除待办事项
+          this.db!.prepare('DELETE FROM todos WHERE id = ?').run(id);
+          
+          // 2. 清理流程图节点中的 todoId 引用
+          // 注意：这里不删除节点，只是清除 todoId 引用
+          // 节点会显示 "(任务已删除)" 提示
+        });
+        
+        transaction();
+        
+        // 3. 异步清理流程图节点引用（不阻塞删除操作）
+        try {
+          const { FlowchartRepository } = await import('./FlowchartRepository');
+          const flowchartRepo = new FlowchartRepository(this.db!);
+          await flowchartRepo.cleanupInvalidTodoReferences(String(id));
+          console.log(`[数据一致性] 已清理待办 ${id} 的流程图节点引用`);
+        } catch (cleanupError) {
+          // 清理失败不影响删除操作
+          console.error('[数据一致性] 清理流程图节点引用失败:', cleanupError);
+        }
+        
         resolve();
       } catch (error) {
         reject(error);

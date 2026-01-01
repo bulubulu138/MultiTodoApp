@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Tag, Popover, Tooltip, Space, Typography } from 'antd';
 import { PartitionOutlined } from '@ant-design/icons';
 import { FlowchartAssociation } from '../../shared/types';
@@ -23,8 +23,9 @@ interface FlowchartIndicatorProps {
  * - 悬停显示 Tooltip
  * - 点击显示 Popover 列表
  * - 支持点击跳转到流程图
+ * - 性能优化：使用 React.memo 避免不必要的重渲染
  */
-export const FlowchartIndicator: React.FC<FlowchartIndicatorProps> = ({
+export const FlowchartIndicator: React.FC<FlowchartIndicatorProps> = React.memo(({
   todoId,
   associations,
   onNavigate,
@@ -40,17 +41,17 @@ export const FlowchartIndicator: React.FC<FlowchartIndicatorProps> = ({
 
   const count = associations.length;
 
-  // Tooltip 文本
-  const tooltipText = `关联了 ${count} 个流程图节点`;
+  // Tooltip 文本（使用 useMemo 缓存）
+  const tooltipText = useMemo(() => `关联了 ${count} 个流程图节点`, [count]);
 
-  // 处理点击流程图项
-  const handleFlowchartClick = (flowchartId: string, nodeId: string) => {
+  // 处理点击流程图项（使用 useCallback 缓存）
+  const handleFlowchartClick = React.useCallback((flowchartId: string, nodeId: string) => {
     setPopoverVisible(false);
     onNavigate(flowchartId, nodeId);
-  };
+  }, [onNavigate]);
 
-  // Popover 内容
-  const popoverContent = (
+  // Popover 内容（使用 useMemo 缓存）
+  const popoverContent = useMemo(() => (
     <div style={{ maxWidth: 300, maxHeight: 400, overflow: 'auto' }}>
       <Space direction="vertical" size="small" style={{ width: '100%' }}>
         {associations.map((assoc, index) => (
@@ -83,7 +84,7 @@ export const FlowchartIndicator: React.FC<FlowchartIndicatorProps> = ({
         ))}
       </Space>
     </div>
-  );
+  ), [associations, handleFlowchartClick]);
 
   return (
     <Tooltip title={tooltipText} placement="top">
@@ -112,4 +113,15 @@ export const FlowchartIndicator: React.FC<FlowchartIndicatorProps> = ({
       </Popover>
     </Tooltip>
   );
-};
+}, (prevProps, nextProps) => {
+  // 自定义比较函数：只在关键 props 变化时重新渲染
+  return (
+    prevProps.todoId === nextProps.todoId &&
+    prevProps.associations === nextProps.associations &&
+    prevProps.onNavigate === nextProps.onNavigate &&
+    prevProps.size === nextProps.size &&
+    prevProps.showLabel === nextProps.showLabel
+  );
+});
+
+FlowchartIndicator.displayName = 'FlowchartIndicator';

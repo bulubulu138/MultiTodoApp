@@ -52,6 +52,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const [showCalendar, setShowCalendar] = useState(false);
   const [showFlowchart, setShowFlowchart] = useState(false);
   const [currentFlowchartId, setCurrentFlowchartId] = useState<string | null>(null);
+  const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
   const [showCustomTabManager, setShowCustomTabManager] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [viewingTodo, setViewingTodo] = useState<Todo | null>(null);
@@ -933,7 +934,53 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const handleCloseFlowchart = useCallback(() => {
     setShowFlowchart(false);
     setCurrentFlowchartId(null);
+    setHighlightedNodeId(null);
   }, []);
+
+  // 跳转到流程图并高亮节点
+  const handleNavigateToFlowchart = useCallback((flowchartId: string, nodeId: string) => {
+    // 验证流程图是否存在
+    const flowchartKey = `flowchart_${flowchartId}`;
+    const flowchartData = localStorage.getItem(flowchartKey);
+    
+    if (!flowchartData) {
+      message.error('流程图不存在或已被删除');
+      console.error(`[导航错误] 流程图 ${flowchartId} 不存在`);
+      return;
+    }
+    
+    // 验证节点是否存在
+    try {
+      const flowchart = JSON.parse(flowchartData);
+      const nodeExists = flowchart.nodes?.some((node: any) => node.id === nodeId);
+      
+      if (!nodeExists) {
+        message.warning('节点不存在，但已跳转到流程图');
+        console.warn(`[导航警告] 节点 ${nodeId} 在流程图 ${flowchartId} 中不存在`);
+        // 继续跳转，但不高亮节点
+        setHighlightedNodeId(null);
+      } else {
+        // 3. 设置需要高亮的节点 ID
+        setHighlightedNodeId(nodeId);
+      }
+    } catch (parseError) {
+      console.error('[导航错误] 解析流程图数据失败:', parseError);
+      message.error('流程图数据损坏');
+      return;
+    }
+    
+    // 1. 切换到流程图标签页
+    setActiveTab('flowchart');
+    
+    // 2. 设置当前流程图 ID
+    setCurrentFlowchartId(flowchartId);
+    
+    // 4. 打开流程图抽屉
+    setShowFlowchart(true);
+    
+    // 5. 显示成功消息
+    message.success('已跳转到流程图');
+  }, [message]);
 
   // Tab 切换处理（带自动保存）
   const handleTabChange = useCallback(async (newTab: string) => {
@@ -1019,6 +1066,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
                   onUpdateDisplayOrder={handleUpdateDisplayOrder}
                   viewMode={currentTabSettings.viewMode}
                   enableVirtualScroll={false}
+                  onNavigateToFlowchart={handleNavigateToFlowchart}
                 />
               )}
             </motion.div>
@@ -1087,6 +1135,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         onClose={handleCloseFlowchart}
         message={message}
         flowchartId={currentFlowchartId}
+        highlightedNodeId={highlightedNodeId}
       />
 
       <CustomTabManager

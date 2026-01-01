@@ -9,7 +9,7 @@ import { InlineTextEditor } from './InlineTextEditor';
  * 支持双击内联编辑
  */
 export const RectangleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selected }) => {
-  const { label, computedStyle, isLocked } = data;
+  const { label, computedStyle, isLocked, isHighlighted } = data;
   const [isEditing, setIsEditing] = useState(false);
 
   const style = computedStyle || {
@@ -37,21 +37,37 @@ export const RectangleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, 
     setIsEditing(false);
   }, []);
 
+  // 高亮样式
+  const highlightStyle = isHighlighted ? {
+    boxShadow: '0 0 0 3px #722ed1, 0 0 20px rgba(114, 46, 209, 0.5)',
+    animation: 'pulse 1s ease-in-out 3'
+  } : {};
+
   return (
-    <div
-      style={{
-        padding: '12px 16px',
-        borderRadius: '4px',
-        border: `${style.borderWidth}px ${style.borderStyle || 'solid'} ${style.borderColor}`,
-        backgroundColor: style.backgroundColor,
-        minWidth: '120px',
-        maxWidth: '200px',
-        position: 'relative',
-        boxShadow: selected ? '0 0 0 2px #1890ff' : '0 2px 4px rgba(0,0,0,0.1)',
-        transition: 'all 0.2s'
-      }}
-      onDoubleClick={handleDoubleClick}
-    >
+    <>
+      <style>
+        {`
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+          }
+        `}
+      </style>
+      <div
+        style={{
+          padding: '12px 16px',
+          borderRadius: '4px',
+          border: `${style.borderWidth}px ${style.borderStyle || 'solid'} ${style.borderColor}`,
+          backgroundColor: style.backgroundColor,
+          minWidth: '120px',
+          maxWidth: '200px',
+          position: 'relative',
+          boxShadow: selected ? '0 0 0 2px #1890ff' : '0 2px 4px rgba(0,0,0,0.1)',
+          transition: 'all 0.2s',
+          ...highlightStyle
+        }}
+        onDoubleClick={handleDoubleClick}
+      >
       <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
 
       {isLocked && (
@@ -91,5 +107,6 @@ export const RectangleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, 
 
       <Handle type="source" position={Position.Bottom} style={{ background: '#555' }} />
     </div>
+    </>
   );
 };

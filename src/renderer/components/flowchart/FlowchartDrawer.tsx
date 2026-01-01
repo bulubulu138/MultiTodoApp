@@ -28,6 +28,7 @@ interface FlowchartDrawerProps {
   onClose: () => void;
   message: MessageInstance;
   flowchartId?: string | null; // 可选的流程图 ID，用于打开特定流程图
+  highlightedNodeId?: string | null; // 需要高亮的节点 ID
 }
 
 /**
@@ -40,7 +41,8 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
   todos,
   onClose,
   message,
-  flowchartId
+  flowchartId,
+  highlightedNodeId
 }) => {
   // 当前流程图状态
   const [currentFlowchart, setCurrentFlowchart] = useState<FlowchartSchema | null>(null);
@@ -359,6 +361,11 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
                       persistedEdges={edges}
                       todos={todos}
                       onPatchesApplied={handlePatchesApplied}
+                      highlightedNodeId={highlightedNodeId}
+                      onHighlightComplete={() => {
+                        // 高亮完成后清除状态（通过父组件）
+                        // 这里不需要做任何事，因为父组件会在关闭时清除
+                      }}
                     />
                   </ReactFlowProvider>
                 </ErrorBoundary>

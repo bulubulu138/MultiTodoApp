@@ -120,6 +120,11 @@ export const FlowchartList: React.FC<FlowchartListProps> = ({
       localStorage.removeItem(key);
       message.success('删除成功');
       loadFlowcharts();
+      
+      // 触发自定义事件，通知其他组件刷新关联数据
+      window.dispatchEvent(new CustomEvent('flowchart-deleted', {
+        detail: { flowchartId: flowchart.id }
+      }));
     } catch (error) {
       message.error('删除失败');
       console.error('Error deleting flowchart:', error);
