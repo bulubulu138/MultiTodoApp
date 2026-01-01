@@ -273,8 +273,30 @@ export class TemplateService {
     };
 
     // 深拷贝节点和边，避免修改模板
-    const nodes = JSON.parse(JSON.stringify(template.nodes));
-    const edges = JSON.parse(JSON.stringify(template.edges));
+    const templateNodes: PersistedNode[] = JSON.parse(JSON.stringify(template.nodes));
+    const templateEdges: PersistedEdge[] = JSON.parse(JSON.stringify(template.edges));
+
+    // 生成全局唯一的节点ID映射
+    const nodeIdMap = new Map<string, string>();
+    templateNodes.forEach(node => {
+      // 为每个节点生成全局唯一的ID：时间戳 + 随机字符串
+      const uniqueId = `node-${now}-${Math.random().toString(36).substr(2, 9)}`;
+      nodeIdMap.set(node.id, uniqueId);
+    });
+
+    // 更新节点ID
+    const nodes = templateNodes.map(node => ({
+      ...node,
+      id: nodeIdMap.get(node.id) || node.id
+    }));
+
+    // 更新边的source和target引用
+    const edges = templateEdges.map(edge => ({
+      ...edge,
+      id: `edge-${now}-${Math.random().toString(36).substr(2, 9)}`,
+      source: nodeIdMap.get(edge.source) || edge.source,
+      target: nodeIdMap.get(edge.target) || edge.target
+    }));
 
     return { schema, nodes, edges };
   }
