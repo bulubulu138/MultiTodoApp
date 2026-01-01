@@ -133,27 +133,8 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
     setShowTemplateModal(true);
   }, []);
 
-  // 处理 Patches（防抖保存）
-  const handlePatchesApplied = useCallback((patches: FlowchartPatch[]) => {
-    // 添加到队列
-    patchQueueRef.current.push(...patches);
-
-    // 清除之前的定时器
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-    }
-
-    // 500ms 后批量保存
-    saveTimerRef.current = setTimeout(() => {
-      if (patchQueueRef.current.length > 0 && currentFlowchart) {
-        savePatchesToLocalStorage(currentFlowchart.id, patchQueueRef.current);
-        patchQueueRef.current = [];
-      }
-    }, 500);
-  }, [currentFlowchart]);
-
   // 保存到 LocalStorage（临时方案，后续可以改为 IPC）
-  const savePatchesToLocalStorage = (flowchartId: string, patches: FlowchartPatch[]) => {
+  const savePatchesToLocalStorage = useCallback((flowchartId: string, patches: FlowchartPatch[]) => {
     try {
       PerformanceMonitor.start('flowchart-save');
       
@@ -174,7 +155,32 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
       console.error('Save failed:', error);
       message.error('保存失败，请检查存储空间');
     }
-  };
+  }, [currentFlowchart, nodes, edges, message]);
+
+  // 处理 Patches（防抖保存）
+  const handlePatchesApplied = useCallback((patches: FlowchartPatch[]) => {
+    // 添加到队列
+    patchQueueRef.current.push(...patches);
+
+    // 清除之前的定时器
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+
+    // 500ms 后批量保存
+    saveTimerRef.current = setTimeout(() => {
+      if (patchQueueRef.current.length > 0 && currentFlowchart) {
+        savePatchesToLocalStorage(currentFlowchart.id, patchQueueRef.current);
+        patchQueueRef.current = [];
+      }
+    }, 500);
+  }, [currentFlowchart, savePatchesToLocalStorage]);
+
+  // 处理 nodes 和 edges 的更新
+  const handleNodesEdgesChange = useCallback((newNodes: PersistedNode[], newEdges: PersistedEdge[]) => {
+    setNodes(newNodes);
+    setEdges(newEdges);
+  }, []);
 
   // 手动保存
   const handleSave = useCallback(async () => {
@@ -361,6 +367,7 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
                       persistedEdges={edges}
                       todos={todos}
                       onPatchesApplied={handlePatchesApplied}
+                      onNodesEdgesChange={handleNodesEdgesChange}
                       highlightedNodeId={highlightedNodeId}
                       onHighlightComplete={() => {
                         // 高亮完成后清除状态（通过父组件）

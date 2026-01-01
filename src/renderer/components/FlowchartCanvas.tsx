@@ -38,6 +38,7 @@ interface FlowchartCanvasProps {
   persistedEdges: PersistedEdge[];
   todos: Todo[];
   onPatchesApplied: (patches: FlowchartPatch[]) => void;
+  onNodesEdgesChange?: (nodes: PersistedNode[], edges: PersistedEdge[]) => void;
   highlightedNodeId?: string | null;
   onHighlightComplete?: () => void;
 }
@@ -54,6 +55,7 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
   persistedEdges: initialPersistedEdges,
   todos,
   onPatchesApplied,
+  onNodesEdgesChange,
   highlightedNodeId,
   onHighlightComplete
 }) => {
@@ -215,12 +217,17 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     setPersistedNodes(result.nodes);
     setPersistedEdges(result.edges);
 
+    // 通知父组件数据已更新
+    if (onNodesEdgesChange) {
+      onNodesEdgesChange(result.nodes, result.edges);
+    }
+
     // 记录到 Undo 历史
     patches.forEach(p => undoRedoManager.current.execute(p));
 
     // 通知父组件保存
     onPatchesApplied(patches);
-  }, [persistedNodes, persistedEdges, onPatchesApplied]);
+  }, [persistedNodes, persistedEdges, onPatchesApplied, onNodesEdgesChange]);
 
   // 7. 处理节点双击编辑 - 启用内联编辑
   const handleNodeDoubleClick = useCallback((_event: React.MouseEvent, node: Node) => {
@@ -527,9 +534,15 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
 
       setPersistedNodes(result.nodes);
       setPersistedEdges(result.edges);
+      
+      // 通知父组件数据已更新
+      if (onNodesEdgesChange) {
+        onNodesEdgesChange(result.nodes, result.edges);
+      }
+      
       onPatchesApplied([invertedPatch]);
     }
-  }, [persistedNodes, persistedEdges, onPatchesApplied]);
+  }, [persistedNodes, persistedEdges, onPatchesApplied, onNodesEdgesChange]);
 
   // 14. 重做功能
   const handleRedo = useCallback(() => {
@@ -545,8 +558,14 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
 
     setPersistedNodes(result.nodes);
     setPersistedEdges(result.edges);
+    
+    // 通知父组件数据已更新
+    if (onNodesEdgesChange) {
+      onNodesEdgesChange(result.nodes, result.edges);
+    }
+    
     onPatchesApplied([patch]);
-  }, [persistedNodes, persistedEdges, onPatchesApplied]);
+  }, [persistedNodes, persistedEdges, onPatchesApplied, onNodesEdgesChange]);
 
   // 15. 处理删除选中元素
   const handleDelete = useCallback(() => {
