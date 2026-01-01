@@ -535,7 +535,8 @@ const TodoForm: React.FC<TodoFormProps> = ({
             {/* 推荐的待办 */}
             {loadingRecommendations ? (
               <div style={{ textAlign: 'center', padding: '20px' }}>
-                <Spin tip="正在分析相关待办..." />
+                <Spin />
+                <div style={{ marginTop: 8 }}>正在分析相关待办...</div>
               </div>
             ) : recommendations.length > 0 ? (
               <div style={{ maxHeight: '300px', overflowY: 'auto' }}>

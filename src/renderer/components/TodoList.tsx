@@ -560,7 +560,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                   borderLeft: hasParallel ? '4px solid #fa8c16' : undefined
                 }}
                 styles={{ body: { padding: '8px' } }}
-                bordered={false}
+                variant="borderless"
               >
               {/* 标题行：标题 + 标签 + 操作按钮 */}
               <div style={{ 

@@ -615,7 +615,8 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
   if (loading) {
     return (
       <div className="content-focus-loading">
-        <Spin size="large" tip="加载中..." />
+        <Spin size="large" />
+        <div style={{ marginTop: 8 }}>加载中...</div>
       </div>
     );
   }

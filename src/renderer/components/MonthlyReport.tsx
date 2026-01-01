@@ -91,7 +91,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
       {/* 概览统计 */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={6}>
-          <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
+          <Card variant="borderless" style={{ backgroundColor: colors.cardBg }}>
             <Statistic
               title="创建待办"
               value={stats.created.length}
@@ -102,7 +102,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
+          <Card variant="borderless" style={{ backgroundColor: colors.cardBg }}>
             <Statistic
               title="完成待办"
               value={stats.completed.length}
@@ -113,7 +113,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
+          <Card variant="borderless" style={{ backgroundColor: colors.cardBg }}>
             <Statistic
               title="完成率"
               value={stats.completionRate}
@@ -123,7 +123,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
+          <Card variant="borderless" style={{ backgroundColor: colors.cardBg }}>
             <Statistic
               title="日均完成"
               value={stats.avgDailyCompleted}
@@ -142,7 +142,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
             📊 每周统计
           </Title>
           <Card 
-            bordered={false} 
+            variant="borderless" 
             style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
             styles={{ body: { padding: '12px' } }}
           >
@@ -165,7 +165,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
         ✨ 月度亮点
       </Title>
       <Card 
-        bordered={false} 
+        variant="borderless" 
         style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
         styles={{ body: { padding: '16px' } }}
       >
@@ -224,7 +224,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
             📈 优先级分布
           </Title>
           <Card 
-            bordered={false} 
+            variant="borderless" 
             style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
             styles={{ body: { padding: '16px' } }}
           >
@@ -274,7 +274,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
             ⭐ 重要完成项（前5个高优先级）
           </Title>
           <Card 
-            bordered={false} 
+            variant="borderless" 
             style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
             styles={{ body: { padding: '12px' } }}
           >
@@ -293,7 +293,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
         🎯 下月目标建议
       </Title>
       <Card 
-        bordered={false} 
+        variant="borderless" 
         style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
         styles={{ body: { padding: '16px' } }}
       >

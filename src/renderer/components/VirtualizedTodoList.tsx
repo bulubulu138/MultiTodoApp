@@ -196,7 +196,7 @@ const VirtualizedTodoItem = memo<{
             (r.source_id === todo.id || r.target_id === todo.id)) ? '4px solid #fa8c16' : undefined
         }}
         styles={{ body: { padding: '12px', height: '100%' } }}
-        bordered={false}
+        variant="borderless"
       >
         {/* 标题行 */}
         <div style={{

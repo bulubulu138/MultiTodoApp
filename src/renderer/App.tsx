@@ -1055,6 +1055,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         visible={showFlowchart}
         todos={todos}
         onClose={() => setShowFlowchart(false)}
+        message={message}
       />
 
       <CustomTabManager

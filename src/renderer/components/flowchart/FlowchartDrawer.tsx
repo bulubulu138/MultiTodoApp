@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Drawer, message, Spin, Modal, Input, List, Button, Space } from 'antd';
+import { Drawer, message as antdMessage, Spin, Modal, Input, List, Button, Space } from 'antd';
+import type { MessageInstance } from 'antd/es/message/interface';
 import { ReactFlowProvider } from 'reactflow';
 import { FlowchartCanvas } from '../FlowchartCanvas';
 import { FlowchartToolbar } from './FlowchartToolbar';
@@ -25,6 +26,7 @@ interface FlowchartDrawerProps {
   visible: boolean;
   todos: Todo[];
   onClose: () => void;
+  message: MessageInstance;
 }
 
 /**
@@ -35,7 +37,8 @@ interface FlowchartDrawerProps {
 export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
   visible,
   todos,
-  onClose
+  onClose,
+  message
 }) => {
   // 当前流程图状态
   const [currentFlowchart, setCurrentFlowchart] = useState<FlowchartSchema | null>(null);
@@ -52,6 +55,11 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templates] = useState<FlowchartTemplate[]>(TemplateService.getAllTemplates());
 
+  // 名称输入对话框
+  const [showNameInputModal, setShowNameInputModal] = useState(false);
+  const [nameInputValue, setNameInputValue] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState<FlowchartTemplate | null>(null);
+
   // 初始化：显示模板选择
   useEffect(() => {
     if (visible && !currentFlowchart) {
@@ -59,19 +67,28 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
     }
   }, [visible, currentFlowchart]);
 
-  // 从模板创建流程图
+  // 从模板创建流程图 - 第一步：显示名称输入框
   const handleCreateFromTemplate = useCallback((template: FlowchartTemplate) => {
-    try {
-      const name = prompt('请输入流程图名称：', template.name);
-      if (!name) return;
+    setSelectedTemplate(template);
+    setNameInputValue(template.name);
+    setShowTemplateModal(false);
+    setShowNameInputModal(true);
+  }, []);
 
+  // 从模板创建流程图 - 第二步：确认名称并创建
+  const handleConfirmName = useCallback(() => {
+    if (!selectedTemplate || !nameInputValue.trim()) return;
+
+    try {
       const { schema, nodes: templateNodes, edges: templateEdges } = 
-        TemplateService.createFromTemplate(template, name);
+        TemplateService.createFromTemplate(selectedTemplate, nameInputValue.trim());
 
       setCurrentFlowchart(schema);
       setNodes(templateNodes);
       setEdges(templateEdges);
-      setShowTemplateModal(false);
+      setShowNameInputModal(false);
+      setSelectedTemplate(null);
+      setNameInputValue('');
 
       // 性能监控：检查流程图规模
       PerformanceMonitor.warnLargeFlowchart(templateNodes.length, templateEdges.length);
@@ -81,6 +98,14 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
       console.error('Failed to create flowchart from template:', error);
       message.error('创建流程图失败');
     }
+  }, [selectedTemplate, nameInputValue]);
+
+  // 取消名称输入
+  const handleCancelNameInput = useCallback(() => {
+    setShowNameInputModal(false);
+    setSelectedTemplate(null);
+    setNameInputValue('');
+    setShowTemplateModal(true);
   }, []);
 
   // 处理 Patches（防抖保存）
@@ -318,8 +343,9 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
             </div>
           </div>
         ) : (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-            <Spin tip="加载中..." />
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <Spin />
+            <div style={{ marginTop: 8 }}>加载中...</div>
           </div>
         )}
       </Drawer>
@@ -357,6 +383,33 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
             </List.Item>
           )}
         />
+      </Modal>
+
+      {/* 名称输入对话框 */}
+      <Modal
+        title="输入流程图名称"
+        open={showNameInputModal}
+        onOk={handleConfirmName}
+        onCancel={handleCancelNameInput}
+        okText="创建"
+        cancelText="返回"
+        okButtonProps={{ disabled: !nameInputValue.trim() }}
+      >
+        <div style={{ marginTop: 16, marginBottom: 8 }}>
+          <Input
+            placeholder="请输入流程图名称"
+            value={nameInputValue}
+            onChange={(e) => setNameInputValue(e.target.value)}
+            onPressEnter={handleConfirmName}
+            autoFocus
+            maxLength={50}
+          />
+          {!nameInputValue.trim() && nameInputValue.length > 0 && (
+            <div style={{ color: '#ff4d4f', fontSize: 12, marginTop: 4 }}>
+              请输入流程图名称
+            </div>
+          )}
+        </div>
       </Modal>
     </>
   );

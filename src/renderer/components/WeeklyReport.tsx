@@ -217,7 +217,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
       {/* 概览统计 */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={4}>
-          <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
+          <Card variant="borderless" style={{ backgroundColor: colors.cardBg }}>
             <Statistic
               title="创建待办"
               value={stats.created.length}
@@ -228,7 +228,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
           </Card>
         </Col>
         <Col span={4}>
-          <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
+          <Card variant="borderless" style={{ backgroundColor: colors.cardBg }}>
             <Statistic
               title="完成待办"
               value={stats.completed.length}
@@ -239,7 +239,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
           </Card>
         </Col>
         <Col span={4}>
-          <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
+          <Card variant="borderless" style={{ backgroundColor: colors.cardBg }}>
             <Statistic
               title="完成率"
               value={stats.completionRate}
@@ -249,7 +249,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
           </Card>
         </Col>
         <Col span={4}>
-          <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
+          <Card variant="borderless" style={{ backgroundColor: colors.cardBg }}>
             <Statistic
               title="日均完成"
               value={stats.avgDailyCompleted}
@@ -260,7 +260,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
           </Card>
         </Col>
         <Col span={4}>
-          <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
+          <Card variant="borderless" style={{ backgroundColor: colors.cardBg }}>
             <Statistic
               title="质量评分"
               value={stats.qualityMetrics.avgQualityScore}
@@ -271,7 +271,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
           </Card>
         </Col>
         <Col span={4}>
-          <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
+          <Card variant="borderless" style={{ backgroundColor: colors.cardBg }}>
             <Statistic
               title="高质量任务"
               value={stats.qualityMetrics.highQualityCount}
@@ -288,7 +288,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
         📅 每日统计（周一至周五）
       </Title>
       <Card 
-        bordered={false} 
+        variant="borderless" 
         style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
         styles={{ body: { padding: '12px' } }}
       >
@@ -308,7 +308,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
             ✅ 本周已完成任务（按完成时间顺序）
           </Title>
           <Card
-            bordered={false}
+            variant="borderless"
             style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
             styles={{ body: { padding: '16px' } }}
           >
@@ -343,7 +343,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
             🌟 本周高质量任务（按质量评分排序）
           </Title>
           <Card
-            bordered={false}
+            variant="borderless"
             style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
             styles={{ body: { padding: '12px' } }}
           >
@@ -378,7 +378,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
             ⭐ 重要完成项（高优先级）
           </Title>
           <Card
-            bordered={false}
+            variant="borderless"
             style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
             styles={{ body: { padding: '12px' } }}
           >
@@ -399,7 +399,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
             📋 待处理事项
           </Title>
           <Card 
-            bordered={false} 
+            variant="borderless" 
             style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
             styles={{ body: { padding: '12px' } }}
           >
@@ -418,7 +418,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
         📅 下周计划
       </Title>
       <Card 
-        bordered={false} 
+        variant="borderless" 
         style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
         styles={{ body: { padding: '16px' } }}
       >

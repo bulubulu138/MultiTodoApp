@@ -101,7 +101,7 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
       {/* 概览统计 */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={6}>
-          <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
+          <Card variant="borderless" style={{ backgroundColor: colors.cardBg }}>
             <Statistic
               title="创建待办"
               value={stats.totalCreated}
@@ -112,7 +112,7 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
+          <Card variant="borderless" style={{ backgroundColor: colors.cardBg }}>
             <Statistic
               title="完成待办"
               value={stats.totalCompleted}
@@ -123,7 +123,7 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
+          <Card variant="borderless" style={{ backgroundColor: colors.cardBg }}>
             <Statistic
               title="完成率"
               value={stats.completionRate}
@@ -133,7 +133,7 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card bordered={false} style={{ backgroundColor: colors.cardBg }}>
+          <Card variant="borderless" style={{ backgroundColor: colors.cardBg }}>
             <Statistic
               title="逾期待办"
               value={stats.totalOverdue}
@@ -152,7 +152,7 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
             📝 今日创建的待办 ({stats.created.length})
           </Title>
           <Card 
-            bordered={false} 
+            variant="borderless" 
             style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
             styles={{ body: { padding: '12px' } }}
           >
@@ -173,7 +173,7 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
             ✅ 今日完成的待办 ({stats.completed.length})
           </Title>
           <Card 
-            bordered={false} 
+            variant="borderless" 
             style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
             styles={{ body: { padding: '12px' } }}
           >
@@ -194,7 +194,7 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
             ⚠️ 逾期提醒 ({stats.overdue.length})
           </Title>
           <Card 
-            bordered={false} 
+            variant="borderless" 
             style={{ marginBottom: 16, backgroundColor: colors.cardBg, borderLeft: '3px solid #ff4d4f' }}
             styles={{ body: { padding: '12px' } }}
           >
@@ -215,7 +215,7 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
             🔄 进行中的待办 ({stats.inProgress.length})
           </Title>
           <Card 
-            bordered={false} 
+            variant="borderless" 
             style={{ marginBottom: 16, backgroundColor: colors.cardBg }}
             styles={{ body: { padding: '12px' } }}
           >

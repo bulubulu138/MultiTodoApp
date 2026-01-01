@@ -310,7 +310,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       ),
       children: (
         <div>
-          <Card title="🚀 全局快捷键" bordered={false} style={{ marginBottom: 16 }}>
+          <Card title="🚀 全局快捷键" variant="borderless" style={{ marginBottom: 16 }}>
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
               <div>
                 <div style={{ marginBottom: 8 }}>
@@ -340,7 +340,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             </Space>
           </Card>
           
-          <Card title="💡 系统托盘" bordered={false}>
+          <Card title="💡 系统托盘" variant="borderless">
             <Space direction="vertical" style={{ width: '100%' }} size="small">
               <Text>
                 • <Text strong>关闭窗口</Text>：应用会最小化到系统托盘，不会退出
@@ -462,7 +462,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
           <Divider />
 
-          <Card title="🔑 关键词管理" bordered={false} size="small">
+          <Card title="🔑 关键词管理" variant="borderless" size="small">
             <Space direction="vertical" style={{ width: '100%' }}>
               <Text type="secondary" style={{ fontSize: 12 }}>
                 系统会自动为新建和编辑的待办提取关键词，用于智能推荐相关待办。

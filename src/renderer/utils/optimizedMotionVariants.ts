@@ -231,6 +231,8 @@ export const useMotionPerformanceMonitor = () => {
   const frameCount = useRef(0);
   const startTime = useRef(performance.now());
   const lastFrameTime = useRef(performance.now());
+  const lastWarningTime = useRef(0);
+  const WARNING_INTERVAL = 5000; // 5 秒
 
   const measureFPS = useCallback(() => {
     frameCount.current++;
@@ -239,9 +241,10 @@ export const useMotionPerformanceMonitor = () => {
     if (now - lastFrameTime.current >= 1000) {
       const fps = Math.round((frameCount.current * 1000) / (now - startTime.current));
 
-      // 性能警告
-      if (fps < 30) {
+      // 性能警告 - 调整阈值为 20，添加频率限制
+      if (fps < 20 && now - lastWarningTime.current > WARNING_INTERVAL) {
         console.warn(`[动画性能] FPS 较低: ${fps}，建议减少动画复杂度`);
+        lastWarningTime.current = now;
       }
 
       // 重置计数器
