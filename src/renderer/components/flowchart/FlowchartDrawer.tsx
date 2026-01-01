@@ -27,6 +27,7 @@ interface FlowchartDrawerProps {
   todos: Todo[];
   onClose: () => void;
   message: MessageInstance;
+  flowchartId?: string | null; // 可选的流程图 ID，用于打开特定流程图
 }
 
 /**
@@ -38,7 +39,8 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
   visible,
   todos,
   onClose,
-  message
+  message,
+  flowchartId
 }) => {
   // 当前流程图状态
   const [currentFlowchart, setCurrentFlowchart] = useState<FlowchartSchema | null>(null);
@@ -60,12 +62,33 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
   const [nameInputValue, setNameInputValue] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<FlowchartTemplate | null>(null);
 
-  // 初始化：显示模板选择
+  // 初始化：加载特定流程图或显示模板选择
   useEffect(() => {
-    if (visible && !currentFlowchart) {
-      setShowTemplateModal(true);
+    if (visible) {
+      if (flowchartId) {
+        // 加载特定的流程图
+        try {
+          const key = `flowchart_${flowchartId}`;
+          const data = JSON.parse(localStorage.getItem(key) || '{}');
+          if (data.schema && data.nodes && data.edges) {
+            setCurrentFlowchart(data.schema);
+            setNodes(data.nodes);
+            setEdges(data.edges);
+          } else {
+            message.error('流程图数据不存在');
+            onClose();
+          }
+        } catch (error) {
+          console.error('Failed to load flowchart:', error);
+          message.error('加载流程图失败');
+          onClose();
+        }
+      } else if (!currentFlowchart) {
+        // 创建新流程图，显示模板选择
+        setShowTemplateModal(true);
+      }
     }
-  }, [visible, currentFlowchart]);
+  }, [visible, flowchartId, currentFlowchart, message, onClose]);
 
   // 从模板创建流程图 - 第一步：显示名称输入框
   const handleCreateFromTemplate = useCallback((template: FlowchartTemplate) => {

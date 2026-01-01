@@ -99,6 +99,7 @@ export interface BackupInfo {
 // 节点和边的类型别名
 export type NodeType = 'rectangle' | 'rounded-rectangle' | 'diamond' | 'circle' | 'todo';
 export type EdgeType = 'default' | 'smoothstep' | 'step' | 'straight';
+export type EdgeMarkerType = 'arrow' | 'arrowclosed' | 'none'; // 箭头类型
 export type ExportFormat = 'json' | 'mermaid' | 'text' | 'png';
 
 // 节点样式
@@ -161,6 +162,8 @@ export interface PersistedEdge {
   type?: EdgeType;
   label?: string;
   style?: EdgeStyle;
+  markerEnd?: EdgeMarkerType; // 终点箭头类型
+  markerStart?: EdgeMarkerType; // 起点箭头类型
 }
 
 // ============================================

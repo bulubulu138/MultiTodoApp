@@ -81,8 +81,28 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
   const [editingNode, setEditingNode] = useState<{ id: string; data: RuntimeNodeData } | null>(null);
 
   // 5. 当持久化数据变化时，更新运行时数据
+  // 使用 setNodes 的函数式更新，保留拖动状态
   useEffect(() => {
-    setRuntimeNodes(toRuntimeNodes(domainNodes));
+    setRuntimeNodes((currentNodes) => {
+      const newNodes = toRuntimeNodes(domainNodes);
+      
+      // 如果有节点正在拖动，保留其位置和拖动状态
+      const updatedNodes = newNodes.map(newNode => {
+        const currentNode = currentNodes.find(n => n.id === newNode.id);
+        if (currentNode && (currentNode.dragging || currentNode.selected)) {
+          // 保留拖动中的节点位置和状态
+          return {
+            ...newNode,
+            position: currentNode.position,
+            dragging: currentNode.dragging,
+            selected: currentNode.selected
+          };
+        }
+        return newNode;
+      });
+      
+      return updatedNodes;
+    });
   }, [domainNodes, setRuntimeNodes]);
 
   useEffect(() => {
@@ -183,10 +203,15 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
 
   // 10. 处理节点变化 -> 生成 Patch
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    // 先应用到 React Flow（保持拖动流畅性）
+    onNodesChange(changes);
+
+    // 然后生成 Patch 用于持久化
     const patches: FlowchartPatch[] = [];
 
     changes.forEach(change => {
-      if (change.type === 'position' && 'position' in change && change.position) {
+      if (change.type === 'position' && 'position' in change && change.position && change.dragging === false) {
+        // 只在拖动结束时才持久化位置（dragging === false）
         // 检查节点是否被锁定
         const node = persistedNodes.find(n => n.id === change.id);
         if (node?.data.isLocked) {
@@ -213,9 +238,6 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     if (patches.length > 0) {
       applyPatches(patches);
     }
-
-    // 应用到 React Flow
-    onNodesChange(changes);
   }, [onNodesChange, applyPatches, persistedNodes]);
 
   // 11. 处理边变化 -> 生成 Patch
@@ -260,7 +282,8 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
       target: connection.target,
       sourceHandle: connection.sourceHandle || undefined,
       targetHandle: connection.targetHandle || undefined,
-      type: 'default'
+      type: 'default',
+      markerEnd: 'arrowclosed' // 默认使用闭合箭头
     };
 
     // 创建 Patch

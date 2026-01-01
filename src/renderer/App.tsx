@@ -13,6 +13,7 @@ import TodoViewDrawer from './components/TodoViewDrawer';
 import NotesDrawer from './components/NotesDrawer';
 import CalendarDrawer from './components/CalendarDrawer';
 import { FlowchartDrawer } from './components/flowchart/FlowchartDrawer';
+import { FlowchartList } from './components/FlowchartList';
 import CustomTabManager from './components/CustomTabManager';
 import ContentFocusView, { ContentFocusViewRef } from './components/ContentFocusView';
 import { getTheme, ThemeMode } from './theme/themes';
@@ -50,6 +51,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const [showNotes, setShowNotes] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [showFlowchart, setShowFlowchart] = useState(false);
+  const [currentFlowchartId, setCurrentFlowchartId] = useState<string | null>(null);
   const [showCustomTabManager, setShowCustomTabManager] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [viewingTodo, setViewingTodo] = useState<Todo | null>(null);
@@ -878,6 +880,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       key: 'paused',
       label: `已暂停 (${statusCounts.paused})`,
     },
+    {
+      key: 'flowcharts',
+      label: '📊 流程图',
+    },
   ];
 
     // 添加自定义标签Tab
@@ -910,6 +916,24 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
 
   // 使用 useMemo 缓存当前 Tab 的设置
   const currentTabSettings = useMemo(() => getCurrentTabSettings(), [getCurrentTabSettings]);
+
+  // 打开流程图
+  const handleOpenFlowchart = useCallback((flowchartId: string) => {
+    setCurrentFlowchartId(flowchartId);
+    setShowFlowchart(true);
+  }, []);
+
+  // 创建新流程图
+  const handleCreateNewFlowchart = useCallback(() => {
+    setCurrentFlowchartId(null);
+    setShowFlowchart(true);
+  }, []);
+
+  // 关闭流程图
+  const handleCloseFlowchart = useCallback(() => {
+    setShowFlowchart(false);
+    setCurrentFlowchartId(null);
+  }, []);
 
   // Tab 切换处理（带自动保存）
   const handleTabChange = useCallback(async (newTab: string) => {
@@ -960,7 +984,13 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
               animate="visible"
               exit="exit"
             >
-              {currentTabSettings.viewMode === 'content-focus' ? (
+              {activeTab === 'flowcharts' ? (
+                <FlowchartList
+                  message={message}
+                  onOpenFlowchart={handleOpenFlowchart}
+                  onCreateNew={handleCreateNewFlowchart}
+                />
+              ) : currentTabSettings.viewMode === 'content-focus' ? (
                 <ContentFocusView
                   ref={contentFocusRef}
                   todos={filteredTodos}
@@ -1054,8 +1084,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       <FlowchartDrawer
         visible={showFlowchart}
         todos={todos}
-        onClose={() => setShowFlowchart(false)}
+        onClose={handleCloseFlowchart}
         message={message}
+        flowchartId={currentFlowchartId}
       />
 
       <CustomTabManager

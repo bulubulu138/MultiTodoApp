@@ -22,7 +22,7 @@ export function toRuntimeNode(domainNode: DomainNode): Node {
  * 将业务领域层边转换为 React Flow 运行时边
  */
 export function toRuntimeEdge(domainEdge: DomainEdge): Edge {
-  return {
+  const edge: Edge = {
     id: domainEdge.id,
     source: domainEdge.source,
     target: domainEdge.target,
@@ -32,6 +32,24 @@ export function toRuntimeEdge(domainEdge: DomainEdge): Edge {
     label: domainEdge.label,
     style: domainEdge.style
   };
+
+  // 添加箭头标记
+  if (domainEdge.markerEnd) {
+    edge.markerEnd = {
+      type: domainEdge.markerEnd === 'none' ? undefined : domainEdge.markerEnd
+    };
+  } else {
+    // 默认使用箭头
+    edge.markerEnd = { type: 'arrowclosed' };
+  }
+
+  if (domainEdge.markerStart && domainEdge.markerStart !== 'none') {
+    edge.markerStart = {
+      type: domainEdge.markerStart
+    };
+  }
+
+  return edge;
 }
 
 /**
