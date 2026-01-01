@@ -137,17 +137,27 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
   }, []);
 
   // 保存到 LocalStorage（临时方案，后续可以改为 IPC）
-  const savePatchesToLocalStorage = useCallback((flowchartId: string, patches: FlowchartPatch[]) => {
+  const savePatchesToLocalStorage = useCallback(() => {
+    // 在保存时读取最新状态，确保数据隔离
+    if (!currentFlowchart) {
+      console.warn('[保存] 跳过保存：currentFlowchart 为空');
+      return;
+    }
+    
     try {
       PerformanceMonitor.start('flowchart-save');
       
-      const key = `flowchart_${flowchartId}`;
+      const key = `flowchart_${currentFlowchart.id}`;
       const data = {
         schema: currentFlowchart,
         nodes,
         edges,
         updatedAt: Date.now()
       };
+      
+      console.log(`[保存] 保存流程图 ${currentFlowchart.id} (${currentFlowchart.name})`);
+      console.log(`[保存] 节点数: ${nodes.length}, 边数: ${edges.length}`);
+      
       localStorage.setItem(key, JSON.stringify(data));
       
       const duration = PerformanceMonitor.end('flowchart-save');
@@ -172,18 +182,45 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
 
     // 500ms 后批量保存
     saveTimerRef.current = setTimeout(() => {
-      if (patchQueueRef.current.length > 0 && currentFlowchart) {
-        savePatchesToLocalStorage(currentFlowchart.id, patchQueueRef.current);
+      if (patchQueueRef.current.length > 0) {
+        savePatchesToLocalStorage();
         patchQueueRef.current = [];
       }
     }, 500);
-  }, [currentFlowchart, savePatchesToLocalStorage]);
+  }, [savePatchesToLocalStorage]);
 
   // 处理 nodes 和 edges 的更新
   const handleNodesEdgesChange = useCallback((newNodes: PersistedNode[], newEdges: PersistedEdge[]) => {
     setNodes(newNodes);
     setEdges(newEdges);
   }, []);
+
+  // 组件卸载时清理定时器并保存
+  useEffect(() => {
+    return () => {
+      console.log('[清理] 组件卸载，清理定时器并保存未保存的修改');
+      
+      // 清理定时器
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      
+      // 立即保存未保存的修改
+      if (patchQueueRef.current.length > 0 && currentFlowchart) {
+        const key = `flowchart_${currentFlowchart.id}`;
+        const data = {
+          schema: currentFlowchart,
+          nodes,
+          edges,
+          updatedAt: Date.now()
+        };
+        localStorage.setItem(key, JSON.stringify(data));
+        console.log(`[清理] 已保存流程图 ${currentFlowchart.id} (${currentFlowchart.name})`);
+        patchQueueRef.current = [];
+      }
+    };
+  }, [currentFlowchart, nodes, edges]);
 
   // 手动保存
   const handleSave = useCallback(async () => {
@@ -193,7 +230,7 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
     try {
       // 立即保存所有待处理的 patches
       if (patchQueueRef.current.length > 0) {
-        savePatchesToLocalStorage(currentFlowchart.id, patchQueueRef.current);
+        savePatchesToLocalStorage();
         patchQueueRef.current = [];
       }
 
@@ -331,6 +368,25 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
     message.info('重做功能已在画布中实现（Ctrl+Y）');
   }, []);
 
+  // 关闭时保存并清理
+  const handleClose = useCallback(() => {
+    console.log('[关闭] 关闭流程图抽屉，保存未保存的修改');
+    
+    // 清除定时器
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    
+    // 立即保存
+    if (patchQueueRef.current.length > 0) {
+      savePatchesToLocalStorage();
+      patchQueueRef.current = [];
+    }
+    
+    onClose();
+  }, [savePatchesToLocalStorage, onClose]);
+
   return (
     <>
       <Drawer
@@ -338,7 +394,7 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
         placement="right"
         width="90%"
         open={visible}
-        onClose={onClose}
+        onClose={handleClose}
         bodyStyle={{ padding: 0, display: 'flex', flexDirection: 'column' }}
       >
         {currentFlowchart ? (
