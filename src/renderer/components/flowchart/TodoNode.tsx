@@ -138,7 +138,7 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selec
           position: 'relative',
           boxShadow: selected ? '0 0 0 2px #1890ff' : '0 2px 4px rgba(0,0,0,0.1)',
           transition: 'all 0.2s',
-          color: '#fff',
+          color: style.color || '#fff', // 使用计算出的文字颜色
           fontWeight: 500,
           ...highlightStyle
         }}
@@ -154,7 +154,8 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selec
             top: '4px',
             right: '4px',
             fontSize: '12px',
-            color: 'rgba(255,255,255,0.8)'
+            color: style.color || '#fff',
+            opacity: 0.8
           }}
         />
       )}
@@ -175,7 +176,8 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selec
             fontSize: '11px',
             display: 'flex',
             alignItems: 'center',
-            color: 'rgba(255,255,255,0.9)'
+            color: style.color || '#fff',
+            opacity: 0.9
           }}>
             {getStatusIcon()}
             {getPriorityBadge()}
@@ -186,7 +188,8 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selec
         {data.todoId && !resolvedTodo && (
           <div style={{ 
             fontSize: '11px',
-            color: 'rgba(255,255,255,0.7)',
+            color: style.color || '#fff',
+            opacity: 0.7,
             fontStyle: 'italic'
           }}>
             (任务已删除)

@@ -109,6 +109,7 @@ export interface NodeStyle {
   borderWidth?: number;
   borderStyle?: 'solid' | 'dashed';
   fontSize?: number;
+  color?: string; // 文字颜色
 }
 
 // 边样式

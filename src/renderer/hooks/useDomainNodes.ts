@@ -92,6 +92,7 @@ function getStyleForTodoStatus(
     borderColor: statusColors[status],
     borderWidth: 2,
     borderStyle: 'solid',
+    color: '#fff', // 白色文字，在彩色背景上清晰可见
     ...customStyle
   };
 }
@@ -105,6 +106,7 @@ function getDefaultStyle(): NodeStyle {
     borderColor: '#d9d9d9',
     borderWidth: 2,
     borderStyle: 'solid',
-    fontSize: 14
+    fontSize: 14,
+    color: '#000000' // 黑色文字，在白色背景上清晰可见
   };
 }
