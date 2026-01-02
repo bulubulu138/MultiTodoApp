@@ -32,10 +32,13 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState('');
 
+  // 缓存 todoIds 数组，避免每次渲染都创建新数组
+  const todoIds = useMemo(() => {
+    return todo?.id ? [todo.id] : [];
+  }, [todo?.id]);
+
   // 查询流程图关联
-  const { associationsByTodo, loading: associationsLoading } = useFlowchartAssociations(
-    todo?.id ? [todo.id] : []
-  );
+  const { associationsByTodo, loading: associationsLoading } = useFlowchartAssociations(todoIds);
 
   // 获取当前待办的流程图关联
   const flowchartAssociations = useMemo(() => {

@@ -94,9 +94,11 @@ export function useFlowchartAssociations(
   }, [fetchAssociationsInBatches]);
 
   // 监听 todoIds 变化，自动重新查询
+  // 使用 JSON.stringify 来比较数组内容而不是引用
   useEffect(() => {
     fetchAssociations(todoIds);
-  }, [todoIds, fetchAssociations]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(todoIds)]);
 
   // 监听流程图删除事件，自动刷新关联数据
   useEffect(() => {
@@ -109,7 +111,8 @@ export function useFlowchartAssociations(
     return () => {
       window.removeEventListener('flowchart-deleted', handleFlowchartDeleted);
     };
-  }, [todoIds, fetchAssociations]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(todoIds)]);
 
   // 将 Record 转换为 Map（使用 useMemo 缓存）
   const associationsByTodo = useMemo(() => {
