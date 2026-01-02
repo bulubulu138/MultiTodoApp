@@ -21,6 +21,7 @@ import { ShareService } from '../../services/ShareService';
 import { LayoutService } from '../../services/LayoutService';
 import { TemplateService, FlowchartTemplate } from '../../services/TemplateService';
 import { PerformanceMonitor } from '../../utils/performanceMonitor';
+import dayjs from 'dayjs';
 
 interface FlowchartDrawerProps {
   visible: boolean;
@@ -445,10 +446,45 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
     }
   }, [nodes, edges, handlePatchesApplied, currentFlowchart, message]);
 
-  // 新建流程图
+  // 新建流程图 - 直接创建空白流程图
   const handleNewFlowchart = useCallback(() => {
-    setShowTemplateModal(true);
-  }, []);
+    // 直接使用空白模板创建
+    const blankTemplate = templates.find(t => t.id === 'blank');
+    if (blankTemplate) {
+      const defaultName = `流程图 ${dayjs().format('YYYY-MM-DD HH:mm')}`;
+      
+      try {
+        const { schema, nodes: templateNodes, edges: templateEdges } = 
+          TemplateService.createFromTemplate(blankTemplate, defaultName);
+
+        console.log(`[创建] 创建新流程图: ${schema.name}`);
+        console.log(`[创建] 流程图ID: ${schema.id}`);
+
+        setCurrentFlowchart(schema);
+        setNodes(templateNodes);
+        setEdges(templateEdges);
+
+        // 立即保存新创建的流程图
+        const key = `flowchart_${schema.id}`;
+        const data = {
+          schema,
+          nodes: templateNodes,
+          edges: templateEdges,
+          updatedAt: Date.now()
+        };
+        localStorage.setItem(key, JSON.stringify(data));
+        console.log(`[创建] 已保存到 localStorage key: ${key}`);
+
+        // 性能监控：检查流程图规模
+        PerformanceMonitor.warnLargeFlowchart(templateNodes.length, templateEdges.length);
+
+        message.success('流程图创建成功');
+      } catch (error) {
+        console.error('Failed to create flowchart:', error);
+        message.error('创建流程图失败');
+      }
+    }
+  }, [templates, message]);
 
   // 撤销/重做（占位符）
   const handleUndo = useCallback(() => {
@@ -458,6 +494,30 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
   const handleRedo = useCallback(() => {
     message.info('重做功能已在画布中实现（Ctrl+Y）');
   }, []);
+
+  // 更改流程图名称
+  const handleNameChange = useCallback((newName: string) => {
+    if (!currentFlowchart) return;
+
+    const updatedFlowchart = {
+      ...currentFlowchart,
+      name: newName,
+      updatedAt: Date.now()
+    };
+
+    setCurrentFlowchart(updatedFlowchart);
+
+    // 立即保存到 localStorage
+    const key = `flowchart_${updatedFlowchart.id}`;
+    const data = {
+      schema: updatedFlowchart,
+      nodes,
+      edges,
+      updatedAt: Date.now()
+    };
+    localStorage.setItem(key, JSON.stringify(data));
+    console.log(`[名称更新] 已保存到 localStorage key: ${key}`);
+  }, [currentFlowchart, nodes, edges]);
 
   // 关闭时保存并清理
   const handleClose = useCallback(() => {
@@ -491,6 +551,8 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
         {currentFlowchart ? (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <FlowchartToolbar
+              flowchartName={currentFlowchart.name}
+              onNameChange={handleNameChange}
               onSave={handleSave}
               onExport={handleExport}
               onShare={handleShare}

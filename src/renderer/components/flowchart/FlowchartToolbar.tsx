@@ -1,5 +1,5 @@
-import React from 'react';
-import { Button, Space, Dropdown, message } from 'antd';
+import React, { useState } from 'react';
+import { Button, Space, Dropdown, message, Typography, Input } from 'antd';
 import {
   SaveOutlined,
   DownloadOutlined,
@@ -8,11 +8,18 @@ import {
   UndoOutlined,
   RedoOutlined,
   PlusOutlined,
-  ShareAltOutlined
+  ShareAltOutlined,
+  EditOutlined,
+  CheckOutlined,
+  CloseOutlined
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 
+const { Title } = Typography;
+
 interface FlowchartToolbarProps {
+  flowchartName?: string;
+  onNameChange?: (newName: string) => void;
   onSave: () => void;
   onExport: (format: 'json' | 'mermaid' | 'text' | 'png') => void;
   onShare: (action: 'link' | 'image') => void;
@@ -31,6 +38,8 @@ interface FlowchartToolbarProps {
  * 提供保存、导出、自动布局等功能按钮
  */
 export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
+  flowchartName,
+  onNameChange,
   onSave,
   onExport,
   onShare,
@@ -45,6 +54,10 @@ export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
   // 获取当前主题
   const [theme, setTheme] = React.useState(document.documentElement.dataset.theme || 'light');
   
+  // 编辑名称状态
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editingName, setEditingName] = useState('');
+  
   React.useEffect(() => {
     const observer = new MutationObserver(() => {
       const newTheme = document.documentElement.dataset.theme || 'light';
@@ -58,6 +71,37 @@ export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
     
     return () => observer.disconnect();
   }, []);
+
+  // 开始编辑名称
+  const handleStartEdit = () => {
+    setEditingName(flowchartName || '');
+    setIsEditingName(true);
+  };
+
+  // 确认编辑
+  const handleConfirmEdit = () => {
+    const trimmedName = editingName.trim();
+    if (trimmedName && trimmedName !== flowchartName) {
+      onNameChange?.(trimmedName);
+      message.success('流程图名称已更新');
+    }
+    setIsEditingName(false);
+  };
+
+  // 取消编辑
+  const handleCancelEdit = () => {
+    setIsEditingName(false);
+    setEditingName('');
+  };
+
+  // 处理回车键
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleConfirmEdit();
+    } else if (e.key === 'Escape') {
+      handleCancelEdit();
+    }
+  };
 
   // 导出菜单
   const exportMenuItems: MenuProps['items'] = [
@@ -125,6 +169,49 @@ export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
         >
           新建流程图
         </Button>
+
+        {/* 流程图名称编辑 */}
+        {flowchartName && (
+          <Space>
+            {isEditingName ? (
+              <>
+                <Input
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onKeyDown={handleKeyPress}
+                  onPressEnter={handleConfirmEdit}
+                  style={{ width: 200 }}
+                  autoFocus
+                />
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CheckOutlined />}
+                  onClick={handleConfirmEdit}
+                />
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CloseOutlined />}
+                  onClick={handleCancelEdit}
+                />
+              </>
+            ) : (
+              <>
+                <Title level={5} style={{ margin: 0, display: 'inline-block' }}>
+                  {flowchartName}
+                </Title>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={handleStartEdit}
+                  title="编辑名称"
+                />
+              </>
+            )}
+          </Space>
+        )}
 
         <Button
           icon={<SaveOutlined />}

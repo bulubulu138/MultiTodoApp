@@ -1007,7 +1007,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         onShowExport={() => setShowExport(true)}
         onShowNotes={() => setShowNotes(true)}
         onShowCalendar={() => setShowCalendar(true)}
-        onShowFlowchart={() => setShowFlowchart(true)}
+        onShowFlowchart={handleCreateNewFlowchart}
         onShowCustomTabManager={() => setShowCustomTabManager(true)}
         sortOption={currentTabSettings.sortOption}
         onSortChange={handleSortChange}
