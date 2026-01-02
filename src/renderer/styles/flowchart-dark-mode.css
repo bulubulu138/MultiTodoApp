@@ -28,6 +28,25 @@
   color: #ffffff;
 }
 
+/* 修复 Ant Design Typography 在暗黑模式下的显示 */
+[data-theme='dark'] .ant-typography {
+  color: #e8e8e8 !important;
+}
+
+[data-theme='dark'] .ant-space-item {
+  color: #e8e8e8 !important;
+}
+
+/* 修复 Ant Design 其他文字组件 */
+[data-theme='dark'] .ant-typography-secondary {
+  color: #a8a8a8 !important;
+}
+
+[data-theme='dark'] .ant-descriptions-item-label,
+[data-theme='dark'] .ant-descriptions-item-content {
+  color: #e8e8e8 !important;
+}
+
 /* 边和连接线 */
 [data-theme='dark'] .react-flow__edge-path {
   stroke: #595959;
@@ -187,4 +206,59 @@
 [data-theme='dark'] .flowchart-toolbar .ant-btn:hover {
   color: #40a9ff;
   border-color: #40a9ff;
+}
+
+/* 待办节点状态样式（暗黑模式） */
+[data-theme='dark'] .react-flow__node-todo[data-status='completed'] {
+  background-color: #162312;
+  border-color: #49aa19;
+  color: #95de64;
+}
+
+[data-theme='dark'] .react-flow__node-todo[data-status='in_progress'] {
+  background-color: #2b2111;
+  border-color: #d48806;
+  color: #ffc53d;
+}
+
+[data-theme='dark'] .react-flow__node-todo[data-status='pending'] {
+  background-color: #1a1a1a;
+  border-color: #595959;
+  color: #e8e8e8;
+}
+
+[data-theme='dark'] .react-flow__node-todo[data-status='paused'] {
+  background-color: #141414;
+  border-color: #434343;
+  color: #8c8c8c;
+}
+
+
+/* 连接点优化：默认隐藏，hover 时显示 */
+.react-flow__handle {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.react-flow__node:hover .react-flow__handle,
+.react-flow__node.selected .react-flow__handle,
+.react-flow.connecting .react-flow__handle {
+  opacity: 1;
+}
+
+/* 连接点 hover 效果增强 */
+.react-flow__handle:hover {
+  transform: scale(1.3);
+  transition: transform 0.2s ease-in-out, opacity 0.2s ease-in-out;
+}
+
+/* 暗黑模式下的连接点优化 */
+[data-theme='dark'] .react-flow__handle {
+  opacity: 0;
+}
+
+[data-theme='dark'] .react-flow__node:hover .react-flow__handle,
+[data-theme='dark'] .react-flow__node.selected .react-flow__handle,
+[data-theme='dark'] .react-flow.connecting .react-flow__handle {
+  opacity: 1;
 }

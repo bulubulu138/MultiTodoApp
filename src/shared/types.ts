@@ -98,7 +98,7 @@ export interface BackupInfo {
 
 // 节点和边的类型别名
 export type NodeType = 'rectangle' | 'rounded-rectangle' | 'diamond' | 'circle' | 'todo';
-export type EdgeType = 'default' | 'smoothstep' | 'step' | 'straight';
+export type EdgeType = 'default' | 'smoothstep' | 'step' | 'straight' | 'bezier'; // 新增 bezier 类型
 export type EdgeMarkerType = 'arrow' | 'arrowclosed' | 'none'; // 箭头类型
 export type ExportFormat = 'json' | 'mermaid' | 'text' | 'png';
 
@@ -112,11 +112,34 @@ export interface NodeStyle {
   color?: string; // 文字颜色
 }
 
-// 边样式
+// 边样式（增强版）
 export interface EdgeStyle {
   stroke?: string;
   strokeWidth?: number;
   strokeDasharray?: string;
+  animated?: boolean; // 新增：动画效果
+}
+
+// 待办节点样式配置类型
+export interface TodoNodeStyleConfig {
+  backgroundColor: string;
+  borderColor: string;
+  borderWidth: number;
+  color: string;
+}
+
+// 待办节点状态样式映射
+export interface TodoNodeStyleMap {
+  completed: TodoNodeStyleConfig;
+  in_progress: TodoNodeStyleConfig;
+  pending: TodoNodeStyleConfig;
+  paused: TodoNodeStyleConfig;
+}
+
+// 待办节点主题样式配置
+export interface TodoNodeThemeStyles {
+  light: TodoNodeStyleMap;
+  dark: TodoNodeStyleMap;
 }
 
 // 视口配置
@@ -165,6 +188,7 @@ export interface PersistedEdge {
   style?: EdgeStyle;
   markerEnd?: EdgeMarkerType; // 终点箭头类型
   markerStart?: EdgeMarkerType; // 起点箭头类型
+  animated?: boolean; // 新增：动画效果
 }
 
 // ============================================

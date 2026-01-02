@@ -68,7 +68,11 @@ export const RectangleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, 
         }}
         onDoubleClick={handleDoubleClick}
       >
-      <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
+      {/* 四向连接点 */}
+      <Handle type="target" position={Position.Top} id="top" style={{ background: '#555' }} />
+      <Handle type="target" position={Position.Left} id="left" style={{ background: '#555' }} />
+      <Handle type="source" position={Position.Right} id="right" style={{ background: '#555' }} />
+      <Handle type="source" position={Position.Bottom} id="bottom" style={{ background: '#555' }} />
 
       {isLocked && (
         <LockOutlined
@@ -96,7 +100,7 @@ export const RectangleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, 
       ) : (
         <div style={{
           fontSize: style.fontSize || 14,
-          color: '#262626',
+          color: style.color || '#262626',
           wordBreak: 'break-word',
           textAlign: 'center',
           cursor: isLocked ? 'default' : 'text'
@@ -104,8 +108,6 @@ export const RectangleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, 
           {label}
         </div>
       )}
-
-      <Handle type="source" position={Position.Bottom} style={{ background: '#555' }} />
     </div>
     </>
   );

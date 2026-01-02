@@ -70,7 +70,11 @@ export const DiamondNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, se
         `}
       </style>
       <div style={{ position: 'relative' }} onDoubleClick={handleDoubleClick}>
-        <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
+        {/* 四向连接点 */}
+        <Handle type="target" position={Position.Top} id="top" style={{ background: '#555' }} />
+        <Handle type="target" position={Position.Left} id="left" style={{ background: '#555', left: '20px' }} />
+        <Handle type="source" position={Position.Right} id="right" style={{ background: '#555', right: '20px' }} />
+        <Handle type="source" position={Position.Bottom} id="bottom" style={{ background: '#555' }} />
 
         <div
           style={{
@@ -104,7 +108,7 @@ export const DiamondNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, se
           style={{
             transform: 'rotate(-45deg)',
             fontSize: style.fontSize || 12,
-            color: '#262626',
+            color: style.color || '#262626',
             wordBreak: 'break-word',
             textAlign: 'center',
             maxWidth: '70px',
@@ -115,8 +119,6 @@ export const DiamondNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, se
           {label}
         </div>
       </div>
-
-      <Handle type="source" position={Position.Bottom} style={{ background: '#555' }} />
     </div>
     </>
   );

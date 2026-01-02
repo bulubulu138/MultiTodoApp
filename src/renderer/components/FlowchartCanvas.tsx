@@ -32,6 +32,7 @@ import { nodeTypes } from './flowchart/nodeTypes';
 import { NodeEditPanel } from './flowchart/NodeEditPanel';
 import { NodeContextMenu } from './flowchart/NodeContextMenu';
 import { wouldCreateCycle } from '../utils/cycleDetection';
+import { migrateEdges, needsEdgesMigration } from '../utils/flowchartMigration';
 
 interface FlowchartCanvasProps {
   flowchartId: string;
@@ -89,8 +90,16 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     console.log('[FlowchartCanvas] Props changed, updating persisted data');
     console.log('[FlowchartCanvas] New nodes count:', initialPersistedNodes.length);
     console.log('[FlowchartCanvas] New edges count:', initialPersistedEdges.length);
+    
+    // 应用数据迁移
+    let migratedEdges = initialPersistedEdges;
+    if (needsEdgesMigration(initialPersistedEdges)) {
+      console.log('[FlowchartCanvas] Applying edge migration...');
+      migratedEdges = migrateEdges(initialPersistedEdges);
+    }
+    
     setPersistedNodes(initialPersistedNodes);
-    setPersistedEdges(initialPersistedEdges);
+    setPersistedEdges(migratedEdges);
   }, [initialPersistedNodes, initialPersistedEdges]);
 
   // 2. 通过 selector 计算业务领域层数据
@@ -524,8 +533,9 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
       target: connection.target,
       sourceHandle: connection.sourceHandle || undefined,
       targetHandle: connection.targetHandle || undefined,
-      type: 'default',
-      markerEnd: 'arrowclosed' // 默认使用闭合箭头
+      type: 'default', // 默认线型
+      markerEnd: 'arrowclosed', // 默认使用闭合箭头
+      animated: false // 默认不动画
     };
 
     // 创建 Patch
@@ -735,6 +745,47 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
+      {/* 自定义箭头标记定义 */}
+      <svg style={{ position: 'absolute', width: 0, height: 0 }}>
+        <defs>
+          {/* 开放箭头 */}
+          <marker
+            id="arrow"
+            markerWidth="12"
+            markerHeight="12"
+            refX="10"
+            refY="6"
+            orient="auto"
+            markerUnits="strokeWidth"
+          >
+            <path
+              d="M2,2 L10,6 L2,10"
+              fill="none"
+              stroke={theme === 'dark' ? '#595959' : '#b1b1b7'}
+              strokeWidth="1.5"
+            />
+          </marker>
+          
+          {/* 闭合箭头 */}
+          <marker
+            id="arrowclosed"
+            markerWidth="12"
+            markerHeight="12"
+            refX="10"
+            refY="6"
+            orient="auto"
+            markerUnits="strokeWidth"
+          >
+            <path
+              d="M2,2 L10,6 L2,10 Z"
+              fill={theme === 'dark' ? '#595959' : '#b1b1b7'}
+              stroke={theme === 'dark' ? '#595959' : '#b1b1b7'}
+              strokeWidth="1"
+            />
+          </marker>
+        </defs>
+      </svg>
+
       <ReactFlow
         nodes={runtimeNodes}
         edges={runtimeEdges}

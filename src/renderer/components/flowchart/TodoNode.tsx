@@ -144,7 +144,11 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selec
         }}
         onDoubleClick={handleDoubleClick}
       >
-      <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
+      {/* 四向连接点 */}
+      <Handle type="target" position={Position.Top} id="top" style={{ background: '#555' }} />
+      <Handle type="target" position={Position.Left} id="left" style={{ background: '#555' }} />
+      <Handle type="source" position={Position.Right} id="right" style={{ background: '#555' }} />
+      <Handle type="source" position={Position.Bottom} id="bottom" style={{ background: '#555' }} />
 
       {/* 锁定图标 */}
       {isLocked && (
@@ -196,8 +200,6 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selec
           </div>
         )}
       </div>
-
-      <Handle type="source" position={Position.Bottom} style={{ background: '#555' }} />
     </div>
     </>
   );

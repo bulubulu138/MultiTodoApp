@@ -70,7 +70,11 @@ export const CircleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, sel
         `}
       </style>
       <div style={{ position: 'relative' }} onDoubleClick={handleDoubleClick}>
-        <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
+        {/* 四向连接点 */}
+        <Handle type="target" position={Position.Top} id="top" style={{ background: '#555' }} />
+        <Handle type="target" position={Position.Left} id="left" style={{ background: '#555', left: '-4px' }} />
+        <Handle type="source" position={Position.Right} id="right" style={{ background: '#555', right: '-4px' }} />
+        <Handle type="source" position={Position.Bottom} id="bottom" style={{ background: '#555' }} />
 
         <div
           style={{
@@ -103,7 +107,7 @@ export const CircleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, sel
         <div
           style={{
             fontSize: style.fontSize || 12,
-            color: '#262626',
+            color: style.color || '#262626',
             wordBreak: 'break-word',
             textAlign: 'center',
             maxWidth: '60px',
@@ -114,8 +118,6 @@ export const CircleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, sel
           {label}
         </div>
       </div>
-
-      <Handle type="source" position={Position.Bottom} style={{ background: '#555' }} />
     </div>
     </>
   );

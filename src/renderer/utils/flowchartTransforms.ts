@@ -20,8 +20,25 @@ export function toRuntimeNode(domainNode: DomainNode): Node {
 
 /**
  * 将业务领域层边转换为 React Flow 运行时边
+ * 支持自定义箭头类型和方向
  */
 export function toRuntimeEdge(domainEdge: DomainEdge): Edge {
+  // 获取箭头标记配置
+  const getMarkerConfig = (markerType?: string) => {
+    if (!markerType || markerType === 'none') {
+      return undefined;
+    }
+    
+    // 使用自定义的 SVG 标记
+    return {
+      type: MarkerType.Arrow,
+      markerUnits: 'strokeWidth',
+      orient: 'auto',
+      width: 12,
+      height: 12
+    };
+  };
+
   const edge: Edge = {
     id: domainEdge.id,
     source: domainEdge.source,
@@ -31,10 +48,10 @@ export function toRuntimeEdge(domainEdge: DomainEdge): Edge {
     type: domainEdge.type || 'default',
     label: domainEdge.label,
     style: domainEdge.style,
-    // 默认使用箭头
-    markerEnd: {
-      type: MarkerType.ArrowClosed
-    }
+    animated: (domainEdge as any).animated || false,
+    // 支持自定义箭头类型
+    markerEnd: getMarkerConfig((domainEdge as any).markerEnd || 'arrowclosed'),
+    markerStart: getMarkerConfig((domainEdge as any).markerStart)
   };
 
   return edge;
