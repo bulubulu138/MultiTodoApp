@@ -385,23 +385,28 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
     if (!currentFlowchart) return;
 
     try {
+      console.log('[自动布局] 开始执行，节点数:', nodes.length, '边数:', edges.length);
       PerformanceMonitor.start('auto-layout');
       
       const patches = LayoutService.hierarchical(nodes, edges);
+      console.log('[自动布局] 生成的 patches 数量:', patches.length);
+      
       if (patches.length > 0) {
+        console.log('[自动布局] 应用 patches...');
         handlePatchesApplied(patches);
-        message.success('布局已应用');
+        message.success(`布局已应用，调整了 ${patches.length} 个节点`);
       } else {
         message.info('无需调整布局');
       }
       
       const duration = PerformanceMonitor.end('auto-layout');
+      console.log('[自动布局] 完成，耗时:', duration.toFixed(0), 'ms');
       if (duration > 1500) {
         console.warn(`Slow layout operation: ${duration.toFixed(0)}ms`);
       }
     } catch (error) {
       message.error(`自动布局失败: ${error instanceof Error ? error.message : '未知错误'}`);
-      console.error('Layout error:', error);
+      console.error('[自动布局] 错误:', error);
     }
   }, [nodes, edges, handlePatchesApplied, currentFlowchart]);
 
@@ -483,6 +488,7 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
                         // 高亮完成后清除状态（通过父组件）
                         // 这里不需要做任何事，因为父组件会在关闭时清除
                       }}
+                      initialViewport={currentFlowchart.viewport}
                     />
                   </ReactFlowProvider>
                 </ErrorBoundary>

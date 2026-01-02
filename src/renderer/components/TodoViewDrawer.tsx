@@ -1,10 +1,11 @@
-import { Todo, TodoRelation } from '../../shared/types';
+import { Todo, TodoRelation, FlowchartAssociation } from '../../shared/types';
 import React, { useMemo, useCallback, useState } from 'react';
-import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message, Image } from 'antd';
-import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined } from '@ant-design/icons';
+import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message, Image, Card, Empty } from 'antd';
+import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined, NodeIndexOutlined } from '@ant-design/icons';
 import RelationContext from './RelationContext';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { useFlowchartAssociations } from '../hooks/useFlowchartAssociations';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -15,6 +16,7 @@ interface TodoViewDrawerProps {
   relations: TodoRelation[];
   onClose: () => void;
   onEdit: (todo: Todo) => void;
+  onOpenFlowchart?: (flowchartId: string, nodeId: string) => void; // 新增：打开流程图回调
 }
 
 const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
@@ -23,11 +25,23 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   allTodos,
   relations,
   onClose,
-  onEdit
+  onEdit,
+  onOpenFlowchart // 新增
 }) => {
   const colors = useThemeColors();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState('');
+
+  // 查询流程图关联
+  const { associationsByTodo, loading: associationsLoading } = useFlowchartAssociations(
+    todo?.id ? [todo.id] : []
+  );
+
+  // 获取当前待办的流程图关联
+  const flowchartAssociations = useMemo(() => {
+    if (!todo?.id) return [];
+    return associationsByTodo.get(todo.id) || [];
+  }, [todo?.id, associationsByTodo]);
 
   // 转换为PNG格式
   const convertToPng = async (blob: Blob): Promise<Blob> => {
@@ -470,6 +484,55 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
               <Paragraph type="secondary" style={{ marginTop: 8 }}>
                 无内容
               </Paragraph>
+            )}
+          </div>
+
+          <Divider />
+
+          {/* 流程图关联 */}
+          <div style={{ marginBottom: 16 }}>
+            <Text strong>关联的流程图：</Text>
+            {associationsLoading ? (
+              <div style={{ marginTop: 8, textAlign: 'center', padding: 16 }}>
+                <Text type="secondary">加载中...</Text>
+              </div>
+            ) : flowchartAssociations.length === 0 ? (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description="暂无关联的流程图"
+                style={{ marginTop: 8 }}
+              />
+            ) : (
+              <Space direction="vertical" style={{ width: '100%', marginTop: 8 }} size="small">
+                {flowchartAssociations.map((assoc) => (
+                  <Card
+                    key={`${assoc.flowchartId}-${assoc.nodeId}`}
+                    size="small"
+                    hoverable
+                    onClick={() => {
+                      if (onOpenFlowchart) {
+                        onOpenFlowchart(assoc.flowchartId, assoc.nodeId);
+                        onClose(); // 关闭抽屉
+                      }
+                    }}
+                    style={{
+                      cursor: onOpenFlowchart ? 'pointer' : 'default',
+                      borderColor: colors.borderColor
+                    }}
+                  >
+                    <Space>
+                      <NodeIndexOutlined style={{ fontSize: 20, color: '#1890ff' }} />
+                      <div>
+                        <Text strong>{assoc.flowchartName}</Text>
+                        <br />
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          节点: {assoc.nodeLabel}
+                        </Text>
+                      </div>
+                    </Space>
+                  </Card>
+                ))}
+              </Space>
             )}
           </div>
         </div>

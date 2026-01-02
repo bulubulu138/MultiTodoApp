@@ -1,0 +1,190 @@
+/* 流程图暗黑模式样式 */
+
+/* React Flow 画布背景 */
+[data-theme='dark'] .react-flow__pane {
+  background-color: #0a0a0a !important;
+}
+
+/* React Flow 背景网格 */
+[data-theme='dark'] .react-flow__background {
+  background-color: #0a0a0a;
+}
+
+[data-theme='dark'] .react-flow__background-pattern {
+  stroke: #2a2a2a;
+}
+
+/* 节点样式 */
+[data-theme='dark'] .react-flow__node {
+  color: #ffffff;
+}
+
+[data-theme='dark'] .react-flow__node-rectangle,
+[data-theme='dark'] .react-flow__node-diamond,
+[data-theme='dark'] .react-flow__node-circle,
+[data-theme='dark'] .react-flow__node-todo {
+  background-color: #141414;
+  border-color: #404040;
+  color: #ffffff;
+}
+
+/* 边和连接线 */
+[data-theme='dark'] .react-flow__edge-path {
+  stroke: #595959;
+  stroke-width: 2;
+}
+
+[data-theme='dark'] .react-flow__edge-text {
+  fill: #ffffff;
+}
+
+[data-theme='dark'] .react-flow__edge.selected .react-flow__edge-path {
+  stroke: #1890ff;
+}
+
+/* 连接线手柄 */
+[data-theme='dark'] .react-flow__handle {
+  background-color: #595959;
+  border-color: #404040;
+}
+
+[data-theme='dark'] .react-flow__handle:hover {
+  background-color: #1890ff;
+}
+
+/* 控件 */
+[data-theme='dark'] .react-flow__controls {
+  background-color: #141414;
+  border-color: #404040;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme='dark'] .react-flow__controls-button {
+  background-color: #1a1a1a;
+  border-color: #404040;
+  color: #ffffff;
+}
+
+[data-theme='dark'] .react-flow__controls-button:hover {
+  background-color: #2a2a2a;
+}
+
+[data-theme='dark'] .react-flow__controls-button svg {
+  fill: #ffffff;
+}
+
+/* 小地图 */
+[data-theme='dark'] .react-flow__minimap {
+  background-color: #141414;
+  border-color: #404040;
+}
+
+[data-theme='dark'] .react-flow__minimap-mask {
+  fill: rgba(26, 26, 26, 0.8);
+}
+
+[data-theme='dark'] .react-flow__minimap-node {
+  fill: #404040;
+  stroke: #595959;
+}
+
+/* 选择框 */
+[data-theme='dark'] .react-flow__selection {
+  background-color: rgba(24, 144, 255, 0.1);
+  border-color: #1890ff;
+}
+
+/* 节点选中状态 */
+[data-theme='dark'] .react-flow__node.selected {
+  box-shadow: 0 0 0 2px #1890ff;
+}
+
+/* 内联文本编辑器 */
+[data-theme='dark'] .inline-text-editor {
+  background-color: #141414;
+  color: #ffffff;
+  border-color: #1890ff;
+}
+
+[data-theme='dark'] .inline-text-editor:focus {
+  border-color: #40a9ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+/* 文本格式化工具栏 */
+[data-theme='dark'] .text-format-toolbar {
+  background-color: #1a1a1a;
+  border-color: #404040;
+}
+
+[data-theme='dark'] .text-format-toolbar button {
+  color: #ffffff;
+  background-color: #2a2a2a;
+  border-color: #404040;
+}
+
+[data-theme='dark'] .text-format-toolbar button:hover {
+  background-color: #3a3a3a;
+  border-color: #595959;
+}
+
+/* 节点上下文菜单 */
+[data-theme='dark'] .node-context-menu {
+  background-color: #1a1a1a;
+  border-color: #404040;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme='dark'] .node-context-menu-item {
+  color: #ffffff;
+}
+
+[data-theme='dark'] .node-context-menu-item:hover {
+  background-color: #2a2a2a;
+}
+
+/* 节点编辑面板 */
+[data-theme='dark'] .node-edit-panel {
+  background-color: #0a0a0a;
+  color: #ffffff;
+}
+
+[data-theme='dark'] .node-edit-panel .ant-drawer-header {
+  background-color: #141414;
+  border-bottom-color: #404040;
+}
+
+[data-theme='dark'] .node-edit-panel .ant-drawer-body {
+  background-color: #0a0a0a;
+}
+
+/* 节点库 */
+[data-theme='dark'] .node-library {
+  background-color: #0a0a0a;
+}
+
+[data-theme='dark'] .node-library .ant-card {
+  background-color: #141414;
+  border-color: #404040;
+}
+
+[data-theme='dark'] .node-library .ant-card:hover {
+  border-color: #1890ff;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+}
+
+/* 流程图工具栏 */
+[data-theme='dark'] .flowchart-toolbar {
+  background-color: #141414;
+  border-bottom-color: #404040;
+}
+
+[data-theme='dark'] .flowchart-toolbar .ant-btn {
+  color: #ffffff;
+  border-color: #404040;
+}
+
+[data-theme='dark'] .flowchart-toolbar .ant-btn:hover {
+  color: #40a9ff;
+  border-color: #40a9ff;
+}

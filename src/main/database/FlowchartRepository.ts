@@ -67,12 +67,31 @@ export class FlowchartRepository {
 
     // 加载节点（只加载 PersistedNode，不加载 Todo 数据）
     const nodeRows = this.db.prepare('SELECT * FROM flowchart_nodes WHERE flowchart_id = ?').all(id) as any[];
-    const nodes: PersistedNode[] = nodeRows.map(row => ({
-      id: row.id,
-      type: row.type,
-      position: JSON.parse(row.position),
-      data: JSON.parse(row.data)
-    }));
+    const nodes: PersistedNode[] = nodeRows.map(row => {
+      let position: { x: number; y: number };
+      
+      try {
+        position = JSON.parse(row.position);
+        
+        // 验证 position 数据的有效性
+        if (!position || typeof position.x !== 'number' || typeof position.y !== 'number') {
+          console.warn(`[FlowchartRepository] Node ${row.id} has invalid position data, using default (0, 0)`);
+          position = { x: 0, y: 0 };
+        } else {
+          console.log(`[FlowchartRepository] Loaded position for node ${row.id}:`, position);
+        }
+      } catch (error) {
+        console.error(`[FlowchartRepository] Failed to parse position for node ${row.id}:`, error);
+        position = { x: 0, y: 0 };
+      }
+      
+      return {
+        id: row.id,
+        type: row.type,
+        position,
+        data: JSON.parse(row.data)
+      };
+    });
 
     // 加载边
     const edgeRows = this.db.prepare('SELECT * FROM flowchart_edges WHERE flowchart_id = ?').all(id) as any[];
@@ -145,7 +164,9 @@ export class FlowchartRepository {
 
             if (patch.changes.position) {
               updates.push('position = ?');
-              values.push(JSON.stringify(patch.changes.position));
+              const positionJson = JSON.stringify(patch.changes.position);
+              values.push(positionJson);
+              console.log(`[FlowchartRepository] Saving position for node ${patch.id}:`, patch.changes.position, '→', positionJson);
             }
             if (patch.changes.data) {
               updates.push('data = ?');
@@ -166,6 +187,7 @@ export class FlowchartRepository {
                 SET ${updates.join(', ')}
                 WHERE id = ?
               `).run(...values);
+              console.log(`[FlowchartRepository] Updated node ${patch.id} with ${updates.length - 1} changes`);
             }
             break;
           }

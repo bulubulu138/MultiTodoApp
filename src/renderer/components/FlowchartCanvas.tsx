@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useContext } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -14,6 +14,7 @@ import ReactFlow, {
   useReactFlow
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import '../styles/flowchart-dark-mode.css';
 import { message } from 'antd';
 import {
   PersistedNode,
@@ -41,6 +42,7 @@ interface FlowchartCanvasProps {
   onNodesEdgesChange?: (nodes: PersistedNode[], edges: PersistedEdge[]) => void;
   highlightedNodeId?: string | null;
   onHighlightComplete?: () => void;
+  initialViewport?: { x: number; y: number; zoom: number }; // 新增：初始视口
 }
 
 /**
@@ -57,8 +59,27 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
   onPatchesApplied,
   onNodesEdgesChange,
   highlightedNodeId,
-  onHighlightComplete
+  onHighlightComplete,
+  initialViewport // 新增：接收初始视口
 }) => {
+  // 获取当前主题
+  const [theme, setTheme] = useState(document.documentElement.dataset.theme || 'light');
+  
+  // 监听主题变化
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const newTheme = document.documentElement.dataset.theme || 'light';
+      setTheme(newTheme);
+    });
+    
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    });
+    
+    return () => observer.disconnect();
+  }, []);
+
   // 1. 持久化层数据
   const [persistedNodes, setPersistedNodes] = useState<PersistedNode[]>(initialPersistedNodes);
   const [persistedEdges, setPersistedEdges] = useState<PersistedEdge[]>(initialPersistedEdges);
@@ -364,16 +385,24 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
   // 9. 初始化标志 - 用于控制 fitView
   const isInitializedRef = useRef(false);
 
-  // 9.1 初始化时执行 fitView
+  // 9.1 初始化时执行 fitView 或恢复 viewport
   useEffect(() => {
     if (!isInitializedRef.current && runtimeNodes.length > 0) {
-      // 延迟执行 fitView，确保节点已渲染
+      // 延迟执行，确保节点已渲染
       setTimeout(() => {
-        reactFlowInstance.fitView({ padding: 0.2, duration: 200 });
+        if (initialViewport) {
+          // 如果有初始 viewport，恢复它
+          console.log('[FlowchartCanvas] Restoring viewport:', initialViewport);
+          reactFlowInstance.setViewport(initialViewport, { duration: 200 });
+        } else {
+          // 否则执行 fitView
+          console.log('[FlowchartCanvas] No initial viewport, using fitView');
+          reactFlowInstance.fitView({ padding: 0.2, duration: 200 });
+        }
         isInitializedRef.current = true;
       }, 100);
     }
-  }, [runtimeNodes.length, reactFlowInstance]);
+  }, [runtimeNodes.length, reactFlowInstance, initialViewport]);
 
   // 9.2 处理拖拽放置
   const handleDrop = useCallback((event: React.DragEvent) => {
@@ -685,8 +714,23 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     return () => window.removeEventListener('node-label-change', handleNodeLabelChange);
   }, [persistedNodes, applyPatches]);
 
+  // 19. 处理 viewport 变化（用于持久化）
+  const handleMoveEnd = useCallback((_event: any, viewport: { x: number; y: number; zoom: number }) => {
+    console.log('[FlowchartCanvas] Viewport changed:', viewport);
+    
+    // 生成 viewport patch
+    const patch: FlowchartPatch = {
+      type: 'updateViewport',
+      viewport
+    };
+
+    // 应用 patch（会触发保存）
+    applyPatches([patch]);
+  }, [applyPatches]);
+
   return (
     <div 
+      data-theme={theme}
       style={{ width: '100%', height: '100%' }}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
@@ -699,6 +743,7 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
         onConnect={handleConnect}
         onNodeDoubleClick={handleNodeDoubleClick}
         onNodeContextMenu={handleNodeContextMenu}
+        onMoveEnd={handleMoveEnd}
         nodeTypes={nodeTypes}
         attributionPosition="bottom-left"
       >

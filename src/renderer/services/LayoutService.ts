@@ -20,6 +20,8 @@ export class LayoutService {
       animate?: boolean;
     } = {}
   ): FlowchartPatch[] {
+    console.log('[LayoutService] 开始布局，输入节点数:', nodes.length, '边数:', edges.length);
+    
     const {
       rankdir = 'TB',
       nodesep = 50,
@@ -41,6 +43,8 @@ export class LayoutService {
     // 添加节点（跳过锁定的节点）
     const unlockedNodes = nodes.filter(node => !node.data.isLocked);
     const lockedNodes = nodes.filter(node => node.data.isLocked);
+    
+    console.log('[LayoutService] 未锁定节点:', unlockedNodes.length, '锁定节点:', lockedNodes.length);
 
     unlockedNodes.forEach(node => {
       // 使用固定的节点尺寸
@@ -60,8 +64,16 @@ export class LayoutService {
       }
     });
 
+    console.log('[LayoutService] 执行 dagre 布局...');
+    
     // 执行布局
-    dagre.layout(g);
+    try {
+      dagre.layout(g);
+      console.log('[LayoutService] dagre 布局完成');
+    } catch (error) {
+      console.error('[LayoutService] dagre 布局失败:', error);
+      throw error;
+    }
 
     // 生成位置更新的 Patches
     const patches: FlowchartPatch[] = [];
@@ -91,6 +103,7 @@ export class LayoutService {
       }
     });
 
+    console.log('[LayoutService] 生成了', patches.length, '个位置更新 patches');
     return patches;
   }
 

@@ -1117,6 +1117,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
           setViewingTodo(null);
         }}
         onEdit={handleEditFromView}
+        onOpenFlowchart={handleNavigateToFlowchart}
       />
 
       <NotesDrawer
