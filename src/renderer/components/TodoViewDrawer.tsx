@@ -149,8 +149,8 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
     }
   }, []);
 
-  // 根据文件扩展名获取对应的图标
-  const getFileIcon = useCallback((filePath: string): string => {
+  // 根据文件扩展名获取对应的图标（移到组件外部，避免循环依赖）
+  const getFileIcon = (filePath: string): string => {
     const ext = filePath.split('.').pop()?.toLowerCase();
     const iconMap: Record<string, string> = {
       // 文档类
@@ -175,7 +175,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
       'md': '📋', 'markdown': '📋',
     };
     return iconMap[ext || ''] || '📎'; // 默认图标
-  }, []);
+  };
 
   // 将文本中的 URL 转换为可点击的链接（扩展支持本地文件路径）
   const linkifyContent = useCallback((html: string): string => {
@@ -255,7 +255,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
     
     processTextNodes(tempDiv);
     return tempDiv.innerHTML;
-  }, [getFileIcon]);
+  }, []); // 移除 getFileIcon 依赖
 
   // 渲染内容（支持图片和链接）
   const renderContentWithImagePreview = useMemo(() => {
@@ -288,7 +288,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
         dangerouslySetInnerHTML={{ __html: processedContent }}
       />
     );
-  }, [todo?.content, colors.contentBg, handleContentClick, handleImageClick, linkifyContent]);
+  }, [todo?.content, colors.contentBg, linkifyContent, handleContentClick, handleImageClick]);
   
   if (!todo) return null;
 
