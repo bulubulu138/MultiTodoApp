@@ -42,6 +42,23 @@ export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
   canRedo,
   isSaving = false
 }) => {
+  // 获取当前主题
+  const [theme, setTheme] = React.useState(document.documentElement.dataset.theme || 'light');
+  
+  React.useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const newTheme = document.documentElement.dataset.theme || 'light';
+      setTheme(newTheme);
+    });
+    
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    });
+    
+    return () => observer.disconnect();
+  }, []);
+
   // 导出菜单
   const exportMenuItems: MenuProps['items'] = [
     {
@@ -93,8 +110,8 @@ export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
     <div
       style={{
         padding: '8px 16px',
-        borderBottom: '1px solid #f0f0f0',
-        backgroundColor: '#fff',
+        borderBottom: `1px solid ${theme === 'dark' ? '#404040' : '#f0f0f0'}`,
+        backgroundColor: theme === 'dark' ? '#1f1f1f' : '#fff',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center'

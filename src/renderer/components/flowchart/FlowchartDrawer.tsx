@@ -44,6 +44,23 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
   flowchartId,
   highlightedNodeId
 }) => {
+  // 获取当前主题
+  const [theme, setTheme] = useState(document.documentElement.dataset.theme || 'light');
+  
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const newTheme = document.documentElement.dataset.theme || 'light';
+      setTheme(newTheme);
+    });
+    
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    });
+    
+    return () => observer.disconnect();
+  }, []);
+
   // 当前流程图状态
   const [currentFlowchart, setCurrentFlowchart] = useState<FlowchartSchema | null>(null);
   const [nodes, setNodes] = useState<PersistedNode[]>([]);
@@ -393,7 +410,25 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
       
       if (patches.length > 0) {
         console.log('[自动布局] 应用 patches...');
+        
+        // 立即应用 patches 到节点状态
+        const updatedNodes = nodes.map(node => {
+          const patch = patches.find(p => p.type === 'updateNode' && p.id === node.id);
+          if (patch && patch.type === 'updateNode' && patch.changes.position) {
+            return {
+              ...node,
+              position: patch.changes.position
+            };
+          }
+          return node;
+        });
+        
+        // 更新状态
+        setNodes(updatedNodes);
+        
+        // 保存到 localStorage
         handlePatchesApplied(patches);
+        
         message.success(`布局已应用，调整了 ${patches.length} 个节点`);
       } else {
         message.info('无需调整布局');
@@ -408,7 +443,7 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
       message.error(`自动布局失败: ${error instanceof Error ? error.message : '未知错误'}`);
       console.error('[自动布局] 错误:', error);
     }
-  }, [nodes, edges, handlePatchesApplied, currentFlowchart]);
+  }, [nodes, edges, handlePatchesApplied, currentFlowchart, message]);
 
   // 新建流程图
   const handleNewFlowchart = useCallback(() => {
@@ -469,7 +504,12 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
             />
 
             <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-              <div style={{ width: '200px', borderRight: '1px solid #f0f0f0', overflow: 'auto' }}>
+              <div style={{ 
+                width: '200px', 
+                borderRight: `1px solid ${theme === 'dark' ? '#404040' : '#f0f0f0'}`,
+                backgroundColor: theme === 'dark' ? '#141414' : '#f5f5f5',
+                overflow: 'auto' 
+              }}>
                 <NodeLibrary onDragStart={() => {}} />
               </div>
 
