@@ -70,11 +70,15 @@ export const DiamondNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, se
         `}
       </style>
       <div style={{ position: 'relative' }} onDoubleClick={handleDoubleClick}>
-        {/* 四向连接点 */}
-        <Handle type="target" position={Position.Top} id="top" style={{ background: '#555' }} />
-        <Handle type="target" position={Position.Left} id="left" style={{ background: '#555', left: '20px' }} />
-        <Handle type="source" position={Position.Right} id="right" style={{ background: '#555', right: '20px' }} />
-        <Handle type="source" position={Position.Bottom} id="bottom" style={{ background: '#555' }} />
+        {/* 四向连接点 - 每个方向都可以作为源或目标 */}
+        <Handle type="source" position={Position.Top} id="top-source" style={{ background: '#555' }} />
+        <Handle type="target" position={Position.Top} id="top-target" style={{ background: '#555' }} />
+        <Handle type="source" position={Position.Left} id="left-source" style={{ background: '#555', left: '20px' }} />
+        <Handle type="target" position={Position.Left} id="left-target" style={{ background: '#555', left: '20px' }} />
+        <Handle type="source" position={Position.Right} id="right-source" style={{ background: '#555', right: '20px' }} />
+        <Handle type="target" position={Position.Right} id="right-target" style={{ background: '#555', right: '20px' }} />
+        <Handle type="source" position={Position.Bottom} id="bottom-source" style={{ background: '#555' }} />
+        <Handle type="target" position={Position.Bottom} id="bottom-target" style={{ background: '#555' }} />
 
         <div
           style={{
