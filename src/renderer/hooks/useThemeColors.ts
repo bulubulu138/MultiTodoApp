@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 
 export interface ThemeColors {
   listItemBg: string;
@@ -41,8 +41,8 @@ export const useThemeColors = (): ThemeColors => {
     return () => observer.disconnect();
   }, []);
   
-  // 根据当前主题返回对应的颜色
-  return {
+  // 根据当前主题返回对应的颜色（使用 useMemo 避免每次渲染都创建新对象）
+  return useMemo(() => ({
     // 列表项背景 - 深色模式下使用浅色（关联上下文卡片用）
     listItemBg: isDark ? '#f5f5f5' : '#fff',
     // 列表项悬停背景
@@ -63,6 +63,6 @@ export const useThemeColors = (): ThemeColors => {
     cardBg: isDark ? '#1f1f1f' : '#ffffff',
     // 主文本颜色 - 用于标题等
     textPrimary: isDark ? '#ffffff' : '#000000',
-  };
+  }), [isDark]);
 };
 

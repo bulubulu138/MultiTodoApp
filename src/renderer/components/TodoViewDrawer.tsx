@@ -255,7 +255,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
     
     processTextNodes(tempDiv);
     return tempDiv.innerHTML;
-  }, []); // 移除 getFileIcon 依赖
+  }, []);
 
   // 渲染内容（支持图片和链接）
   const renderContentWithImagePreview = useMemo(() => {
@@ -561,7 +561,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
           visible: previewOpen,
           src: previewImage,
           onVisibleChange: (visible) => setPreviewOpen(visible),
-          toolbarRender: (originalNode, info) => (
+          toolbarRender: (originalNode) => (
             <Space>
               {originalNode}
               <Button
