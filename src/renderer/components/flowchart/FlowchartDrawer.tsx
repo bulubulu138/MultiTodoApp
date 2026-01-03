@@ -82,7 +82,7 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
   const [nameInputValue, setNameInputValue] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<FlowchartTemplate | null>(null);
 
-  // 初始化：加载特定流程图或显示模板选择
+  // 初始化：加载特定流程图或直接创建空白流程图
   useEffect(() => {
     if (visible) {
       if (flowchartId) {
@@ -121,15 +121,45 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
           onClose();
         }
       } else {
-        // 创建新流程图：清除状态并显示模板选择
-        console.log('[加载] 创建新流程图，显示模板选择');
-        setCurrentFlowchart(null);
-        setNodes([]);
-        setEdges([]);
-        setShowTemplateModal(true);
+        // 创建新流程图：直接创建空白流程图
+        console.log('[加载] 创建新流程图，直接使用空白模板');
+        const blankTemplate = templates.find(t => t.id === 'blank');
+        if (blankTemplate) {
+          const defaultName = `流程图 ${dayjs().format('YYYY-MM-DD HH:mm')}`;
+          
+          try {
+            const { schema, nodes: templateNodes, edges: templateEdges } = 
+              TemplateService.createFromTemplate(blankTemplate, defaultName);
+
+            console.log(`[创建] 创建新流程图: ${schema.name}`);
+            console.log(`[创建] 流程图ID: ${schema.id}`);
+
+            setCurrentFlowchart(schema);
+            setNodes(templateNodes);
+            setEdges(templateEdges);
+
+            // 立即保存新创建的流程图
+            const key = `flowchart_${schema.id}`;
+            const data = {
+              schema,
+              nodes: templateNodes,
+              edges: templateEdges,
+              updatedAt: Date.now()
+            };
+            localStorage.setItem(key, JSON.stringify(data));
+            console.log(`[创建] 已保存到 localStorage key: ${key}`);
+
+            // 性能监控：检查流程图规模
+            PerformanceMonitor.warnLargeFlowchart(templateNodes.length, templateEdges.length);
+          } catch (error) {
+            console.error('Failed to create flowchart:', error);
+            message.error('创建流程图失败');
+            onClose();
+          }
+        }
       }
     }
-  }, [visible, flowchartId, message, onClose]);
+  }, [visible, flowchartId, message, onClose, templates]);
 
   // 从模板创建流程图 - 第一步：显示名称输入框
   const handleCreateFromTemplate = useCallback((template: FlowchartTemplate) => {

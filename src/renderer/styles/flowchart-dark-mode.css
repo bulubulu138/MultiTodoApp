@@ -192,6 +192,15 @@
   box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
 }
 
+/* 节点库标题和文字 */
+[data-theme='dark'] .node-library .ant-typography {
+  color: #e8e8e8 !important;
+}
+
+[data-theme='dark'] .node-library .ant-typography-secondary {
+  color: #a8a8a8 !important;
+}
+
 /* 流程图工具栏 */
 [data-theme='dark'] .flowchart-toolbar {
   background-color: #141414;
@@ -206,6 +215,11 @@
 [data-theme='dark'] .flowchart-toolbar .ant-btn:hover {
   color: #40a9ff;
   border-color: #40a9ff;
+}
+
+/* 工具栏标题 */
+[data-theme='dark'] .flowchart-toolbar .ant-typography {
+  color: #e8e8e8 !important;
 }
 
 /* 待办节点状态样式（暗黑模式） */

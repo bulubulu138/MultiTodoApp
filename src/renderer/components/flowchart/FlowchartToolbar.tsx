@@ -198,7 +198,11 @@ export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
               </>
             ) : (
               <>
-                <Title level={5} style={{ margin: 0, display: 'inline-block' }}>
+                <Title level={5} style={{ 
+                  margin: 0, 
+                  display: 'inline-block',
+                  color: theme === 'dark' ? '#e8e8e8' : undefined
+                }}>
                   {flowchartName}
                 </Title>
                 <Button
