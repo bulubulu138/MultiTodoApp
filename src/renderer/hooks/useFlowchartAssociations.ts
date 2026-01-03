@@ -116,15 +116,21 @@ export function useFlowchartAssociations(
 
   // 将 Record 转换为 Map（使用 useMemo 缓存）
   const associationsByTodo = useMemo(() => {
+    console.log('[useFlowchartAssociations] Converting associationsData to Map');
+    console.log('[useFlowchartAssociations] associationsData keys:', Object.keys(associationsData));
+    
     const map = new Map<number, FlowchartAssociation[]>();
     
     Object.entries(associationsData).forEach(([todoIdStr, associations]) => {
+      console.log('[useFlowchartAssociations] Processing todoIdStr:', todoIdStr, 'type:', typeof todoIdStr);
       const todoId = parseInt(todoIdStr, 10);
       if (!isNaN(todoId)) {
+        console.log('[useFlowchartAssociations] Setting Map entry:', todoId, '→', associations.length, 'associations');
         map.set(todoId, associations);
       }
     });
     
+    console.log('[useFlowchartAssociations] Final Map keys:', Array.from(map.keys()));
     return map;
   }, [associationsData]);
 

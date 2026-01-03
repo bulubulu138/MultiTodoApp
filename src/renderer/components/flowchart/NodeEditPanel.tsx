@@ -44,6 +44,9 @@ export const NodeEditPanel: React.FC<NodeEditPanelProps> = ({
   const handleSave = () => {
     const values = form.getFieldsValue();
     
+    // 调试日志：记录保存的 todoId
+    console.log('[NodeEditPanel] Saving node with todoId:', values.todoId, 'type:', typeof values.todoId);
+    
     const updates: Partial<RuntimeNodeData> = {
       label: values.label,
       todoId: values.todoId || undefined,
@@ -61,6 +64,7 @@ export const NodeEditPanel: React.FC<NodeEditPanelProps> = ({
       }
     };
 
+    console.log('[NodeEditPanel] Final updates object:', updates);
     onSave(updates);
     onClose();
   };

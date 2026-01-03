@@ -43,7 +43,11 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   // 获取当前待办的流程图关联
   const flowchartAssociations = useMemo(() => {
     if (!todo?.id) return [];
-    return associationsByTodo.get(todo.id) || [];
+    console.log('[TodoViewDrawer] Looking up associations for todo.id:', todo.id, 'type:', typeof todo.id);
+    console.log('[TodoViewDrawer] associationsByTodo Map keys:', Array.from(associationsByTodo.keys()));
+    const result = associationsByTodo.get(todo.id) || [];
+    console.log('[TodoViewDrawer] Found', result.length, 'associations');
+    return result;
   }, [todo?.id, associationsByTodo]);
 
   // 转换为PNG格式

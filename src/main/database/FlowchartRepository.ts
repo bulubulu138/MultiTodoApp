@@ -401,6 +401,9 @@ export class FlowchartRepository {
     }
 
     try {
+      // 调试日志：记录查询参数
+      console.log('[FlowchartRepository] Querying nodes by todoIds:', todoIds);
+      
       // 构建 IN 子句的占位符
       const placeholders = todoIds.map(() => '?').join(', ');
       
@@ -417,6 +420,17 @@ export class FlowchartRepository {
         ORDER BY f.updated_at DESC
       `).all(...todoIds) as any[];
 
+      // 调试日志：记录查询结果
+      console.log('[FlowchartRepository] Query returned', rows.length, 'rows');
+      rows.forEach(row => {
+        console.log('[FlowchartRepository] Row:', {
+          todoId: row.todoId,
+          todoIdType: typeof row.todoId,
+          flowchartName: row.flowchartName,
+          nodeLabel: row.nodeLabel
+        });
+      });
+
       // 按 todoId 分组
       rows.forEach(row => {
         const todoId = row.todoId;
@@ -431,6 +445,7 @@ export class FlowchartRepository {
         });
       });
 
+      console.log('[FlowchartRepository] Result Map keys:', Array.from(result.keys()));
       return result;
     } catch (error) {
       console.error('Error querying nodes by todoIds:', error);
