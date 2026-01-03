@@ -78,7 +78,7 @@ export interface ElectronAPI {
   
   // 流程图API
   flowchart: {
-    getAssociationsByTodoIds: (todoIds: number[]) => Promise<Record<string, Array<{
+    getAssociationsByTodoIds: (todoIds: number[]) => Promise<Record<number, Array<{
       flowchartId: string;
       flowchartName: string;
       nodeId: string;

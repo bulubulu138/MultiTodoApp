@@ -695,12 +695,14 @@ class Application {
         
         // 将数字 ID 转换为字符串（因为 todoId 在节点中存储为字符串）
         const todoIdStrings = todoIds.map(id => id.toString());
+        console.log('[IPC] Query todoIds (string):', todoIdStrings);
         
         // 批量查询关联数据
         const associations = flowchartRepo.queryNodesByTodoIds(todoIdStrings);
         
         // 转换 Map 为普通对象以便序列化
-        const result: Record<string, Array<{
+        // 关键修复：将 Map key 从 string 转换为 number，确保与前端 todo.id 类型一致
+        const result: Record<number, Array<{
           flowchartId: string;
           flowchartName: string;
           nodeId: string;
@@ -708,10 +710,17 @@ class Application {
         }>> = {};
         
         associations.forEach((value, key) => {
-          result[key] = value;
+          const numericKey = parseInt(key, 10);
+          if (!isNaN(numericKey)) {
+            result[numericKey] = value;
+            console.log(`[IPC] Converted key: "${key}" (string) → ${numericKey} (number), associations:`, value.length);
+          } else {
+            console.warn(`[IPC] Invalid todoId key: ${key}, skipping`);
+          }
         });
         
         console.log(`[Flowchart Associations] Queried ${todoIds.length} todos, found ${Object.keys(result).length} with associations`);
+        console.log('[IPC] Result keys (number):', Object.keys(result).map(k => Number(k)));
         
         return result;
       } catch (error) {

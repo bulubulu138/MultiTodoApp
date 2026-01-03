@@ -32,7 +32,7 @@ const BATCH_SIZE = 100;
 export function useFlowchartAssociations(
   todoIds: number[]
 ): UseFlowchartAssociationsResult {
-  const [associationsData, setAssociationsData] = useState<Record<string, FlowchartAssociation[]>>({});
+  const [associationsData, setAssociationsData] = useState<Record<number, FlowchartAssociation[]>>({});
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -121,13 +121,12 @@ export function useFlowchartAssociations(
     
     const map = new Map<number, FlowchartAssociation[]>();
     
+    // Object.entries 总是返回 string key，需要转换为 number
     Object.entries(associationsData).forEach(([todoIdStr, associations]) => {
-      console.log('[useFlowchartAssociations] Processing todoIdStr:', todoIdStr, 'type:', typeof todoIdStr);
-      const todoId = parseInt(todoIdStr, 10);
-      if (!isNaN(todoId)) {
-        console.log('[useFlowchartAssociations] Setting Map entry:', todoId, '→', associations.length, 'associations');
-        map.set(todoId, associations);
-      }
+      const todoId = Number(todoIdStr);
+      console.log('[useFlowchartAssociations] Processing todoIdStr:', todoIdStr, '→ todoId (number):', todoId);
+      console.log('[useFlowchartAssociations] Setting Map entry:', todoId, '→', associations.length, 'associations');
+      map.set(todoId, associations);
     });
     
     console.log('[useFlowchartAssociations] Final Map keys:', Array.from(map.keys()));
