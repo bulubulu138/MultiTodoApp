@@ -4,7 +4,6 @@ import {
   SaveOutlined,
   DownloadOutlined,
   PictureOutlined,
-  LayoutOutlined,
   UndoOutlined,
   RedoOutlined,
   PlusOutlined,
@@ -23,7 +22,6 @@ interface FlowchartToolbarProps {
   onSave: () => void;
   onExport: (format: 'json' | 'mermaid' | 'text' | 'png') => void;
   onShare: (action: 'link' | 'image') => void;
-  onAutoLayout: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onNewFlowchart: () => void;
@@ -43,7 +41,6 @@ export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
   onSave,
   onExport,
   onShare,
-  onAutoLayout,
   onUndo,
   onRedo,
   onNewFlowchart,
@@ -252,13 +249,6 @@ export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
           disabled={!canRedo}
           title="重做 (Ctrl+Y)"
         />
-
-        <Button
-          icon={<LayoutOutlined />}
-          onClick={onAutoLayout}
-        >
-          自动布局
-        </Button>
       </Space>
     </div>
   );

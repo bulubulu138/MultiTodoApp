@@ -292,15 +292,35 @@ export interface FlowchartRuntime {
 // 用于 Undo/Redo、协作、AI 编辑
 // ============================================
 
+// Patch 元数据，用于存储原始数据以支持 Undo 操作
+export interface PatchMetadata {
+  // For removeNode operations
+  originalNode?: PersistedNode;
+  originalEdges?: PersistedEdge[];  // Edges connected to the deleted node
+  
+  // For updateNode operations
+  originalNodeState?: PersistedNode;
+  
+  // For removeEdge operations
+  originalEdge?: PersistedEdge;
+  
+  // For updateEdge operations
+  originalEdgeState?: PersistedEdge;
+  
+  // For viewport/metadata operations
+  originalViewport?: ViewportSchema;
+  originalMetadata?: Partial<FlowchartSchema>;
+}
+
 export type FlowchartPatch =
-  | { type: 'addNode'; node: PersistedNode }
-  | { type: 'updateNode'; id: string; changes: Partial<PersistedNode> }
-  | { type: 'removeNode'; id: string }
-  | { type: 'addEdge'; edge: PersistedEdge }
-  | { type: 'updateEdge'; id: string; changes: Partial<PersistedEdge> }
-  | { type: 'removeEdge'; id: string }
-  | { type: 'updateViewport'; viewport: ViewportSchema }
-  | { type: 'updateMetadata'; changes: Partial<FlowchartSchema> };
+  | { type: 'addNode'; node: PersistedNode; metadata?: PatchMetadata }
+  | { type: 'updateNode'; id: string; changes: Partial<PersistedNode>; metadata?: PatchMetadata }
+  | { type: 'removeNode'; id: string; metadata?: PatchMetadata }
+  | { type: 'addEdge'; edge: PersistedEdge; metadata?: PatchMetadata }
+  | { type: 'updateEdge'; id: string; changes: Partial<PersistedEdge>; metadata?: PatchMetadata }
+  | { type: 'removeEdge'; id: string; metadata?: PatchMetadata }
+  | { type: 'updateViewport'; viewport: ViewportSchema; metadata?: PatchMetadata }
+  | { type: 'updateMetadata'; changes: Partial<FlowchartSchema>; metadata?: PatchMetadata };
 
 export interface PatchHistory {
   patches: FlowchartPatch[];

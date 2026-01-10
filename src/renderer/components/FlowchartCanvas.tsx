@@ -586,21 +586,30 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     const patch = undoRedoManager.current.undo();
     if (!patch) return;
 
-    // 根据 patch 类型提取 ID
-    let nodeId: string | undefined;
-    let edgeId: string | undefined;
+    // 优先从 patch.metadata 中提取原始数据
+    let originalNode: PersistedNode | undefined;
+    let originalEdge: PersistedEdge | undefined;
 
-    if (patch.type === 'addNode' || patch.type === 'updateNode' || patch.type === 'removeNode') {
-      nodeId = patch.type === 'addNode' ? patch.node.id : patch.id;
-    } else if (patch.type === 'addEdge' || patch.type === 'updateEdge' || patch.type === 'removeEdge') {
-      edgeId = patch.type === 'addEdge' ? patch.edge.id : patch.id;
+    if (patch.metadata) {
+      // 使用 metadata 中的原始数据
+      originalNode = patch.metadata.originalNode || patch.metadata.originalNodeState;
+      originalEdge = patch.metadata.originalEdge || patch.metadata.originalEdgeState;
+    } else {
+      // 回退：从当前状态查找（用于兼容旧的 patch）
+      if (patch.type === 'addNode' || patch.type === 'updateNode' || patch.type === 'removeNode') {
+        const nodeId = patch.type === 'addNode' ? patch.node.id : patch.id;
+        originalNode = persistedNodes.find(n => n.id === nodeId);
+      } else if (patch.type === 'addEdge' || patch.type === 'updateEdge' || patch.type === 'removeEdge') {
+        const edgeId = patch.type === 'addEdge' ? patch.edge.id : patch.id;
+        originalEdge = persistedEdges.find(e => e.id === edgeId);
+      }
     }
 
     // 应用反向 Patch
     const invertedPatch = FlowchartPatchService.invertPatch(
       patch,
-      nodeId ? persistedNodes.find(n => n.id === nodeId) : undefined,
-      edgeId ? persistedEdges.find(e => e.id === edgeId) : undefined
+      originalNode,
+      originalEdge
     );
 
     if (invertedPatch) {
@@ -620,6 +629,9 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
       }
       
       onPatchesApplied([invertedPatch]);
+    } else {
+      // 如果无法生成反向 patch，显示错误消息
+      message.error('无法撤销此操作 - 数据不足');
     }
   }, [persistedNodes, persistedEdges, onPatchesApplied, onNodesEdgesChange]);
 
@@ -657,22 +669,42 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
 
     // 删除选中的节点
     selectedNodes.forEach(node => {
+      // 查找原始节点数据（从持久化层）
+      const originalNode = persistedNodes.find(n => n.id === node.id);
+      
+      // 查找所有连接到该节点的边
+      const connectedEdges = persistedEdges.filter(
+        edge => edge.source === node.id || edge.target === node.id
+      );
+
+      // 创建带有元数据的 removeNode patch
       patches.push({
         type: 'removeNode',
-        id: node.id
+        id: node.id,
+        metadata: {
+          originalNode,
+          originalEdges: connectedEdges
+        }
       });
     });
 
     // 删除选中的边
     selectedEdges.forEach(edge => {
+      // 查找原始边数据（从持久化层）
+      const originalEdge = persistedEdges.find(e => e.id === edge.id);
+
+      // 创建带有元数据的 removeEdge patch
       patches.push({
         type: 'removeEdge',
-        id: edge.id
+        id: edge.id,
+        metadata: {
+          originalEdge
+        }
       });
     });
 
     applyPatches(patches);
-  }, [runtimeNodes, runtimeEdges, applyPatches]);
+  }, [runtimeNodes, runtimeEdges, persistedNodes, persistedEdges, applyPatches]);
 
   // 16. 处理全选
   const handleSelectAll = useCallback(() => {

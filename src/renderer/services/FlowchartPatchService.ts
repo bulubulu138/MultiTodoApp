@@ -107,7 +107,7 @@ export class FlowchartPatchService {
 
   /**
    * 生成反向 Patch（用于 Undo）
-   * 注意：这需要保存原始数据才能生成准确的反向 Patch
+   * 优先使用 patch.metadata 中的原始数据，回退到传入的参数
    */
   static invertPatch(
     patch: FlowchartPatch,
@@ -116,6 +116,18 @@ export class FlowchartPatchService {
     originalViewport?: any,
     originalMetadata?: Partial<FlowchartSchema>
   ): FlowchartPatch | null {
+    // 优先从 patch.metadata 中提取原始数据
+    const nodeFromMetadata = patch.metadata?.originalNode || patch.metadata?.originalNodeState;
+    const edgeFromMetadata = patch.metadata?.originalEdge || patch.metadata?.originalEdgeState;
+    const viewportFromMetadata = patch.metadata?.originalViewport;
+    const metadataFromMetadata = patch.metadata?.originalMetadata;
+
+    // 使用 metadata 中的数据，如果没有则使用传入的参数
+    const finalOriginalNode = nodeFromMetadata || originalNode;
+    const finalOriginalEdge = edgeFromMetadata || originalEdge;
+    const finalOriginalViewport = viewportFromMetadata || originalViewport;
+    const finalOriginalMetadata = metadataFromMetadata || originalMetadata;
+
     switch (patch.type) {
       case 'addNode':
         // 添加节点的反向操作是删除节点
@@ -123,23 +135,23 @@ export class FlowchartPatchService {
 
       case 'removeNode':
         // 删除节点的反向操作是添加节点（需要原始节点数据）
-        if (!originalNode) {
-          console.warn('Cannot invert removeNode without original node data');
+        if (!finalOriginalNode) {
+          console.error('[FlowchartPatchService] Cannot invert removeNode: missing original node data');
           return null;
         }
-        return { type: 'addNode', node: originalNode };
+        return { type: 'addNode', node: finalOriginalNode };
 
       case 'updateNode':
         // 更新节点的反向操作是恢复原始数据
-        if (!originalNode) {
-          console.warn('Cannot invert updateNode without original node data');
+        if (!finalOriginalNode) {
+          console.error('[FlowchartPatchService] Cannot invert updateNode: missing original node data');
           return null;
         }
         // 只恢复被修改的字段
         const nodeChanges: Partial<PersistedNode> = {};
-        if (patch.changes.position) nodeChanges.position = originalNode.position;
-        if (patch.changes.data) nodeChanges.data = originalNode.data;
-        if (patch.changes.type) nodeChanges.type = originalNode.type;
+        if (patch.changes.position) nodeChanges.position = finalOriginalNode.position;
+        if (patch.changes.data) nodeChanges.data = finalOriginalNode.data;
+        if (patch.changes.type) nodeChanges.type = finalOriginalNode.type;
         return { type: 'updateNode', id: patch.id, changes: nodeChanges };
 
       case 'addEdge':
@@ -148,39 +160,39 @@ export class FlowchartPatchService {
 
       case 'removeEdge':
         // 删除边的反向操作是添加边（需要原始边数据）
-        if (!originalEdge) {
-          console.warn('Cannot invert removeEdge without original edge data');
+        if (!finalOriginalEdge) {
+          console.error('[FlowchartPatchService] Cannot invert removeEdge: missing original edge data');
           return null;
         }
-        return { type: 'addEdge', edge: originalEdge };
+        return { type: 'addEdge', edge: finalOriginalEdge };
 
       case 'updateEdge':
         // 更新边的反向操作是恢复原始数据
-        if (!originalEdge) {
-          console.warn('Cannot invert updateEdge without original edge data');
+        if (!finalOriginalEdge) {
+          console.error('[FlowchartPatchService] Cannot invert updateEdge: missing original edge data');
           return null;
         }
         const edgeChanges: Partial<PersistedEdge> = {};
-        if (patch.changes.label !== undefined) edgeChanges.label = originalEdge.label;
-        if (patch.changes.style) edgeChanges.style = originalEdge.style;
-        if (patch.changes.type) edgeChanges.type = originalEdge.type;
+        if (patch.changes.label !== undefined) edgeChanges.label = finalOriginalEdge.label;
+        if (patch.changes.style) edgeChanges.style = finalOriginalEdge.style;
+        if (patch.changes.type) edgeChanges.type = finalOriginalEdge.type;
         return { type: 'updateEdge', id: patch.id, changes: edgeChanges };
 
       case 'updateViewport':
         // 更新视口的反向操作是恢复原始视口
-        if (!originalViewport) {
-          console.warn('Cannot invert updateViewport without original viewport data');
+        if (!finalOriginalViewport) {
+          console.error('[FlowchartPatchService] Cannot invert updateViewport: missing original viewport data');
           return null;
         }
-        return { type: 'updateViewport', viewport: originalViewport };
+        return { type: 'updateViewport', viewport: finalOriginalViewport };
 
       case 'updateMetadata':
         // 更新元数据的反向操作是恢复原始元数据
-        if (!originalMetadata) {
-          console.warn('Cannot invert updateMetadata without original metadata');
+        if (!finalOriginalMetadata) {
+          console.error('[FlowchartPatchService] Cannot invert updateMetadata: missing original metadata');
           return null;
         }
-        return { type: 'updateMetadata', changes: originalMetadata };
+        return { type: 'updateMetadata', changes: finalOriginalMetadata };
 
       default:
         return null;

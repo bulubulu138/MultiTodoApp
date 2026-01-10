@@ -18,7 +18,6 @@ import { MermaidExporter } from '../../services/MermaidExporter';
 import { TextExporter } from '../../services/TextExporter';
 import { ImageExporter } from '../../services/ImageExporter';
 import { ShareService } from '../../services/ShareService';
-import { LayoutService } from '../../services/LayoutService';
 import { TemplateService, FlowchartTemplate } from '../../services/TemplateService';
 import { PerformanceMonitor } from '../../utils/performanceMonitor';
 import dayjs from 'dayjs';
@@ -428,54 +427,6 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
     }
   }, [currentFlowchart, nodes, edges]);
 
-  // 自动布局
-  const handleAutoLayout = useCallback(() => {
-    if (!currentFlowchart) return;
-
-    try {
-      console.log('[自动布局] 开始执行，节点数:', nodes.length, '边数:', edges.length);
-      PerformanceMonitor.start('auto-layout');
-      
-      const patches = LayoutService.hierarchical(nodes, edges);
-      console.log('[自动布局] 生成的 patches 数量:', patches.length);
-      
-      if (patches.length > 0) {
-        console.log('[自动布局] 应用 patches...');
-        
-        // 立即应用 patches 到节点状态
-        const updatedNodes = nodes.map(node => {
-          const patch = patches.find(p => p.type === 'updateNode' && p.id === node.id);
-          if (patch && patch.type === 'updateNode' && patch.changes.position) {
-            return {
-              ...node,
-              position: patch.changes.position
-            };
-          }
-          return node;
-        });
-        
-        // 更新状态
-        setNodes(updatedNodes);
-        
-        // 保存到 localStorage
-        handlePatchesApplied(patches);
-        
-        message.success(`布局已应用，调整了 ${patches.length} 个节点`);
-      } else {
-        message.info('无需调整布局');
-      }
-      
-      const duration = PerformanceMonitor.end('auto-layout');
-      console.log('[自动布局] 完成，耗时:', duration.toFixed(0), 'ms');
-      if (duration > 1500) {
-        console.warn(`Slow layout operation: ${duration.toFixed(0)}ms`);
-      }
-    } catch (error) {
-      message.error(`自动布局失败: ${error instanceof Error ? error.message : '未知错误'}`);
-      console.error('[自动布局] 错误:', error);
-    }
-  }, [nodes, edges, handlePatchesApplied, currentFlowchart, message]);
-
   // 新建流程图 - 直接创建空白流程图
   const handleNewFlowchart = useCallback(() => {
     // 直接使用空白模板创建
@@ -586,7 +537,6 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
               onSave={handleSave}
               onExport={handleExport}
               onShare={handleShare}
-              onAutoLayout={handleAutoLayout}
               onUndo={handleUndo}
               onRedo={handleRedo}
               onNewFlowchart={handleNewFlowchart}
