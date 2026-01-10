@@ -7,6 +7,7 @@ import ReactFlow, {
   useEdgesState,
   addEdge,
   Connection,
+  ConnectionMode,
   NodeChange,
   EdgeChange,
   Node,
@@ -25,6 +26,7 @@ import {
   RuntimeNodeData
 } from '../../shared/types';
 import { useDomainNodes } from '../hooks/useDomainNodes';
+import { useHandleVisibility } from '../hooks/useHandleVisibility';
 import { toRuntimeNodes, toRuntimeEdges } from '../utils/flowchartTransforms';
 import { FlowchartPatchService } from '../services/FlowchartPatchService';
 import { UndoRedoManager } from '../services/UndoRedoManager';
@@ -33,6 +35,7 @@ import { NodeEditPanel } from './flowchart/NodeEditPanel';
 import { NodeContextMenu } from './flowchart/NodeContextMenu';
 import { wouldCreateCycle } from '../utils/cycleDetection';
 import { migrateEdges, needsEdgesMigration } from '../utils/flowchartMigration';
+import { HandleVisibilityProvider } from '../contexts/HandleVisibilityContext';
 
 interface FlowchartCanvasProps {
   flowchartId: string;
@@ -139,6 +142,9 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     y: 0,
     nodeId: null
   });
+
+  // 9. Handle 可见性控制
+  const handleVisibility = useHandleVisibility();
 
   // 5. 当持久化数据变化时，更新运行时数据
   // 关键修复：完全保留节点位置，只更新数据内容
@@ -273,6 +279,16 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     // 双击启用内联编辑模式
     setInlineEditingNodeId(node.id);
   }, []);
+
+  // 7.01 处理节点鼠标进入
+  const handleNodeMouseEnter = useCallback((_event: React.MouseEvent, node: Node) => {
+    handleVisibility.setHoveredNode(node.id);
+  }, [handleVisibility]);
+
+  // 7.02 处理节点鼠标离开
+  const handleNodeMouseLeave = useCallback(() => {
+    handleVisibility.setHoveredNode(null);
+  }, [handleVisibility]);
 
   // 7.0 处理内联编辑保存
   const handleInlineEditSave = useCallback((nodeId: string, newLabel: string) => {
@@ -548,7 +564,22 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
 
     // 应用到 React Flow
     setRuntimeEdges((eds) => addEdge(connection, eds));
-  }, [applyPatches, setRuntimeEdges, persistedEdges]);
+    
+    // 连接完成，重置 Handle 可见性
+    handleVisibility.setConnecting(null);
+  }, [applyPatches, setRuntimeEdges, persistedEdges, handleVisibility]);
+
+  // 12.1 处理连接开始
+  const handleConnectStart = useCallback((_event: any, params: { nodeId: string | null; handleId: string | null }) => {
+    if (params.nodeId) {
+      handleVisibility.setConnecting(params.nodeId);
+    }
+  }, [handleVisibility]);
+
+  // 12.2 处理连接结束
+  const handleConnectEnd = useCallback(() => {
+    handleVisibility.setConnecting(null);
+  }, [handleVisibility]);
 
   // 13. 撤销功能
   const handleUndo = useCallback(() => {
@@ -739,12 +770,17 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
   }, [applyPatches]);
 
   return (
-    <div 
-      data-theme={theme}
-      style={{ width: '100%', height: '100%' }}
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-    >
+    <HandleVisibilityProvider value={{
+      getHandleStyle: handleVisibility.getHandleStyle,
+      setHoveredNode: handleVisibility.setHoveredNode,
+      setConnecting: handleVisibility.setConnecting
+    }}>
+      <div 
+        data-theme={theme}
+        style={{ width: '100%', height: '100%' }}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+      >
       {/* 自定义箭头标记定义 */}
       <svg style={{ position: 'absolute', width: 0, height: 0 }}>
         <defs>
@@ -792,10 +828,15 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onConnect={handleConnect}
+        onConnectStart={handleConnectStart}
+        onConnectEnd={handleConnectEnd}
         onNodeDoubleClick={handleNodeDoubleClick}
+        onNodeMouseEnter={handleNodeMouseEnter}
+        onNodeMouseLeave={handleNodeMouseLeave}
         onNodeContextMenu={handleNodeContextMenu}
         onMoveEnd={handleMoveEnd}
         nodeTypes={nodeTypes}
+        connectionMode={ConnectionMode.Loose}
         attributionPosition="bottom-left"
       >
         <Background />
@@ -828,5 +869,6 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
         onSave={handleNodeEditSave}
       />
     </div>
+    </HandleVisibilityProvider>
   );
 };

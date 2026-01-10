@@ -3,6 +3,7 @@ import { Handle, Position, NodeProps } from 'reactflow';
 import { LockOutlined, CheckCircleOutlined, ClockCircleOutlined, PauseCircleOutlined } from '@ant-design/icons';
 import { RuntimeNodeData } from '../../../shared/types';
 import { InlineTextEditor } from './InlineTextEditor';
+import { useHandleVisibilityContext } from '../../contexts/HandleVisibilityContext';
 
 /**
  * TodoNode - 关联待办任务的节点组件
@@ -14,6 +15,7 @@ import { InlineTextEditor } from './InlineTextEditor';
 export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selected }) => {
   const { label, resolvedTodo, computedStyle, isLocked, isHighlighted } = data;
   const [isEditing, setIsEditing] = useState(false);
+  const { getHandleStyle } = useHandleVisibilityContext();
 
   // 优先使用任务标题，否则使用节点 label
   const displayLabel = resolvedTodo?.title || label;
@@ -151,7 +153,7 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selec
         id="top" 
         isConnectableStart={true}
         isConnectableEnd={true}
-        style={{ background: '#555' }} 
+        style={getHandleStyle(id, 'top')} 
       />
       <Handle 
         type="source" 
@@ -159,7 +161,7 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selec
         id="left" 
         isConnectableStart={true}
         isConnectableEnd={true}
-        style={{ background: '#555' }} 
+        style={getHandleStyle(id, 'left')} 
       />
       <Handle 
         type="source" 
@@ -167,7 +169,7 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selec
         id="right" 
         isConnectableStart={true}
         isConnectableEnd={true}
-        style={{ background: '#555' }} 
+        style={getHandleStyle(id, 'right')} 
       />
       <Handle 
         type="source" 
@@ -175,7 +177,7 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selec
         id="bottom" 
         isConnectableStart={true}
         isConnectableEnd={true}
-        style={{ background: '#555' }} 
+        style={getHandleStyle(id, 'bottom')} 
       />
 
       {/* 锁定图标 */}

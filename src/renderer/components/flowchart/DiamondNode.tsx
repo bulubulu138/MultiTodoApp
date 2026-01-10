@@ -3,6 +3,7 @@ import { Handle, Position, NodeProps } from 'reactflow';
 import { LockOutlined } from '@ant-design/icons';
 import { RuntimeNodeData } from '../../../shared/types';
 import { InlineTextEditor } from './InlineTextEditor';
+import { useHandleVisibilityContext } from '../../contexts/HandleVisibilityContext';
 
 /**
  * DiamondNode - 菱形节点组件（用于决策点）
@@ -11,6 +12,7 @@ import { InlineTextEditor } from './InlineTextEditor';
 export const DiamondNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selected }) => {
   const { label, computedStyle, isLocked, isHighlighted } = data;
   const [isEditing, setIsEditing] = useState(false);
+  const { getHandleStyle } = useHandleVisibilityContext();
 
   const style = computedStyle || {
     backgroundColor: '#fff',
@@ -77,7 +79,7 @@ export const DiamondNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, se
           id="top" 
           isConnectableStart={true}
           isConnectableEnd={true}
-          style={{ background: '#555' }} 
+          style={getHandleStyle(id, 'top')} 
         />
         <Handle 
           type="source" 
@@ -85,7 +87,7 @@ export const DiamondNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, se
           id="left" 
           isConnectableStart={true}
           isConnectableEnd={true}
-          style={{ background: '#555', left: '20px' }} 
+          style={getHandleStyle(id, 'left')} 
         />
         <Handle 
           type="source" 
@@ -93,7 +95,7 @@ export const DiamondNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, se
           id="right" 
           isConnectableStart={true}
           isConnectableEnd={true}
-          style={{ background: '#555', right: '20px' }} 
+          style={getHandleStyle(id, 'right')} 
         />
         <Handle 
           type="source" 
@@ -101,7 +103,7 @@ export const DiamondNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, se
           id="bottom" 
           isConnectableStart={true}
           isConnectableEnd={true}
-          style={{ background: '#555' }} 
+          style={getHandleStyle(id, 'bottom')} 
         />
 
         <div

@@ -3,6 +3,7 @@ import { Handle, Position, NodeProps } from 'reactflow';
 import { LockOutlined } from '@ant-design/icons';
 import { RuntimeNodeData } from '../../../shared/types';
 import { InlineTextEditor } from './InlineTextEditor';
+import { useHandleVisibilityContext } from '../../contexts/HandleVisibilityContext';
 
 /**
  * RectangleNode - 矩形节点组件
@@ -11,6 +12,7 @@ import { InlineTextEditor } from './InlineTextEditor';
 export const RectangleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selected }) => {
   const { label, computedStyle, isLocked, isHighlighted } = data;
   const [isEditing, setIsEditing] = useState(false);
+  const { getHandleStyle } = useHandleVisibilityContext();
 
   const style = computedStyle || {
     backgroundColor: '#fff',
@@ -75,7 +77,7 @@ export const RectangleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, 
         id="top" 
         isConnectableStart={true}
         isConnectableEnd={true}
-        style={{ background: '#555' }} 
+        style={getHandleStyle(id, 'top')} 
       />
       <Handle 
         type="source" 
@@ -83,7 +85,7 @@ export const RectangleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, 
         id="left" 
         isConnectableStart={true}
         isConnectableEnd={true}
-        style={{ background: '#555' }} 
+        style={getHandleStyle(id, 'left')} 
       />
       <Handle 
         type="source" 
@@ -91,7 +93,7 @@ export const RectangleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, 
         id="right" 
         isConnectableStart={true}
         isConnectableEnd={true}
-        style={{ background: '#555' }} 
+        style={getHandleStyle(id, 'right')} 
       />
       <Handle 
         type="source" 
@@ -99,7 +101,7 @@ export const RectangleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, 
         id="bottom" 
         isConnectableStart={true}
         isConnectableEnd={true}
-        style={{ background: '#555' }} 
+        style={getHandleStyle(id, 'bottom')} 
       />
 
       {isLocked && (
