@@ -941,22 +941,20 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   }, []);
 
   // 跳转到流程图并高亮节点
-  const handleNavigateToFlowchart = useCallback((flowchartId: string, nodeId?: string) => {
-    // 验证流程图是否存在
-    const flowchartKey = `flowchart_${flowchartId}`;
-    const flowchartData = localStorage.getItem(flowchartKey);
-    
-    if (!flowchartData) {
-      message.error('流程图不存在或已被删除');
-      console.error(`[导航错误] 流程图 ${flowchartId} 不存在`);
-      return;
-    }
-    
-    // 如果提供了nodeId，验证节点是否存在
-    if (nodeId) {
-      try {
-        const flowchart = JSON.parse(flowchartData);
-        const nodeExists = flowchart.nodes?.some((node: any) => node.id === nodeId);
+  const handleNavigateToFlowchart = useCallback(async (flowchartId: string, nodeId?: string) => {
+    try {
+      // 验证流程图是否存在（从数据库查询）
+      const flowchartData = await window.electronAPI.flowchart.load(flowchartId);
+      
+      if (!flowchartData) {
+        message.error('流程图不存在或已被删除');
+        console.error(`[导航错误] 流程图 ${flowchartId} 不存在`);
+        return;
+      }
+      
+      // 如果提供了nodeId，验证节点是否存在
+      if (nodeId) {
+        const nodeExists = flowchartData.nodes?.some((node: any) => node.id === nodeId);
         
         if (!nodeExists) {
           message.warning('节点不存在，但已跳转到流程图');
@@ -964,30 +962,29 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
           // 继续跳转，但不高亮节点
           setHighlightedNodeId(null);
         } else {
-          // 3. 设置需要高亮的节点 ID
+          // 设置需要高亮的节点 ID
           setHighlightedNodeId(nodeId);
         }
-      } catch (parseError) {
-        console.error('[导航错误] 解析流程图数据失败:', parseError);
-        message.error('流程图数据损坏');
-        return;
+      } else {
+        // 没有提供nodeId，不高亮任何节点
+        setHighlightedNodeId(null);
       }
-    } else {
-      // 没有提供nodeId，不高亮任何节点
-      setHighlightedNodeId(null);
+      
+      // 1. 切换到流程图标签页
+      setActiveTab('flowcharts');
+      
+      // 2. 设置当前流程图 ID
+      setCurrentFlowchartId(flowchartId);
+      
+      // 3. 打开流程图抽屉
+      setShowFlowchart(true);
+      
+      // 4. 显示成功消息
+      message.success('已跳转到流程图');
+    } catch (error) {
+      console.error('[导航错误] 验证流程图失败:', error);
+      message.error('无法打开流程图，请稍后重试');
     }
-    
-    // 1. 切换到流程图标签页
-    setActiveTab('flowchart');
-    
-    // 2. 设置当前流程图 ID
-    setCurrentFlowchartId(flowchartId);
-    
-    // 4. 打开流程图抽屉
-    setShowFlowchart(true);
-    
-    // 5. 显示成功消息
-    message.success('已跳转到流程图');
   }, [message]);
 
   // Tab 切换处理（带自动保存）
