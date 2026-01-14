@@ -86,6 +86,25 @@ export interface ElectronAPI {
     }>>>;
   };
   
+  // 流程图与待办关联API（流程图级别）
+  flowchartTodoAssociation: {
+    create: (flowchartId: string, todoId: number) => Promise<{success: boolean}>;
+    delete: (flowchartId: string, todoId: number) => Promise<{success: boolean}>;
+    queryByFlowchart: (flowchartId: string) => Promise<number[]>;
+    queryByTodo: (todoId: number) => Promise<Array<{
+      flowchartId: string;
+      flowchartName: string;
+      flowchartDescription?: string;
+      createdAt: number;
+    }>>;
+    queryByTodos: (todoIds: number[]) => Promise<Record<number, Array<{
+      flowchartId: string;
+      flowchartName: string;
+      flowchartDescription?: string;
+      createdAt: number;
+    }>>>;
+  };
+  
   // Shell API
   openExternal: (url: string) => Promise<{success: boolean; error?: string}>;
   
@@ -159,6 +178,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   flowchart: {
     getAssociationsByTodoIds: (todoIds: number[]) => 
       ipcRenderer.invoke('flowchart:getAssociationsByTodoIds', todoIds),
+  },
+  flowchartTodoAssociation: {
+    create: (flowchartId: string, todoId: number) => 
+      ipcRenderer.invoke('flowchart-todo-association:create', flowchartId, todoId),
+    delete: (flowchartId: string, todoId: number) => 
+      ipcRenderer.invoke('flowchart-todo-association:delete', flowchartId, todoId),
+    queryByFlowchart: (flowchartId: string) => 
+      ipcRenderer.invoke('flowchart-todo-association:query-by-flowchart', flowchartId),
+    queryByTodo: (todoId: number) => 
+      ipcRenderer.invoke('flowchart-todo-association:query-by-todo', todoId),
+    queryByTodos: (todoIds: number[]) => 
+      ipcRenderer.invoke('flowchart-todo-association:query-by-todos', todoIds),
   },
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
   

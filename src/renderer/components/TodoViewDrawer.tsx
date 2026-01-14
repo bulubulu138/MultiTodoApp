@@ -1,7 +1,7 @@
-import { Todo, TodoRelation, FlowchartAssociation } from '../../shared/types';
-import React, { useMemo, useCallback, useState } from 'react';
-import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message, Image, Card, Empty } from 'antd';
-import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined, NodeIndexOutlined } from '@ant-design/icons';
+import { Todo, TodoRelation, FlowchartAssociation, FlowchartAssociationDisplay } from '../../shared/types';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
+import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message, Image, Card, Empty, Spin } from 'antd';
+import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined, NodeIndexOutlined, FileTextOutlined } from '@ant-design/icons';
 import RelationContext from './RelationContext';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -16,7 +16,7 @@ interface TodoViewDrawerProps {
   relations: TodoRelation[];
   onClose: () => void;
   onEdit: (todo: Todo) => void;
-  onOpenFlowchart?: (flowchartId: string, nodeId: string) => void; // 新增：打开流程图回调
+  onOpenFlowchart?: (flowchartId: string, nodeId?: string) => void; // 修改：nodeId改为可选
 }
 
 const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
@@ -32,23 +32,70 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState('');
 
+  // 流程图级别关联状态
+  const [flowchartLevelAssociations, setFlowchartLevelAssociations] = useState<FlowchartAssociationDisplay[]>([]);
+  const [flowchartLevelLoading, setFlowchartLevelLoading] = useState(false);
+
+  // 查询流程图级别关联
+  useEffect(() => {
+    const loadFlowchartLevelAssociations = async () => {
+      if (!todo?.id) {
+        setFlowchartLevelAssociations([]);
+        return;
+      }
+
+      setFlowchartLevelLoading(true);
+      try {
+        const associations = await window.electronAPI.flowchartTodoAssociation.queryByTodo(todo.id);
+        // 转换为统一的显示格式
+        const displayAssociations: FlowchartAssociationDisplay[] = associations.map(assoc => ({
+          type: 'flowchart' as const,
+          flowchartId: assoc.flowchartId,
+          flowchartName: assoc.flowchartName,
+          flowchartDescription: assoc.flowchartDescription,
+          createdAt: assoc.createdAt
+        }));
+        setFlowchartLevelAssociations(displayAssociations);
+      } catch (error) {
+        console.error('查询流程图级别关联失败:', error);
+        setFlowchartLevelAssociations([]);
+      } finally {
+        setFlowchartLevelLoading(false);
+      }
+    };
+
+    loadFlowchartLevelAssociations();
+  }, [todo?.id]);
+
   // 缓存 todoIds 数组，避免每次渲染都创建新数组
   const todoIds = useMemo(() => {
     return todo?.id ? [todo.id] : [];
   }, [todo?.id]);
 
-  // 查询流程图关联
-  const { associationsByTodo, loading: associationsLoading } = useFlowchartAssociations(todoIds);
+  // 查询节点级别关联（使用现有的hook）
+  const { associationsByTodo, loading: nodeLevelLoading } = useFlowchartAssociations(todoIds);
 
-  // 获取当前待办的流程图关联
-  const flowchartAssociations = useMemo(() => {
+  // 获取当前待办的节点级别关联
+  const nodeLevelAssociations = useMemo(() => {
     if (!todo?.id) return [];
-    console.log('[TodoViewDrawer] Looking up associations for todo.id:', todo.id, 'type:', typeof todo.id);
-    console.log('[TodoViewDrawer] associationsByTodo Map keys:', Array.from(associationsByTodo.keys()));
-    const result = associationsByTodo.get(todo.id) || [];
-    console.log('[TodoViewDrawer] Found', result.length, 'associations');
-    return result;
+    const nodeAssocs = associationsByTodo.get(todo.id) || [];
+    // 转换为统一的显示格式
+    return nodeAssocs.map(assoc => ({
+      type: 'node' as const,
+      flowchartId: assoc.flowchartId,
+      flowchartName: assoc.flowchartName,
+      nodeId: assoc.nodeId,
+      nodeLabel: assoc.nodeLabel
+    } as FlowchartAssociationDisplay));
   }, [todo?.id, associationsByTodo]);
+
+  // 合并两种类型的关联
+  const allAssociations = useMemo(() => {
+    return [...flowchartLevelAssociations, ...nodeLevelAssociations];
+  }, [flowchartLevelAssociations, nodeLevelAssociations]);
+
+  // 关联加载状态
+  const associationsLoading = flowchartLevelLoading || nodeLevelLoading;
 
   // 转换为PNG格式
   const convertToPng = async (blob: Blob): Promise<Blob> => {
@@ -501,9 +548,10 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
             <Text strong>关联的流程图：</Text>
             {associationsLoading ? (
               <div style={{ marginTop: 8, textAlign: 'center', padding: 16 }}>
-                <Text type="secondary">加载中...</Text>
+                <Spin size="small" />
+                <Text type="secondary" style={{ marginLeft: 8 }}>加载中...</Text>
               </div>
-            ) : flowchartAssociations.length === 0 ? (
+            ) : allAssociations.length === 0 ? (
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
                 description="暂无关联的流程图"
@@ -511,34 +559,85 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
               />
             ) : (
               <Space direction="vertical" style={{ width: '100%', marginTop: 8 }} size="small">
-                {flowchartAssociations.map((assoc) => (
-                  <Card
-                    key={`${assoc.flowchartId}-${assoc.nodeId}`}
-                    size="small"
-                    hoverable
-                    onClick={() => {
-                      if (onOpenFlowchart) {
-                        onOpenFlowchart(assoc.flowchartId, assoc.nodeId);
-                        onClose(); // 关闭抽屉
-                      }
-                    }}
-                    style={{
-                      cursor: onOpenFlowchart ? 'pointer' : 'default',
-                      borderColor: colors.borderColor
-                    }}
-                  >
-                    <Space>
-                      <NodeIndexOutlined style={{ fontSize: 20, color: '#1890ff' }} />
-                      <div>
-                        <Text strong>{assoc.flowchartName}</Text>
-                        <br />
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          节点: {assoc.nodeLabel}
-                        </Text>
-                      </div>
-                    </Space>
-                  </Card>
-                ))}
+                {/* 流程图级别关联 */}
+                {flowchartLevelAssociations.length > 0 && (
+                  <>
+                    <Text type="secondary" style={{ fontSize: 12, marginTop: 8 }}>
+                      流程图级别关联 ({flowchartLevelAssociations.length})
+                    </Text>
+                    {flowchartLevelAssociations.map((assoc) => (
+                      <Card
+                        key={`flowchart-${assoc.flowchartId}`}
+                        size="small"
+                        hoverable
+                        onClick={() => {
+                          if (onOpenFlowchart) {
+                            onOpenFlowchart(assoc.flowchartId);
+                            onClose();
+                          }
+                        }}
+                        style={{
+                          cursor: onOpenFlowchart ? 'pointer' : 'default',
+                          borderColor: colors.borderColor,
+                          borderLeft: '4px solid #52c41a'
+                        }}
+                      >
+                        <Space>
+                          <FileTextOutlined style={{ fontSize: 20, color: '#52c41a' }} />
+                          <div>
+                            <Text strong>{assoc.flowchartName}</Text>
+                            {assoc.flowchartDescription && (
+                              <>
+                                <br />
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                  {assoc.flowchartDescription}
+                                </Text>
+                              </>
+                            )}
+                          </div>
+                        </Space>
+                      </Card>
+                    ))}
+                  </>
+                )}
+
+                {/* 节点级别关联 */}
+                {nodeLevelAssociations.length > 0 && (
+                  <>
+                    <Text type="secondary" style={{ fontSize: 12, marginTop: 8 }}>
+                      节点级别关联 ({nodeLevelAssociations.length})
+                    </Text>
+                    {nodeLevelAssociations.map((assoc) => (
+                      <Card
+                        key={`node-${assoc.flowchartId}-${assoc.nodeId}`}
+                        size="small"
+                        hoverable
+                        onClick={() => {
+                          if (onOpenFlowchart && assoc.nodeId) {
+                            onOpenFlowchart(assoc.flowchartId, assoc.nodeId);
+                            onClose();
+                          }
+                        }}
+                        style={{
+                          cursor: onOpenFlowchart ? 'pointer' : 'default',
+                          borderColor: colors.borderColor,
+                          borderLeft: '4px solid #1890ff'
+                        }}
+                      >
+                        <Space>
+                          <NodeIndexOutlined style={{ fontSize: 20, color: '#1890ff' }} />
+                          <div>
+                            <Text strong>{assoc.flowchartName}</Text>
+                            <br />
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              节点: {assoc.nodeLabel}
+                            </Text>
+                          </div>
+                        </Space>
+                      </Card>
+                    ))}
+                  </>
+                )}
               </Space>
             )}
           </div>

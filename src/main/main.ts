@@ -728,6 +728,104 @@ class Application {
         return {};
       }
     });
+
+    // 流程图与待办关联（流程图级别）
+    ipcMain.handle('flowchart-todo-association:create', async (_, flowchartId: string, todoId: number) => {
+      try {
+        const { FlowchartTodoAssociationRepository } = await import('./database/FlowchartTodoAssociationRepository');
+        const db = this.dbManager.getDb();
+        if (!db) {
+          throw new Error('Database not initialized');
+        }
+        
+        const repo = new FlowchartTodoAssociationRepository(db);
+        repo.create(flowchartId, todoId);
+        console.log(`[FlowchartTodoAssociation] Created: flowchart=${flowchartId}, todo=${todoId}`);
+        return { success: true };
+      } catch (error) {
+        console.error('Error creating flowchart-todo association:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('flowchart-todo-association:delete', async (_, flowchartId: string, todoId: number) => {
+      try {
+        const { FlowchartTodoAssociationRepository } = await import('./database/FlowchartTodoAssociationRepository');
+        const db = this.dbManager.getDb();
+        if (!db) {
+          throw new Error('Database not initialized');
+        }
+        
+        const repo = new FlowchartTodoAssociationRepository(db);
+        repo.delete(flowchartId, todoId);
+        console.log(`[FlowchartTodoAssociation] Deleted: flowchart=${flowchartId}, todo=${todoId}`);
+        return { success: true };
+      } catch (error) {
+        console.error('Error deleting flowchart-todo association:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('flowchart-todo-association:query-by-flowchart', async (_, flowchartId: string) => {
+      try {
+        const { FlowchartTodoAssociationRepository } = await import('./database/FlowchartTodoAssociationRepository');
+        const db = this.dbManager.getDb();
+        if (!db) {
+          throw new Error('Database not initialized');
+        }
+        
+        const repo = new FlowchartTodoAssociationRepository(db);
+        const todoIds = repo.queryByFlowchartId(flowchartId);
+        console.log(`[FlowchartTodoAssociation] Query by flowchart ${flowchartId}: found ${todoIds.length} todos`);
+        return todoIds;
+      } catch (error) {
+        console.error('Error querying flowchart-todo associations by flowchart:', error);
+        return [];
+      }
+    });
+
+    ipcMain.handle('flowchart-todo-association:query-by-todo', async (_, todoId: number) => {
+      try {
+        const { FlowchartTodoAssociationRepository } = await import('./database/FlowchartTodoAssociationRepository');
+        const db = this.dbManager.getDb();
+        if (!db) {
+          throw new Error('Database not initialized');
+        }
+        
+        const repo = new FlowchartTodoAssociationRepository(db);
+        const associations = repo.queryByTodoId(todoId);
+        console.log(`[FlowchartTodoAssociation] Query by todo ${todoId}: found ${associations.length} flowcharts`);
+        return associations;
+      } catch (error) {
+        console.error('Error querying flowchart-todo associations by todo:', error);
+        return [];
+      }
+    });
+
+    ipcMain.handle('flowchart-todo-association:query-by-todos', async (_, todoIds: number[]) => {
+      try {
+        const { FlowchartTodoAssociationRepository } = await import('./database/FlowchartTodoAssociationRepository');
+        const db = this.dbManager.getDb();
+        if (!db) {
+          throw new Error('Database not initialized');
+        }
+        
+        const repo = new FlowchartTodoAssociationRepository(db);
+        const associationsMap = repo.queryByTodoIds(todoIds);
+        
+        // 转换 Map 为普通对象以便序列化
+        const result: Record<number, any[]> = {};
+        associationsMap.forEach((value, key) => {
+          result[key] = value;
+        });
+        
+        console.log(`[FlowchartTodoAssociation] Batch query ${todoIds.length} todos: found ${Object.keys(result).length} with associations`);
+        return result;
+      } catch (error) {
+        console.error('Error batch querying flowchart-todo associations:', error);
+        return {};
+      }
+    });
   }
 
   public async initialize(): Promise<void> {

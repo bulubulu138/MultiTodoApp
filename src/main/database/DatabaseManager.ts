@@ -135,7 +135,21 @@ export class DatabaseManager {
       
       `CREATE INDEX IF NOT EXISTS idx_flowchart_edges_flowchart_id ON flowchart_edges(flowchart_id)`,
       `CREATE INDEX IF NOT EXISTS idx_flowchart_edges_connection_hash ON flowchart_edges(connection_hash)`,
-      `CREATE INDEX IF NOT EXISTS idx_flowchart_edges_updated_at ON flowchart_edges(updated_at)`
+      `CREATE INDEX IF NOT EXISTS idx_flowchart_edges_updated_at ON flowchart_edges(updated_at)`,
+      
+      // 流程图与待办关联表
+      `CREATE TABLE IF NOT EXISTS flowchart_todo_associations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        flowchart_id TEXT NOT NULL,
+        todo_id INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (flowchart_id) REFERENCES flowcharts(id) ON DELETE CASCADE,
+        FOREIGN KEY (todo_id) REFERENCES todos(id) ON DELETE CASCADE,
+        UNIQUE(flowchart_id, todo_id)
+      )`,
+      
+      `CREATE INDEX IF NOT EXISTS idx_flowchart_todo_assoc_flowchart ON flowchart_todo_associations(flowchart_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_flowchart_todo_assoc_todo ON flowchart_todo_associations(todo_id)`
     ];
 
     for (const sql of tables) {

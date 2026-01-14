@@ -347,3 +347,22 @@ export interface FlowchartAssociation {
   nodeId: string;
   nodeLabel: string;
 }
+
+// 流程图与待办关联（流程图级别）
+export interface FlowchartTodoAssociation {
+  id?: number;
+  flowchartId: string;
+  todoId: number;
+  createdAt: number;
+}
+
+// 关联信息展示模型
+export interface FlowchartAssociationDisplay {
+  type: 'flowchart' | 'node';
+  flowchartId: string;
+  flowchartName: string;
+  flowchartDescription?: string;
+  nodeId?: string;  // 仅节点级别关联有值
+  nodeLabel?: string;  // 仅节点级别关联有值
+  createdAt?: number;
+}
