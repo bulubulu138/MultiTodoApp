@@ -941,7 +941,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   }, []);
 
   // 跳转到流程图并高亮节点
-  const handleNavigateToFlowchart = useCallback((flowchartId: string, nodeId: string) => {
+  const handleNavigateToFlowchart = useCallback((flowchartId: string, nodeId?: string) => {
     // 验证流程图是否存在
     const flowchartKey = `flowchart_${flowchartId}`;
     const flowchartData = localStorage.getItem(flowchartKey);
@@ -952,24 +952,29 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       return;
     }
     
-    // 验证节点是否存在
-    try {
-      const flowchart = JSON.parse(flowchartData);
-      const nodeExists = flowchart.nodes?.some((node: any) => node.id === nodeId);
-      
-      if (!nodeExists) {
-        message.warning('节点不存在，但已跳转到流程图');
-        console.warn(`[导航警告] 节点 ${nodeId} 在流程图 ${flowchartId} 中不存在`);
-        // 继续跳转，但不高亮节点
-        setHighlightedNodeId(null);
-      } else {
-        // 3. 设置需要高亮的节点 ID
-        setHighlightedNodeId(nodeId);
+    // 如果提供了nodeId，验证节点是否存在
+    if (nodeId) {
+      try {
+        const flowchart = JSON.parse(flowchartData);
+        const nodeExists = flowchart.nodes?.some((node: any) => node.id === nodeId);
+        
+        if (!nodeExists) {
+          message.warning('节点不存在，但已跳转到流程图');
+          console.warn(`[导航警告] 节点 ${nodeId} 在流程图 ${flowchartId} 中不存在`);
+          // 继续跳转，但不高亮节点
+          setHighlightedNodeId(null);
+        } else {
+          // 3. 设置需要高亮的节点 ID
+          setHighlightedNodeId(nodeId);
+        }
+      } catch (parseError) {
+        console.error('[导航错误] 解析流程图数据失败:', parseError);
+        message.error('流程图数据损坏');
+        return;
       }
-    } catch (parseError) {
-      console.error('[导航错误] 解析流程图数据失败:', parseError);
-      message.error('流程图数据损坏');
-      return;
+    } else {
+      // 没有提供nodeId，不高亮任何节点
+      setHighlightedNodeId(null);
     }
     
     // 1. 切换到流程图标签页
