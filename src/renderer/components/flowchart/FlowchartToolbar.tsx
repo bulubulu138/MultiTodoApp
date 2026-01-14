@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Space, Dropdown, message, Typography, Input } from 'antd';
+import { Button, Space, Dropdown, message, Typography, Input, Select } from 'antd';
 import {
   SaveOutlined,
   DownloadOutlined,
@@ -10,14 +10,19 @@ import {
   ShareAltOutlined,
   EditOutlined,
   CheckOutlined,
-  CloseOutlined
+  CloseOutlined,
+  LinkOutlined
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
+import { Todo } from '../../../shared/types';
 
 const { Title } = Typography;
+const { Option } = Select;
 
 interface FlowchartToolbarProps {
   flowchartName?: string;
+  flowchartId?: string;
+  todos?: Todo[];
   onNameChange?: (newName: string) => void;
   onSave: () => void;
   onExport: (format: 'json' | 'mermaid' | 'text' | 'png') => void;
@@ -37,6 +42,8 @@ interface FlowchartToolbarProps {
  */
 export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
   flowchartName,
+  flowchartId,
+  todos = [],
   onNameChange,
   onSave,
   onExport,
@@ -55,6 +62,10 @@ export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
   const [isEditingName, setIsEditingName] = useState(false);
   const [editingName, setEditingName] = useState('');
   
+  // 待办关联状态
+  const [associatedTodoIds, setAssociatedTodoIds] = useState<number[]>([]);
+  const [loadingAssociations, setLoadingAssociations] = useState(false);
+  
   React.useEffect(() => {
     const observer = new MutationObserver(() => {
       const newTheme = document.documentElement.dataset.theme || 'light';
@@ -68,6 +79,47 @@ export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
     
     return () => observer.disconnect();
   }, []);
+
+  // 加载已关联的待办
+  React.useEffect(() => {
+    if (flowchartId) {
+      loadAssociatedTodos();
+    }
+  }, [flowchartId]);
+
+  const loadAssociatedTodos = async () => {
+    if (!flowchartId) return;
+    
+    try {
+      setLoadingAssociations(true);
+      const todoIds = await window.electronAPI.flowchartTodoAssociation.queryByFlowchart(flowchartId);
+      setAssociatedTodoIds(todoIds);
+    } catch (error) {
+      console.error('加载关联待办失败:', error);
+    } finally {
+      setLoadingAssociations(false);
+    }
+  };
+
+  // 处理待办关联
+  const handleTodoAssociation = async (todoId: number, checked: boolean) => {
+    if (!flowchartId) return;
+    
+    try {
+      if (checked) {
+        await window.electronAPI.flowchartTodoAssociation.create(flowchartId, todoId);
+        setAssociatedTodoIds(prev => [...prev, todoId]);
+        message.success('已关联待办');
+      } else {
+        await window.electronAPI.flowchartTodoAssociation.delete(flowchartId, todoId);
+        setAssociatedTodoIds(prev => prev.filter(id => id !== todoId));
+        message.success('已取消关联');
+      }
+    } catch (error) {
+      console.error('关联操作失败:', error);
+      message.error('操作失败，请重试');
+    }
+  };
 
   // 开始编辑名称
   const handleStartEdit = () => {
@@ -212,6 +264,49 @@ export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
               </>
             )}
           </Space>
+        )}
+
+        {/* 待办关联选择器 */}
+        {flowchartId && todos.length > 0 && (
+          <Select
+            mode="multiple"
+            placeholder="关联待办事项"
+            style={{ minWidth: 200, maxWidth: 400 }}
+            value={associatedTodoIds}
+            onChange={(selectedIds) => {
+              // 找出新增和删除的ID
+              const added = selectedIds.filter(id => !associatedTodoIds.includes(id));
+              const removed = associatedTodoIds.filter(id => !selectedIds.includes(id));
+              
+              // 处理新增
+              added.forEach(id => handleTodoAssociation(id, true));
+              // 处理删除
+              removed.forEach(id => handleTodoAssociation(id, false));
+            }}
+            loading={loadingAssociations}
+            maxTagCount={2}
+            suffixIcon={<LinkOutlined />}
+            filterOption={(input, option) => {
+              const todo = todos.find(t => t.id === option?.value);
+              if (!todo) return false;
+              const searchText = input.toLowerCase();
+              return (
+                todo.title.toLowerCase().includes(searchText) ||
+                (todo.content?.toLowerCase().includes(searchText) || false)
+              );
+            }}
+          >
+            {todos.map(todo => (
+              <Option key={todo.id} value={todo.id!}>
+                <Space>
+                  <span>{todo.title}</span>
+                  {todo.status === 'completed' && (
+                    <span style={{ color: '#52c41a', fontSize: 12 }}>✓</span>
+                  )}
+                </Space>
+              </Option>
+            ))}
+          </Select>
         )}
 
         <Button

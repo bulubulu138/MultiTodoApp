@@ -520,6 +520,8 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <FlowchartToolbar
               flowchartName={currentFlowchart.name}
+              flowchartId={currentFlowchart.id}
+              todos={todos}
               onNameChange={handleNameChange}
               onSave={handleSave}
               onExport={handleExport}
