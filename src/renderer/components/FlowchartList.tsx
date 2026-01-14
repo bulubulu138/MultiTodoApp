@@ -40,25 +40,13 @@ export const FlowchartList: React.FC<FlowchartListProps> = ({
   const loadFlowcharts = useCallback(async () => {
     try {
       setLoading(true);
-      // 从 localStorage 加载（临时方案）
-      const keys = Object.keys(localStorage).filter(key => key.startsWith('flowchart_'));
-      const flowchartList: FlowchartSchema[] = [];
-
-      keys.forEach(key => {
-        try {
-          const data = JSON.parse(localStorage.getItem(key) || '{}');
-          if (data.schema) {
-            flowchartList.push(data.schema);
-          }
-        } catch (error) {
-          console.error(`Failed to parse flowchart ${key}:`, error);
-        }
-      });
+      // 从数据库加载
+      const flowchartList = await window.electronAPI.flowchart.list();
 
       // 按更新时间排序
       flowchartList.sort((a, b) => {
-        const timeA = new Date(a.updatedAt).getTime();
-        const timeB = new Date(b.updatedAt).getTime();
+        const timeA = typeof a.updatedAt === 'number' ? a.updatedAt : new Date(a.updatedAt).getTime();
+        const timeB = typeof b.updatedAt === 'number' ? b.updatedAt : new Date(b.updatedAt).getTime();
         return timeB - timeA;
       });
 
@@ -95,12 +83,18 @@ export const FlowchartList: React.FC<FlowchartListProps> = ({
     }
 
     try {
-      // 更新 localStorage
-      const key = `flowchart_${renamingFlowchart.id}`;
-      const data = JSON.parse(localStorage.getItem(key) || '{}');
-      data.schema.name = newName.trim();
-      data.schema.updatedAt = new Date().toISOString();
-      localStorage.setItem(key, JSON.stringify(data));
+      // 加载流程图数据
+      const flowchartData = await window.electronAPI.flowchart.load(renamingFlowchart.id);
+      if (!flowchartData) {
+        message.error('流程图不存在');
+        return;
+      }
+
+      // 更新名称并保存
+      flowchartData.schema.name = newName.trim();
+      flowchartData.schema.updatedAt = Date.now();
+      
+      await window.electronAPI.flowchart.save(flowchartData);
 
       message.success('重命名成功');
       setRenameModalVisible(false);
@@ -116,8 +110,7 @@ export const FlowchartList: React.FC<FlowchartListProps> = ({
   // 删除流程图
   const handleDelete = async (flowchart: FlowchartSchema) => {
     try {
-      const key = `flowchart_${flowchart.id}`;
-      localStorage.removeItem(key);
+      await window.electronAPI.flowchart.delete(flowchart.id);
       message.success('删除成功');
       loadFlowcharts();
       
@@ -132,16 +125,16 @@ export const FlowchartList: React.FC<FlowchartListProps> = ({
   };
 
   // 导出流程图
-  const handleExport = (flowchart: FlowchartSchema) => {
+  const handleExport = async (flowchart: FlowchartSchema) => {
     try {
-      const key = `flowchart_${flowchart.id}`;
-      const data = localStorage.getItem(key);
+      const data = await window.electronAPI.flowchart.load(flowchart.id);
       if (!data) {
         message.error('流程图数据不存在');
         return;
       }
 
-      const blob = new Blob([data], { type: 'application/json' });
+      const jsonData = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonData], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

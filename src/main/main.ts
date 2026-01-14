@@ -826,6 +826,156 @@ class Application {
         return {};
       }
     });
+
+    // 流程图数据库操作
+    ipcMain.handle('flowchart:save', async (_, flowchartData: any) => {
+      try {
+        const { FlowchartRepository } = await import('./database/FlowchartRepository');
+        const db = this.dbManager.getDb();
+        if (!db) {
+          throw new Error('Database not initialized');
+        }
+        
+        const repo = new FlowchartRepository(db);
+        
+        // 检查流程图是否已存在
+        const existing = repo.load(flowchartData.schema.id);
+        
+        if (existing) {
+          // 更新现有流程图 - 先删除再重新创建
+          console.log(`[Flowchart] Updating existing flowchart: ${flowchartData.schema.id}`);
+          
+          // 删除旧的流程图（会级联删除节点和边）
+          repo.delete(flowchartData.schema.id);
+          
+          // 重新创建流程图
+          repo.create(flowchartData.schema);
+          
+          // 添加所有节点和边
+          const patches: any[] = [];
+          
+          flowchartData.nodes.forEach((node: any) => {
+            patches.push({ type: 'addNode', node });
+          });
+          
+          flowchartData.edges.forEach((edge: any) => {
+            patches.push({ type: 'addEdge', edge });
+          });
+          
+          if (patches.length > 0) {
+            repo.savePatches(flowchartData.schema.id, patches);
+          }
+          
+          console.log(`[Flowchart] Updated flowchart with ${flowchartData.nodes.length} nodes and ${flowchartData.edges.length} edges`);
+        } else {
+          // 创建新流程图
+          console.log(`[Flowchart] Creating new flowchart: ${flowchartData.schema.id}`);
+          repo.create(flowchartData.schema);
+          
+          // 添加所有节点和边
+          const patches: any[] = [];
+          
+          flowchartData.nodes.forEach((node: any) => {
+            patches.push({ type: 'addNode', node });
+          });
+          
+          flowchartData.edges.forEach((edge: any) => {
+            patches.push({ type: 'addEdge', edge });
+          });
+          
+          if (patches.length > 0) {
+            repo.savePatches(flowchartData.schema.id, patches);
+          }
+          
+          console.log(`[Flowchart] Created flowchart with ${flowchartData.nodes.length} nodes and ${flowchartData.edges.length} edges`);
+        }
+        
+        return { success: true };
+      } catch (error) {
+        console.error('Error saving flowchart:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('flowchart:load', async (_, flowchartId: string) => {
+      try {
+        const { FlowchartRepository } = await import('./database/FlowchartRepository');
+        const db = this.dbManager.getDb();
+        if (!db) {
+          throw new Error('Database not initialized');
+        }
+        
+        const repo = new FlowchartRepository(db);
+        const flowchart = repo.load(flowchartId);
+        
+        if (!flowchart) {
+          return null;
+        }
+        
+        console.log(`[Flowchart] Loaded flowchart: ${flowchartId}`);
+        return flowchart;
+      } catch (error) {
+        console.error('Error loading flowchart:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('flowchart:list', async () => {
+      try {
+        const { FlowchartRepository } = await import('./database/FlowchartRepository');
+        const db = this.dbManager.getDb();
+        if (!db) {
+          throw new Error('Database not initialized');
+        }
+        
+        const repo = new FlowchartRepository(db);
+        const flowcharts = repo.list();
+        
+        console.log(`[Flowchart] Listed ${flowcharts.length} flowcharts`);
+        return flowcharts;
+      } catch (error) {
+        console.error('Error listing flowcharts:', error);
+        return [];
+      }
+    });
+
+    ipcMain.handle('flowchart:delete', async (_, flowchartId: string) => {
+      try {
+        const { FlowchartRepository } = await import('./database/FlowchartRepository');
+        const db = this.dbManager.getDb();
+        if (!db) {
+          throw new Error('Database not initialized');
+        }
+        
+        const repo = new FlowchartRepository(db);
+        repo.delete(flowchartId);
+        
+        console.log(`[Flowchart] Deleted flowchart: ${flowchartId}`);
+        return { success: true };
+      } catch (error) {
+        console.error('Error deleting flowchart:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('flowchart:savePatches', async (_, flowchartId: string, patches: any[]) => {
+      try {
+        const { FlowchartRepository } = await import('./database/FlowchartRepository');
+        const db = this.dbManager.getDb();
+        if (!db) {
+          throw new Error('Database not initialized');
+        }
+        
+        const repo = new FlowchartRepository(db);
+        repo.savePatches(flowchartId, patches);
+        
+        console.log(`[Flowchart] Saved ${patches.length} patches for flowchart: ${flowchartId}`);
+        return { success: true };
+      } catch (error) {
+        console.error('Error saving flowchart patches:', error);
+        throw error;
+      }
+    });
   }
 
   public async initialize(): Promise<void> {
