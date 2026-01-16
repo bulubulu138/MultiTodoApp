@@ -115,6 +115,20 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     };
   }, [message]);
 
+  // 监听创建新流程图事件（从FlowchartDrawer内部触发）
+  useEffect(() => {
+    const handleCreateNewFlowchartEvent = () => {
+      console.log('[App] 收到创建新流程图事件');
+      handleCreateNewFlowchart();
+    };
+    
+    window.addEventListener('create-new-flowchart', handleCreateNewFlowchartEvent);
+    
+    return () => {
+      window.removeEventListener('create-new-flowchart', handleCreateNewFlowchartEvent);
+    };
+  }, [handleCreateNewFlowchart]);
+
   // 检查首次运行，显示快捷键引导
   useEffect(() => {
     const hasSeenHotkeyGuide = localStorage.getItem('hasSeenHotkeyGuide');

@@ -33,7 +33,6 @@ import { UndoRedoManager } from '../services/UndoRedoManager';
 import { nodeTypes } from './flowchart/nodeTypes';
 import { NodeEditPanel } from './flowchart/NodeEditPanel';
 import { NodeContextMenu } from './flowchart/NodeContextMenu';
-import { FlowchartTodoSearchBar } from './FlowchartTodoSearchBar';
 import { wouldCreateCycle } from '../utils/cycleDetection';
 import { migrateEdges, needsEdgesMigration } from '../utils/flowchartMigration';
 import { HandleVisibilityProvider } from '../contexts/HandleVisibilityContext';
@@ -863,16 +862,7 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
-      {/* 待办搜索栏 */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
-        <FlowchartTodoSearchBar
-          flowchartId={flowchartId}
-          todos={todos}
-          associatedTodoIds={associatedTodoIds}
-          onAssociate={handleAssociate}
-          onDisassociate={handleDisassociate}
-        />
-      </div>
+
 
       {/* 自定义箭头标记定义 */}
       <svg style={{ position: 'absolute', width: 0, height: 0 }}>

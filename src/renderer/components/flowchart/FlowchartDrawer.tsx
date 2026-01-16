@@ -415,42 +415,24 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
     }
   }, [currentFlowchart, nodes, edges]);
 
-  // 新建流程图 - 直接创建空白流程图
-  const handleNewFlowchart = useCallback(async () => {
-    // 直接使用空白模板创建
-    const blankTemplate = templates.find(t => t.id === 'blank');
-    if (blankTemplate) {
-      const defaultName = `流程图 ${dayjs().format('YYYY-MM-DD HH:mm')}`;
-      
-      try {
-        const { schema, nodes: templateNodes, edges: templateEdges } = 
-          TemplateService.createFromTemplate(blankTemplate, defaultName);
-
-        console.log(`[创建] 创建新流程图: ${schema.name}`);
-        console.log(`[创建] 流程图ID: ${schema.id}`);
-
-        setCurrentFlowchart(schema);
-        setNodes(templateNodes);
-        setEdges(templateEdges);
-
-        // 立即保存新创建的流程图到数据库
-        await window.electronAPI.flowchart.save({
-          schema,
-          nodes: templateNodes,
-          edges: templateEdges
-        });
-        console.log(`[创建] 已保存到数据库: ${schema.id}`);
-
-        // 性能监控：检查流程图规模
-        PerformanceMonitor.warnLargeFlowchart(templateNodes.length, templateEdges.length);
-
-        message.success('流程图创建成功');
-      } catch (error) {
-        console.error('Failed to create flowchart:', error);
-        message.error('创建流程图失败');
-      }
+  // 新建流程图 - 关闭当前抽屉，让父组件重新打开新的流程图
+  const handleNewFlowchart = useCallback(() => {
+    // 先保存当前流程图的未保存修改
+    if (patchQueueRef.current.length > 0) {
+      savePatchesToDatabase();
+      patchQueueRef.current = [];
     }
-  }, [templates, message]);
+    
+    // 关闭当前抽屉
+    onClose();
+    
+    // 延迟一下，让父组件有时间处理关闭事件
+    setTimeout(() => {
+      // 触发父组件的创建新流程图逻辑
+      // 通过关闭并清空 flowchartId，父组件会重新打开抽屉并创建新流程图
+      window.dispatchEvent(new CustomEvent('create-new-flowchart'));
+    }, 100);
+  }, [savePatchesToDatabase, onClose]);
 
   // 撤销/重做（占位符）
   const handleUndo = useCallback(() => {
