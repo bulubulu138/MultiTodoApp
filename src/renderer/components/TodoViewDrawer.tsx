@@ -1,4 +1,4 @@
-import { Todo, TodoRelation, FlowchartAssociation, FlowchartAssociationDisplay } from '../../shared/types';
+import { Todo, TodoRelation, FlowchartAssociationDisplay } from '../../shared/types';
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message, Image, Card, Empty, Spin } from 'antd';
 import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined, NodeIndexOutlined, FileTextOutlined } from '@ant-design/icons';
@@ -6,6 +6,7 @@ import RelationContext from './RelationContext';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useFlowchartAssociations } from '../hooks/useFlowchartAssociations';
+import { LazyFlowchartPreviewCard } from './flowchart/LazyFlowchartPreviewCard';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -39,7 +40,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   // 查询流程图级别关联
   useEffect(() => {
     const loadFlowchartLevelAssociations = async () => {
-      if (!todo?.id) {
+      if (!todo?.id || !visible) {
         setFlowchartLevelAssociations([]);
         return;
       }
@@ -65,7 +66,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
     };
 
     loadFlowchartLevelAssociations();
-  }, [todo?.id]);
+  }, [todo?.id, visible]);
 
   // 缓存 todoIds 数组，避免每次渲染都创建新数组
   const todoIds = useMemo(() => {
@@ -73,7 +74,14 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   }, [todo?.id]);
 
   // 查询节点级别关联（使用现有的hook）
-  const { associationsByTodo, loading: nodeLevelLoading } = useFlowchartAssociations(todoIds);
+  const { associationsByTodo, loading: nodeLevelLoading, refresh: refreshNodeAssociations } = useFlowchartAssociations(todoIds);
+
+  // 当抽屉打开时，强制刷新节点级别关联
+  useEffect(() => {
+    if (visible && todo?.id) {
+      refreshNodeAssociations();
+    }
+  }, [visible, todo?.id, refreshNodeAssociations]);
 
   // 获取当前待办的节点级别关联
   const nodeLevelAssociations = useMemo(() => {
@@ -558,83 +566,53 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
                 style={{ marginTop: 8 }}
               />
             ) : (
-              <Space direction="vertical" style={{ width: '100%', marginTop: 8 }} size="small">
-                {/* 流程图级别关联 */}
+              <Space direction="vertical" style={{ width: '100%', marginTop: 8 }} size="middle">
+                {/* 流程图级别关联 - 使用懒加载预览卡片 */}
                 {flowchartLevelAssociations.length > 0 && (
                   <>
                     <Text type="secondary" style={{ fontSize: 12, marginTop: 8 }}>
                       流程图级别关联 ({flowchartLevelAssociations.length})
                     </Text>
                     {flowchartLevelAssociations.map((assoc) => (
-                      <Card
+                      <LazyFlowchartPreviewCard
                         key={`flowchart-${assoc.flowchartId}`}
-                        size="small"
-                        hoverable
-                        onClick={() => {
+                        flowchartId={assoc.flowchartId}
+                        flowchartName={assoc.flowchartName}
+                        flowchartDescription={assoc.flowchartDescription}
+                        onPreviewClick={(flowchartId) => {
                           if (onOpenFlowchart) {
-                            onOpenFlowchart(assoc.flowchartId);
+                            onOpenFlowchart(flowchartId);
                             onClose();
                           }
                         }}
-                        style={{
-                          cursor: onOpenFlowchart ? 'pointer' : 'default',
-                          borderColor: colors.borderColor,
-                          borderLeft: '4px solid #52c41a'
-                        }}
-                      >
-                        <Space>
-                          <FileTextOutlined style={{ fontSize: 20, color: '#52c41a' }} />
-                          <div>
-                            <Text strong>{assoc.flowchartName}</Text>
-                            {assoc.flowchartDescription && (
-                              <>
-                                <br />
-                                <Text type="secondary" style={{ fontSize: 12 }}>
-                                  {assoc.flowchartDescription}
-                                </Text>
-                              </>
-                            )}
-                          </div>
-                        </Space>
-                      </Card>
+                        previewHeight={300}
+                        showActions={true}
+                      />
                     ))}
                   </>
                 )}
 
-                {/* 节点级别关联 */}
+                {/* 节点级别关联 - 使用懒加载预览卡片（带节点高亮） */}
                 {nodeLevelAssociations.length > 0 && (
                   <>
                     <Text type="secondary" style={{ fontSize: 12, marginTop: 8 }}>
                       节点级别关联 ({nodeLevelAssociations.length})
                     </Text>
                     {nodeLevelAssociations.map((assoc) => (
-                      <Card
+                      <LazyFlowchartPreviewCard
                         key={`node-${assoc.flowchartId}-${assoc.nodeId}`}
-                        size="small"
-                        hoverable
-                        onClick={() => {
-                          if (onOpenFlowchart && assoc.nodeId) {
-                            onOpenFlowchart(assoc.flowchartId, assoc.nodeId);
+                        flowchartId={assoc.flowchartId}
+                        flowchartName={assoc.flowchartName}
+                        highlightedNodeId={assoc.nodeId}
+                        onPreviewClick={(flowchartId, nodeId) => {
+                          if (onOpenFlowchart) {
+                            onOpenFlowchart(flowchartId, nodeId);
                             onClose();
                           }
                         }}
-                        style={{
-                          cursor: onOpenFlowchart ? 'pointer' : 'default',
-                          borderColor: colors.borderColor,
-                          borderLeft: '4px solid #1890ff'
-                        }}
-                      >
-                        <Space>
-                          <NodeIndexOutlined style={{ fontSize: 20, color: '#1890ff' }} />
-                          <div>
-                            <Text strong>{assoc.flowchartName}</Text>
-                            <br />
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              节点: {assoc.nodeLabel}
-                            </Text>
-                          </div>
-                        </Space>
-                      </Card>
+                        previewHeight={300}
+                        showActions={true}
+                      />
                     ))}
                   </>
                 )}
