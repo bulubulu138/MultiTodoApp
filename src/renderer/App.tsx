@@ -19,6 +19,7 @@ import ContentFocusView, { ContentFocusViewRef } from './components/ContentFocus
 import { getTheme, ThemeMode } from './theme/themes';
 import { buildParallelGroups, selectGroupRepresentatives, sortWithGroups, getSortComparator } from './utils/sortWithGroups';
 import { optimizedMotionVariants, useConditionalAnimation, shouldReduceMotion, useMotionPerformanceMonitor } from './utils/optimizedMotionVariants';
+import { PerformanceMonitor } from './utils/performanceMonitor';
 import dayjs from 'dayjs';
 
 const { Content } = Layout;
@@ -66,6 +67,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const [showHotkeyGuide, setShowHotkeyGuide] = useState(false);
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearchText, setDebouncedSearchText] = useState<string>('');
+  
+  // 分页状态管理
+  const [displayCount, setDisplayCount] = useState<number>(50); // 初始显示50条
+  const [hasMoreData, setHasMoreData] = useState<boolean>(true); // 是否还有更多数据
 
   // 搜索结果缓存 - 提升搜索性能
   const searchCacheRef = useRef<Map<string, Todo[]>>(new Map());
@@ -87,11 +92,35 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     }
   }, [startMonitoring]);
 
+  // 启动全局性能监控（开发环境）
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      // 记录初始加载时间
+      PerformanceMonitor.start('initial-load');
+      
+      // 启动定期监控（每10秒）
+      const monitoringTimer = PerformanceMonitor.startMonitoring(10000);
+      
+      return () => {
+        if (monitoringTimer) {
+          PerformanceMonitor.stopMonitoring(monitoringTimer);
+        }
+      };
+    }
+  }, []);
+
   // 加载数据
   useEffect(() => {
     loadTodos();
     loadSettings();
     loadRelations();
+    
+    // 记录初始加载完成时间
+    if (process.env.NODE_ENV === 'development') {
+      setTimeout(() => {
+        PerformanceMonitor.end('initial-load');
+      }, 100);
+    }
   }, []);
 
   // 监听快速创建待办事件
@@ -114,6 +143,14 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       window.electronAPI.removeQuickCreateListener();
     };
   }, [message]);
+
+  // 创建新流程图的回调函数
+  const handleCreateNewFlowchart = useCallback(() => {
+    setCurrentFlowchartId(null);
+    setHighlightedNodeId(null);
+    setFlowchartDrawerKey(prev => prev + 1); // 强制重新挂载FlowchartDrawer
+    setShowFlowchart(true);
+  }, []);
 
   // 监听创建新流程图事件（从FlowchartDrawer内部触发）
   useEffect(() => {
@@ -148,10 +185,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       clearTimeout(searchInputTimerRef.current);
     }
 
-    // 性能优化：使用300ms防抖，在性能和用户体验间找到最佳平衡
+    // 性能优化：使用250ms防抖，在性能和用户体验间找到最佳平衡
     searchInputTimerRef.current = setTimeout(() => {
       setDebouncedSearchText(searchText);
-    }, 300); // 300ms，既减少计算压力又保证响应性
+    }, 250); // 250ms，既减少计算压力又保证响应性
 
     return () => {
       if (searchInputTimerRef.current) {
@@ -283,12 +320,27 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   }, [settings]);
 
   const loadTodos = async () => {
+    PerformanceMonitor.start('todo-list-load');
+    
     try {
       setLoading(true);
       const todoList = await window.electronAPI.todo.getAll();
       // 过滤空值，确保数据完整性
       setTodos(todoList.filter(todo => todo && todo.id));
+      
+      // 重置分页状态
+      setDisplayCount(50);
+      setHasMoreData(todoList.length > 50);
+      
+      console.log(`[分页] 加载了 ${todoList.length} 条待办，初始显示 50 条`);
+      
+      const duration = PerformanceMonitor.end('todo-list-load');
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Performance] Todo list loaded in ${duration.toFixed(2)}ms`);
+      }
     } catch (error) {
+      PerformanceMonitor.end('todo-list-load');
       message.error('加载待办事项失败');
       console.error('Error loading todos:', error);
     } finally {
@@ -356,6 +408,19 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       message.error('加载关系失败');
     }
   };
+
+  // 加载更多数据（分页）
+  const loadMore = useCallback(() => {
+    const newCount = displayCount + 50;
+    setDisplayCount(newCount);
+    
+    // 检查是否还有更多数据
+    if (newCount >= todos.length) {
+      setHasMoreData(false);
+    }
+    
+    console.log(`[分页] 加载更多数据，当前显示: ${newCount}/${todos.length}`);
+  }, [displayCount, todos.length]);
 
   // 获取当前 Tab 的设置（带默认值）
   const getCurrentTabSettings = useCallback((): TabSettings => {
@@ -453,13 +518,18 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   };
 
   const handleUpdateTodo = async (id: number, updates: Partial<Todo>) => {
+    PerformanceMonitor.start('save');
+    
     try {
       await window.electronAPI.todo.update(id, updates);
       // 重新加载所有待办，确保数据一致性
       await loadTodos();
       setEditingTodo(null);
       message.success('待办事项更新成功');
+      
+      PerformanceMonitor.end('save');
     } catch (error) {
+      PerformanceMonitor.end('save');
       message.error('更新待办事项失败');
       console.error('Error updating todo:', error);
     }
@@ -791,7 +861,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     }
 
     // 缓存未命中，执行搜索
-    const searchStartTime = performance.now();
+    PerformanceMonitor.start('search');
 
     // 性能优化：改进搜索算法，先搜索标题再搜索内容
     const filtered = baseFilteredTodos.filter(todo => {
@@ -804,8 +874,11 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       return contentMatch;
     });
 
-    const searchEndTime = performance.now();
-    console.log(`[搜索] 搜索耗时: ${(searchEndTime - searchStartTime).toFixed(2)}ms, 结果数量: ${filtered.length}`);
+    const duration = PerformanceMonitor.end('search');
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[搜索] 搜索耗时: ${duration.toFixed(2)}ms, 结果数量: ${filtered.length}`);
+    }
 
     // 性能优化：改进缓存策略，LRU缓存
     if (searchCacheRef.current.size >= 30) { // 减少缓存大小
@@ -873,6 +946,22 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     return sortWithGroups(searchedTodos, parallelGroups, groupRepresentatives, comparator);
   }, [searchedTodos, parallelGroups, activeTab, getCurrentTabSettings]);
 
+  // 第五层：应用分页限制
+  const paginatedTodos = useMemo(() => {
+    // 只显示前 displayCount 条数据
+    const paginated = filteredTodos.slice(0, displayCount);
+    
+    // 更新是否还有更多数据的状态
+    const hasMore = displayCount < filteredTodos.length;
+    if (hasMore !== hasMoreData) {
+      setHasMoreData(hasMore);
+    }
+    
+    console.log(`[分页] 总数据: ${filteredTodos.length}, 显示: ${paginated.length}, 还有更多: ${hasMore}`);
+    
+    return paginated;
+  }, [filteredTodos, displayCount, hasMoreData]);
+
   // Tab配置
   const tabItems = useMemo(() => {
     const defaultTabs = [
@@ -930,20 +1019,17 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     return [...defaultTabs, ...customTabItems];
   }, [statusCounts, customTabs, todos]);
 
-  // 使用 useMemo 缓存当前 Tab 的设置
-  const currentTabSettings = useMemo(() => getCurrentTabSettings(), [getCurrentTabSettings]);
+  // 使用 useMemo 缓存当前 Tab 的设置 - 优化：直接依赖activeTab和tabSettings
+  const currentTabSettings = useMemo(() => {
+    return tabSettings[activeTab] || {
+      sortOption: 'createdAt-desc',
+      viewMode: 'card'
+    };
+  }, [activeTab, tabSettings]);
 
   // 打开流程图
   const handleOpenFlowchart = useCallback((flowchartId: string) => {
     setCurrentFlowchartId(flowchartId);
-    setShowFlowchart(true);
-  }, []);
-
-  // 创建新流程图
-  const handleCreateNewFlowchart = useCallback(() => {
-    setCurrentFlowchartId(null);
-    setHighlightedNodeId(null);
-    setFlowchartDrawerKey(prev => prev + 1); // 强制重新挂载FlowchartDrawer
     setShowFlowchart(true);
   }, []);
 
@@ -1070,7 +1156,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
                 />
               ) : (
                 <TodoList
-                  todos={filteredTodos}
+                  todos={paginatedTodos}
                   allTodos={todos}
                   loading={loading}
                   onEdit={handleEditTodo}
@@ -1086,6 +1172,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
                   viewMode={currentTabSettings.viewMode}
                   enableVirtualScroll={false}
                   onNavigateToFlowchart={handleNavigateToFlowchart}
+                  hasMoreData={hasMoreData}
+                  onLoadMore={loadMore}
+                  totalCount={filteredTodos.length}
                 />
               )}
             </motion.div>

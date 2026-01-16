@@ -921,6 +921,12 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
         nodeTypes={nodeTypes}
         connectionMode={ConnectionMode.Loose}
         attributionPosition="bottom-left"
+        // 性能优化选项
+        onlyRenderVisibleElements={true}
+        fitView
+        minZoom={0.5}
+        maxZoom={2}
+        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
       >
         <Background />
         <Controls />

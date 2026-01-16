@@ -3,8 +3,7 @@ import React, { useState, useMemo, useCallback, memo } from 'react';
 import { Card, Tag, Button, Space, Popconfirm, Select, Typography, Tooltip, InputNumber, App } from 'antd';
 import { EditOutlined, DeleteOutlined, LinkOutlined, EyeOutlined, EyeInvisibleOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
-// 暂时移除虚拟滚动，简化实现
-// import { FixedSizeList as VirtualList } from 'react-window';
+import { List as VirtualList } from 'react-window';
 import { SortOption, ViewMode } from './Toolbar';
 import RelationsModal from './RelationsModal';
 import RelationContext from './RelationContext';
@@ -445,10 +444,43 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
     setShowRelationsModal(true);
   }, []);
 
-  // 渲染虚拟化列表项
-  const renderItem = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
+  // 创建行组件的props（不包括index和style，这些由List自动提供）
+  type RowPropsType = {
+    todos: Todo[];
+    allTodos?: Todo[];
+    relations?: TodoRelation[];
+    sortOption?: SortOption;
+    activeTab: string;
+    onEdit: (todo: Todo) => void;
+    onDelete: (id: number) => void;
+    onStatusChange: (id: number, updates: Partial<Todo>) => void;
+    onView: (todo: Todo) => void;
+    onRelationsChange?: () => Promise<void>;
+    onUpdateDisplayOrder?: (id: number, tabKey: string, order: number | null) => Promise<void>;
+  };
+
+  const rowPropsData: RowPropsType = useMemo(() => ({
+    todos,
+    allTodos,
+    relations,
+    sortOption,
+    activeTab,
+    onEdit,
+    onDelete,
+    onStatusChange,
+    onView,
+    onRelationsChange,
+    onUpdateDisplayOrder
+  }), [todos, allTodos, relations, sortOption, activeTab, onEdit, onDelete, onStatusChange, onView, onRelationsChange, onUpdateDisplayOrder]);
+
+  // 渲染虚拟化列表项 - 接收List自动提供的index和style，以及我们传入的rowProps
+  const RowComponent = useCallback((props: { 
+    index: number; 
+    style: React.CSSProperties;
+  } & RowPropsType) => {
+    const { index, style, todos, allTodos, relations, sortOption, activeTab, onEdit, onDelete, onStatusChange, onView, onRelationsChange, onUpdateDisplayOrder } = props;
     const todo = todos[index];
-    if (!todo || !todo.id) return null;
+    if (!todo || !todo.id) return <div style={style} />;
 
     return (
       <VirtualizedTodoItem
@@ -467,7 +499,7 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
         onUpdateDisplayOrder={onUpdateDisplayOrder}
       />
     );
-  }, [todos, allTodos, relations, sortOption, activeTab, onEdit, onDelete, onStatusChange, onView, onRelationsChange, onUpdateDisplayOrder]);
+  }, []);
 
   return (
     <>
@@ -482,15 +514,19 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
         onRelationsChange={onRelationsChange}
       />
 
-      <div style={{ width: '100%', height: '600px', overflow: 'auto' }}>
       {loading ? (
         <div style={{ textAlign: 'center', padding: '50px' }}>加载中...</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {todos.map((todo, index) => renderItem({ index, style: {} }))}
-        </div>
+        <VirtualList
+          defaultHeight={window.innerHeight - 200} // 动态计算高度
+          rowCount={todos.length}
+          rowHeight={ITEM_HEIGHT}
+          style={{ width: '100%' }}
+          overscanCount={3} // 预渲染3个额外项，提升滚动体验
+          rowComponent={RowComponent}
+          rowProps={rowPropsData as any}
+        />
       )}
-    </div>
     </>
   );
 });

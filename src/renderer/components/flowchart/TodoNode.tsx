@@ -45,10 +45,10 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selec
     setIsEditing(false);
   }, []);
 
-  // 高亮样式
+  // 高亮样式 - 性能优化：简化动画
   const highlightStyle = isHighlighted ? {
     boxShadow: '0 0 0 3px #722ed1, 0 0 20px rgba(114, 46, 209, 0.5)',
-    animation: 'pulse 1s ease-in-out 3'
+    animation: 'pulse 0.8s ease-in-out 2' // 减少动画次数和时长
   } : {};
 
   // 获取状态图标
@@ -125,7 +125,7 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selec
         {`
           @keyframes pulse {
             0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
+            50% { transform: scale(1.03); }
           }
         `}
       </style>
@@ -139,7 +139,7 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selec
           maxWidth: '250px',
           position: 'relative',
           boxShadow: selected ? '0 0 0 2px #1890ff' : '0 2px 4px rgba(0,0,0,0.1)',
-          transition: 'all 0.2s',
+          transition: 'box-shadow 0.15s', // 性能优化：只对必要属性添加过渡，缩短时长
           color: style.color || '#fff', // 使用计算出的文字颜色
           fontWeight: 500,
           ...highlightStyle

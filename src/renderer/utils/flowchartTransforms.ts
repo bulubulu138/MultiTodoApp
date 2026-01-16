@@ -21,6 +21,7 @@ export function toRuntimeNode(domainNode: DomainNode): Node {
 /**
  * 将业务领域层边转换为 React Flow 运行时边
  * 支持自定义箭头类型和方向
+ * 性能优化：禁用动画，简化样式
  */
 export function toRuntimeEdge(domainEdge: DomainEdge): Edge {
   // 获取箭头标记配置
@@ -39,6 +40,12 @@ export function toRuntimeEdge(domainEdge: DomainEdge): Edge {
     };
   };
 
+  // 性能优化：简化边的样式
+  const optimizedStyle = {
+    ...domainEdge.style,
+    strokeWidth: domainEdge.style?.strokeWidth || 1, // 使用较细的线条
+  };
+
   const edge: Edge = {
     id: domainEdge.id,
     source: domainEdge.source,
@@ -47,8 +54,8 @@ export function toRuntimeEdge(domainEdge: DomainEdge): Edge {
     targetHandle: domainEdge.targetHandle,
     type: domainEdge.type || 'default',
     label: domainEdge.label,
-    style: domainEdge.style,
-    animated: (domainEdge as any).animated || false,
+    style: optimizedStyle,
+    animated: false, // 性能优化：禁用动画
     // 支持自定义箭头类型
     markerEnd: getMarkerConfig((domainEdge as any).markerEnd || 'arrowclosed'),
     markerStart: getMarkerConfig((domainEdge as any).markerStart)

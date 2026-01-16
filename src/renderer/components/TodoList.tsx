@@ -1,5 +1,5 @@
 import { Todo, TodoRelation } from '../../shared/types';
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { List, Card, Tag, Button, Space, Popconfirm, Select, Typography, Image, Tooltip, App, InputNumber } from 'antd';
 import { EditOutlined, DeleteOutlined, LinkOutlined, EyeOutlined, EyeInvisibleOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
@@ -14,6 +14,7 @@ import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useFlowchartAssociations } from '../hooks/useFlowchartAssociations';
 import { formatCompletedTime } from '../utils/timeFormatter';
+import { PerformanceMonitor } from '../utils/performanceMonitor';
 import dayjs from 'dayjs';
 
 const { Text, Paragraph } = Typography;
@@ -36,6 +37,9 @@ interface TodoListProps {
   onUpdateInPlace?: (id: number, updates: Partial<Todo>) => void; // 专注模式专用：乐观更新
   enableVirtualScroll?: boolean; // 是否启用虚拟滚动
   onNavigateToFlowchart?: (flowchartId: string, nodeId: string) => void; // 跳转到流程图
+  hasMoreData?: boolean; // 是否还有更多数据
+  onLoadMore?: () => void; // 加载更多数据的回调
+  totalCount?: number; // 总数据量
 }
 
 // 性能优化：使用 React.memo 避免不必要的重渲染
@@ -55,7 +59,10 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   viewMode = 'card',
   onUpdateInPlace,
   enableVirtualScroll = true, // 默认启用虚拟滚动以提升性能
-  onNavigateToFlowchart
+  onNavigateToFlowchart,
+  hasMoreData = false,
+  onLoadMore,
+  totalCount = 0
 }) => {
   const { message } = App.useApp();
   const colors = useThemeColors();
@@ -65,11 +72,58 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   const [editingOrder, setEditingOrder] = useState<{[key: number]: number | null}>({});
   const [savingOrder, setSavingOrder] = useState<Set<number>>(new Set());
   
+  // 无限滚动：检测滚动到底部
+  const listContainerRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    if (!hasMoreData || !onLoadMore) return;
+    
+    const handleScroll = () => {
+      const container = listContainerRef.current;
+      if (!container) return;
+      
+      // 检查是否滚动到底部（距离底部小于100px时触发）
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight;
+      const clientHeight = window.innerHeight;
+      
+      if (scrollHeight - scrollTop - clientHeight < 100) {
+        console.log('[无限滚动] 触发加载更多');
+        onLoadMore();
+      }
+    };
+    
+    // 添加滚动监听
+    window.addEventListener('scroll', handleScroll);
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [hasMoreData, onLoadMore]);
+  
   // 获取所有待办的流程图关联数据
   const todoIds = useMemo(() => todos.map(t => t.id!).filter(id => id !== undefined), [todos]);
   const { associationsByTodo, loading: associationsLoading } = useFlowchartAssociations(todoIds);
   
-  const getStatusColor = (status: string) => {
+  // 性能监控：记录待办列表渲染时间
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development' && todos.length > 0) {
+      PerformanceMonitor.start('todo-list-render');
+      
+      // 使用 requestAnimationFrame 确保在渲染完成后测量
+      requestAnimationFrame(() => {
+        const duration = PerformanceMonitor.end('todo-list-render');
+        console.log(`[Performance] Todo list rendered ${todos.length} items in ${duration.toFixed(2)}ms`);
+        
+        // 记录 DOM 节点数量和内存使用
+        PerformanceMonitor.recordDOMNodeCount();
+        PerformanceMonitor.recordMemoryUsage();
+      });
+    }
+  }, [todos.length]);
+  
+  // 性能优化：使用useCallback缓存工具函数
+  const getStatusColor = useCallback((status: string) => {
     switch (status) {
       case 'pending': return 'orange';
       case 'in_progress': return 'blue';
@@ -77,9 +131,9 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
       case 'paused': return 'default';
       default: return 'default';
     }
-  };
+  }, []);
 
-  const getStatusText = (status: string) => {
+  const getStatusText = useCallback((status: string) => {
     switch (status) {
       case 'pending': return '待办';
       case 'in_progress': return '进行中';
@@ -87,25 +141,25 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
       case 'paused': return '暂停';
       default: return status;
     }
-  };
+  }, []);
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityColor = useCallback((priority: string) => {
     switch (priority) {
       case 'high': return 'red';
       case 'medium': return 'orange';
       case 'low': return 'green';
       default: return 'default';
     }
-  };
+  }, []);
 
-  const getPriorityText = (priority: string) => {
+  const getPriorityText = useCallback((priority: string) => {
     switch (priority) {
       case 'high': return '高';
       case 'medium': return '中';
       case 'low': return '低';
       default: return priority;
     }
-  };
+  }, []);
 
   // 性能优化：使用 useCallback 缓存函数
   const handleStatusChange = useCallback((todoId: number, newStatus: string) => {
@@ -190,10 +244,10 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
     return `${month}/${day} ${hours}:${minutes}`;
   };
 
-  // 处理序号变化
-  const handleOrderChange = (todoId: number, value: number | null) => {
+  // 处理序号变化 - 性能优化：使用useCallback
+  const handleOrderChange = useCallback((todoId: number, value: number | null) => {
     setEditingOrder(prev => ({ ...prev, [todoId]: value }));
-  };
+  }, []);
 
   // 保存序号（支持多Tab独立排序）- 优化版：递归式冲突解决
   const handleOrderSave = async (todoId: number, currentValue: number | undefined) => {
@@ -433,7 +487,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   }
 
   return (
-    <>
+    <div ref={listContainerRef}>
       <RelationsModal
         visible={showRelationsModal}
         todo={selectedTodo}
@@ -795,7 +849,47 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
         );
       }}
     />
-    </>
+    
+    {/* 加载更多按钮 */}
+    {hasMoreData && onLoadMore && (
+      <div style={{ 
+        textAlign: 'center', 
+        marginTop: 16, 
+        marginBottom: 16,
+        padding: '12px 0'
+      }}>
+        <Button 
+          type="primary" 
+          onClick={onLoadMore}
+          size="large"
+          style={{ minWidth: 200 }}
+        >
+          加载更多 ({todos.length}/{totalCount})
+        </Button>
+        <div style={{ 
+          marginTop: 8, 
+          fontSize: 12, 
+          color: '#999' 
+        }}>
+          还有 {totalCount - todos.length} 条待办未显示
+        </div>
+      </div>
+    )}
+    
+    {/* 已加载全部数据提示 */}
+    {!hasMoreData && todos.length > 0 && totalCount > 50 && (
+      <div style={{ 
+        textAlign: 'center', 
+        marginTop: 16, 
+        marginBottom: 16,
+        padding: '12px 0',
+        color: '#999',
+        fontSize: 12
+      }}>
+        已显示全部 {totalCount} 条待办
+      </div>
+    )}
+    </div>
   );
 }, (prevProps, nextProps) => {
   // 自定义比较函数，只在关键 props 改变时重新渲染

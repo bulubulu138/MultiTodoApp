@@ -38,10 +38,10 @@ export const CircleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, sel
     setIsEditing(false);
   }, []);
 
-  // 高亮样式
+  // 高亮样式 - 性能优化：简化动画
   const highlightStyle = isHighlighted ? {
     boxShadow: '0 0 0 3px #722ed1, 0 0 20px rgba(114, 46, 209, 0.5)',
-    animation: 'pulse 1s ease-in-out 3'
+    animation: 'pulse 0.8s ease-in-out 2' // 减少动画次数和时长
   } : {};
 
   if (isEditing) {
@@ -67,7 +67,7 @@ export const CircleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, sel
         {`
           @keyframes pulse {
             0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
+            50% { transform: scale(1.03); }
           }
         `}
       </style>
@@ -114,7 +114,7 @@ export const CircleNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, sel
             border: `${style.borderWidth}px ${style.borderStyle || 'solid'} ${style.borderColor}`,
             backgroundColor: style.backgroundColor,
             boxShadow: selected ? '0 0 0 2px #1890ff' : '0 2px 4px rgba(0,0,0,0.1)',
-            transition: 'all 0.2s',
+            transition: 'box-shadow 0.15s', // 性能优化：只对必要属性添加过渡，缩短时长
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
