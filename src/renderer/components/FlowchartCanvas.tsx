@@ -23,7 +23,10 @@ import {
   FlowchartPatch,
   Todo,
   NodeType,
-  RuntimeNodeData
+  RuntimeNodeData,
+  EdgeStyle,
+  EdgeType,
+  LINE_WIDTH_OPTIONS
 } from '../../shared/types';
 import { useDomainNodes } from '../hooks/useDomainNodes';
 import { useHandleVisibility } from '../hooks/useHandleVisibility';
@@ -33,8 +36,11 @@ import { UndoRedoManager } from '../services/UndoRedoManager';
 import { nodeTypes } from './flowchart/nodeTypes';
 import { NodeEditPanel } from './flowchart/NodeEditPanel';
 import { NodeContextMenu } from './flowchart/NodeContextMenu';
+import { EdgeLabelEditor } from './flowchart/EdgeLabelEditor';
+import { EdgeStylePanel } from './flowchart/EdgeStylePanel';
 import { wouldCreateCycle } from '../utils/cycleDetection';
-import { migrateEdges, needsEdgesMigration } from '../utils/flowchartMigration';
+import { migrateEdges as migrateEdgesBasic, needsEdgesMigration as needsEdgesMigrationBasic } from '../utils/flowchartMigration';
+import { migrateEdges as migrateEdgesEnhancements, migrateNodes as migrateNodesEnhancements, needsEdgesMigration as needsEdgesMigrationEnhancements, needsNodesMigration } from '../utils/flowchartEnhancementsMigration';
 import { HandleVisibilityProvider } from '../contexts/HandleVisibilityContext';
 
 interface FlowchartCanvasProps {
@@ -94,14 +100,29 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     console.log('[FlowchartCanvas] New nodes count:', initialPersistedNodes.length);
     console.log('[FlowchartCanvas] New edges count:', initialPersistedEdges.length);
     
-    // 应用数据迁移
+    // 应用数据迁移 - 按顺序应用两个迁移
+    let migratedNodes = initialPersistedNodes;
     let migratedEdges = initialPersistedEdges;
-    if (needsEdgesMigration(initialPersistedEdges)) {
-      console.log('[FlowchartCanvas] Applying edge migration...');
-      migratedEdges = migrateEdges(initialPersistedEdges);
+    
+    // 1. 应用基础迁移（marker, type, animated）
+    if (needsEdgesMigrationBasic(initialPersistedEdges)) {
+      console.log('[FlowchartCanvas] Applying basic edge migration...');
+      migratedEdges = migrateEdgesBasic(migratedEdges);
     }
     
-    setPersistedNodes(initialPersistedNodes);
+    // 2. 应用增强迁移（style, labelStyle）
+    if (needsEdgesMigrationEnhancements(migratedEdges)) {
+      console.log('[FlowchartCanvas] Applying enhancements edge migration...');
+      migratedEdges = migrateEdgesEnhancements(migratedEdges);
+    }
+    
+    // 3. 应用节点迁移（目前为空，但为未来扩展预留）
+    if (needsNodesMigration(initialPersistedNodes)) {
+      console.log('[FlowchartCanvas] Applying node migration...');
+      migratedNodes = migrateNodesEnhancements(migratedNodes);
+    }
+    
+    setPersistedNodes(migratedNodes);
     setPersistedEdges(migratedEdges);
   }, [initialPersistedNodes, initialPersistedEdges]);
 
@@ -129,6 +150,20 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
   // 7. 节点编辑状态
   const [editingNode, setEditingNode] = useState<{ id: string; data: RuntimeNodeData } | null>(null);
   const [inlineEditingNodeId, setInlineEditingNodeId] = useState<string | null>(null);
+
+  // 7.1 边标签编辑状态
+  const [editingEdge, setEditingEdge] = useState<{
+    id: string;
+    label: string;
+    position: { x: number; y: number };
+  } | null>(null);
+
+  // 7.2 边样式编辑状态
+  const [editingEdgeStyle, setEditingEdgeStyle] = useState<{
+    id: string;
+    style: EdgeStyle;
+    type: EdgeType;
+  } | null>(null);
 
   // 8. 右键菜单状态
   const [contextMenu, setContextMenu] = useState<{
@@ -297,6 +332,20 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     setInlineEditingNodeId(node.id);
   }, []);
 
+  // 7.01 处理边点击 - 显示样式编辑面板
+  const handleEdgeClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
+    // 查找持久化层的边数据
+    const persistedEdge = persistedEdges.find(e => e.id === edge.id);
+    if (!persistedEdge) return;
+
+    // 显示样式编辑面板
+    setEditingEdgeStyle({
+      id: edge.id,
+      style: persistedEdge.style || {},
+      type: persistedEdge.type || 'default'
+    });
+  }, [persistedEdges]);
+
   // 7.01 处理节点鼠标进入
   const handleNodeMouseEnter = useCallback((_event: React.MouseEvent, node: Node) => {
     handleVisibility.setHoveredNode(node.id);
@@ -326,6 +375,244 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     applyPatches([patch]);
     setInlineEditingNodeId(null);
   }, [persistedNodes, applyPatches]);
+
+  // 7.02 处理边标签保存
+  const handleEdgeLabelSave = useCallback((label: string) => {
+    if (!editingEdge) return;
+
+    try {
+      const edge = persistedEdges.find(e => e.id === editingEdge.id);
+      if (!edge) {
+        console.error('[FlowchartCanvas] Edge not found for label save:', editingEdge.id);
+        // 错误处理：边不存在（可能已被删除）
+        setEditingEdge(null);
+        return;
+      }
+
+      const patch: FlowchartPatch = {
+        type: 'updateEdge',
+        id: editingEdge.id,
+        changes: {
+          label: label || undefined, // 空字符串转为 undefined
+          labelStyle: edge.labelStyle || {
+            fontSize: 12,
+            color: '#000',
+            backgroundColor: '#fff',
+            padding: 4,
+            borderRadius: 4
+          }
+        },
+        metadata: {
+          originalEdgeState: edge
+        }
+      };
+
+      applyPatches([patch]);
+      setEditingEdge(null);
+    } catch (error) {
+      // 错误处理：保存失败（可能是并发编辑冲突）
+      console.error('[FlowchartCanvas] Failed to save edge label:', error);
+      // 不关闭编辑器，让用户可以重试
+      // 错误会在 EdgeLabelEditor 中显示
+    }
+  }, [editingEdge, persistedEdges, applyPatches]);
+
+  // 7.03 处理边标签取消
+  const handleEdgeLabelCancel = useCallback(() => {
+    setEditingEdge(null);
+  }, []);
+
+  // 7.04 处理边样式变化
+  const handleEdgeStyleChange = useCallback((style: Partial<EdgeStyle>) => {
+    if (!editingEdgeStyle) return;
+
+    try {
+      const edge = persistedEdges.find(e => e.id === editingEdgeStyle.id);
+      if (!edge) {
+        console.warn('[FlowchartCanvas] Edge not found for style change:', editingEdgeStyle.id);
+        message.warning('连接线不存在，无法应用样式');
+        setEditingEdgeStyle(null);
+        return;
+      }
+
+      // 验证样式值
+      const validatedStyle: Partial<EdgeStyle> = {};
+      
+      // 验证 strokeWidth
+      if (style.strokeWidth !== undefined) {
+        if (typeof style.strokeWidth === 'number' && isFinite(style.strokeWidth) && style.strokeWidth > 0 && style.strokeWidth <= 10) {
+          validatedStyle.strokeWidth = style.strokeWidth;
+        } else {
+          console.warn('[FlowchartCanvas] Invalid strokeWidth:', style.strokeWidth, 'using default medium (2px)');
+          validatedStyle.strokeWidth = LINE_WIDTH_OPTIONS.medium;
+        }
+      }
+      
+      // 验证 stroke (颜色)
+      if (style.stroke !== undefined) {
+        validatedStyle.stroke = style.stroke;
+      }
+      
+      // 验证 strokeDasharray
+      if (style.strokeDasharray !== undefined) {
+        validatedStyle.strokeDasharray = style.strokeDasharray;
+      }
+      
+      // 验证 animated
+      if (style.animated !== undefined) {
+        validatedStyle.animated = Boolean(style.animated);
+      }
+
+      // 合并新样式
+      const newStyle = {
+        ...edge.style,
+        ...validatedStyle
+      };
+
+      const patch: FlowchartPatch = {
+        type: 'updateEdge',
+        id: editingEdgeStyle.id,
+        changes: {
+          style: newStyle
+        },
+        metadata: {
+          originalEdgeState: edge
+        }
+      };
+
+      applyPatches([patch]);
+
+      // 更新本地编辑状态以保持面板同步
+      setEditingEdgeStyle(prev => prev ? {
+        ...prev,
+        style: newStyle
+      } : null);
+    } catch (error) {
+      // 错误处理：样式应用失败
+      console.error('[FlowchartCanvas] Failed to apply edge style:', error);
+      message.error('应用连接线样式失败，请重试');
+      // 不关闭编辑面板，让用户可以重试
+    }
+  }, [editingEdgeStyle, persistedEdges, applyPatches]);
+
+  // 7.05 处理边类型变化
+  const handleEdgeTypeChange = useCallback((type: EdgeType) => {
+    if (!editingEdgeStyle) return;
+
+    try {
+      const edge = persistedEdges.find(e => e.id === editingEdgeStyle.id);
+      if (!edge) {
+        console.warn('[FlowchartCanvas] Edge not found for type change:', editingEdgeStyle.id);
+        message.warning('连接线不存在，无法更改类型');
+        setEditingEdgeStyle(null);
+        return;
+      }
+
+      // 验证边类型
+      const validEdgeTypes: EdgeType[] = ['default', 'smoothstep', 'step', 'straight', 'bezier'];
+      const validatedType = validEdgeTypes.includes(type) ? type : 'default';
+      
+      if (validatedType !== type) {
+        console.warn('[FlowchartCanvas] Invalid edge type:', type, 'using default');
+        message.warning('无效的连接线类型，使用默认类型');
+      }
+
+      const patch: FlowchartPatch = {
+        type: 'updateEdge',
+        id: editingEdgeStyle.id,
+        changes: {
+          type: validatedType
+        },
+        metadata: {
+          originalEdgeState: edge
+        }
+      };
+
+      applyPatches([patch]);
+
+      // 更新本地编辑状态以保持面板同步
+      setEditingEdgeStyle(prev => prev ? {
+        ...prev,
+        type: validatedType
+      } : null);
+    } catch (error) {
+      // 错误处理：类型变更失败
+      console.error('[FlowchartCanvas] Failed to change edge type:', error);
+      message.error('更改连接线类型失败，请重试');
+      // 不关闭编辑面板，让用户可以重试
+    }
+  }, [editingEdgeStyle, persistedEdges, applyPatches]);
+
+  // 7.06 处理边样式面板关闭
+  const handleEdgeStylePanelClose = useCallback(() => {
+    setEditingEdgeStyle(null);
+  }, []);
+
+  // 7.07 处理边标签编辑按钮点击
+  const handleEditLabelClick = useCallback(() => {
+    if (!editingEdgeStyle) return;
+
+    const edge = persistedEdges.find(e => e.id === editingEdgeStyle.id);
+    if (!edge) return;
+
+    // 计算边的中点位置用于显示标签编辑器
+    // 错误处理：如果无法计算位置，使用屏幕中心作为回退
+    const calculateEdgeMidpoint = (): { x: number; y: number } => {
+      try {
+        // 查找源节点和目标节点
+        const sourceNode = runtimeNodes.find(n => n.id === edge.source);
+        const targetNode = runtimeNodes.find(n => n.id === edge.target);
+
+        if (!sourceNode || !targetNode) {
+          console.warn('[FlowchartCanvas] Cannot find source or target node for edge label position');
+          // 回退到屏幕中心
+          return {
+            x: window.innerWidth / 2,
+            y: window.innerHeight / 2
+          };
+        }
+
+        // 计算中点（考虑节点位置）
+        const sourceX = sourceNode.position.x + (sourceNode.width || 100) / 2;
+        const sourceY = sourceNode.position.y + (sourceNode.height || 50) / 2;
+        const targetX = targetNode.position.x + (targetNode.width || 100) / 2;
+        const targetY = targetNode.position.y + (targetNode.height || 50) / 2;
+
+        const midX = (sourceX + targetX) / 2;
+        const midY = (sourceY + targetY) / 2;
+
+        // 验证计算结果
+        if (!isFinite(midX) || !isFinite(midY)) {
+          console.warn('[FlowchartCanvas] Invalid midpoint calculation, using fallback');
+          return {
+            x: window.innerWidth / 2,
+            y: window.innerHeight / 2
+          };
+        }
+
+        return { x: midX, y: midY };
+      } catch (error) {
+        console.error('[FlowchartCanvas] Error calculating edge midpoint:', error);
+        // 错误处理：回退到屏幕中心
+        return {
+          x: window.innerWidth / 2,
+          y: window.innerHeight / 2
+        };
+      }
+    };
+
+    const position = calculateEdgeMidpoint();
+
+    // 设置编辑状态
+    setEditingEdge({
+      id: edge.id,
+      label: edge.label || '',
+      position
+    });
+
+    // 关闭样式面板
+    setEditingEdgeStyle(null);
+  }, [editingEdgeStyle, persistedEdges, runtimeNodes]);
 
   // 7.1 处理节点右键菜单
   const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
@@ -766,16 +1053,81 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
         event.preventDefault();
         handleSelectAll();
       }
+      // Ctrl/Cmd+1/2/3: 设置选中边的线宽（thin/medium/thick）
+      else if (ctrlKey && ['1', '2', '3'].includes(event.key) && !isInputField) {
+        event.preventDefault();
+        
+        try {
+          const selectedEdges = runtimeEdges.filter(e => e.selected);
+          
+          if (selectedEdges.length === 0) {
+            return;
+          }
+
+          // 根据按键确定线宽
+          let strokeWidth: number;
+          if (event.key === '1') {
+            strokeWidth = LINE_WIDTH_OPTIONS.thin;
+          } else if (event.key === '2') {
+            strokeWidth = LINE_WIDTH_OPTIONS.medium;
+          } else {
+            strokeWidth = LINE_WIDTH_OPTIONS.thick;
+          }
+
+          // 验证线宽值
+          if (!isFinite(strokeWidth) || strokeWidth <= 0) {
+            console.error('[FlowchartCanvas] Invalid strokeWidth from keyboard shortcut:', strokeWidth);
+            message.error('无效的线宽值');
+            return;
+          }
+
+          // 为每个选中的边创建更新 patch
+          const patches: FlowchartPatch[] = selectedEdges.map(edge => {
+            const persistedEdge = persistedEdges.find(e => e.id === edge.id);
+            if (!persistedEdge) {
+              console.warn('[FlowchartCanvas] Persisted edge not found for keyboard shortcut:', edge.id);
+              return null;
+            }
+
+            return {
+              type: 'updateEdge',
+              id: edge.id,
+              changes: {
+                style: {
+                  ...persistedEdge.style,
+                  strokeWidth
+                }
+              },
+              metadata: {
+                originalEdgeState: persistedEdge
+              }
+            } as FlowchartPatch;
+          }).filter((p): p is FlowchartPatch => p !== null);
+
+          if (patches.length > 0) {
+            applyPatches(patches);
+            message.success(`已将 ${patches.length} 条连接线设置为${event.key === '1' ? '细线' : event.key === '2' ? '中等' : '粗线'}`);
+          } else {
+            console.warn('[FlowchartCanvas] No valid patches created for line width change');
+          }
+        } catch (error) {
+          // 错误处理：快捷键应用失败
+          console.error('[FlowchartCanvas] Failed to apply line width via keyboard shortcut:', error);
+          message.error('应用线宽失败，请重试');
+        }
+      }
       // Escape: 关闭上下文菜单和编辑面板
       else if (event.key === 'Escape') {
         setContextMenu({ visible: false, x: 0, y: 0, nodeId: null });
         setEditingNode(null);
+        setEditingEdge(null);
+        setEditingEdgeStyle(null);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleUndo, handleRedo, handleDelete, handleSelectAll]);
+  }, [handleUndo, handleRedo, handleDelete, handleSelectAll, runtimeEdges, persistedEdges, applyPatches]);
 
   // 18. 监听节点标签变化事件
   useEffect(() => {
@@ -917,6 +1269,7 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
         onNodeMouseEnter={handleNodeMouseEnter}
         onNodeMouseLeave={handleNodeMouseLeave}
         onNodeContextMenu={handleNodeContextMenu}
+        onEdgeClick={handleEdgeClick}
         onMoveEnd={handleMoveEnd}
         nodeTypes={nodeTypes}
         connectionMode={ConnectionMode.Loose}
@@ -956,6 +1309,28 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
         todos={todos}
         onClose={() => setEditingNode(null)}
         onSave={handleNodeEditSave}
+      />
+
+      {editingEdge && (
+        <EdgeLabelEditor
+          edgeId={editingEdge.id}
+          currentLabel={editingEdge.label}
+          position={editingEdge.position}
+          onSave={handleEdgeLabelSave}
+          onCancel={handleEdgeLabelCancel}
+        />
+      )}
+
+      <EdgeStylePanel
+        visible={!!editingEdgeStyle}
+        edgeId={editingEdgeStyle?.id || null}
+        currentStyle={editingEdgeStyle?.style || {}}
+        currentType={editingEdgeStyle?.type || 'default'}
+        currentLabel={editingEdgeStyle ? persistedEdges.find(e => e.id === editingEdgeStyle.id)?.label : undefined}
+        onClose={handleEdgeStylePanelClose}
+        onStyleChange={handleEdgeStyleChange}
+        onTypeChange={handleEdgeTypeChange}
+        onEditLabel={handleEditLabelClick}
       />
     </div>
     </HandleVisibilityProvider>

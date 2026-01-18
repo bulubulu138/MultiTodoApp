@@ -57,20 +57,65 @@ const convertNodesToReactFlow = (
 };
 
 /**
+ * 截断过长的标签文本
+ * 错误处理：标签溢出时使用省略号
+ */
+const truncateLabel = (label: string | undefined, maxLength: number = 30): string | undefined => {
+  if (!label) return label;
+  
+  if (label.length > maxLength) {
+    return label.substring(0, maxLength) + '...';
+  }
+  
+  return label;
+};
+
+/**
  * 将持久化的边数据转换为 ReactFlow 格式
+ * 错误处理：标签溢出截断，无效样式回退到默认值
  */
 const convertEdgesToReactFlow = (edges: any[]): Edge[] => {
-  return edges.map((edge) => ({
-    id: edge.id,
-    source: edge.source,
-    target: edge.target,
-    type: edge.type || 'default',
-    label: edge.label,
-    animated: edge.animated || false,
-    style: edge.style,
-    // 禁用选择
-    selectable: false
-  }));
+  return edges.map((edge) => {
+    // 错误处理：验证并应用标签样式
+    const labelStyle = edge.labelStyle ? {
+      fontSize: typeof edge.labelStyle.fontSize === 'number' && 
+                edge.labelStyle.fontSize > 0 && 
+                edge.labelStyle.fontSize < 100
+        ? edge.labelStyle.fontSize 
+        : 12,
+      fill: edge.labelStyle.color || '#000',
+    } : undefined;
+
+    const labelBgStyle = edge.labelStyle ? {
+      fill: edge.labelStyle.backgroundColor || '#fff',
+      fillOpacity: 0.8
+    } : undefined;
+
+    // 错误处理：截断过长的标签
+    const displayLabel = truncateLabel(edge.label);
+
+    return {
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle,
+      targetHandle: edge.targetHandle,
+      type: edge.type || 'default',
+      label: displayLabel,
+      labelStyle,
+      labelBgStyle,
+      animated: edge.animated || false,
+      style: edge.style,
+      markerEnd: edge.markerEnd,
+      markerStart: edge.markerStart,
+      // 禁用选择
+      selectable: false,
+      // 保存完整标签用于悬停显示
+      data: {
+        fullLabel: edge.label
+      }
+    };
+  });
 };
 
 /**

@@ -4,7 +4,8 @@ import {
   BorderOutlined,
   CheckSquareOutlined,
   DashOutlined,
-  NodeIndexOutlined
+  NodeIndexOutlined,
+  FontSizeOutlined
 } from '@ant-design/icons';
 import { NodeType } from '../../../shared/types';
 
@@ -47,6 +48,12 @@ const nodeTemplates: NodeTemplate[] = [
     label: '待办任务',
     icon: <CheckSquareOutlined style={{ fontSize: '24px' }} />,
     description: '关联待办'
+  },
+  {
+    type: 'text',
+    label: '文本',
+    icon: <FontSizeOutlined style={{ fontSize: '24px' }} />,
+    description: '注释/标签'
   }
 ];
 

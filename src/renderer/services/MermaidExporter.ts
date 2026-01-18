@@ -129,7 +129,8 @@ export class MermaidExporter {
       'rounded-rectangle': { start: '(', end: ')' },
       'diamond': { start: '{', end: '}' },
       'circle': { start: '((', end: '))' },
-      'todo': { start: '[', end: ']' }
+      'todo': { start: '[', end: ']' },
+      'text': { start: '[', end: ']' }  // Text nodes use rectangle shape in Mermaid
     };
 
     return shapes[type] || shapes['rectangle'];

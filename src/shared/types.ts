@@ -97,7 +97,7 @@ export interface BackupInfo {
 // ============================================
 
 // 节点和边的类型别名
-export type NodeType = 'rectangle' | 'rounded-rectangle' | 'diamond' | 'circle' | 'todo';
+export type NodeType = 'rectangle' | 'rounded-rectangle' | 'diamond' | 'circle' | 'todo' | 'text';
 export type EdgeType = 'default' | 'smoothstep' | 'step' | 'straight' | 'bezier'; // 新增 bezier 类型
 export type EdgeMarkerType = 'arrow' | 'arrowclosed' | 'none'; // 箭头类型
 export type ExportFormat = 'json' | 'mermaid' | 'text' | 'png';
@@ -110,14 +110,34 @@ export interface NodeStyle {
   borderStyle?: 'solid' | 'dashed';
   fontSize?: number;
   color?: string; // 文字颜色
+  textAlign?: 'left' | 'center' | 'right'; // 文本对齐方式（用于文本节点）
 }
+
+// 线宽选项常量
+export const LINE_WIDTH_OPTIONS = {
+  thin: 1,
+  medium: 2,
+  thick: 4
+} as const;
+
+// 线宽类型
+export type LineWidth = keyof typeof LINE_WIDTH_OPTIONS;
 
 // 边样式（增强版）
 export interface EdgeStyle {
   stroke?: string;
-  strokeWidth?: number;
+  strokeWidth?: number; // 可使用 LINE_WIDTH_OPTIONS 中的值
   strokeDasharray?: string;
   animated?: boolean; // 新增：动画效果
+}
+
+// 边标签样式
+export interface EdgeLabelStyle {
+  fontSize?: number;
+  color?: string;
+  backgroundColor?: string;
+  padding?: number;
+  borderRadius?: number;
 }
 
 // 待办节点样式配置类型
@@ -185,6 +205,7 @@ export interface PersistedEdge {
   targetHandle?: string;
   type?: EdgeType;
   label?: string;
+  labelStyle?: EdgeLabelStyle; // 新增：标签样式
   style?: EdgeStyle;
   markerEnd?: EdgeMarkerType; // 终点箭头类型
   markerStart?: EdgeMarkerType; // 起点箭头类型
@@ -229,6 +250,7 @@ export interface DomainEdge {
   targetHandle?: string;
   type?: EdgeType;
   label?: string;
+  labelStyle?: EdgeLabelStyle; // 新增：标签样式
   style?: EdgeStyle;
 }
 
@@ -269,6 +291,7 @@ export interface RuntimeEdge {
   targetHandle?: string;
   type?: EdgeType;
   label?: string;
+  labelStyle?: EdgeLabelStyle; // 新增：标签样式
   style?: EdgeStyle;
   selected?: boolean;
 }

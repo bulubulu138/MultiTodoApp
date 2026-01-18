@@ -158,6 +158,7 @@ export class DatabaseManager {
     
     // 执行表迁移
     await this.migrateTodosTable();
+    await this.migrateFlowchartEdgesTable();
     
     // 创建流程图查询索引
     await this.createFlowchartIndexes();
@@ -238,6 +239,25 @@ export class DatabaseManager {
       console.log('Todos table migration completed');
     } catch (error) {
       console.error('Migration error:', error);
+    }
+  }
+
+  private async migrateFlowchartEdgesTable(): Promise<void> {
+    try {
+      // 检查列是否存在
+      const tableInfo = this.db!.pragma('table_info(flowchart_edges)') as any[];
+      
+      const hasLabelStyle = tableInfo.some((col: any) => col.name === 'label_style');
+      
+      if (!hasLabelStyle) {
+        console.log('Adding label_style column to flowchart_edges table...');
+        this.db!.prepare('ALTER TABLE flowchart_edges ADD COLUMN label_style TEXT').run();
+        console.log('label_style column added successfully');
+      }
+      
+      console.log('Flowchart edges table migration completed');
+    } catch (error) {
+      console.error('Flowchart edges migration error:', error);
     }
   }
 

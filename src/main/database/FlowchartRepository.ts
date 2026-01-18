@@ -103,6 +103,7 @@ export class FlowchartRepository {
       targetHandle: row.target_handle,
       type: row.type,
       label: row.label,
+      labelStyle: row.label_style ? JSON.parse(row.label_style) : undefined,
       style: row.style ? JSON.parse(row.style) : undefined
     }));
 
@@ -202,8 +203,8 @@ export class FlowchartRepository {
             const connectionHash = this.getConnectionHash(patch.edge);
             this.db.prepare(`
               INSERT INTO flowchart_edges 
-              (id, flowchart_id, source, target, source_handle, target_handle, type, label, style, connection_hash, created_at, updated_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (id, flowchart_id, source, target, source_handle, target_handle, type, label, label_style, style, connection_hash, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).run(
               patch.edge.id,
               flowchartId,
@@ -213,6 +214,7 @@ export class FlowchartRepository {
               patch.edge.targetHandle || null,
               patch.edge.type || 'default',
               patch.edge.label || null,
+              patch.edge.labelStyle ? JSON.stringify(patch.edge.labelStyle) : null,
               patch.edge.style ? JSON.stringify(patch.edge.style) : null,
               connectionHash,
               now,
@@ -228,6 +230,10 @@ export class FlowchartRepository {
             if (patch.changes.label !== undefined) {
               updates.push('label = ?');
               values.push(patch.changes.label);
+            }
+            if (patch.changes.labelStyle !== undefined) {
+              updates.push('label_style = ?');
+              values.push(patch.changes.labelStyle ? JSON.stringify(patch.changes.labelStyle) : null);
             }
             if (patch.changes.style) {
               updates.push('style = ?');
