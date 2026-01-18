@@ -81,6 +81,9 @@ export const LazyFlowchartPreviewCard: React.FC<LazyFlowchartPreviewCardProps> =
   const observerRef = useRef<IntersectionObserver | null>(null);
 
   useEffect(() => {
+    // 重置 Intersection Observer
+    setShouldLoad(false);
+    
     // 创建 Intersection Observer
     observerRef.current = new IntersectionObserver(
       (entries) => {
@@ -118,7 +121,7 @@ export const LazyFlowchartPreviewCard: React.FC<LazyFlowchartPreviewCardProps> =
         observerRef.current.disconnect();
       }
     };
-  }, [flowchartName, threshold]);
+  }, [flowchartId, flowchartName, threshold]); // 添加 flowchartId 作为依赖
 
   return (
     <div ref={cardRef}>

@@ -42,6 +42,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
     const loadFlowchartLevelAssociations = async () => {
       if (!todo?.id || !visible) {
         setFlowchartLevelAssociations([]);
+        setFlowchartLevelLoading(false);
         return;
       }
 
@@ -56,6 +57,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
           flowchartDescription: assoc.flowchartDescription,
           createdAt: assoc.createdAt
         }));
+        console.log('[TodoViewDrawer] Loaded flowchart-level associations:', displayAssociations);
         setFlowchartLevelAssociations(displayAssociations);
       } catch (error) {
         console.error('查询流程图级别关联失败:', error);
@@ -575,7 +577,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
                     </Text>
                     {flowchartLevelAssociations.map((assoc) => (
                       <LazyFlowchartPreviewCard
-                        key={`flowchart-${assoc.flowchartId}`}
+                        key={`flowchart-${assoc.flowchartId}-${visible}`}
                         flowchartId={assoc.flowchartId}
                         flowchartName={assoc.flowchartName}
                         flowchartDescription={assoc.flowchartDescription}
@@ -600,7 +602,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
                     </Text>
                     {nodeLevelAssociations.map((assoc) => (
                       <LazyFlowchartPreviewCard
-                        key={`node-${assoc.flowchartId}-${assoc.nodeId}`}
+                        key={`node-${assoc.flowchartId}-${assoc.nodeId}-${visible}`}
                         flowchartId={assoc.flowchartId}
                         flowchartName={assoc.flowchartName}
                         highlightedNodeId={assoc.nodeId}

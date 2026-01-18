@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
-import { Drawer, Form, Select, Button, Space, Divider, Typography, message } from 'antd';
-import { EdgeStyle, EdgeType, LINE_WIDTH_OPTIONS, LineWidth } from '../../../shared/types';
+import { Drawer, Form, Select, Button, Space, Divider, Typography, message, ColorPicker, InputNumber, Switch } from 'antd';
+import { EdgeStyle, EdgeType, LINE_WIDTH_OPTIONS, LineWidth, EdgeMarkerType, EdgeLabelStyle } from '../../../shared/types';
+import type { Color } from 'antd/es/color-picker';
 
 const { Text } = Typography;
 
@@ -9,11 +10,18 @@ interface EdgeStylePanelProps {
   edgeId: string | null;
   currentStyle: EdgeStyle;
   currentType: EdgeType;
-  currentLabel?: string; // 新增：当前标签文本
+  currentLabel?: string;
+  currentLabelStyle?: EdgeLabelStyle; // 新增：当前标签样式
+  currentMarkerStart?: EdgeMarkerType; // 新增：起点箭头
+  currentMarkerEnd?: EdgeMarkerType; // 新增：终点箭头
+  currentAnimated?: boolean; // 新增：动画状态
   onClose: () => void;
   onStyleChange: (style: Partial<EdgeStyle>) => void;
   onTypeChange: (type: EdgeType) => void;
-  onEditLabel?: () => void; // 新增：编辑标签回调
+  onEditLabel?: () => void;
+  onLabelStyleChange?: (labelStyle: Partial<EdgeLabelStyle>) => void; // 新增：标签样式变更
+  onMarkerChange?: (markers: { start?: EdgeMarkerType; end?: EdgeMarkerType }) => void; // 新增：箭头变更
+  onAnimatedChange?: (animated: boolean) => void; // 新增：动画变更
 }
 
 /**
@@ -30,10 +38,17 @@ export const EdgeStylePanel: React.FC<EdgeStylePanelProps> = ({
   currentStyle,
   currentType,
   currentLabel,
+  currentLabelStyle,
+  currentMarkerStart,
+  currentMarkerEnd,
+  currentAnimated,
   onClose,
   onStyleChange,
   onTypeChange,
-  onEditLabel
+  onEditLabel,
+  onLabelStyleChange,
+  onMarkerChange,
+  onAnimatedChange
 }) => {
   const [form] = Form.useForm();
 
@@ -72,10 +87,18 @@ export const EdgeStylePanel: React.FC<EdgeStylePanelProps> = ({
     if (visible && edgeId) {
       form.setFieldsValue({
         lineWidth: getCurrentLineWidth(),
-        curveType: getCurrentCurveType()
+        curveType: getCurrentCurveType(),
+        lineColor: currentStyle.stroke || '#b1b1b7',
+        lineStyle: currentStyle.strokeDasharray || '',
+        markerStart: currentMarkerStart || 'none',
+        markerEnd: currentMarkerEnd || 'arrowclosed',
+        animated: currentAnimated || false,
+        labelFontSize: currentLabelStyle?.fontSize || 12,
+        labelColor: currentLabelStyle?.color || '#000',
+        labelBackgroundColor: currentLabelStyle?.backgroundColor || '#fff'
       });
     }
-  }, [visible, edgeId, currentStyle, currentType, form]);
+  }, [visible, edgeId, currentStyle, currentType, currentLabelStyle, currentMarkerStart, currentMarkerEnd, currentAnimated, form]);
 
   const handleSave = () => {
     try {
@@ -149,6 +172,102 @@ export const EdgeStylePanel: React.FC<EdgeStylePanelProps> = ({
     }
   };
 
+  // 5.1 处理线条颜色变化
+  const handleLineColorChange = (color: Color) => {
+    try {
+      const hexColor = typeof color === 'string' ? color : color.toHexString();
+      onStyleChange({
+        stroke: hexColor
+      });
+    } catch (error) {
+      console.error('Failed to change line color:', error);
+      message.error('更改线条颜色失败');
+    }
+  };
+
+  // 5.2 处理线条样式变化（实线/虚线/点线）
+  const handleLineStyleChange = (value: string) => {
+    try {
+      onStyleChange({
+        strokeDasharray: value || undefined
+      });
+    } catch (error) {
+      console.error('Failed to change line style:', error);
+      message.error('更改线条样式失败');
+    }
+  };
+
+  // 5.3 处理箭头标记变化
+  const handleMarkerStartChange = (value: EdgeMarkerType) => {
+    try {
+      if (onMarkerChange) {
+        onMarkerChange({ start: value });
+      }
+    } catch (error) {
+      console.error('Failed to change marker start:', error);
+      message.error('更改起点箭头失败');
+    }
+  };
+
+  const handleMarkerEndChange = (value: EdgeMarkerType) => {
+    try {
+      if (onMarkerChange) {
+        onMarkerChange({ end: value });
+      }
+    } catch (error) {
+      console.error('Failed to change marker end:', error);
+      message.error('更改终点箭头失败');
+    }
+  };
+
+  // 5.4 处理标签样式变化
+  const handleLabelFontSizeChange = (value: number | null) => {
+    try {
+      if (value && onLabelStyleChange) {
+        onLabelStyleChange({ fontSize: value });
+      }
+    } catch (error) {
+      console.error('Failed to change label font size:', error);
+      message.error('更改标签字号失败');
+    }
+  };
+
+  const handleLabelColorChange = (color: Color) => {
+    try {
+      if (onLabelStyleChange) {
+        const hexColor = typeof color === 'string' ? color : color.toHexString();
+        onLabelStyleChange({ color: hexColor });
+      }
+    } catch (error) {
+      console.error('Failed to change label color:', error);
+      message.error('更改标签颜色失败');
+    }
+  };
+
+  const handleLabelBackgroundColorChange = (color: Color) => {
+    try {
+      if (onLabelStyleChange) {
+        const hexColor = typeof color === 'string' ? color : color.toHexString();
+        onLabelStyleChange({ backgroundColor: hexColor });
+      }
+    } catch (error) {
+      console.error('Failed to change label background color:', error);
+      message.error('更改标签背景色失败');
+    }
+  };
+
+  // 5.5 处理动画切换
+  const handleAnimatedChange = (checked: boolean) => {
+    try {
+      if (onAnimatedChange) {
+        onAnimatedChange(checked);
+      }
+    } catch (error) {
+      console.error('Failed to change animated:', error);
+      message.error('更改动画状态失败');
+    }
+  };
+
   return (
     <Drawer
       title="编辑连接线样式"
@@ -192,6 +311,49 @@ export const EdgeStylePanel: React.FC<EdgeStylePanelProps> = ({
           </Space>
         </Form.Item>
 
+        {/* 5.4 标签样式控制 */}
+        {onLabelStyleChange && (
+          <>
+            <Form.Item
+              label="标签字号"
+              name="labelFontSize"
+              help="设置标签文字大小"
+            >
+              <InputNumber
+                min={8}
+                max={24}
+                step={1}
+                style={{ width: '100%' }}
+                onChange={handleLabelFontSizeChange}
+              />
+            </Form.Item>
+
+            <Form.Item
+              label="标签文字颜色"
+              name="labelColor"
+              help="设置标签文字颜色"
+            >
+              <ColorPicker
+                showText
+                style={{ width: '100%' }}
+                onChange={handleLabelColorChange}
+              />
+            </Form.Item>
+
+            <Form.Item
+              label="标签背景颜色"
+              name="labelBackgroundColor"
+              help="设置标签背景颜色"
+            >
+              <ColorPicker
+                showText
+                style={{ width: '100%' }}
+                onChange={handleLabelBackgroundColorChange}
+              />
+            </Form.Item>
+          </>
+        )}
+
         <Divider>线条样式</Divider>
 
         <Form.Item
@@ -209,6 +371,35 @@ export const EdgeStylePanel: React.FC<EdgeStylePanelProps> = ({
           />
         </Form.Item>
 
+        {/* 5.1 线条颜色控制 */}
+        <Form.Item
+          label="线条颜色"
+          name="lineColor"
+          help="设置连接线的颜色"
+        >
+          <ColorPicker
+            showText
+            style={{ width: '100%' }}
+            onChange={handleLineColorChange}
+          />
+        </Form.Item>
+
+        {/* 5.2 线条样式控制 */}
+        <Form.Item
+          label="线条样式"
+          name="lineStyle"
+          help="选择实线、虚线或点线"
+        >
+          <Select
+            onChange={handleLineStyleChange}
+            options={[
+              { value: '', label: '实线' },
+              { value: '5,5', label: '虚线' },
+              { value: '2,2', label: '点线' }
+            ]}
+          />
+        </Form.Item>
+
         <Form.Item
           label="曲线类型"
           name="curveType"
@@ -222,6 +413,53 @@ export const EdgeStylePanel: React.FC<EdgeStylePanelProps> = ({
             ]}
           />
         </Form.Item>
+
+        {/* 5.3 箭头标记控制 */}
+        {onMarkerChange && (
+          <>
+            <Form.Item
+              label="起点箭头"
+              name="markerStart"
+              help="设置连接线起点的箭头样式"
+            >
+              <Select
+                onChange={handleMarkerStartChange}
+                options={[
+                  { value: 'none', label: '无箭头' },
+                  { value: 'arrow', label: '开放箭头' },
+                  { value: 'arrowclosed', label: '闭合箭头' }
+                ]}
+              />
+            </Form.Item>
+
+            <Form.Item
+              label="终点箭头"
+              name="markerEnd"
+              help="设置连接线终点的箭头样式"
+            >
+              <Select
+                onChange={handleMarkerEndChange}
+                options={[
+                  { value: 'none', label: '无箭头' },
+                  { value: 'arrow', label: '开放箭头' },
+                  { value: 'arrowclosed', label: '闭合箭头' }
+                ]}
+              />
+            </Form.Item>
+          </>
+        )}
+
+        {/* 5.5 动画切换控制 */}
+        {onAnimatedChange && (
+          <Form.Item
+            label="动画效果"
+            name="animated"
+            help="启用连接线流动动画"
+            valuePropName="checked"
+          >
+            <Switch onChange={handleAnimatedChange} />
+          </Form.Item>
+        )}
 
         <Divider>当前样式</Divider>
 

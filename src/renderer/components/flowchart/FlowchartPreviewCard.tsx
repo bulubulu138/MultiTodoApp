@@ -161,6 +161,20 @@ export const FlowchartPreviewCard: React.FC<FlowchartPreviewCardProps> = ({
   // 加载流程图数据
   const { flowchartData, loading, error, refetch } = useFlowchartData(flowchartId);
 
+  // 调试：打印加载的数据
+  React.useEffect(() => {
+    if (flowchartData) {
+      console.log('[FlowchartPreviewCard] Loaded flowchart data:', {
+        id: flowchartData.id,
+        name: flowchartData.name,
+        nodesCount: flowchartData.nodes?.length || 0,
+        edgesCount: flowchartData.edges?.length || 0,
+        nodes: flowchartData.nodes,
+        edges: flowchartData.edges
+      });
+    }
+  }, [flowchartData]);
+
   // 处理点击事件
   const handleCardClick = () => {
     if (!loading && !error) {
@@ -200,9 +214,15 @@ export const FlowchartPreviewCard: React.FC<FlowchartPreviewCardProps> = ({
       onClick={handleCardClick}
       style={{
         cursor: loading || error ? 'default' : 'pointer',
-        borderColor: isHovered && !loading && !error ? '#1890ff' : colors.borderColor,
-        borderWidth: isHovered && !loading && !error ? '2px' : '1px',
-        borderLeft: highlightedNodeId ? '4px solid #1890ff' : undefined,
+        borderTopColor: isHovered && !loading && !error ? '#1890ff' : colors.borderColor,
+        borderRightColor: isHovered && !loading && !error ? '#1890ff' : colors.borderColor,
+        borderBottomColor: isHovered && !loading && !error ? '#1890ff' : colors.borderColor,
+        borderLeftColor: highlightedNodeId ? '#1890ff' : (isHovered && !loading && !error ? '#1890ff' : colors.borderColor),
+        borderTopWidth: isHovered && !loading && !error ? '2px' : '1px',
+        borderRightWidth: isHovered && !loading && !error ? '2px' : '1px',
+        borderBottomWidth: isHovered && !loading && !error ? '2px' : '1px',
+        borderLeftWidth: highlightedNodeId ? '4px' : (isHovered && !loading && !error ? '2px' : '1px'),
+        borderStyle: 'solid',
         boxShadow: isHovered && !loading && !error ? '0 4px 12px rgba(0, 0, 0, 0.15)' : undefined,
         transition: 'all 0.3s ease'
       }}

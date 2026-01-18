@@ -29,10 +29,12 @@ const convertNodesToReactFlow = (
   nodes: any[],
   highlightedNodeId?: string
 ): Node[] => {
+  console.log('[FlowchartPreviewCanvas] Converting nodes:', nodes);
+  
   return nodes.map((node) => {
     const isHighlighted = highlightedNodeId && node.id === highlightedNodeId;
 
-    return {
+    const convertedNode = {
       id: node.id,
       type: node.type || 'default',
       position: node.position || { x: 0, y: 0 },
@@ -53,6 +55,9 @@ const convertNodesToReactFlow = (
       selectable: false,
       connectable: false
     };
+    
+    console.log('[FlowchartPreviewCanvas] Converted node:', convertedNode);
+    return convertedNode;
   });
 };
 
@@ -75,6 +80,8 @@ const truncateLabel = (label: string | undefined, maxLength: number = 30): strin
  * 错误处理：标签溢出截断，无效样式回退到默认值
  */
 const convertEdgesToReactFlow = (edges: any[]): Edge[] => {
+  console.log('[FlowchartPreviewCanvas] Converting edges:', edges);
+  
   return edges.map((edge) => {
     // 错误处理：验证并应用标签样式
     const labelStyle = edge.labelStyle ? {
@@ -94,19 +101,19 @@ const convertEdgesToReactFlow = (edges: any[]): Edge[] => {
     // 错误处理：截断过长的标签
     const displayLabel = truncateLabel(edge.label);
 
-    return {
+    const convertedEdge = {
       id: edge.id,
       source: edge.source,
       target: edge.target,
       sourceHandle: edge.sourceHandle,
       targetHandle: edge.targetHandle,
-      type: edge.type || 'default',
+      type: edge.type || 'smoothstep',
       label: displayLabel,
       labelStyle,
       labelBgStyle,
       animated: edge.animated || false,
-      style: edge.style,
-      markerEnd: edge.markerEnd,
+      style: edge.style || { stroke: '#b1b1b7', strokeWidth: 2 },
+      markerEnd: edge.markerEnd || { type: 'arrowclosed', color: '#b1b1b7' },
       markerStart: edge.markerStart,
       // 禁用选择
       selectable: false,
@@ -115,6 +122,9 @@ const convertEdgesToReactFlow = (edges: any[]): Edge[] => {
         fullLabel: edge.label
       }
     };
+    
+    console.log('[FlowchartPreviewCanvas] Converted edge:', convertedEdge);
+    return convertedEdge;
   });
 };
 
@@ -147,10 +157,12 @@ export const FlowchartPreviewCanvas: React.FC<FlowchartPreviewCanvasProps> = ({
 }) => {
   // 转换数据格式
   const nodes = useMemo(() => {
+    console.log('[FlowchartPreviewCanvas] Raw nodes data:', data.nodes);
     return convertNodesToReactFlow(data.nodes || [], highlightedNodeId);
   }, [data.nodes, highlightedNodeId]);
 
   const edges = useMemo(() => {
+    console.log('[FlowchartPreviewCanvas] Raw edges data:', data.edges);
     return convertEdgesToReactFlow(data.edges || []);
   }, [data.edges]);
 

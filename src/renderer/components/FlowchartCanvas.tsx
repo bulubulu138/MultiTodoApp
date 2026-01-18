@@ -26,7 +26,9 @@ import {
   RuntimeNodeData,
   EdgeStyle,
   EdgeType,
-  LINE_WIDTH_OPTIONS
+  LINE_WIDTH_OPTIONS,
+  EdgeMarkerType,
+  EdgeLabelStyle
 } from '../../shared/types';
 import { useDomainNodes } from '../hooks/useDomainNodes';
 import { useHandleVisibility } from '../hooks/useHandleVisibility';
@@ -233,7 +235,40 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
   }, [domainNodes, setRuntimeNodes]);
 
   useEffect(() => {
-    setRuntimeEdges(toRuntimeEdges(domainEdges));
+    setRuntimeEdges((currentEdges) => {
+      const newEdges = toRuntimeEdges(domainEdges);
+      
+      // Create a map of current edges for quick lookup
+      const currentEdgesMap = new Map(currentEdges.map(e => [e.id, e]));
+      
+      // Preserve selected state and apply visual feedback
+      const updatedEdges = newEdges.map(newEdge => {
+        const currentEdge = currentEdgesMap.get(newEdge.id);
+        
+        if (currentEdge && currentEdge.selected) {
+          // Edge is selected, apply visual feedback
+          const baseStrokeWidth = typeof newEdge.style?.strokeWidth === 'number' 
+            ? newEdge.style.strokeWidth 
+            : 1;
+          const baseStroke = newEdge.style?.stroke;
+          
+          return {
+            ...newEdge,
+            selected: true, // Preserve selected state
+            style: {
+              ...newEdge.style,
+              strokeWidth: baseStrokeWidth + 1, // Increase width by 1
+              stroke: '#1890ff' // Blue highlight color
+            }
+          };
+        }
+        
+        // Not selected or new edge, use as is
+        return newEdge;
+      });
+      
+      return updatedEdges;
+    });
   }, [domainEdges, setRuntimeEdges]);
 
   // 5.1 监听 Todo 数据变化（实时同步）
@@ -332,19 +367,75 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     setInlineEditingNodeId(node.id);
   }, []);
 
-  // 7.01 处理边点击 - 显示样式编辑面板
+  // 7.01 处理边点击 - 单击选中边（不打开样式面板）
   const handleEdgeClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
-    // 查找持久化层的边数据
-    const persistedEdge = persistedEdges.find(e => e.id === edge.id);
-    if (!persistedEdge) return;
+    // 单击仅用于选中边，ReactFlow 会自动处理选中状态
+    // 样式面板通过右键菜单打开（onEdgeContextMenu）
+    // 这里不需要额外的逻辑，ReactFlow 的内置选择机制会处理
+  }, []);
 
-    // 显示样式编辑面板
-    setEditingEdgeStyle({
+  // 7.01.1 处理边双击 - 打开标签编辑器
+  const handleEdgeDoubleClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
+    const persistedEdge = persistedEdges.find(e => e.id === edge.id);
+    if (!persistedEdge) {
+      console.warn('[FlowchartCanvas] Edge not found for double-click:', edge.id);
+      return;
+    }
+
+    // 计算边的中点位置用于显示标签编辑器
+    const calculateEdgeMidpoint = (): { x: number; y: number } => {
+      try {
+        // 查找源节点和目标节点
+        const sourceNode = runtimeNodes.find(n => n.id === edge.source);
+        const targetNode = runtimeNodes.find(n => n.id === edge.target);
+
+        if (!sourceNode || !targetNode) {
+          console.warn('[FlowchartCanvas] Cannot find source or target node for edge label position');
+          // 回退到屏幕中心
+          return {
+            x: window.innerWidth / 2,
+            y: window.innerHeight / 2
+          };
+        }
+
+        // 计算中点（考虑节点位置）
+        const sourceX = sourceNode.position.x + (sourceNode.width || 100) / 2;
+        const sourceY = sourceNode.position.y + (sourceNode.height || 50) / 2;
+        const targetX = targetNode.position.x + (targetNode.width || 100) / 2;
+        const targetY = targetNode.position.y + (targetNode.height || 50) / 2;
+
+        const midX = (sourceX + targetX) / 2;
+        const midY = (sourceY + targetY) / 2;
+
+        // 验证计算结果
+        if (!isFinite(midX) || !isFinite(midY)) {
+          console.warn('[FlowchartCanvas] Invalid midpoint calculation, using fallback');
+          return {
+            x: window.innerWidth / 2,
+            y: window.innerHeight / 2
+          };
+        }
+
+        return { x: midX, y: midY };
+      } catch (error) {
+        console.error('[FlowchartCanvas] Error calculating edge midpoint:', error);
+        // 错误处理：回退到屏幕中心
+        return {
+          x: window.innerWidth / 2,
+          y: window.innerHeight / 2
+        };
+      }
+    };
+
+    const position = calculateEdgeMidpoint();
+
+    // 设置编辑状态以触发 EdgeLabelEditor
+    setEditingEdge({
       id: edge.id,
-      style: persistedEdge.style || {},
-      type: persistedEdge.type || 'default'
+      label: persistedEdge.label || '',
+      position
     });
-  }, [persistedEdges]);
+  }, [persistedEdges, runtimeNodes]);
 
   // 7.01 处理节点鼠标进入
   const handleNodeMouseEnter = useCallback((_event: React.MouseEvent, node: Node) => {
@@ -614,6 +705,117 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     setEditingEdgeStyle(null);
   }, [editingEdgeStyle, persistedEdges, runtimeNodes]);
 
+  // 7.08 处理标签样式变化 (Task 7.1)
+  const handleLabelStyleChange = useCallback((labelStyle: Partial<EdgeLabelStyle>) => {
+    if (!editingEdgeStyle) return;
+
+    try {
+      const edge = persistedEdges.find(e => e.id === editingEdgeStyle.id);
+      if (!edge) {
+        console.warn('[FlowchartCanvas] Edge not found for label style change:', editingEdgeStyle.id);
+        message.warning('连接线不存在，无法应用标签样式');
+        setEditingEdgeStyle(null);
+        return;
+      }
+
+      // 合并新标签样式
+      const newLabelStyle = {
+        ...(edge.labelStyle || {
+          fontSize: 12,
+          color: '#000',
+          backgroundColor: '#fff',
+          padding: 4,
+          borderRadius: 4
+        }),
+        ...labelStyle
+      };
+
+      const patch: FlowchartPatch = {
+        type: 'updateEdge',
+        id: editingEdgeStyle.id,
+        changes: {
+          labelStyle: newLabelStyle
+        },
+        metadata: {
+          originalEdgeState: edge
+        }
+      };
+
+      applyPatches([patch]);
+    } catch (error) {
+      console.error('[FlowchartCanvas] Failed to apply label style:', error);
+      message.error('应用标签样式失败，请重试');
+    }
+  }, [editingEdgeStyle, persistedEdges, applyPatches]);
+
+  // 7.09 处理箭头标记变化 (Task 7.2)
+  const handleMarkerChange = useCallback((markers: { start?: EdgeMarkerType; end?: EdgeMarkerType }) => {
+    if (!editingEdgeStyle) return;
+
+    try {
+      const edge = persistedEdges.find(e => e.id === editingEdgeStyle.id);
+      if (!edge) {
+        console.warn('[FlowchartCanvas] Edge not found for marker change:', editingEdgeStyle.id);
+        message.warning('连接线不存在，无法更改箭头');
+        setEditingEdgeStyle(null);
+        return;
+      }
+
+      const changes: Partial<PersistedEdge> = {};
+      if (markers.start !== undefined) {
+        changes.markerStart = markers.start;
+      }
+      if (markers.end !== undefined) {
+        changes.markerEnd = markers.end;
+      }
+
+      const patch: FlowchartPatch = {
+        type: 'updateEdge',
+        id: editingEdgeStyle.id,
+        changes,
+        metadata: {
+          originalEdgeState: edge
+        }
+      };
+
+      applyPatches([patch]);
+    } catch (error) {
+      console.error('[FlowchartCanvas] Failed to change markers:', error);
+      message.error('更改箭头失败，请重试');
+    }
+  }, [editingEdgeStyle, persistedEdges, applyPatches]);
+
+  // 7.10 处理动画状态变化 (Task 7.3)
+  const handleAnimatedChange = useCallback((animated: boolean) => {
+    if (!editingEdgeStyle) return;
+
+    try {
+      const edge = persistedEdges.find(e => e.id === editingEdgeStyle.id);
+      if (!edge) {
+        console.warn('[FlowchartCanvas] Edge not found for animated change:', editingEdgeStyle.id);
+        message.warning('连接线不存在，无法更改动画状态');
+        setEditingEdgeStyle(null);
+        return;
+      }
+
+      const patch: FlowchartPatch = {
+        type: 'updateEdge',
+        id: editingEdgeStyle.id,
+        changes: {
+          animated
+        },
+        metadata: {
+          originalEdgeState: edge
+        }
+      };
+
+      applyPatches([patch]);
+    } catch (error) {
+      console.error('[FlowchartCanvas] Failed to change animated:', error);
+      message.error('更改动画状态失败，请重试');
+    }
+  }, [editingEdgeStyle, persistedEdges, applyPatches]);
+
   // 7.1 处理节点右键菜单
   const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
     event.preventDefault();
@@ -624,6 +826,25 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
       nodeId: node.id
     });
   }, []);
+
+  // 7.1.1 处理边右键菜单 (Task 6.1)
+  const handleEdgeContextMenu = useCallback((event: React.MouseEvent, edge: Edge) => {
+    event.preventDefault();
+    
+    // 查找持久化层的边数据
+    const persistedEdge = persistedEdges.find(e => e.id === edge.id);
+    if (!persistedEdge) {
+      console.warn('[FlowchartCanvas] Edge not found for context menu:', edge.id);
+      return;
+    }
+
+    // 打开 EdgeStylePanel，传递完整的边数据
+    setEditingEdgeStyle({
+      id: edge.id,
+      style: persistedEdge.style || {},
+      type: persistedEdge.type || 'default'
+    });
+  }, [persistedEdges]);
 
   // 7.2 打开详细编辑抽屉
   const handleOpenDetailEdit = useCallback(() => {
@@ -853,9 +1074,13 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
       target: connection.target,
       sourceHandle: connection.sourceHandle || undefined,
       targetHandle: connection.targetHandle || undefined,
-      type: 'default', // 默认线型
+      type: 'smoothstep', // 默认使用平滑曲线
       markerEnd: 'arrowclosed', // 默认使用闭合箭头
-      animated: false // 默认不动画
+      animated: false, // 默认不动画
+      style: {
+        strokeWidth: 2, // 默认线宽 2px
+        stroke: theme === 'dark' ? '#595959' : '#b1b1b7' // 主题感知的默认颜色
+      }
     };
 
     // 创建 Patch
@@ -871,7 +1096,7 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     
     // 连接完成，重置 Handle 可见性
     handleVisibility.setConnecting(null);
-  }, [applyPatches, setRuntimeEdges, persistedEdges, handleVisibility]);
+  }, [applyPatches, setRuntimeEdges, persistedEdges, handleVisibility, theme]);
 
   // 12.1 处理连接开始
   const handleConnectStart = useCallback((_event: any, params: { nodeId: string | null; handleId: string | null }) => {
@@ -1270,6 +1495,8 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
         onNodeMouseLeave={handleNodeMouseLeave}
         onNodeContextMenu={handleNodeContextMenu}
         onEdgeClick={handleEdgeClick}
+        onEdgeDoubleClick={handleEdgeDoubleClick}
+        onEdgeContextMenu={handleEdgeContextMenu}
         onMoveEnd={handleMoveEnd}
         nodeTypes={nodeTypes}
         connectionMode={ConnectionMode.Loose}
@@ -1327,10 +1554,17 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
         currentStyle={editingEdgeStyle?.style || {}}
         currentType={editingEdgeStyle?.type || 'default'}
         currentLabel={editingEdgeStyle ? persistedEdges.find(e => e.id === editingEdgeStyle.id)?.label : undefined}
+        currentLabelStyle={editingEdgeStyle ? persistedEdges.find(e => e.id === editingEdgeStyle.id)?.labelStyle : undefined}
+        currentMarkerStart={editingEdgeStyle ? persistedEdges.find(e => e.id === editingEdgeStyle.id)?.markerStart : undefined}
+        currentMarkerEnd={editingEdgeStyle ? persistedEdges.find(e => e.id === editingEdgeStyle.id)?.markerEnd : undefined}
+        currentAnimated={editingEdgeStyle ? persistedEdges.find(e => e.id === editingEdgeStyle.id)?.animated : undefined}
         onClose={handleEdgeStylePanelClose}
         onStyleChange={handleEdgeStyleChange}
         onTypeChange={handleEdgeTypeChange}
         onEditLabel={handleEditLabelClick}
+        onLabelStyleChange={handleLabelStyleChange}
+        onMarkerChange={handleMarkerChange}
+        onAnimatedChange={handleAnimatedChange}
       />
     </div>
     </HandleVisibilityProvider>
