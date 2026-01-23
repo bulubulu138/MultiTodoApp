@@ -59,7 +59,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [viewingTodo, setViewingTodo] = useState<Todo | null>(null);
   const [settings, setSettings] = useState<Record<string, string>>({});
-  const [activeTab, setActiveTab] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<string>('pending');
   const [relations, setRelations] = useState<TodoRelation[]>([]);
   const [tabSettings, setTabSettings] = useState<TabSettingsMap>({});
   const [customTabs, setCustomTabs] = useState<CustomTab[]>([]);
@@ -466,7 +466,23 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     pendingRelations?: Array<{targetId: number; relationType: string}>
   ) => {
     try {
-      const newTodo = await window.electronAPI.todo.create(todoData);
+      // 获取当前tab的排序设置
+      const currentSettings = getCurrentTabSettings();
+
+      // 如果当前tab使用手动排序，自动设置displayOrders为1
+      let finalTodoData = { ...todoData };
+      if (currentSettings.sortOption === 'manual') {
+        const displayOrders = todoData.displayOrders || {};
+        finalTodoData = {
+          ...todoData,
+          displayOrders: {
+            ...displayOrders,
+            [activeTab]: 1  // 新增待办默认编号为1
+          }
+        };
+      }
+
+      const newTodo = await window.electronAPI.todo.create(finalTodoData);
       
       // 如果有待创建的关系，创建它们
       if (pendingRelations && pendingRelations.length > 0 && newTodo.id) {
