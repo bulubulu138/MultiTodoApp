@@ -81,8 +81,16 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
   const [nameInputValue, setNameInputValue] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<FlowchartTemplate | null>(null);
 
+  // 防止 StrictMode 双重调用
+  const hasInitializedRef = useRef(false);
+
   // 初始化：加载特定流程图或直接创建空白流程图
   useEffect(() => {
+    // 防止 StrictMode 双重调用
+    if (hasInitializedRef.current) {
+      return;
+    }
+
     if (visible) {
       if (flowchartId) {
         // 加载特定的流程图
@@ -158,7 +166,17 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
           createFlowchart();
         }
       }
+
+      // 标记 effect 已运行
+      hasInitializedRef.current = true;
     }
+
+    // 清理函数：当 drawer 关闭时重置标志
+    return () => {
+      if (!visible) {
+        hasInitializedRef.current = false;
+      }
+    };
   }, [visible, flowchartId, message, onClose, templates]);
 
   // 从模板创建流程图 - 第一步：显示名称输入框
