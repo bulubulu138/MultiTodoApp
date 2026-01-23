@@ -166,6 +166,11 @@ export const FlowchartPreviewCanvas: React.FC<FlowchartPreviewCanvasProps> = ({
     return convertEdgesToReactFlow(data.edges || []);
   }, [data.edges]);
 
+  // 决定是否使用 fitView（只有当没有保存的 viewport 时才使用）
+  const shouldFitView = useMemo(() => {
+    return !data.viewport;
+  }, [data.viewport]);
+
   // 初始视口（如果数据中有保存）
   const defaultViewport = useMemo(() => {
     if (data.viewport) {
@@ -201,8 +206,8 @@ export const FlowchartPreviewCanvas: React.FC<FlowchartPreviewCanvasProps> = ({
         panOnDrag={true}
         zoomOnScroll={true}
         panOnScroll={false}
-        // 自动适应视图
-        fitView={true}
+        // 只有在没有保存的 viewport 时才自动适应视图
+        fitView={shouldFitView}
         fitViewOptions={{
           padding: 0.2,
           includeHiddenNodes: false,
@@ -212,8 +217,8 @@ export const FlowchartPreviewCanvas: React.FC<FlowchartPreviewCanvasProps> = ({
         // 缩放范围
         minZoom={0.1}
         maxZoom={2}
-        // 默认视口
-        defaultViewport={defaultViewport}
+        // 只有在不需要 fitView 时才设置 defaultViewport
+        defaultViewport={shouldFitView ? undefined : defaultViewport}
         // 禁用交互式控制
         proOptions={{ hideAttribution: true }}
       >
