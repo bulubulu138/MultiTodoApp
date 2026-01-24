@@ -14,7 +14,7 @@ on:
 
 jobs:
   build:
-    name: Build (${{ matrix.os }})
+    name: Build ${{ matrix.platform == 'win' && 'Windows' || (matrix.arch == 'x64' && 'macOS Intel' || 'macOS Apple Silicon') }}
     runs-on: ${{ matrix.os }}
     
     strategy:
@@ -296,7 +296,7 @@ jobs:
         if: matrix.platform == 'win'
         uses: actions/upload-artifact@v4
         with:
-          name: MultiTodo-Windows-${{ matrix.arch }}
+          name: MultiTodo-Windows
           path: |
             release/*.exe
             release/*.exe.blockmap
@@ -306,7 +306,7 @@ jobs:
         if: matrix.platform == 'mac'
         uses: actions/upload-artifact@v4
         with:
-          name: MultiTodo-macOS-${{ matrix.arch }}
+          name: MultiTodo-${{ matrix.arch == 'x64' && 'macOS-Intel' || 'macOS-Apple-Silicon' }}
           path: |
             release/*.dmg
             release/*.dmg.blockmap
@@ -346,11 +346,16 @@ jobs:
             ## 📦 安装包下载
 
             ### Windows
-            - `MultiTodo-*-x64-setup.exe` - Windows 64位安装包
+            - `MultiTodo-*-x64-setup.exe` - Windows 安装包（适用于 Windows 10/11 64位）
 
             ### macOS
-            - `MultiTodo-*-x64.dmg` - macOS Intel芯片安装包
-            - `MultiTodo-*-arm64.dmg` - macOS Apple Silicon (M1/M2) 安装包
+            - `MultiTodo-*-x64.dmg` - **Intel 芯片 Mac** 安装包（适用于 2019 年及早期的 Intel 处理器 Mac）
+            - `MultiTodo-*-arm64.dmg` - **Apple Silicon Mac** 安装包（适用于 M1/M2/M3/M4 芯片的 Mac）
+
+            **如何选择？**
+            - 如果你不确定：点击屏幕左上角的 🍎 图标 → 选择"关于本机" → 查看"处理器"或"芯片"信息
+            - Intel 芯片显示：Intel Core i5/i7/i9 等
+            - Apple Silicon 显示：M1、M2、M3、M4 等
 
             ## 🎯 功能特性
             - ✅ 基于关键词的智能待办推荐
