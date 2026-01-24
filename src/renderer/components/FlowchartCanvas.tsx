@@ -1482,7 +1482,8 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
         // 性能优化选项
         onlyRenderVisibleElements={true}
         // 🔧 修复：条件性使用 fitView - 有保存的 viewport 时禁用，否则启用
-        fitView={initialViewport ? false : {
+        fitView={!initialViewport}
+        fitViewOptions={{
           padding: 0.2,
           includeHiddenNodes: false
         }}
