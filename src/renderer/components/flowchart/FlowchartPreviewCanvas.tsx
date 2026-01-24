@@ -3,7 +3,8 @@ import ReactFlow, {
   Background,
   Node,
   Edge,
-  BackgroundVariant
+  BackgroundVariant,
+  MarkerType
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import '../../styles/flowchart-dark-mode.css';
@@ -75,6 +76,24 @@ const truncateLabel = (label: string | undefined, maxLength: number = 30): strin
 };
 
 /**
+ * 获取箭头标记配置
+ * React Flow 要求 markerEnd/markerStart 必须是对象，不能是字符串
+ */
+const getMarkerConfig = (markerType?: string) => {
+  if (!markerType || markerType === 'none') {
+    return undefined;
+  }
+  // 返回 React Flow 期望的对象格式
+  return {
+    type: MarkerType.ArrowClosed,
+    markerUnits: 'strokeWidth',
+    orient: 'auto',
+    width: 12,
+    height: 12
+  };
+};
+
+/**
  * 将持久化的边数据转换为 ReactFlow 格式
  * 错误处理：标签溢出截断，无效样式回退到默认值
  */
@@ -100,9 +119,9 @@ const convertEdgesToReactFlow = (edges: any[]): Edge[] => {
     // 错误处理：截断过长的标签
     const displayLabel = truncateLabel(edge.label);
 
-    // 修复：markerEnd 应该是字符串，不是对象
-    const markerEnd = edge.markerEnd || 'arrowclosed';
-    const markerStart = edge.markerStart || undefined;
+    // 修复：markerEnd 和 markerStart 必须是对象，不是字符串
+    const markerEnd = getMarkerConfig(edge.markerEnd || 'arrowclosed');
+    const markerStart = edge.markerStart ? getMarkerConfig(edge.markerStart) : undefined;
 
     // 修复：不覆盖已有的 style
     const edgeStyle = edge.style || {
@@ -110,7 +129,7 @@ const convertEdgesToReactFlow = (edges: any[]): Edge[] => {
       strokeWidth: 2
     };
 
-    return {
+    const convertedEdge = {
       id: edge.id,
       source: edge.source,
       target: edge.target,
@@ -127,6 +146,9 @@ const convertEdgesToReactFlow = (edges: any[]): Edge[] => {
       selectable: false,
       data: { fullLabel: edge.label }
     };
+
+    console.log('[FlowchartPreviewCanvas] Converted edge:', convertedEdge);
+    return convertedEdge;
   });
 };
 
