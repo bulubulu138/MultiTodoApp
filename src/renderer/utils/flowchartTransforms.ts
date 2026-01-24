@@ -108,10 +108,10 @@ export function toRuntimeEdge(domainEdge: DomainEdge): Edge {
     labelBgPadding,
     labelBgBorderRadius,
     style: optimizedStyle,
-    animated: false, // 性能优化：禁用动画
-    // 支持自定义箭头类型
-    markerEnd: getMarkerConfig((domainEdge as any).markerEnd || 'arrowclosed'),
-    markerStart: getMarkerConfig((domainEdge as any).markerStart),
+    animated: domainEdge.animated || false, // 使用类型安全的访问
+    // 支持自定义箭头类型（使用类型安全的访问，移除 as any）
+    markerEnd: getMarkerConfig(domainEdge.markerEnd || 'arrowclosed'),
+    markerStart: getMarkerConfig(domainEdge.markerStart),
     // 添加 data 属性以存储完整标签（用于悬停显示）
     data: {
       fullLabel: domainEdge.label // 保存完整标签文本

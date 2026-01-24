@@ -95,17 +95,36 @@ export class FlowchartRepository {
 
     // 加载边
     const edgeRows = this.db.prepare('SELECT * FROM flowchart_edges WHERE flowchart_id = ?').all(id) as any[];
-    const edges: PersistedEdge[] = edgeRows.map(row => ({
-      id: row.id,
-      source: row.source,
-      target: row.target,
-      sourceHandle: row.source_handle,
-      targetHandle: row.target_handle,
-      type: row.type,
-      label: row.label,
-      labelStyle: row.label_style ? JSON.parse(row.label_style) : undefined,
-      style: row.style ? JSON.parse(row.style) : undefined
-    }));
+    const edges: PersistedEdge[] = edgeRows.map(row => {
+      // 解析 JSON 字段
+      let labelStyle, style;
+      try {
+        labelStyle = row.label_style ? JSON.parse(row.label_style) : undefined;
+        style = row.style ? JSON.parse(row.style) : undefined;
+      } catch (error) {
+        console.warn(`[FlowchartRepository] Failed to parse style for edge ${row.id}:`, error);
+        labelStyle = undefined;
+        style = undefined;
+      }
+
+      // 解析 animated（存储为 INTEGER 0/1）
+      const animated = row.animated === 1;
+
+      return {
+        id: row.id,
+        source: row.source,
+        target: row.target,
+        sourceHandle: row.source_handle,
+        targetHandle: row.target_handle,
+        type: row.type,
+        label: row.label,
+        labelStyle,
+        style,
+        markerEnd: row.marker_end || undefined,
+        markerStart: row.marker_start || undefined,
+        animated
+      };
+    });
 
     return { schema, nodes, edges };
   }
@@ -202,9 +221,9 @@ export class FlowchartRepository {
           case 'addEdge': {
             const connectionHash = this.getConnectionHash(patch.edge);
             this.db.prepare(`
-              INSERT INTO flowchart_edges 
-              (id, flowchart_id, source, target, source_handle, target_handle, type, label, label_style, style, connection_hash, created_at, updated_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              INSERT INTO flowchart_edges
+              (id, flowchart_id, source, target, source_handle, target_handle, type, label, label_style, style, marker_end, marker_start, animated, connection_hash, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).run(
               patch.edge.id,
               flowchartId,
@@ -216,6 +235,9 @@ export class FlowchartRepository {
               patch.edge.label || null,
               patch.edge.labelStyle ? JSON.stringify(patch.edge.labelStyle) : null,
               patch.edge.style ? JSON.stringify(patch.edge.style) : null,
+              patch.edge.markerEnd || null,
+              patch.edge.markerStart || null,
+              patch.edge.animated ? 1 : 0,
               connectionHash,
               now,
               now
@@ -242,6 +264,19 @@ export class FlowchartRepository {
             if (patch.changes.type) {
               updates.push('type = ?');
               values.push(patch.changes.type);
+            }
+            // 支持更新 markerEnd, markerStart, animated
+            if (patch.changes.markerEnd !== undefined) {
+              updates.push('marker_end = ?');
+              values.push(patch.changes.markerEnd);
+            }
+            if (patch.changes.markerStart !== undefined) {
+              updates.push('marker_start = ?');
+              values.push(patch.changes.markerStart);
+            }
+            if (patch.changes.animated !== undefined) {
+              updates.push('animated = ?');
+              values.push(patch.changes.animated ? 1 : 0);
             }
 
             if (updates.length > 0) {

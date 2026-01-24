@@ -246,15 +246,39 @@ export class DatabaseManager {
     try {
       // 检查列是否存在
       const tableInfo = this.db!.pragma('table_info(flowchart_edges)') as any[];
-      
+
+      // 检查并添加 label_style
       const hasLabelStyle = tableInfo.some((col: any) => col.name === 'label_style');
-      
       if (!hasLabelStyle) {
         console.log('Adding label_style column to flowchart_edges table...');
         this.db!.prepare('ALTER TABLE flowchart_edges ADD COLUMN label_style TEXT').run();
         console.log('label_style column added successfully');
       }
-      
+
+      // 检查并添加 marker_end
+      const hasMarkerEnd = tableInfo.some((col: any) => col.name === 'marker_end');
+      if (!hasMarkerEnd) {
+        console.log('Adding marker_end column to flowchart_edges table...');
+        this.db!.prepare('ALTER TABLE flowchart_edges ADD COLUMN marker_end TEXT').run();
+        console.log('marker_end column added successfully');
+      }
+
+      // 检查并添加 marker_start
+      const hasMarkerStart = tableInfo.some((col: any) => col.name === 'marker_start');
+      if (!hasMarkerStart) {
+        console.log('Adding marker_start column to flowchart_edges table...');
+        this.db!.prepare('ALTER TABLE flowchart_edges ADD COLUMN marker_start TEXT').run();
+        console.log('marker_start column added successfully');
+      }
+
+      // 检查并添加 animated
+      const hasAnimated = tableInfo.some((col: any) => col.name === 'animated');
+      if (!hasAnimated) {
+        console.log('Adding animated column to flowchart_edges table...');
+        this.db!.prepare('ALTER TABLE flowchart_edges ADD COLUMN animated INTEGER DEFAULT 0').run();
+        console.log('animated column added successfully');
+      }
+
       console.log('Flowchart edges table migration completed');
     } catch (error) {
       console.error('Flowchart edges migration error:', error);

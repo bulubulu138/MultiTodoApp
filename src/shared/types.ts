@@ -250,8 +250,11 @@ export interface DomainEdge {
   targetHandle?: string;
   type?: EdgeType;
   label?: string;
-  labelStyle?: EdgeLabelStyle; // 新增：标签样式
+  labelStyle?: EdgeLabelStyle;
   style?: EdgeStyle;
+  markerEnd?: EdgeMarkerType;
+  markerStart?: EdgeMarkerType;
+  animated?: boolean;
 }
 
 export interface FlowchartDomain {
@@ -291,9 +294,12 @@ export interface RuntimeEdge {
   targetHandle?: string;
   type?: EdgeType;
   label?: string;
-  labelStyle?: EdgeLabelStyle; // 新增：标签样式
+  labelStyle?: EdgeLabelStyle;
   style?: EdgeStyle;
   selected?: boolean;
+  markerEnd?: EdgeMarkerType;
+  markerStart?: EdgeMarkerType;
+  animated?: boolean;
 }
 
 export interface UIState {
