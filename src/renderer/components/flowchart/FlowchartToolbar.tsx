@@ -15,6 +15,7 @@ import {
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { Todo } from '../../../shared/types';
+import { useTheme } from '../../hooks/useTheme';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -55,30 +56,15 @@ export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
   canRedo,
   isSaving = false
 }) => {
-  // 获取当前主题
-  const [theme, setTheme] = React.useState(document.documentElement.dataset.theme || 'light');
-  
+  const theme = useTheme();
+
   // 编辑名称状态
   const [isEditingName, setIsEditingName] = useState(false);
   const [editingName, setEditingName] = useState('');
-  
+
   // 待办关联状态
   const [associatedTodoIds, setAssociatedTodoIds] = useState<number[]>([]);
   const [loadingAssociations, setLoadingAssociations] = useState(false);
-  
-  React.useEffect(() => {
-    const observer = new MutationObserver(() => {
-      const newTheme = document.documentElement.dataset.theme || 'light';
-      setTheme(newTheme);
-    });
-    
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-theme']
-    });
-    
-    return () => observer.disconnect();
-  }, []);
 
   // 加载已关联的待办
   React.useEffect(() => {
@@ -205,7 +191,7 @@ export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
       style={{
         padding: '8px 16px',
         borderBottom: `1px solid ${theme === 'dark' ? '#404040' : '#f0f0f0'}`,
-        backgroundColor: theme === 'dark' ? '#1f1f1f' : '#fff',
+        backgroundColor: theme === 'dark' ? '#141414' : '#fff',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center'
@@ -248,10 +234,10 @@ export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
               </>
             ) : (
               <>
-                <Title level={5} style={{ 
-                  margin: 0, 
+                <Title level={5} style={{
+                  margin: 0,
                   display: 'inline-block',
-                  color: theme === 'dark' ? '#e8e8e8' : undefined
+                  color: theme === 'dark' ? '#ffffff' : undefined
                 }}>
                   {flowchartName}
                 </Title>

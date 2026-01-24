@@ -8,6 +8,7 @@ import {
   FontSizeOutlined
 } from '@ant-design/icons';
 import { NodeType } from '../../../shared/types';
+import { useTheme } from '../../hooks/useTheme';
 
 const { Text } = Typography;
 
@@ -67,22 +68,7 @@ interface NodeLibraryProps {
  * 展示可用节点类型，支持拖拽到画布
  */
 export const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart }) => {
-  // 获取当前主题
-  const [theme, setTheme] = React.useState(document.documentElement.dataset.theme || 'light');
-  
-  React.useEffect(() => {
-    const observer = new MutationObserver(() => {
-      const newTheme = document.documentElement.dataset.theme || 'light';
-      setTheme(newTheme);
-    });
-    
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-theme']
-    });
-    
-    return () => observer.disconnect();
-  }, []);
+  const theme = useTheme();
 
   const handleDragStart = (event: React.DragEvent, nodeType: NodeType) => {
     event.dataTransfer.setData('application/reactflow', nodeType);
@@ -100,9 +86,9 @@ export const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart }) => {
         overflowY: 'auto'
       }}
     >
-      <Typography.Title level={5} style={{ 
+      <Typography.Title level={5} style={{
         marginBottom: '16px',
-        color: theme === 'dark' ? '#e8e8e8' : undefined
+        color: theme === 'dark' ? '#ffffff' : undefined
       }}>
         节点库
       </Typography.Title>
@@ -117,7 +103,7 @@ export const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart }) => {
             onDragStart={(e) => handleDragStart(e, template.type)}
             style={{
               cursor: 'grab',
-              border: `1px solid ${theme === 'dark' ? '#404040' : '#d9d9d9'}`,
+              border: `1px solid ${theme === 'dark' ? '#505050' : '#d9d9d9'}`,
               borderRadius: '8px',
               backgroundColor: theme === 'dark' ? '#141414' : '#fff'
             }}
@@ -128,13 +114,13 @@ export const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart }) => {
                 <div style={{ color: theme === 'dark' ? '#40a9ff' : '#1890ff' }}>
                   {template.icon}
                 </div>
-                <Text strong style={{ color: theme === 'dark' ? '#e8e8e8' : undefined }}>
+                <Text strong style={{ color: theme === 'dark' ? '#ffffff' : undefined }}>
                   {template.label}
                 </Text>
               </div>
-              <Text type="secondary" style={{ 
+              <Text type="secondary" style={{
                 fontSize: '12px',
-                color: theme === 'dark' ? '#a8a8a8' : undefined
+                color: theme === 'dark' ? '#bfbfbf' : undefined
               }}>
                 {template.description}
               </Text>
@@ -143,15 +129,16 @@ export const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart }) => {
         ))}
       </Space>
 
-      <div style={{ 
-        marginTop: '16px', 
-        padding: '12px', 
-        backgroundColor: theme === 'dark' ? '#141414' : '#fff', 
-        borderRadius: '8px' 
+      <div style={{
+        marginTop: '16px',
+        padding: '12px',
+        backgroundColor: theme === 'dark' ? '#141414' : '#fff',
+        border: `1px solid ${theme === 'dark' ? '#404040' : 'transparent'}`,
+        borderRadius: '8px'
       }}>
-        <Text type="secondary" style={{ 
+        <Text type="secondary" style={{
           fontSize: '12px',
-          color: theme === 'dark' ? '#a8a8a8' : undefined
+          color: theme === 'dark' ? '#bfbfbf' : undefined
         }}>
           💡 提示：拖拽节点到画布上即可创建
         </Text>

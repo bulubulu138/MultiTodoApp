@@ -177,49 +177,96 @@
   background-color: #0a0a0a;
 }
 
-/* 节点库 */
-[data-theme='dark'] .node-library {
-  background-color: #0a0a0a;
-}
-
+/* 节点库 - 背景由内联样式控制，这里只处理卡片和文字 */
 [data-theme='dark'] .node-library .ant-card {
-  background-color: #141414;
-  border-color: #404040;
+  background-color: #141414 !important;
+  border-color: #505050 !important;
+  color: #ffffff !important;
 }
 
 [data-theme='dark'] .node-library .ant-card:hover {
-  border-color: #1890ff;
-  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+  border-color: #1890ff !important;
+  background-color: #1a1a1a !important;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+  transform: translateY(-1px);
+  transition: all 0.2s ease;
 }
 
-/* 节点库标题和文字 */
+/* 节点库标题和文字 - 增强对比度 */
 [data-theme='dark'] .node-library .ant-typography {
-  color: #e8e8e8 !important;
+  color: #ffffff !important;
 }
 
 [data-theme='dark'] .node-library .ant-typography-secondary {
-  color: #a8a8a8 !important;
+  color: #bfbfbf !important;
 }
 
-/* 流程图工具栏 */
+[data-theme='dark'] .node-library .ant-card .ant-space-item {
+  color: #ffffff !important;
+}
+
+/* 流程图工具栏 - 背景由内联样式控制，这里只处理按钮和文字 */
 [data-theme='dark'] .flowchart-toolbar {
-  background-color: #141414;
+  /* 移除背景色规则，避免与内联样式冲突 */
   border-bottom-color: #404040;
 }
 
 [data-theme='dark'] .flowchart-toolbar .ant-btn {
   color: #ffffff;
-  border-color: #404040;
+  border-color: #505050;
+  background-color: #1a1a1a;
 }
 
 [data-theme='dark'] .flowchart-toolbar .ant-btn:hover {
   color: #40a9ff;
   border-color: #40a9ff;
+  background-color: #2a2a2a;
 }
 
-/* 工具栏标题 */
+[data-theme='dark'] .flowchart-toolbar .ant-btn-primary {
+  background-color: #1890ff;
+  border-color: #1890ff;
+}
+
+[data-theme='dark'] .flowchart-toolbar .ant-btn-primary:hover {
+  background-color: #40a9ff;
+  border-color: #40a9ff;
+}
+
+/* 工具栏标题 - 增强对比度 */
 [data-theme='dark'] .flowchart-toolbar .ant-typography {
-  color: #e8e8e8 !important;
+  color: #ffffff !important;
+}
+
+/* 工具栏输入框 */
+[data-theme='dark'] .flowchart-toolbar .ant-input {
+  background-color: #1a1a1a !important;
+  border-color: #404040 !important;
+  color: #ffffff !important;
+}
+
+[data-theme='dark'] .flowchart-toolbar .ant-input::placeholder {
+  color: #737373 !important;
+}
+
+[data-theme='dark'] .flowchart-toolbar .ant-input:focus {
+  border-color: #1890ff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+}
+
+/* 工具栏选择框 */
+[data-theme='dark'] .flowchart-toolbar .ant-select-selector {
+  background-color: #1a1a1a !important;
+  border-color: #404040 !important;
+  color: #ffffff !important;
+}
+
+[data-theme='dark'] .flowchart-toolbar .ant-select-arrow {
+  color: #a6a6a6 !important;
+}
+
+[data-theme='dark'] .flowchart-toolbar .ant-select-selection-item {
+  color: #ffffff !important;
 }
 
 /* 待办节点状态样式（暗黑模式） */
