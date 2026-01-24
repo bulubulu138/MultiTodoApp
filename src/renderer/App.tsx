@@ -152,6 +152,11 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     setShowFlowchart(true);
   }, []);
 
+  // 显示流程图列表（切换Tab）
+  const handleShowFlowchartList = useCallback(() => {
+    setActiveTab('flowcharts');
+  }, []);
+
   // 监听创建新流程图事件（从FlowchartDrawer内部触发）
   useEffect(() => {
     const handleCreateNewFlowchartEvent = () => {
@@ -1125,7 +1130,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         onShowExport={() => setShowExport(true)}
         onShowNotes={() => setShowNotes(true)}
         onShowCalendar={() => setShowCalendar(true)}
-        onShowFlowchart={handleCreateNewFlowchart}
+        onShowFlowchart={handleShowFlowchartList}
         onShowCustomTabManager={() => setShowCustomTabManager(true)}
         sortOption={currentTabSettings.sortOption}
         onSortChange={handleSortChange}
@@ -1255,7 +1260,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       />
 
       <FlowchartDrawer
-        key={flowchartDrawerKey}
+        key={currentFlowchartId ? `flowchart-${currentFlowchartId}` : `new-${flowchartDrawerKey}`}
         visible={showFlowchart}
         todos={todos}
         onClose={handleCloseFlowchart}

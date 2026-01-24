@@ -201,6 +201,7 @@ export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
 
   return (
     <div
+      className="flowchart-toolbar"
       style={{
         padding: '8px 16px',
         borderBottom: `1px solid ${theme === 'dark' ? '#404040' : '#f0f0f0'}`,

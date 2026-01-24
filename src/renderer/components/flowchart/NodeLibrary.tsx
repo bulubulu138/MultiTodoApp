@@ -91,12 +91,15 @@ export const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart }) => {
   };
 
   return (
-    <div style={{ 
-      padding: '16px', 
-      backgroundColor: theme === 'dark' ? '#0a0a0a' : '#f5f5f5', 
-      height: '100%', 
-      overflowY: 'auto' 
-    }}>
+    <div
+      className="node-library"
+      style={{
+        padding: '16px',
+        backgroundColor: theme === 'dark' ? '#0a0a0a' : '#f5f5f5',
+        height: '100%',
+        overflowY: 'auto'
+      }}
+    >
       <Typography.Title level={5} style={{ 
         marginBottom: '16px',
         color: theme === 'dark' ? '#e8e8e8' : undefined

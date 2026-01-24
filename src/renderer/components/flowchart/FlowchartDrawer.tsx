@@ -81,13 +81,14 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
   const [nameInputValue, setNameInputValue] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<FlowchartTemplate | null>(null);
 
-  // 防止 StrictMode 双重调用
-  const hasInitializedRef = useRef(false);
+  // 跟踪已加载的流程图 ID，防止重复加载
+  const loadedFlowchartIdRef = useRef<string | null>(null);
 
   // 初始化：加载特定流程图或直接创建空白流程图
   useEffect(() => {
-    // 防止 StrictMode 双重调用
-    if (hasInitializedRef.current) {
+    // 如果已经加载过这个流程图，跳过
+    if (loadedFlowchartIdRef.current === flowchartId) {
+      console.log(`[加载] 跳过重复加载: ${flowchartId}`);
       return;
     }
 
@@ -95,26 +96,29 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
       if (flowchartId) {
         // 加载特定的流程图
         console.log(`[加载] 尝试加载流程图 ID: ${flowchartId}`);
-        
+
         const loadFlowchart = async () => {
           try {
             const data = await window.electronAPI.flowchart.load(flowchartId);
-            
+
             if (data && data.schema && data.nodes && data.edges) {
               console.log(`[加载] 成功加载流程图: ${data.schema.name}`);
               console.log(`[加载] 流程图ID: ${data.schema.id}`);
               console.log(`[加载] 节点数: ${data.nodes.length}, 边数: ${data.edges.length}`);
               console.log(`[加载] 节点ID列表:`, data.nodes.map((n: any) => n.id).join(', '));
-              
+
               setCurrentFlowchart(data.schema);
               setNodes(data.nodes);
               setEdges(data.edges);
+
+              // 标记已加载此流程图
+              loadedFlowchartIdRef.current = flowchartId;
             } else {
-              console.error(`[加载] 数据不完整:`, { 
+              console.error(`[加载] 数据不完整:`, {
                 hasData: !!data,
-                hasSchema: !!data?.schema, 
-                hasNodes: !!data?.nodes, 
-                hasEdges: !!data?.edges 
+                hasSchema: !!data?.schema,
+                hasNodes: !!data?.nodes,
+                hasEdges: !!data?.edges
               });
               message.error('流程图数据不存在');
               onClose();
@@ -125,7 +129,7 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
             onClose();
           }
         };
-        
+
         loadFlowchart();
       } else {
         // 创建新流程图：直接创建空白流程图
@@ -133,10 +137,10 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
         const blankTemplate = templates.find(t => t.id === 'blank');
         if (blankTemplate) {
           const defaultName = `流程图 ${dayjs().format('YYYY-MM-DD HH:mm')}`;
-          
+
           const createFlowchart = async () => {
             try {
-              const { schema, nodes: templateNodes, edges: templateEdges } = 
+              const { schema, nodes: templateNodes, edges: templateEdges } =
                 TemplateService.createFromTemplate(blankTemplate, defaultName);
 
               console.log(`[创建] 创建新流程图: ${schema.name}`);
@@ -154,6 +158,9 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
               });
               console.log(`[创建] 已保存到数据库: ${schema.id}`);
 
+              // 标记已加载此流程图
+              loadedFlowchartIdRef.current = schema.id;
+
               // 性能监控：检查流程图规模
               PerformanceMonitor.warnLargeFlowchart(templateNodes.length, templateEdges.length);
             } catch (error) {
@@ -162,19 +169,16 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
               onClose();
             }
           };
-          
+
           createFlowchart();
         }
       }
-
-      // 标记 effect 已运行
-      hasInitializedRef.current = true;
     }
 
     // 清理函数：当 drawer 关闭时重置标志
     return () => {
       if (!visible) {
-        hasInitializedRef.current = false;
+        loadedFlowchartIdRef.current = null;
       }
     };
   }, [visible, flowchartId, message, onClose, templates]);
