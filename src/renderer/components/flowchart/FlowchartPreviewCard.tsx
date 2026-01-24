@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Typography, Space, Button, Alert, Skeleton, Spin } from 'antd';
-import { FileTextOutlined, EditOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
+import { FileTextOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
 import { ReactFlowProvider } from 'reactflow';
 import { useFlowchartData } from '../../hooks/useFlowchartData';
 import { FlowchartPreviewCanvas } from './FlowchartPreviewCanvas';
@@ -63,8 +63,8 @@ const PreviewError: React.FC<{
         <Button size="small" icon={<ReloadOutlined />} onClick={onRetry}>
           重试
         </Button>
-        <Button size="small" type="primary" icon={<EditOutlined />} onClick={onOpenEditor}>
-          打开编辑器
+        <Button size="small" type="primary" icon={<EyeOutlined />} onClick={onOpenEditor}>
+          查看详情
         </Button>
       </Space>
     }
@@ -109,14 +109,15 @@ const PreviewHeader: React.FC<{
  */
 const PreviewFooter: React.FC<{
   onView: (e: React.MouseEvent) => void;
-  onEdit: (e: React.MouseEvent) => void;
-}> = ({ onView, onEdit }) => (
-  <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-    <Button size="small" icon={<EyeOutlined />} onClick={onView}>
+}> = ({ onView }) => (
+  <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+    <Button
+      size="small"
+      type="primary"
+      icon={<EyeOutlined />}
+      onClick={onView}
+    >
       查看详情
-    </Button>
-    <Button size="small" type="primary" icon={<EditOutlined />} onClick={onEdit}>
-      编辑
     </Button>
   </div>
 );
@@ -188,12 +189,6 @@ export const FlowchartPreviewCard: React.FC<FlowchartPreviewCardProps> = ({
     onPreviewClick(flowchartId, highlightedNodeId);
   };
 
-  // 处理编辑
-  const handleEdit = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onPreviewClick(flowchartId, highlightedNodeId);
-  };
-
   // 处理重试
   const handleRetry = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -259,7 +254,7 @@ export const FlowchartPreviewCard: React.FC<FlowchartPreviewCardProps> = ({
 
       {/* 底部操作栏 */}
       {showActions && flowchartData && !loading && !error && (
-        <PreviewFooter onView={handleView} onEdit={handleEdit} />
+        <PreviewFooter onView={handleView} />
       )}
     </Card>
   );

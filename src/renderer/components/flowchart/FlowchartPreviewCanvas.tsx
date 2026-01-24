@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import ReactFlow, {
   Background,
-  Controls,
   Node,
   Edge,
   BackgroundVariant
@@ -81,14 +80,14 @@ const truncateLabel = (label: string | undefined, maxLength: number = 30): strin
  */
 const convertEdgesToReactFlow = (edges: any[]): Edge[] => {
   console.log('[FlowchartPreviewCanvas] Converting edges:', edges);
-  
+
   return edges.map((edge) => {
     // 错误处理：验证并应用标签样式
     const labelStyle = edge.labelStyle ? {
-      fontSize: typeof edge.labelStyle.fontSize === 'number' && 
-                edge.labelStyle.fontSize > 0 && 
+      fontSize: typeof edge.labelStyle.fontSize === 'number' &&
+                edge.labelStyle.fontSize > 0 &&
                 edge.labelStyle.fontSize < 100
-        ? edge.labelStyle.fontSize 
+        ? edge.labelStyle.fontSize
         : 12,
       fill: edge.labelStyle.color || '#000',
     } : undefined;
@@ -101,7 +100,17 @@ const convertEdgesToReactFlow = (edges: any[]): Edge[] => {
     // 错误处理：截断过长的标签
     const displayLabel = truncateLabel(edge.label);
 
-    const convertedEdge = {
+    // 修复：markerEnd 应该是字符串，不是对象
+    const markerEnd = edge.markerEnd || 'arrowclosed';
+    const markerStart = edge.markerStart || undefined;
+
+    // 修复：不覆盖已有的 style
+    const edgeStyle = edge.style || {
+      stroke: '#b1b1b7',
+      strokeWidth: 2
+    };
+
+    return {
       id: edge.id,
       source: edge.source,
       target: edge.target,
@@ -112,19 +121,12 @@ const convertEdgesToReactFlow = (edges: any[]): Edge[] => {
       labelStyle,
       labelBgStyle,
       animated: edge.animated || false,
-      style: edge.style || { stroke: '#b1b1b7', strokeWidth: 2 },
-      markerEnd: edge.markerEnd || { type: 'arrowclosed', color: '#b1b1b7' },
-      markerStart: edge.markerStart,
-      // 禁用选择
+      style: edgeStyle,
+      markerEnd,
+      markerStart,
       selectable: false,
-      // 保存完整标签用于悬停显示
-      data: {
-        fullLabel: edge.label
-      }
+      data: { fullLabel: edge.label }
     };
-    
-    console.log('[FlowchartPreviewCanvas] Converted edge:', convertedEdge);
-    return convertedEdge;
   });
 };
 
@@ -202,24 +204,25 @@ export const FlowchartPreviewCanvas: React.FC<FlowchartPreviewCanvasProps> = ({
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}
-        // 启用查看功能
-        panOnDrag={true}
-        zoomOnScroll={true}
+        // 禁用所有交互 - 静态快照模式
+        panOnDrag={false}
+        zoomOnScroll={false}
         panOnScroll={false}
-        // 只有在没有保存的 viewport 时才自动适应视图
+        zoomOnPinch={false}
+        // 使用 fitView 一次性调整视图，然后锁定
         fitView={shouldFitView}
         fitViewOptions={{
-          padding: 0.2,
+          padding: 0.3,
           includeHiddenNodes: false,
-          minZoom: 0.1,
-          maxZoom: 1.5
+          minZoom: 0.5,
+          maxZoom: 1.0
         }}
-        // 缩放范围
-        minZoom={0.1}
-        maxZoom={2}
+        // 锁定缩放范围
+        minZoom={0.5}
+        maxZoom={1.0}
         // 只有在不需要 fitView 时才设置 defaultViewport
         defaultViewport={shouldFitView ? undefined : defaultViewport}
-        // 禁用交互式控制
+        // 隐藏 attribution
         proOptions={{ hideAttribution: true }}
       >
         <Background
@@ -227,11 +230,6 @@ export const FlowchartPreviewCanvas: React.FC<FlowchartPreviewCanvasProps> = ({
           gap={16}
           size={1}
           color="#e0e0e0"
-        />
-        <Controls
-          showInteractive={false}
-          showZoom={true}
-          showFitView={true}
         />
       </ReactFlow>
     </div>

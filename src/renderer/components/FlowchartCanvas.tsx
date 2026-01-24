@@ -932,29 +932,7 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     setEditingNode(null);
   }, [editingNode, applyPatches]);
 
-  // 9. 初始化标志 - 用于控制 fitView
-  const isInitializedRef = useRef(false);
-
-  // 9.1 初始化时执行 fitView 或恢复 viewport
-  useEffect(() => {
-    if (!isInitializedRef.current && runtimeNodes.length > 0) {
-      // 延迟执行，确保节点已渲染
-      setTimeout(() => {
-        if (initialViewport) {
-          // 如果有初始 viewport，恢复它
-          console.log('[FlowchartCanvas] Restoring viewport:', initialViewport);
-          reactFlowInstance.setViewport(initialViewport, { duration: 200 });
-        } else {
-          // 否则执行 fitView
-          console.log('[FlowchartCanvas] No initial viewport, using fitView');
-          reactFlowInstance.fitView({ padding: 0.2, duration: 200 });
-        }
-        isInitializedRef.current = true;
-      }, 100);
-    }
-  }, [runtimeNodes.length, reactFlowInstance, initialViewport]);
-
-  // 9.2 处理拖拽放置
+  // 9. 处理拖拽放置
   const handleDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
 
@@ -1503,10 +1481,15 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
         attributionPosition="bottom-left"
         // 性能优化选项
         onlyRenderVisibleElements={true}
-        fitView
+        // 🔧 修复：条件性使用 fitView - 有保存的 viewport 时禁用，否则启用
+        fitView={initialViewport ? false : {
+          padding: 0.2,
+          includeHiddenNodes: false
+        }}
         minZoom={0.5}
         maxZoom={2}
-        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+        // 🔧 修复：使用保存的 viewport，如果没有则使用默认值
+        defaultViewport={initialViewport || { x: 0, y: 0, zoom: 1 }}
       >
         <Background />
         <Controls />
