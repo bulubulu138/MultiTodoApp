@@ -24,7 +24,7 @@ jobs:
           - os: windows-latest
             platform: win
             arch: x64
-          - os: macos-13  # Intel runners for x64 builds
+          - os: macos-latest  # Updated from macos-13 (retired)
             platform: mac
             arch: x64
             target_arch: x64
