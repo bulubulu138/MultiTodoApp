@@ -210,22 +210,26 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
       const currentNodesMap = new Map(currentNodes.map(n => [n.id, n]));
       
       // 更新策略：
-      // 1. 对于已存在的节点：完全保留其位置、选中状态、拖动状态
-      // 2. 对于新节点：使用持久化层的位置
+      // 1. 对于正在拖动的节点：保留其当前位置
+      // 2. 对于其他已存在的节点：使用数据库中的位置
+      // 3. 对于新节点：使用持久化层的位置
       const updatedNodes = newNodes.map(newNode => {
         const currentNode = currentNodesMap.get(newNode.id);
-        
+
         if (currentNode) {
-          // 节点已存在，保留所有运行时状态，只更新 data
+          // 只有当节点正在被拖动时，才保留当前位置
+          // 否则使用数据库中的位置（newNode.position）
+          const shouldPreservePosition = currentNode.dragging === true;
+
           return {
             ...newNode,
-            position: currentNode.position, // 保留当前位置
+            position: shouldPreservePosition ? currentNode.position : newNode.position,
             selected: currentNode.selected, // 保留选中状态
             dragging: currentNode.dragging, // 保留拖动状态
             data: newNode.data // 更新数据（label、resolvedTodo 等）
           };
         }
-        
+
         // 新节点，直接使用
         return newNode;
       });
