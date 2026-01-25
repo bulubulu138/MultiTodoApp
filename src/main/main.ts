@@ -56,11 +56,11 @@ class Application {
       console.error(`Platform: ${process.platform} ${process.arch}`);
       console.error(`Node.js: ${process.version} (ABI ${process.versions.modules})`);
       console.error(`Electron: ${process.versions.electron || 'Unknown'}`);
-      console.error(`Error: ${error.message}`);
-      if (error.stack) console.error(`Stack: ${error.stack}`);
+      console.error(`Error: ${(error as Error).message}`);
+      if ((error as Error).stack) console.error(`Stack: ${(error as Error).stack}`);
       console.error('=====================================\n');
 
-      throw new Error(`Native module compatibility check failed: ${error.message}`);
+      throw new Error(`Native module compatibility check failed: ${(error as Error).message}`);
     }
   }
 
@@ -1050,8 +1050,8 @@ class Application {
         // 提供详细的错误信息
         console.error('\n=== DATABASE INITIALIZATION ERROR ===');
         console.error(`Database path: ${this.dbManager.getDbPath()}`);
-        console.error(`Error: ${dbError.message}`);
-        if (dbError.stack) console.error(`Stack: ${dbError.stack}`);
+        console.error(`Error: ${(dbError as Error).message}`);
+        if ((dbError as Error).stack) console.error(`Stack: ${(dbError as Error).stack}`);
         console.error('======================================\n');
 
         // 尝试备份损坏的数据库
