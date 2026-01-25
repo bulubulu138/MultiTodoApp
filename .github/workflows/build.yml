@@ -61,13 +61,21 @@ jobs:
         run: |
           echo "Rebuilding native modules for Electron from source..."
 
+          # 从 package.json 读取精确的 Electron 版本
+          ELECTRON_VERSION=$(node -p "require('./package.json').devDependencies.electron.replace('^', '')")
+          echo "Electron version: $ELECTRON_VERSION"
+
           if [ "${{ matrix.platform }}" = "mac" ]; then
             echo "Rebuilding for ${{ matrix.target_arch }} architecture..."
-            npx electron-rebuild -f -w better-sqlite3 -v --prebuild-tag-prefix disabled \
+            npx electron-rebuild -f -w better-sqlite3 \
+              -v $ELECTRON_VERSION \
+              --prebuild-tag-prefix disabled \
               --arch=${{ matrix.target_arch }}
           else
             echo "Rebuilding for Windows..."
-            npx electron-rebuild -f -w better-sqlite3 -v --prebuild-tag-prefix disabled
+            npx electron-rebuild -f -w better-sqlite3 \
+              -v $ELECTRON_VERSION \
+              --prebuild-tag-prefix disabled
           fi
 
           echo "Checking build result..."
@@ -109,10 +117,70 @@ jobs:
           fi
         shell: bash
 
-        # 注意：不在此处运行 npm run verify
-    # 原因：verify 脚本在 Node.js 环境运行，但 better-sqlite3 已为 Electron 编译
-    # MODULE_VERSION 不同：Node.js 20 (115) vs Electron 27 (127)
-    # 如果原生模块有问题，后续的 build 和 dist 步骤会失败
+
+      - name: Verify native modules in Electron environment
+        run: |
+          echo "=== Verifying native modules in Electron runtime ==="
+
+          # 创建验证脚本
+          cat > scripts/verify-electron-native-modules.js << 'EOF'
+          const path = require('path');
+          const os = require('os');
+          const fs = require('fs');
+
+          console.log('Environment Info:');
+          console.log(`  Node.js: ${process.version}`);
+          console.log(`  Node.js ABI: ${process.versions.modules}`);
+          console.log(`  Electron: ${process.versions.electron || 'Unknown'}`);
+          console.log(`  Platform: ${process.platform}-${process.arch}`);
+          console.log('');
+
+          try {
+            console.log('Testing better-sqlite3 loading...');
+            const Database = require('better-sqlite3');
+
+            console.log('Creating test database...');
+            const tempDir = path.join(os.tmpdir(), 'verify-better-sqlite3');
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+            const testDbPath = path.join(tempDir, 'test.db');
+            if (fs.existsSync(testDbPath)) fs.unlinkSync(testDbPath);
+
+            const db = new Database(testDbPath);
+            db.exec('CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)');
+            db.prepare('INSERT INTO test (name) VALUES (?)').run('test1');
+            db.prepare('INSERT INTO test (name) VALUES (?)').run('test2');
+            const rows = db.prepare('SELECT * FROM test').all();
+
+            db.close();
+            fs.unlinkSync(testDbPath);
+            fs.rmdirSync(tempDir);
+
+            if (rows.length === 2) {
+              console.log('✅ better-sqlite3 verification PASSED');
+              console.log(`  - Database operations: OK`);
+              console.log(`  - Query results: ${rows.length} rows`);
+              process.exit(0);
+            } else {
+              console.log('❌ better-sqlite3 verification FAILED');
+              console.log(`  - Expected 2 rows, got ${rows.length}`);
+              process.exit(1);
+            }
+          } catch (error) {
+            console.log('❌ better-sqlite3 verification FAILED');
+            console.log(`  - Error: ${error.message}`);
+            console.log('');
+            console.log('Diagnostics:');
+            const modulePath = path.join(__dirname, 'node_modules', 'better-sqlite3', 'build', 'Release', 'better_sqlite3.node');
+            console.log(`  - Module path: ${modulePath}`);
+            console.log(`  - Module exists: ${fs.existsSync(modulePath)}`);
+            process.exit(1);
+          }
+          EOF
+
+          # 运行验证
+          node scripts/verify-electron-native-modules.js
+        shell: bash
 
       - name: Create macOS icons
         if: matrix.platform == 'mac'

@@ -144,13 +144,16 @@
       "category": "public.app-category.productivity",
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "identity": null,
-      "hardenedRuntime": false,
+      "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "assets/entitlements.mac.plist",
       "entitlementsInherit": "assets/entitlements.mac.plist",
       "extendInfo": {
         "NSCameraUsageDescription": "This app does not use the camera.",
-        "NSMicrophoneUsageDescription": "This app does not use the microphone."
+        "NSMicrophoneUsageDescription": "This app does not use the microphone.",
+        "NSDocumentsFolderUsageDescription": "This app needs to access your documents to manage your tasks.",
+        "NSDownloadsFolderUsageDescription": "This app needs to access your downloads to manage your tasks.",
+        "NSDesktopFolderUsageDescription": "This app needs to access your desktop to manage your tasks."
       }
     },
     "dmg": {

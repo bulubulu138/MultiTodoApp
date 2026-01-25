@@ -25,6 +25,45 @@ class Application {
     this.imageManager = new ImageManager();
   }
 
+  private async checkNativeModuleCompatibility(): Promise<void> {
+    try {
+      console.log('Checking native module compatibility...');
+      console.log(`  Node.js: ${process.version}`);
+      console.log(`  Node.js ABI: ${process.versions.modules}`);
+      console.log(`  Electron: ${process.versions.electron || 'Unknown'}`);
+      console.log(`  Platform: ${process.platform}-${process.arch}`);
+
+      // 检查 better-sqlite3 是否可加载
+      const Database = require('better-sqlite3');
+
+      // 创建内存数据库测试
+      const testDb = new Database(':memory:');
+      testDb.exec('CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)');
+      testDb.prepare('INSERT INTO test (name) VALUES (?)').run('test');
+      const result = testDb.prepare('SELECT * FROM test').all();
+      testDb.close();
+
+      if (result.length === 1) {
+        console.log('✅ Native module compatibility check PASSED');
+      } else {
+        throw new Error('Native module test failed: unexpected query result');
+      }
+    } catch (error) {
+      console.error('❌ Native module compatibility check FAILED:', error);
+
+      // 提供详细的诊断信息
+      console.error('\n=== NATIVE MODULE ERROR DIAGNOSIS ===');
+      console.error(`Platform: ${process.platform} ${process.arch}`);
+      console.error(`Node.js: ${process.version} (ABI ${process.versions.modules})`);
+      console.error(`Electron: ${process.versions.electron || 'Unknown'}`);
+      console.error(`Error: ${error.message}`);
+      if (error.stack) console.error(`Stack: ${error.stack}`);
+      console.error('=====================================\n');
+
+      throw new Error(`Native module compatibility check failed: ${error.message}`);
+    }
+  }
+
   private createWindow(): void {
     const isDev = process.env.NODE_ENV === 'development';
     
@@ -995,24 +1034,53 @@ class Application {
       console.log('Waiting for app ready...');
       await app.whenReady();
       console.log('App is ready');
-      
-      // 初始化数据库
+
+      // === 原生模块兼容性检查 ===
+      console.log('Running native module compatibility check...');
+      await this.checkNativeModuleCompatibility();
+
+      // 初始化数据库（增强错误处理）
       console.log('Initializing database...');
-      await this.dbManager.initialize();
-      console.log('Database initialized successfully');
-      
+      try {
+        await this.dbManager.initialize();
+        console.log('Database initialized successfully');
+      } catch (dbError) {
+        console.error('Database initialization failed:', dbError);
+
+        // 提供详细的错误信息
+        console.error('\n=== DATABASE INITIALIZATION ERROR ===');
+        console.error(`Database path: ${this.dbManager.getDbPath()}`);
+        console.error(`Error: ${dbError.message}`);
+        if (dbError.stack) console.error(`Stack: ${dbError.stack}`);
+        console.error('======================================\n');
+
+        // 尝试备份损坏的数据库
+        try {
+          const dbPath = this.dbManager.getDbPath();
+          if (fs.existsSync(dbPath)) {
+            const backupPath = dbPath + '.corrupt.' + Date.now();
+            fs.copyFileSync(dbPath, backupPath);
+            console.log(`Corrupted database backed up to: ${backupPath}`);
+          }
+        } catch (backupError) {
+          console.error('Failed to backup database:', backupError);
+        }
+
+        throw dbError;
+      }
+
       // 初始化备份管理器
       console.log('Initializing backup manager...');
       const dbPath = this.dbManager.getDbPath();
       this.backupManager = new BackupManager(dbPath);
       this.backupManager.startAutoBackup();
       console.log('Backup manager initialized successfully');
-      
+
       // 初始化关键词处理器
       console.log('Initializing keyword processor...');
       this.keywordProcessor = new KeywordProcessor(this.dbManager);
       console.log('Keyword processor initialized successfully');
-      
+
       // 初始化 AI 服务
       console.log('Initializing AI service...');
       const settings = await this.dbManager.getSettings();
@@ -1024,27 +1092,27 @@ class Application {
         );
       }
       console.log('AI service initialized successfully');
-      
+
       // 设置IPC处理器
       console.log('Setting up IPC handlers...');
       this.setupIpcHandlers();
       console.log('IPC handlers set up successfully');
-      
+
       // 创建主窗口
       console.log('Creating main window...');
       this.createWindow();
       console.log('Main window created successfully');
-      
+
       // 创建系统托盘
       console.log('Creating system tray...');
       this.createTray();
       console.log('System tray created successfully');
-      
+
       // 注册全局快捷键
       console.log('Registering global shortcuts...');
       this.registerGlobalShortcuts();
       console.log('Global shortcuts registered successfully');
-      
+
     } catch (error) {
       console.error('Error during initialization:', error);
       throw error;
