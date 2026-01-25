@@ -45,6 +45,18 @@ import { migrateEdges as migrateEdgesBasic, needsEdgesMigration as needsEdgesMig
 import { migrateEdges as migrateEdgesEnhancements, migrateNodes as migrateNodesEnhancements, needsEdgesMigration as needsEdgesMigrationEnhancements, needsNodesMigration } from '../utils/flowchartEnhancementsMigration';
 import { HandleVisibilityProvider } from '../contexts/HandleVisibilityContext';
 
+/**
+ * 验证位置是否有效
+ */
+function isValidPosition(position: { x: number; y: number } | undefined): boolean {
+  if (!position) return false;
+  if (typeof position.x !== 'number' || typeof position.y !== 'number') return false;
+  if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) return false;
+  // 检查位置是否在合理范围内
+  if (Math.abs(position.x) > 100000 || Math.abs(position.y) > 100000) return false;
+  return true;
+}
+
 interface FlowchartCanvasProps {
   flowchartId: string;
   persistedNodes: PersistedNode[];
@@ -205,21 +217,19 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
   useEffect(() => {
     setRuntimeNodes((currentNodes) => {
       const newNodes = toRuntimeNodes(domainNodes);
-      
+
       // 创建当前节点的 Map 以便快速查找
       const currentNodesMap = new Map(currentNodes.map(n => [n.id, n]));
-      
-      // 更新策略：
-      // 1. 对于正在拖动的节点：保留其当前位置
-      // 2. 对于其他已存在的节点：使用数据库中的位置
-      // 3. 对于新节点：使用持久化层的位置
+
+      // 改进的位置保持策略：
+      // 1. 如果节点正在拖动，保留当前位置
+      // 2. 如果新位置无效（非零且合理），使用当前位置
+      // 3. 否则使用数据库中的位置
       const updatedNodes = newNodes.map(newNode => {
         const currentNode = currentNodesMap.get(newNode.id);
 
         if (currentNode) {
-          // 只有当节点正在被拖动时，才保留当前位置
-          // 否则使用数据库中的位置（newNode.position）
-          const shouldPreservePosition = currentNode.dragging === true;
+          const shouldPreservePosition = currentNode.dragging === true || !isValidPosition(newNode.position);
 
           return {
             ...newNode,
@@ -233,7 +243,7 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
         // 新节点，直接使用
         return newNode;
       });
-      
+
       return updatedNodes;
     });
   }, [domainNodes, setRuntimeNodes]);

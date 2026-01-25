@@ -8,8 +8,43 @@ import {
 } from '../../shared/types';
 
 /**
+ * 为节点查找一个安全的、不重叠的位置
+ * 使用网格布局策略，确保节点不会重叠
+ */
+function findSafePosition(nodeId: string, existingNodes: PersistedNode[]): { x: number; y: number } {
+  const gridSize = 250; // 节点间距
+  const cols = 5; // 每行节点数
+
+  // 找到第一个空闲的网格位置
+  for (let i = 0; i < 100; i++) {
+    const x = (i % cols) * gridSize;
+    const y = Math.floor(i / cols) * gridSize;
+
+    // 检查这个位置是否已被占用
+    const isOccupied = existingNodes.some(node => {
+      if (!node.position) return false;
+      try {
+        return Math.abs(node.position.x - x) < 200 && Math.abs(node.position.y - y) < 100;
+      } catch {
+        return false;
+      }
+    });
+
+    if (!isOccupied) {
+      return { x, y };
+    }
+  }
+
+  // 如果所有网格位置都被占用，返回一个随机位置
+  return {
+    x: Math.random() * 1000,
+    y: Math.random() * 1000
+  };
+}
+
+/**
  * FlowchartRepository
- * 
+ *
  * 流程图数据访问层，负责数据库 CRUD 操作
  * 使用增量 Patch 模型进行高效保存
  */
@@ -67,31 +102,42 @@ export class FlowchartRepository {
 
     // 加载节点（只加载 PersistedNode，不加载 Todo 数据）
     const nodeRows = this.db.prepare('SELECT * FROM flowchart_nodes WHERE flowchart_id = ?').all(id) as any[];
-    const nodes: PersistedNode[] = nodeRows.map(row => {
+    const nodes: PersistedNode[] = [];
+
+    for (const row of nodeRows) {
       let position: { x: number; y: number };
-      
+
       try {
         position = JSON.parse(row.position);
-        
-        // 验证 position 数据的有效性
-        if (!position || typeof position.x !== 'number' || typeof position.y !== 'number') {
-          console.warn(`[FlowchartRepository] Node ${row.id} has invalid position data, using default (0, 0)`);
-          position = { x: 0, y: 0 };
+
+        // 增强的位置验证
+        if (!position || typeof position.x !== 'number' || typeof position.y !== 'number' ||
+            !Number.isFinite(position.x) || !Number.isFinite(position.y) ||
+            Math.abs(position.x) > 100000 || Math.abs(position.y) > 100000) {
+          console.error(`[FlowchartRepository] Node ${row.id} has invalid position data:`, row.position);
+
+          // 尝试修复：使用安全位置计算不重叠的位置
+          const safePosition = findSafePosition(row.id, nodes);
+          position = safePosition;
+          console.warn(`[FlowchartRepository] Using safe position for node ${row.id}:`, safePosition);
         } else {
           console.log(`[FlowchartRepository] Loaded position for node ${row.id}:`, position);
         }
       } catch (error) {
         console.error(`[FlowchartRepository] Failed to parse position for node ${row.id}:`, error);
-        position = { x: 0, y: 0 };
+        // 使用安全位置而不是固定的 (0, 0)
+        const safePosition = findSafePosition(row.id, nodes);
+        position = safePosition;
+        console.warn(`[FlowchartRepository] Using safe position for node ${row.id}:`, safePosition);
       }
-      
-      return {
+
+      nodes.push({
         id: row.id,
         type: row.type,
         position,
         data: JSON.parse(row.data)
-      };
-    });
+      });
+    }
 
     // 加载边
     const edgeRows = this.db.prepare('SELECT * FROM flowchart_edges WHERE flowchart_id = ?').all(id) as any[];
@@ -184,10 +230,18 @@ export class FlowchartRepository {
             const values: any[] = [];
 
             if (patch.changes.position) {
-              updates.push('position = ?');
-              const positionJson = JSON.stringify(patch.changes.position);
-              values.push(positionJson);
-              console.log(`[FlowchartRepository] Saving position for node ${patch.id}:`, patch.changes.position, '→', positionJson);
+              // 验证位置数据的有效性
+              const pos = patch.changes.position;
+              if (pos && typeof pos.x === 'number' && typeof pos.y === 'number' &&
+                  Number.isFinite(pos.x) && Number.isFinite(pos.y)) {
+                updates.push('position = ?');
+                const positionJson = JSON.stringify(pos);
+                values.push(positionJson);
+                console.log(`[FlowchartRepository] Saving position for node ${patch.id}:`, pos, '→', positionJson);
+              } else {
+                console.error(`[FlowchartRepository] Invalid position data for node ${patch.id}:`, pos);
+                // 不保存无效的位置数据
+              }
             }
             if (patch.changes.data) {
               updates.push('data = ?');
