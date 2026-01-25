@@ -133,8 +133,9 @@ const convertEdgesToReactFlow = (edges: any[]): Edge[] => {
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      sourceHandle: edge.sourceHandle,
-      targetHandle: edge.targetHandle,
+      // 关键修复：将空字符串转换为 undefined，ReactFlow 才能正确连接
+      sourceHandle: edge.sourceHandle || undefined,
+      targetHandle: edge.targetHandle || undefined,
       type: edge.type || 'smoothstep',
       label: displayLabel,
       labelStyle,
@@ -154,15 +155,16 @@ const convertEdgesToReactFlow = (edges: any[]): Edge[] => {
 
 /**
  * FlowchartPreviewCanvas 组件
- * 
- * 只读模式的流程图画布，用于在待办详情中预览流程图
- * 
+ *
+ * 简化的流程图预览画布，用于在待办详情中预览流程图
+ *
  * 特性：
  * - 完全禁用编辑功能（节点拖拽、连线编辑等）
- * - 支持缩放和平移查看
+ * - 完全禁用交互功能（缩放、平移等）
+ * - 纯静态快照视图
  * - 自动适应视图（fitView）
  * - 支持节点高亮显示
- * 
+ *
  * @example
  * ```tsx
  * <FlowchartPreviewCanvas
@@ -190,23 +192,6 @@ export const FlowchartPreviewCanvas: React.FC<FlowchartPreviewCanvasProps> = ({
     return convertEdgesToReactFlow(data.edges || []);
   }, [data.edges]);
 
-  // 决定是否使用 fitView（只有当没有保存的 viewport 时才使用）
-  const shouldFitView = useMemo(() => {
-    return !data.viewport;
-  }, [data.viewport]);
-
-  // 初始视口（如果数据中有保存）
-  const defaultViewport = useMemo(() => {
-    if (data.viewport) {
-      return {
-        x: data.viewport.x,
-        y: data.viewport.y,
-        zoom: data.viewport.zoom
-      };
-    }
-    return undefined;
-  }, [data.viewport]);
-
   return (
     <div
       style={{
@@ -222,29 +207,22 @@ export const FlowchartPreviewCanvas: React.FC<FlowchartPreviewCanvasProps> = ({
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
-        // 禁用所有编辑功能
+        // 完全禁用交互 - 静态快照
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}
-        // 禁用所有交互 - 静态快照模式
         panOnDrag={false}
         zoomOnScroll={false}
         panOnScroll={false}
         zoomOnPinch={false}
-        // 使用 fitView 一次性调整视图，然后锁定
-        fitView={shouldFitView}
+        // 简化的视图配置 - 自动适应
+        fitView={true}
         fitViewOptions={{
-          padding: 0.3,
-          includeHiddenNodes: false,
+          padding: 0.2,
           minZoom: 0.5,
           maxZoom: 1.0
         }}
-        // 锁定缩放范围
-        minZoom={0.5}
-        maxZoom={1.0}
-        // 只有在不需要 fitView 时才设置 defaultViewport
-        defaultViewport={shouldFitView ? undefined : defaultViewport}
-        // 隐藏 attribution
+        // 隐藏品牌标识
         proOptions={{ hideAttribution: true }}
       >
         <Background

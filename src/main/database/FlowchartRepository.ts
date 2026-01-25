@@ -114,8 +114,9 @@ export class FlowchartRepository {
         id: row.id,
         source: row.source,
         target: row.target,
-        sourceHandle: row.source_handle,
-        targetHandle: row.target_handle,
+        // 修复：将空字符串转换为 undefined，确保 ReactFlow 能正确连接
+        sourceHandle: row.source_handle || undefined,
+        targetHandle: row.target_handle || undefined,
         type: row.type,
         label: row.label,
         labelStyle,
