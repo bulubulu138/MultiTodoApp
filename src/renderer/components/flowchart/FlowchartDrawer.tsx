@@ -86,8 +86,8 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
 
   // 初始化：加载特定流程图或直接创建空白流程图
   useEffect(() => {
-    // 如果已经加载过这个流程图，跳过
-    if (loadedFlowchartIdRef.current === flowchartId) {
+    // 如果已经加载过这个流程图（且不是新建），跳过
+    if (flowchartId && loadedFlowchartIdRef.current === flowchartId) {
       console.log(`[加载] 跳过重复加载: ${flowchartId}`);
       return;
     }
