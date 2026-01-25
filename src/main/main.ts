@@ -980,10 +980,18 @@ class Application {
 
   public async initialize(): Promise<void> {
     try {
-      // 根据用户反馈，硬件加速可能导致启动白屏和卡顿
-      // 暂时禁用，后续可通过环境变量控制
-      app.disableHardwareAcceleration();
-      
+      // 硬件加速控制
+      // 在 macOS 上默认启用硬件加速以获得更好的性能
+      // 在其他平台上可以通过环境变量 MULTI_TODO_DISABLE_HW_ACC=1 禁用
+      const disableHardwareAcceleration = process.env.MULTI_TODO_DISABLE_HW_ACC === '1' || process.platform !== 'darwin';
+
+      if (disableHardwareAcceleration) {
+        console.log('Hardware acceleration is disabled');
+        app.disableHardwareAcceleration();
+      } else {
+        console.log('Hardware acceleration is enabled (default on macOS)');
+      }
+
       console.log('Waiting for app ready...');
       await app.whenReady();
       console.log('App is ready');
