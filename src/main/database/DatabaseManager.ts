@@ -49,6 +49,11 @@ export class DatabaseManager {
         images TEXT,
         startTime TEXT,
         deadline TEXT,
+        displayOrder INTEGER,
+        displayOrders TEXT DEFAULT '{}',
+        contentHash TEXT,
+        keywords TEXT DEFAULT '[]',
+        completedAt TEXT,
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
         updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
       )`,
@@ -508,36 +513,69 @@ export class DatabaseManager {
         const now = new Date().toISOString();
         // 生成内容哈希
         const contentHash = todo.contentHash || generateContentHash(todo.title, todo.content);
-        // 处理 displayOrders
-        const displayOrdersJSON = todo.displayOrders ? JSON.stringify(todo.displayOrders) : '{}';
         // 处理 keywords
         const keywordsJSON = todo.keywords ? JSON.stringify(todo.keywords) : '[]';
         // 处理 completedAt：如果状态为 completed，设置完成时间
         const completedAt = todo.status === 'completed' ? (todo.completedAt || now) : null;
-        
-        const stmt = this.db!.prepare(
-          `INSERT INTO todos (title, content, status, priority, tags, imageUrl, images, startTime, deadline, displayOrder, displayOrders, contentHash, keywords, completedAt, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        );
-        
-        const result = stmt.run(
-          todo.title,
-          todo.content || '',
-          todo.status,
-          todo.priority,
-          todo.tags || '',
-          todo.imageUrl || null,
-          todo.images || '',
-          todo.startTime || null,
-          todo.deadline || null,
-          todo.displayOrder !== undefined ? todo.displayOrder : null,
-          displayOrdersJSON,
-          contentHash,
-          keywordsJSON,
-          completedAt,
-          now,
-          now
-        );
+
+        // 检查 displayOrders 列是否存在
+        const tableInfo = this.db!.pragma('table_info(todos)') as any[];
+        const hasDisplayOrders = tableInfo.some((col: any) => col.name === 'displayOrders');
+
+        let result: Database.RunResult;
+
+        if (hasDisplayOrders) {
+          // 处理 displayOrders
+          const displayOrdersJSON = todo.displayOrders ? JSON.stringify(todo.displayOrders) : '{}';
+
+          const stmt = this.db!.prepare(
+            `INSERT INTO todos (title, content, status, priority, tags, imageUrl, images, startTime, deadline, displayOrder, displayOrders, contentHash, keywords, completedAt, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          );
+
+          result = stmt.run(
+            todo.title,
+            todo.content || '',
+            todo.status,
+            todo.priority,
+            todo.tags || '',
+            todo.imageUrl || null,
+            todo.images || '',
+            todo.startTime || null,
+            todo.deadline || null,
+            todo.displayOrder !== undefined ? todo.displayOrder : null,
+            displayOrdersJSON,
+            contentHash,
+            keywordsJSON,
+            completedAt,
+            now,
+            now
+          );
+        } else {
+          // 兼容模式：不包含 displayOrders 列
+          const stmt = this.db!.prepare(
+            `INSERT INTO todos (title, content, status, priority, tags, imageUrl, images, startTime, deadline, displayOrder, contentHash, keywords, completedAt, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          );
+
+          result = stmt.run(
+            todo.title,
+            todo.content || '',
+            todo.status,
+            todo.priority,
+            todo.tags || '',
+            todo.imageUrl || null,
+            todo.images || '',
+            todo.startTime || null,
+            todo.deadline || null,
+            todo.displayOrder !== undefined ? todo.displayOrder : null,
+            contentHash,
+            keywordsJSON,
+            completedAt,
+            now,
+            now
+          );
+        }
 
         const newTodo = this.db!.prepare('SELECT * FROM todos WHERE id = ?').get(result.lastInsertRowid) as any;
         resolve(this.parseTodo(newTodo));
