@@ -27,11 +27,28 @@ class Application {
 
   private async checkNativeModuleCompatibility(): Promise<void> {
     try {
-      console.log('Checking native module compatibility...');
-      console.log(`  Node.js: ${process.version}`);
-      console.log(`  Node.js ABI: ${process.versions.modules}`);
-      console.log(`  Electron: ${process.versions.electron || 'Unknown'}`);
-      console.log(`  Platform: ${process.platform}-${process.arch}`);
+      console.log('=== MultiTodo Startup Diagnostics ===');
+      console.log(`Platform: ${process.platform} ${process.arch}`);
+      console.log(`Electron: ${process.versions.electron || 'Unknown'}`);
+      console.log(`Node.js: ${process.version} (ABI ${process.versions.modules})`);
+      console.log(`Packaged: ${app.isPackaged}`);
+      console.log(`App Path: ${app.getAppPath()}`);
+
+      // macOS 特定检查
+      if (process.platform === 'darwin' && app.isPackaged) {
+        console.log('=== macOS Environment Check ===');
+        try {
+          const { execSync } = require('child_process');
+          const signatureInfo = execSync('codesign -dv --verbose=4 2>&1 || true', {
+            cwd: app.getAppPath(),
+            encoding: 'utf8'
+          });
+          console.log('Code signature info:');
+          console.log(signatureInfo);
+        } catch (error) {
+          console.warn('Could not verify code signature (expected for ad-hoc signing)');
+        }
+      }
 
       // 检查 better-sqlite3 是否可加载
       const Database = require('better-sqlite3');
@@ -1019,6 +1036,17 @@ class Application {
 
   public async initialize(): Promise<void> {
     try {
+      // 添加全局错误处理
+      process.on('uncaughtException', (error) => {
+        console.error('Uncaught Exception:', error);
+        if (process.platform === 'darwin' && app.isPackaged) {
+          dialog.showErrorBox(
+            'MultiTodo 意外错误',
+            `应用发生未捕获的异常：\n\n${error.message}\n\n请检查控制台日志或报告此问题。`
+          );
+        }
+      });
+
       // 硬件加速控制
       // 在 macOS 上默认启用硬件加速以获得更好的性能
       // 在其他平台上可以通过环境变量 MULTI_TODO_DISABLE_HW_ACC=1 禁用
@@ -1114,7 +1142,22 @@ class Application {
       console.log('Global shortcuts registered successfully');
 
     } catch (error) {
-      console.error('Error during initialization:', error);
+      console.error('Application initialization failed:', error);
+
+      // macOS 特定的用户友好错误提示
+      if (process.platform === 'darwin' && app.isPackaged) {
+        dialog.showErrorBox(
+          'MultiTodo 启动失败',
+          '应用启动失败。可能的原因：\n\n' +
+          '1. 原生模块加载失败（架构不匹配）\n' +
+          '2. 应用文件损坏\n\n' +
+          '解决方案：\n' +
+          '• 重新下载安装包\n' +
+          '• 如果问题持续，请报告此问题\n\n' +
+          `错误详情：\n${(error as Error).message}`
+        );
+      }
+
       throw error;
     }
 
