@@ -81,7 +81,6 @@ export class DatabaseManager {
       `CREATE INDEX IF NOT EXISTS idx_todos_status ON todos(status)`,
       `CREATE INDEX IF NOT EXISTS idx_todos_created_at ON todos(createdAt)`,
       `CREATE INDEX IF NOT EXISTS idx_todos_priority ON todos(priority)`,
-      `CREATE INDEX IF NOT EXISTS idx_todos_completed_at ON todos(completedAt)`,
       
       `CREATE TABLE IF NOT EXISTS notes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -231,6 +230,15 @@ export class DatabaseManager {
         // 为现有已完成的待办，使用 updatedAt 作为 completedAt 的初始值（数据迁移）
         this.db!.prepare('UPDATE todos SET completedAt = updatedAt WHERE status = "completed"').run();
         console.log('completedAt column added successfully');
+
+        // 为 completedAt 列创建索引以优化查询性能
+        try {
+          this.db!.prepare('CREATE INDEX IF NOT EXISTS idx_todos_completed_at ON todos(completedAt)').run();
+          console.log('completedAt index created successfully');
+        } catch (indexError) {
+          console.warn('Failed to create completedAt index:', indexError);
+          // 不阻塞迁移流程，索引创建失败不是致命错误
+        }
       }
       
       // 迁移 displayOrders
