@@ -65,6 +65,8 @@ This is an Electron desktop application with a React frontend for task managemen
 
 #### Main Process Services (`src/main/`)
 - `DatabaseManager.ts` (`src/main/database/`): SQLite database operations using better-sqlite3 with automatic migrations, indexing, and batch operations
+- `FlowchartRepository.ts` (`src/main/database/`): Flowchart CRUD operations with incremental patch saving, node/edge persistence
+- `FlowchartTodoAssociationRepository.ts` (`src/main/database/`): Manages many-to-many relationships between flowcharts and todos
 - `AIService.ts` (`src/main/services/`): Multi-provider AI integration for keyword extraction and smart recommendations (Kimi, DeepSeek, Doubao, custom)
 - `KeywordExtractor.ts` (`src/main/services/`): Chinese text segmentation and keyword processing using `segment` library
 - `ImageManager.ts` (`src/main/utils/`): Image handling, validation, and base64 conversion with file path sanitization
@@ -83,6 +85,14 @@ This is an Electron desktop application with a React frontend for task managemen
 - `SettingsModal.tsx`: App configuration, AI provider setup, and theme management
 - `CustomTabManager.tsx`: Multi-tab interface with independent state per tab
 - `Toolbar.tsx`: Global controls for search, view modes, and bulk operations
+- **Flowchart Components** (`src/renderer/components/flowchart/`): React Flow-based visual workflow editor
+  - `FlowchartDrawer.tsx`: Main flowchart editor with drag-and-drop, zoom/pan, and node customization
+  - `FlowchartPreview.tsx`: Read-only flowchart viewer for embedded previews
+  - `EditableNode.tsx`: Custom node component with inline editing and styling
+  - `EdgeLabelEditor.tsx`: Edge label editing with rich text support
+  - `EdgeStylePanel.tsx`: Edge style customization (stroke, width, markers, animation)
+  - `CircleNode.tsx`, `DiamondNode.tsx`: Specialized shape nodes for decision trees
+  - `ErrorBoundary.tsx`: Error handling for flowchart rendering
 
 ### Key Technical Details
 
@@ -102,6 +112,26 @@ todo_relations: {
 
 notes: Separate notes system for work reflections
 settings: Key-value configuration storage
+
+flowcharts: {
+  id, name, description, viewport,
+  created_at, updated_at
+}
+
+flowchart_nodes: {
+  id, flowchart_id, type, position, data,
+  created_at, updated_at
+}
+
+flowchart_edges: {
+  id, flowchart_id, source, target,
+  source_handle, target_handle, type, label,
+  style, connection_hash, created_at, updated_at
+}
+
+flowchart_todo_associations: {
+  id, flowchart_id, todo_id, created_at
+}
 ```
 
 #### Performance Optimizations
@@ -183,6 +213,68 @@ settings: Key-value configuration storage
 - **Custom components**: Add to `src/renderer/components/` and follow the memoization patterns using `React.memo`
 - **Database migrations**: Add new migration functions to `DatabaseManager.ts` following the existing version pattern
 - **IPC channels**: Add new handlers to `preload.ts` and corresponding main process handlers with consistent naming
+- **Flowchart node types**: Add custom node types in `src/shared/types.ts` (NodeType) and create corresponding components in `src/renderer/components/flowchart/`
+- **Flowchart edge styles**: Extend edge style options in `EdgeStyle` interface and update `EdgeStylePanel.tsx` UI
+
+## Flowchart System Architecture
+
+The flowchart system is a sophisticated visual workflow editor built on React Flow, enabling users to create diagrams with todo integration.
+
+### Core Concepts
+
+**Three-Layer Architecture**:
+1. **Persistence Layer** (Database): Raw data storage in SQLite tables (flowcharts, flowchart_nodes, flowchart_edges)
+2. **Runtime Layer** (React Flow State): Interactive nodes/edges with React Flow's internal state management
+3. **Presentation Layer** (Components): Custom node components with styling and editing capabilities
+
+### Data Flow Patterns
+
+**Incremental Patch Saving**:
+- Flowcharts use an incremental save model to avoid full re-renders
+- Only changed nodes/edges are saved to database via `FlowchartRepository.savePatches()`
+- Each patch includes: `{ id, type, action: 'upsert' | 'delete', data }`
+- Connection hash prevents duplicate edge creation
+
+**Todo Integration**:
+- Todo nodes can link to actual todos via `flowchart_todo_associations` table
+- Todo nodes dynamically load todo data on render (title, status, priority)
+- Multiple nodes can reference the same todo (many-to-many relationship)
+- Bidirectional linking: todos show associated flowcharts in their detail view
+
+**Node Position Management**:
+- Grid-based positioning (250px spacing) prevents overlap on creation
+- `findSafePosition()` algorithm ensures nodes don't overlap existing nodes
+- Viewport state (x, y, zoom) persisted separately for each flowchart
+
+### Flowchart Component Patterns
+
+**Custom Node Types**:
+- `rectangle` - Standard rectangular nodes
+- `rounded-rectangle` - Rounded corners for UI elements
+- `diamond` - Decision tree nodes
+- `circle` - Connector/terminator nodes
+- `todo` - Special nodes linked to todo items
+- `text` - Simple text labels
+
+**Edge Styling System**:
+- Stroke color, width (thin/medium/thick), dash patterns
+- Animated edges (flowing dashed lines)
+- Custom markers (arrow, arrowclosed, none)
+- Label styling with background and padding
+
+**Performance Optimizations**:
+- React Flow's built-in virtualization for large diagrams
+- Debounced auto-save (500ms) to reduce database writes
+- Incremental patch updates minimize database traffic
+- Memoized node components with `React.memo`
+
+### Important Implementation Notes
+
+- **Connection Hash**: Edges use a hash of (source, target, sourceHandle, targetHandle) to prevent duplicates
+- **Position Persistence**: Node positions stored as JSON strings in database (`{x, y}`)
+- **Viewport Persistence**: Zoom level and pan position saved per flowchart
+- **Todo Node Sync**: Todo nodes automatically update when linked todo changes status/priority
+- **Error Handling**: `ErrorBoundary` component catches React Flow rendering errors
 
 ## Important Development Considerations
 
@@ -212,8 +304,11 @@ src/
 ├── renderer/
 │   ├── App.tsx                 # Root component with tab management
 │   ├── components/             # React components with memoization
+│   │   └── flowchart/          # Flowchart editor components (React Flow)
 │   ├── hooks/
-│   │   └── useThemeColors.ts   # Theme management
+│   │   ├── useThemeColors.ts   # Theme management
+│   │   ├── useFlowchartData.ts # Flowchart state management
+│   │   └── useAppState.ts      # Global app state hooks
 │   ├── theme/
 │   │   └── themes.ts           # Theme definitions and CSS variables
 │   └── utils/
@@ -221,7 +316,7 @@ src/
 │       ├── reportGenerator.ts  # Report generation logic
 │       └── sortWithGroups.ts   # Grouping and sorting algorithms
 └── shared/
-    └── types.ts                # Shared TypeScript interfaces
+    └── types.ts                # Shared TypeScript interfaces (includes flowchart types)
 ```
 
 ### Data Handling Patterns
@@ -230,6 +325,8 @@ src/
 - Task relationships support complex dependency graphs with circular reference detection
 - Search functionality works across titles, content, and metadata with title matching priority
 - Content hash includes title + content + timestamp for SHA256-based duplicate detection
+- Flowchart data stored as JSON in database with incremental patch updates for performance
+- Todo nodes in flowcharts reference todos via many-to-many association table
 
 ### Performance Considerations
 - All database operations use the main process through IPC to maintain data consistency
