@@ -59,6 +59,20 @@ export interface TodoRelation {
   created_at: string;
 }
 
+// 树形节点类型（用于待办关系树）
+export interface TodoTreeNode {
+  key: string;
+  title: string;  // 待办标题
+  todo: Todo;
+  children?: TodoTreeNode[];
+}
+
+// 树形关系数据
+export interface TreeRelationData {
+  roots: TodoTreeNode[];
+  relations: TodoRelation[];
+}
+
 export interface Note {
   id?: number;
   title: string;

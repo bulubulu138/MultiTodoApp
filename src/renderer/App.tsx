@@ -6,6 +6,7 @@ import { VerticalAlignTopOutlined } from '@ant-design/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import TodoList from './components/TodoList';
 import TodoForm from './components/TodoForm';
+import TodoPositionSelector, { PositionSelection } from './components/TodoPositionSelector';
 import Toolbar, { SortOption, ViewMode } from './components/Toolbar';
 import SettingsModal from './components/SettingsModal';
 import ExportModal from './components/ExportModal';
@@ -67,6 +68,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const [showHotkeyGuide, setShowHotkeyGuide] = useState(false);
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearchText, setDebouncedSearchText] = useState<string>('');
+  const [showPositionSelector, setShowPositionSelector] = useState(false);
+  const [pendingPosition, setPendingPosition] = useState<PositionSelection | null>(null);
   
   // 分页状态管理
   const [displayCount, setDisplayCount] = useState<number>(50); // 初始显示50条
@@ -488,13 +491,33 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       }
 
       const newTodo = await window.electronAPI.todo.create(finalTodoData);
-      
+
+      // 处理位置选择器中选择的关系
+      let relationsToCreate = pendingRelations ? [...pendingRelations] : [];
+
+      if (pendingPosition && pendingPosition.mode !== 'root' && pendingPosition.targetTodoId) {
+        // 将位置选择转换为关系
+        if (pendingPosition.mode === 'extends') {
+          relationsToCreate.push({
+            targetId: pendingPosition.targetTodoId,
+            relationType: 'extends'
+          });
+        } else if (pendingPosition.mode === 'parallel') {
+          relationsToCreate.push({
+            targetId: pendingPosition.targetTodoId,
+            relationType: 'parallel'
+          });
+        }
+        // 清除待处理的位置
+        setPendingPosition(null);
+      }
+
       // 如果有待创建的关系，创建它们
-      if (pendingRelations && pendingRelations.length > 0 && newTodo.id) {
+      if (relationsToCreate.length > 0 && newTodo.id) {
         let successCount = 0;
         let failedRelations: string[] = [];
-        
-        for (const relation of pendingRelations) {
+
+        for (const relation of relationsToCreate) {
           try {
             // 修复：使用下划线命名（与数据库期望的格式一致）
             await window.electronAPI.relations.create({
@@ -515,12 +538,12 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
             // 继续创建其他关系，不中断流程
           }
         }
-        
-        if (successCount === pendingRelations.length) {
+
+        if (successCount === relationsToCreate.length) {
           message.success(`待办事项创建成功，已建立 ${successCount} 个关系`);
         } else if (successCount > 0) {
           message.warning(`待办事项创建成功，${successCount} 个关系成功，${failedRelations.length} 个失败（${failedRelations.join('、')}）`);
-        } else if (successCount === 0 && pendingRelations.length > 0) {
+        } else if (successCount === 0 && relationsToCreate.length > 0) {
           message.error(`待办事项创建成功，但所有关系创建失败（${failedRelations.join('、')}）`);
         }
       } else {
@@ -663,6 +686,18 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const handleEditTodo = (todo: Todo) => {
     setEditingTodo(todo);
     setShowForm(true);
+  };
+
+  // 处理位置选择
+  const handlePositionSelect = (selection: PositionSelection) => {
+    setPendingPosition(selection);
+    setShowPositionSelector(false);
+    // 打开表单
+    setShowForm(true);
+  };
+
+  const handleClosePositionSelector = () => {
+    setShowPositionSelector(false);
   };
 
   const handleCloseForm = () => {
@@ -1125,7 +1160,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   return (
     <Layout style={{ height: '100vh' }} data-theme={themeMode}>
         <Toolbar
-          onAddTodo={() => setShowForm(true)}
+          onAddTodo={() => setShowPositionSelector(true)}
         onShowSettings={() => setShowSettings(true)}
         onShowExport={() => setShowExport(true)}
         onShowNotes={() => setShowNotes(true)}
@@ -1202,6 +1237,15 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
           </AnimatePresence>
         </div>
       </Content>
+
+      {showPositionSelector && (
+        <TodoPositionSelector
+          visible={showPositionSelector}
+          todos={todos}
+          onClose={handleClosePositionSelector}
+          onConfirm={handlePositionSelect}
+        />
+      )}
 
       {showForm && (
         <TodoForm

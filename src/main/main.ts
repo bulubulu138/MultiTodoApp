@@ -558,6 +558,10 @@ class Application {
       return await this.dbManager.relationExists(sourceId, targetId, relationType);
     });
 
+    ipcMain.handle('relations:buildTree', async () => {
+      return await this.dbManager.buildTree();
+    });
+
     // Notes CRUD
     ipcMain.handle('notes:getAll', async () => {
       return await this.dbManager.getAllNotes();

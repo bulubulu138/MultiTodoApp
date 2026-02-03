@@ -1192,17 +1192,65 @@ export class DatabaseManager {
     if (!keywords1 || !keywords2 || keywords1.length === 0 || keywords2.length === 0) {
       return 0;
     }
-    
+
     const set1 = new Set(keywords1);
     const set2 = new Set(keywords2);
-    
+
     // 交集
     const intersection = new Set([...set1].filter(x => set2.has(x)));
-    
+
     // 并集
     const union = new Set([...set1, ...set2]);
-    
+
     return intersection.size / union.size;
+  }
+
+  // 构建树形结构（用于前端位置选择器）
+  public async buildTree(): Promise<{ roots: any[]; relations: TodoRelation[] }> {
+    try {
+      // 1. 获取所有待办
+      const todos = await this.getAllTodos();
+
+      // 2. 获取所有关系
+      const relations = await this.getAllRelations();
+
+      // 3. 构建 parent-child 映射（基于 extends 和 background 关系）
+      // extends: A extends B => B 是父节点，A 是子节点
+      // background: A background B => B 是父节点（背景），A 是子节点
+      const childToParent = new Map<number, number>();
+      relations.forEach(rel => {
+        if (rel.relation_type === 'extends' || rel.relation_type === 'background') {
+          // target 是 source 的父节点
+          childToParent.set(rel.source_id, rel.target_id);
+        }
+      });
+
+      // 4. 找到根节点（没有父节点的待办）
+      const rootTodos = todos.filter(t => !childToParent.has(t.id!));
+
+      // 5. 递归构建子树
+      const buildSubTree = (parentId: number): any[] => {
+        const children = todos.filter(t => childToParent.get(t.id!) === parentId);
+        return children.map(todo => ({
+          key: String(todo.id),
+          title: todo.title,
+          todo,
+          children: buildSubTree(todo.id!)
+        }));
+      };
+
+      const roots = rootTodos.map(todo => ({
+        key: String(todo.id),
+        title: todo.title,
+        todo,
+        children: buildSubTree(todo.id!)
+      }));
+
+      return { roots, relations };
+    } catch (error) {
+      console.error('Error building tree:', error);
+      throw error;
+    }
   }
 
   public close(): void {

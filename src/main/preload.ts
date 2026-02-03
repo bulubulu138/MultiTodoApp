@@ -59,6 +59,7 @@ export interface ElectronAPI {
     deleteByTodoId: (todoId: number) => Promise<void>;
     deleteSpecific: (sourceId: number, targetId: number, relationType: string) => Promise<void>;
     exists: (sourceId: number, targetId: number, relationType: string) => Promise<boolean>;
+    buildTree: () => Promise<{roots: any[]; relations: any[]}>;
   };
   
   // 心得API
@@ -164,10 +165,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     create: (relation: any) => ipcRenderer.invoke('relations:create', relation),
     delete: (id: number) => ipcRenderer.invoke('relations:delete', id),
     deleteByTodoId: (todoId: number) => ipcRenderer.invoke('relations:deleteByTodoId', todoId),
-    deleteSpecific: (sourceId: number, targetId: number, relationType: string) => 
+    deleteSpecific: (sourceId: number, targetId: number, relationType: string) =>
       ipcRenderer.invoke('relations:deleteSpecific', sourceId, targetId, relationType),
-    exists: (sourceId: number, targetId: number, relationType: string) => 
+    exists: (sourceId: number, targetId: number, relationType: string) =>
       ipcRenderer.invoke('relations:exists', sourceId, targetId, relationType),
+    buildTree: () => ipcRenderer.invoke('relations:buildTree'),
   },
   notes: {
     getAll: () => ipcRenderer.invoke('notes:getAll'),
