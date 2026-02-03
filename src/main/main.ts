@@ -960,16 +960,26 @@ class Application {
         if (!db) {
           throw new Error('Database not initialized');
         }
-        
+
         const repo = new FlowchartRepository(db);
         const flowchart = repo.load(flowchartId);
-        
+
         if (!flowchart) {
           return null;
         }
-        
-        console.log(`[Flowchart] Loaded flowchart: ${flowchartId}`);
-        return flowchart;
+
+        // 修复：将嵌套的 schema 结构转换为扁平化结构，与渲染器期望的 FlowchartData 接口匹配
+        console.log(`[Flowchart] Loaded flowchart: ${flowchartId}, nodes: ${flowchart.nodes.length}, edges: ${flowchart.edges.length}`);
+        return {
+          id: flowchart.schema.id,
+          name: flowchart.schema.name,
+          description: flowchart.schema.description,
+          viewport: flowchart.schema.viewport,
+          createdAt: flowchart.schema.createdAt,
+          updatedAt: flowchart.schema.updatedAt,
+          nodes: flowchart.nodes,
+          edges: flowchart.edges
+        };
       } catch (error) {
         console.error('Error loading flowchart:', error);
         throw error;
