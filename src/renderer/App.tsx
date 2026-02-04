@@ -1288,6 +1288,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         }}
         onEdit={handleEditFromView}
         onOpenFlowchart={handleNavigateToFlowchart}
+        onRelationsChange={loadRelations}
       />
 
       <NotesDrawer

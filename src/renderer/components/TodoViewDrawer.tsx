@@ -1,8 +1,9 @@
 import { Todo, TodoRelation, FlowchartAssociationDisplay } from '../../shared/types';
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message, Image, Card, Empty, Spin } from 'antd';
-import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined, NodeIndexOutlined, FileTextOutlined } from '@ant-design/icons';
+import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined, NodeIndexOutlined, FileTextOutlined, LinkOutlined } from '@ant-design/icons';
 import RelationContext from './RelationContext';
+import RelationsModal from './RelationsModal';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useFlowchartAssociations } from '../hooks/useFlowchartAssociations';
@@ -18,6 +19,7 @@ interface TodoViewDrawerProps {
   onClose: () => void;
   onEdit: (todo: Todo) => void;
   onOpenFlowchart?: (flowchartId: string, nodeId?: string) => void; // 修改：nodeId改为可选
+  onRelationsChange?: () => Promise<void>; // 新增
 }
 
 const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
@@ -27,11 +29,13 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   relations,
   onClose,
   onEdit,
-  onOpenFlowchart // 新增
+  onOpenFlowchart, // 新增
+  onRelationsChange // 新增
 }) => {
   const colors = useThemeColors();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState('');
+  const [showRelationsModal, setShowRelationsModal] = useState(false); // 新增
 
   // 流程图级别关联状态
   const [flowchartLevelAssociations, setFlowchartLevelAssociations] = useState<FlowchartAssociationDisplay[]>([]);
@@ -212,6 +216,19 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
       }
     }
   }, []);
+
+  // 新增：处理编辑关联关系
+  const handleEditRelations = useCallback(() => {
+    if (!todo) return;
+    setShowRelationsModal(true);
+  }, [todo]);
+
+  // 新增：处理抽屉关闭时重置模态框状态
+  useEffect(() => {
+    if (!visible) {
+      setShowRelationsModal(false);
+    }
+  }, [visible]);
 
   // 根据文件扩展名获取对应的图标（移到组件外部，避免循环依赖）
   const getFileIcon = (filePath: string): string => {
@@ -625,12 +642,28 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
 
         {/* 右侧：关系上下文 */}
         {showRelationContext && (
-          <div style={{ 
-            flex: 1, 
-            borderLeft: `1px solid ${colors.borderColor}`, 
-            paddingLeft: 16 
+          <div style={{
+            flex: 1,
+            borderLeft: `1px solid ${colors.borderColor}`,
+            paddingLeft: 16
           }}>
-            <Title level={5}>关联上下文</Title>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 16
+            }}>
+              <Title level={5} style={{ margin: 0 }}>关联上下文</Title>
+              <Button
+                type="text"
+                icon={<LinkOutlined />}
+                onClick={handleEditRelations}
+                size="small"
+                style={{ padding: '0 4px' }}
+              >
+                编辑
+              </Button>
+            </div>
             <RelationContext
               currentTodo={todo}
               allTodos={allTodos}
@@ -660,6 +693,15 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
             </Space>
           ),
         }}
+      />
+
+      {/* 关联关系编辑模态框 */}
+      <RelationsModal
+        visible={showRelationsModal}
+        todo={todo}
+        todos={allTodos}
+        onClose={() => setShowRelationsModal(false)}
+        onRelationsChange={onRelationsChange}
       />
     </Drawer>
   );
