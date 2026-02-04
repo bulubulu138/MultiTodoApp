@@ -64,15 +64,15 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
 
       // 处理关系方向和类型
       if (newRelationType === 'extends') {
-        // 当前todo extends targetTodo
-        // 含义：当前todo 扩展自 targetTodo，targetTodo 是基础
+        // 当前todo extends targetTodo（子待办关系）
+        // 含义：当前todo是targetTodo的子待办
         // 存储：source=当前todo, target=targetTodo, type='extends'
         sourceId = todo.id!;
         targetId = targetTodo.id!;
         relationType = 'extends';
       } else if (newRelationType === 'background') {
-        // targetTodo background 当前todo
-        // 含义：targetTodo 是当前todo的背景，当前todo 需要 targetTodo 提供上下文
+        // targetTodo background 当前todo（父待办关系）
+        // 含义：targetTodo是当前todo的父待办
         // 存储：source=targetTodo, target=当前todo, type='background'
         sourceId = targetTodo.id!;
         targetId = todo.id!;
@@ -194,8 +194,8 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
 
   const getRelationTypeText = (type: string) => {
     switch (type) {
-      case 'extends': return '延伸';
-      case 'background': return '背景';
+      case 'extends': return '子待办';
+      case 'background': return '父待办';
       case 'parallel': return '并列';
       default: return type;
     }
@@ -298,8 +298,8 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
               onChange={setNewRelationType}
               style={{ width: 120 }}
             >
-              <Option value="background">背景</Option>
-              <Option value="extends">延伸</Option>
+              <Option value="background">父待办</Option>
+              <Option value="extends">子待办</Option>
               <Option value="parallel">并列</Option>
             </Select>
             <Select

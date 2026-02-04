@@ -489,8 +489,8 @@ const TodoForm: React.FC<TodoFormProps> = ({
                     onChange={setSelectedRelationType}
                     style={{ width: '30%' }}
                   >
-                    <Option value="extends">延伸</Option>
-                    <Option value="background">背景</Option>
+                    <Option value="extends">子待办</Option>
+                    <Option value="background">父待办</Option>
                     <Option value="parallel">并列</Option>
                   </Select>
                   
@@ -504,8 +504,8 @@ const TodoForm: React.FC<TodoFormProps> = ({
                           handleAddPendingRelation(selectedTodoId, selectedRelationType);
                           
                           const typeNames: Record<string, string> = {
-                            extends: '延伸',
-                            background: '背景',
+                            extends: '子待办',
+                            background: '父待办',
                             parallel: '并列'
                           };
                           message.success(
@@ -580,7 +580,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
                               }
                             }}
                           >
-                            {hasPendingRelation('extends') ? '已选延伸' : '延伸'}
+                            {hasPendingRelation('extends') ? '已选子待办' : '子待办'}
                           </Button>
                           <Button
                             size="small"
@@ -593,7 +593,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
                               }
                             }}
                           >
-                            {hasPendingRelation('background') ? '已选背景' : '背景'}
+                            {hasPendingRelation('background') ? '已选父待办' : '父待办'}
                           </Button>
                           <Button
                             size="small"
@@ -634,8 +634,8 @@ const TodoForm: React.FC<TodoFormProps> = ({
                     if (!targetTodo) return null;
                     
                     const relationTypeMap = {
-                      extends: { label: '延伸', color: 'blue' },
-                      background: { label: '背景', color: 'green' },
+                      extends: { label: '子待办', color: 'blue' },
+                      background: { label: '父待办', color: 'green' },
                       parallel: { label: '并列', color: 'orange' }
                     };
                     const relInfo = relationTypeMap[rel.relationType as keyof typeof relationTypeMap];
@@ -668,8 +668,8 @@ const TodoForm: React.FC<TodoFormProps> = ({
                               handleAddPendingRelation(rel.targetId, newType);
                             }}
                             options={[
-                              { label: '延伸', value: 'extends' },
-                              { label: '背景', value: 'background' },
+                              { label: '子待办', value: 'extends' },
+                              { label: '父待办', value: 'background' },
                               { label: '并列', value: 'parallel' }
                             ]}
                           />

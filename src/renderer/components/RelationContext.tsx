@@ -158,7 +158,7 @@ const RelationContext: React.FC<RelationContextProps> = ({
   compact = false
 }) => {
   const colors = useThemeColors();
-  // 查找所有背景事项（递归）
+  // 查找所有父待办（递归）
   const backgrounds = useMemo(() => {
     const result: Todo[] = [];
     const visited = new Set<number>();
@@ -191,7 +191,7 @@ const RelationContext: React.FC<RelationContextProps> = ({
     );
   }, [currentTodo.id, relations, allTodos]);
 
-  // 查找背景的延续（背景的其他延伸，即兄弟任务）
+  // 查找兄弟待办
   const backgroundExtensions = useMemo(() => {
     const result: Todo[] = [];
     const visited = new Set<number>();
@@ -217,13 +217,13 @@ const RelationContext: React.FC<RelationContextProps> = ({
     );
   }, [backgrounds, relations, allTodos, currentTodo.id]);
 
-  // 查找延伸事项（以当前待办为背景的事项）
+  // 查找子待办（以当前待办为父待办的事项）
   const extensions = useMemo(() => {
     const result: Todo[] = [];
-    
-    // 查找所有以当前待办为 source 的 background 关系
+
+    // 查找所有以当前待办为 source 的 extends 关系
     const extensionRels = relations.filter(
-      r => r.source_id === currentTodo.id && r.relation_type === 'background'
+      r => r.source_id === currentTodo.id && r.relation_type === 'extends'
     );
     
     extensionRels.forEach(rel => {
@@ -288,7 +288,7 @@ const RelationContext: React.FC<RelationContextProps> = ({
           items={[
             {
               key: 'backgrounds',
-              label: `📋 背景事项 (${backgrounds.length})`,
+              label: `📋 父待办 (${backgrounds.length})`,
               children: backgrounds.map(todo => (
                 <TodoContextCard
                   key={todo.id}
@@ -311,7 +311,7 @@ const RelationContext: React.FC<RelationContextProps> = ({
           items={[
             {
               key: 'backgroundExtensions',
-              label: `📝 背景的延续 (${backgroundExtensions.length})`,
+              label: `📝 兄弟待办 (${backgroundExtensions.length})`,
               children: backgroundExtensions.map(todo => (
                 <TodoContextCard
                   key={todo.id}
@@ -353,7 +353,7 @@ const RelationContext: React.FC<RelationContextProps> = ({
           items={[
             {
               key: 'extensions',
-              label: `📤 延伸事项 (${extensions.length})`,
+              label: `📤 子待办 (${extensions.length})`,
               children: extensions.map(todo => (
                 <TodoContextCard
                   key={todo.id}
