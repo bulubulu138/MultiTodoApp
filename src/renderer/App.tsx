@@ -470,8 +470,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   }, [activeTab, getCurrentTabSettings]);
 
   const handleCreateTodo = async (
-    todoData: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'>,
-    pendingRelations?: Array<{targetId: number; relationType: string}>
+    todoData: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'>
   ) => {
     try {
       // 获取当前tab的排序设置
@@ -493,63 +492,27 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       const newTodo = await window.electronAPI.todo.create(finalTodoData);
 
       // 处理位置选择器中选择的关系
-      let relationsToCreate = pendingRelations ? [...pendingRelations] : [];
-
       if (pendingPosition && pendingPosition.mode !== 'root' && pendingPosition.targetTodoId) {
-        // 将位置选择转换为关系
-        if (pendingPosition.mode === 'extends') {
-          relationsToCreate.push({
-            targetId: pendingPosition.targetTodoId,
-            relationType: 'extends'
+        const relationType = pendingPosition.mode === 'extends' ? 'extends' : 'parallel';
+
+        try {
+          await window.electronAPI.relations.create({
+            source_id: newTodo.id,
+            target_id: pendingPosition.targetTodoId,
+            relation_type: relationType
           });
-        } else if (pendingPosition.mode === 'parallel') {
-          relationsToCreate.push({
-            targetId: pendingPosition.targetTodoId,
-            relationType: 'parallel'
-          });
+          message.success('待办事项创建成功，关联关系已建立');
+        } catch (error) {
+          console.error('Failed to create relation:', error);
+          message.error('待办事项创建成功，但关联关系创建失败');
         }
+
         // 清除待处理的位置
         setPendingPosition(null);
-      }
-
-      // 如果有待创建的关系，创建它们
-      if (relationsToCreate.length > 0 && newTodo.id) {
-        let successCount = 0;
-        let failedRelations: string[] = [];
-
-        for (const relation of relationsToCreate) {
-          try {
-            // 修复：使用下划线命名（与数据库期望的格式一致）
-            await window.electronAPI.relations.create({
-              source_id: newTodo.id,
-              target_id: relation.targetId,
-              relation_type: relation.relationType
-            });
-            successCount++;
-          } catch (error) {
-            console.error('Failed to create relation:', error);
-            // 记录失败的关系类型
-            const relationTypeMap: {[key: string]: string} = {
-              'extends': '延伸',
-              'background': '背景',
-              'parallel': '并列'
-            };
-            failedRelations.push(relationTypeMap[relation.relationType] || relation.relationType);
-            // 继续创建其他关系，不中断流程
-          }
-        }
-
-        if (successCount === relationsToCreate.length) {
-          message.success(`待办事项创建成功，已建立 ${successCount} 个关系`);
-        } else if (successCount > 0) {
-          message.warning(`待办事项创建成功，${successCount} 个关系成功，${failedRelations.length} 个失败（${failedRelations.join('、')}）`);
-        } else if (successCount === 0 && relationsToCreate.length > 0) {
-          message.error(`待办事项创建成功，但所有关系创建失败（${failedRelations.join('、')}）`);
-        }
       } else {
         message.success('待办事项创建成功');
       }
-      
+
       // 重新加载所有待办，确保数据一致性（与更新操作保持一致）
       await loadTodos();
       // 同时刷新关联关系
@@ -1252,8 +1215,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
           visible={showForm}
           todo={editingTodo}
           quickCreateContent={quickCreateContent}
-          onSubmit={editingTodo ? 
-            (data, _pendingRelations) => handleUpdateTodo(editingTodo.id!, data) : 
+          onSubmit={editingTodo ?
+            (data) => handleUpdateTodo(editingTodo.id!, data) :
             handleCreateTodo
           }
           onCancel={handleCloseForm}
