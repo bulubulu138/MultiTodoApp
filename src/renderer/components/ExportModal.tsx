@@ -2,6 +2,7 @@ import { Todo } from '../../shared/types';
 import React, { useState } from 'react';
 import { Modal, Radio, Button, Space, App, Typography, Divider } from 'antd';
 import { DownloadOutlined, CopyOutlined } from '@ant-design/icons';
+import { processImagesInHtml } from '../utils/processImagesInHtml';
 
 const { Text, Paragraph } = Typography;
 
@@ -30,10 +31,13 @@ const ExportModal: React.FC<ExportModalProps> = ({
         const csvRows = [headers.join(',')];
         
         todos.forEach(todo => {
+          // 处理content中的图片，移除base64数据并添加图片数量标记
+          const processedContent = processImagesInHtml(todo.content || '');
+
           const row = [
             todo.id?.toString() || '',
             `"${todo.title.replace(/"/g, '""')}"`,
-            `"${todo.content.replace(/"/g, '""')}"`,
+            `"${processedContent.replace(/"/g, '""')}"`,
             todo.status,
             todo.priority,
             `"${todo.tags.replace(/"/g, '""')}"`,
@@ -59,7 +63,9 @@ const ExportModal: React.FC<ExportModalProps> = ({
           }
           
           if (todo.content) {
-            markdown += `**描述**:\n${todo.content}\n`;
+            // 处理content中的图片，移除base64数据并添加图片数量标记
+            const processedContent = processImagesInHtml(todo.content);
+            markdown += `**描述**:\n${processedContent}\n`;
           }
           
           markdown += `**创建时间**: ${new Date(todo.createdAt).toLocaleString()}\n`;
