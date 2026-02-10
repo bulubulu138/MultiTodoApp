@@ -1331,7 +1331,6 @@ body {
   align-items: center;
   margin-bottom: 8px;
   padding-bottom: 4px;
-  border-bottom: 1px solid var(--border-color);
 }
 
 /* 富文本编辑器容器 */
