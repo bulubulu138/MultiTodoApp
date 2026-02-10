@@ -972,15 +972,10 @@ class Application {
           return null;
         }
 
-        // 修复：将嵌套的 schema 结构转换为扁平化结构，与渲染器期望的 FlowchartData 接口匹配
+        // 保持嵌套结构，与数据库层和组件层的期望结构一致
         console.log(`[Flowchart] Loaded flowchart: ${flowchartId}, nodes: ${flowchart.nodes.length}, edges: ${flowchart.edges.length}`);
         return {
-          id: flowchart.schema.id,
-          name: flowchart.schema.name,
-          description: flowchart.schema.description,
-          viewport: flowchart.schema.viewport,
-          createdAt: flowchart.schema.createdAt,
-          updatedAt: flowchart.schema.updatedAt,
+          schema: flowchart.schema,
           nodes: flowchart.nodes,
           edges: flowchart.edges
         };
