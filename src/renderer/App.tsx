@@ -15,7 +15,6 @@ import NotesDrawer from './components/NotesDrawer';
 import CalendarDrawer from './components/CalendarDrawer';
 import { FlowchartDrawer } from './components/flowchart/FlowchartDrawer';
 import { FlowchartList } from './components/FlowchartList';
-import CustomTabManager from './components/CustomTabManager';
 import ContentFocusView, { ContentFocusViewRef } from './components/ContentFocusView';
 import { getTheme, ThemeMode } from './theme/themes';
 import { buildParallelGroups, selectGroupRepresentatives, sortWithGroups, getSortComparator } from './utils/sortWithGroups';
@@ -56,7 +55,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const [currentFlowchartId, setCurrentFlowchartId] = useState<string | null>(null);
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
   const [flowchartDrawerKey, setFlowchartDrawerKey] = useState(0);
-  const [showCustomTabManager, setShowCustomTabManager] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [viewingTodo, setViewingTodo] = useState<Todo | null>(null);
   const [settings, setSettings] = useState<Record<string, string>>({});
@@ -1129,7 +1127,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         onShowNotes={() => setShowNotes(true)}
         onShowCalendar={() => setShowCalendar(true)}
         onShowFlowchart={handleShowFlowchartList}
-        onShowCustomTabManager={() => setShowCustomTabManager(true)}
         sortOption={currentTabSettings.sortOption}
         onSortChange={handleSortChange}
         viewMode={currentTabSettings.viewMode}
@@ -1238,6 +1235,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         onSave={handleSettingsUpdate}
         onCancel={() => setShowSettings(false)}
         onReload={loadTodos}
+        customTabs={customTabs}
+        onSaveCustomTabs={handleSaveCustomTabs}
+        existingTags={existingTags}
       />
 
       <TodoViewDrawer
@@ -1275,14 +1275,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         message={message}
         flowchartId={currentFlowchartId}
         highlightedNodeId={highlightedNodeId}
-      />
-
-      <CustomTabManager
-        visible={showCustomTabManager}
-        onClose={() => setShowCustomTabManager(false)}
-        customTabs={customTabs}
-        onSave={handleSaveCustomTabs}
-        existingTags={existingTags}
       />
 
       {/* 回到顶部按钮 */}

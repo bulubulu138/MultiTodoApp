@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, Space, Select, Tooltip, Segmented, Input } from 'antd';
-import { PlusOutlined, SettingOutlined, ExportOutlined, BulbOutlined, CalendarOutlined, SortAscendingOutlined, TagsOutlined, UnorderedListOutlined, AlignLeftOutlined, SearchOutlined, ApartmentOutlined } from '@ant-design/icons';
+import { PlusOutlined, SettingOutlined, ExportOutlined, BulbOutlined, CalendarOutlined, SortAscendingOutlined, UnorderedListOutlined, AlignLeftOutlined, SearchOutlined, ApartmentOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 
 const { Option } = Select;
@@ -25,7 +25,6 @@ interface ToolbarProps {
   onShowExport: () => void;
   onShowNotes: () => void;
   onShowCalendar: () => void;
-  onShowCustomTabManager: () => void;
   onShowFlowchart: () => void;
   sortOption?: SortOption;
   onSortChange?: (option: SortOption) => void;
@@ -40,7 +39,6 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
   onAddTodo,
   onShowSettings,
   onShowExport,
-  onShowCustomTabManager,
   onShowNotes,
   onShowCalendar,
   onShowFlowchart,
@@ -139,17 +137,7 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
             <span className="btn-text">流程图</span>
           </Button>
         </Tooltip>
-        
-        <Tooltip title="管理Tab">
-          <Button
-            icon={<TagsOutlined />}
-            onClick={onShowCustomTabManager}
-            className="toolbar-btn-with-text"
-          >
-            <span className="btn-text">管理Tab</span>
-          </Button>
-        </Tooltip>
-        
+
         <Button
           type="primary"
           icon={<PlusOutlined />}

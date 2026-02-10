@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert } from 'antd';
 import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { App } from 'antd';
-import { Todo } from '../../shared/types';
+import { Todo, CustomTab } from '../../shared/types';
 import TagManagement from './TagManagement';
 import BackupSettings from './BackupSettings';
+import CustomTabManager from './CustomTabManager';
 
 const { Text } = Typography;
 
@@ -15,6 +16,9 @@ interface SettingsModalProps {
   onSave: (settings: Record<string, string>) => void;
   onCancel: () => void;
   onReload?: () => Promise<void>;
+  customTabs?: CustomTab[];
+  onSaveCustomTabs?: (tabs: CustomTab[]) => void;
+  existingTags?: string[];
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -23,7 +27,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   todos = [],
   onSave,
   onCancel,
-  onReload
+  onReload,
+  customTabs = [],
+  onSaveCustomTabs,
+  existingTags = []
 }) => {
   const [form] = Form.useForm();
   const [aiForm] = Form.useForm();
@@ -481,6 +488,27 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             </Space>
           </Card>
         </div>
+      ),
+    },
+    {
+      key: 'customTabs',
+      label: (
+        <span>
+          <TagOutlined />
+          自定义Tab
+        </span>
+      ),
+      children: (
+        <CustomTabManager
+          visible={visible && activeTab === 'customTabs'}
+          onClose={() => {}}
+          customTabs={customTabs}
+          onSave={(tabs) => {
+            onSaveCustomTabs?.(tabs);
+          }}
+          existingTags={existingTags}
+          embedded={true}
+        />
       ),
     },
     {

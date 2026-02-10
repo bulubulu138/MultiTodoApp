@@ -13,6 +13,7 @@ interface CustomTabManagerProps {
   customTabs: CustomTab[];
   onSave: (tabs: CustomTab[]) => void;
   existingTags: string[]; // 所有现有标签
+  embedded?: boolean; // 是否嵌入在其他Modal中（如SettingsModal）
 }
 
 const CustomTabManager: React.FC<CustomTabManagerProps> = ({
@@ -20,7 +21,8 @@ const CustomTabManager: React.FC<CustomTabManagerProps> = ({
   onClose,
   customTabs,
   onSave,
-  existingTags
+  existingTags,
+  embedded = false
 }) => {
   const { message } = App.useApp();
   const colors = useThemeColors();
@@ -38,7 +40,7 @@ const CustomTabManager: React.FC<CustomTabManagerProps> = ({
     form.validateFields().then(values => {
       // 处理tag：mode="tags"返回数组，需要转为字符串
       const tagValue = Array.isArray(values.tag) ? values.tag[0] : values.tag;
-      
+
       // 检查标签是否已存在
       if (tabs.some(t => t.tag === tagValue)) {
         message.warning(`标签"${tagValue}"已存在`);
@@ -89,9 +91,129 @@ const CustomTabManager: React.FC<CustomTabManagerProps> = ({
   const handleSave = () => {
     onSave(tabs);
     message.success('保存成功');
-    onClose();
+    if (!embedded) {
+      onClose();
+    }
   };
 
+  const content = (
+    <div>
+      <Text type="secondary" style={{ marginBottom: 12, fontSize: 13, display: 'block' }}>
+        💡 提示：创建自定义Tab后，所有包含对应标签的待办都会显示在该Tab中
+      </Text>
+
+      <Form form={form} layout="inline" style={{ marginBottom: 16 }}>
+        <Form.Item
+          name="label"
+          rules={[{ required: true, message: '请输入Tab名称' }]}
+          style={{ flex: 1, minWidth: 150 }}
+        >
+          <Input placeholder="Tab名称（如：Bug修复）" prefix={<TagsOutlined />} />
+        </Form.Item>
+
+        <Form.Item
+          name="tag"
+          rules={[{ required: true, message: '请选择或输入标签' }]}
+          style={{ flex: 1, minWidth: 150 }}
+        >
+          <Select
+            placeholder="选择或输入标签"
+            showSearch
+            allowClear
+            mode="tags"
+            maxCount={1}
+            options={existingTags.map(tag => ({ label: tag, value: tag }))}
+          />
+        </Form.Item>
+
+        <Form.Item>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+            添加
+          </Button>
+        </Form.Item>
+      </Form>
+
+      {tabs.length === 0 ? (
+        <Empty
+          description="还没有自定义Tab，添加一个吧！"
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+        />
+      ) : (
+        <List
+          size="small"
+          dataSource={tabs}
+          renderItem={(tab, index) => (
+            <List.Item
+              style={{
+                padding: '12px',
+                background: colors.cardBg,
+                marginBottom: 8,
+                borderRadius: 6,
+                border: `1px solid ${colors.borderColor}`
+              }}
+            >
+              <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                <Space>
+                  <DragOutlined style={{ color: '#8c8c8c', cursor: 'move' }} />
+                  <Tag color="blue">{tab.label}</Tag>
+                  <Tag color="orange">{tab.tag}</Tag>
+                </Space>
+
+                <Space size={4}>
+                  <Button
+                    type="text"
+                    size="small"
+                    onClick={() => handleMoveUp(index)}
+                    disabled={index === 0}
+                  >
+                    ↑
+                  </Button>
+                  <Button
+                    type="text"
+                    size="small"
+                    onClick={() => handleMoveDown(index)}
+                    disabled={index === tabs.length - 1}
+                  >
+                    ↓
+                  </Button>
+                  <Popconfirm
+                    title="确定删除此Tab吗？"
+                    onConfirm={() => handleDelete(tab.id)}
+                    okText="确定"
+                    cancelText="取消"
+                  >
+                    <Button
+                      type="text"
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                    />
+                  </Popconfirm>
+                </Space>
+              </Space>
+            </List.Item>
+          )}
+        />
+      )}
+    </div>
+  );
+
+  // 嵌入模式：直接返回内容，不包装Modal
+  if (embedded) {
+    return (
+      <div>
+        <div style={{ marginBottom: 16 }}>
+          <Space>
+            <TagsOutlined />
+            <span style={{ fontSize: 16, fontWeight: 500 }}>管理自定义标签Tab</span>
+          </Space>
+        </div>
+        {content}
+      </div>
+    );
+  }
+
+  // 独立模式：使用Modal包装
   return (
     <Modal
       title={
@@ -109,111 +231,12 @@ const CustomTabManager: React.FC<CustomTabManagerProps> = ({
         </Button>,
         <Button key="save" type="primary" onClick={handleSave}>
           保存
-        </Button>
+        </Button>,
       ]}
     >
-      <div style={{ marginBottom: 24 }}>
-        <Text type="secondary" style={{ marginBottom: 12, fontSize: 13, display: 'block' }}>
-          💡 提示：创建自定义Tab后，所有包含对应标签的待办都会显示在该Tab中
-        </Text>
-        
-        <Form form={form} layout="inline" style={{ marginBottom: 16 }}>
-          <Form.Item
-            name="label"
-            rules={[{ required: true, message: '请输入Tab名称' }]}
-            style={{ flex: 1, minWidth: 150 }}
-          >
-            <Input placeholder="Tab名称（如：Bug修复）" prefix={<TagsOutlined />} />
-          </Form.Item>
-          
-          <Form.Item
-            name="tag"
-            rules={[{ required: true, message: '请选择或输入标签' }]}
-            style={{ flex: 1, minWidth: 150 }}
-          >
-            <Select
-              placeholder="选择或输入标签"
-              showSearch
-              allowClear
-              mode="tags"
-              maxCount={1}
-              options={existingTags.map(tag => ({ label: tag, value: tag }))}
-            />
-          </Form.Item>
-          
-          <Form.Item>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-              添加
-            </Button>
-          </Form.Item>
-        </Form>
-
-        {tabs.length === 0 ? (
-          <Empty 
-            description="还没有自定义Tab，添加一个吧！" 
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-          />
-        ) : (
-          <List
-            size="small"
-            dataSource={tabs}
-            renderItem={(tab, index) => (
-              <List.Item
-                style={{
-                  padding: '12px',
-                  background: colors.cardBg,
-                  marginBottom: 8,
-                  borderRadius: 6,
-                  border: `1px solid ${colors.borderColor}`
-                }}
-              >
-                <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                  <Space>
-                    <DragOutlined style={{ color: '#8c8c8c', cursor: 'move' }} />
-                    <Tag color="blue">{tab.label}</Tag>
-                    <Tag color="orange">{tab.tag}</Tag>
-                  </Space>
-                  
-                  <Space size={4}>
-                    <Button
-                      type="text"
-                      size="small"
-                      onClick={() => handleMoveUp(index)}
-                      disabled={index === 0}
-                    >
-                      ↑
-                    </Button>
-                    <Button
-                      type="text"
-                      size="small"
-                      onClick={() => handleMoveDown(index)}
-                      disabled={index === tabs.length - 1}
-                    >
-                      ↓
-                    </Button>
-                    <Popconfirm
-                      title="确定删除此Tab吗？"
-                      onConfirm={() => handleDelete(tab.id)}
-                      okText="确定"
-                      cancelText="取消"
-                    >
-                      <Button 
-                        type="text" 
-                        size="small" 
-                        danger 
-                        icon={<DeleteOutlined />}
-                      />
-                    </Popconfirm>
-                  </Space>
-                </Space>
-              </List.Item>
-            )}
-          />
-        )}
-      </div>
+      {content}
     </Modal>
   );
 };
 
 export default CustomTabManager;
-
