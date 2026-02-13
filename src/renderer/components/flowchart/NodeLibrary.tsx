@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card, Space, Typography } from 'antd';
 import {
   BorderOutlined,
@@ -60,15 +60,25 @@ const nodeTemplates: NodeTemplate[] = [
 
 interface NodeLibraryProps {
   onDragStart: (nodeType: NodeType) => void;
+  allowedNodeTypes?: NodeType[];
 }
 
 /**
  * NodeLibrary - 节点库面板
- * 
+ *
  * 展示可用节点类型，支持拖拽到画布
  */
-export const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart }) => {
+export const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart, allowedNodeTypes }) => {
   const theme = useTheme();
+
+  const visibleTemplates = useMemo(() => {
+    if (!allowedNodeTypes || allowedNodeTypes.length === 0) {
+      return nodeTemplates;
+    }
+
+    const allowed = new Set(allowedNodeTypes);
+    return nodeTemplates.filter((template) => allowed.has(template.type));
+  }, [allowedNodeTypes]);
 
   const handleDragStart = (event: React.DragEvent, nodeType: NodeType) => {
     event.dataTransfer.setData('application/reactflow', nodeType);
@@ -94,7 +104,7 @@ export const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart }) => {
       </Typography.Title>
 
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        {nodeTemplates.map((template) => (
+        {visibleTemplates.map((template) => (
           <Card
             key={template.type}
             size="small"

@@ -289,6 +289,33 @@ body {
   color: #1890ff;
 }
 
+.ql-toolbar .ql-flowchart {
+  min-width: 48px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+flowchart-preview.flowchart-embedded {
+  display: block;
+  margin: 12px 0;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  cursor: pointer;
+}
+
+flowchart-preview.flowchart-embedded img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+flowchart-preview.flowchart-embedded:hover {
+  border-color: #40a9ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.15);
+}
+
 /* Modal 中的 Quill 编辑器特殊样式 */
 .ant-modal .quill {
   margin-bottom: 16px;
@@ -326,6 +353,16 @@ body {
 
 [data-theme='dark'] .ql-toolbar button:hover {
   color: #40a9ff;
+}
+
+[data-theme='dark'] flowchart-preview.flowchart-embedded {
+  background: #1f1f1f;
+  border-color: #404040;
+}
+
+[data-theme='dark'] flowchart-preview.flowchart-embedded:hover {
+  border-color: #40a9ff;
+  box-shadow: 0 0 0 2px rgba(64, 169, 255, 0.2);
 }
 
 [data-theme='dark'] .ql-toolbar .ql-stroke {

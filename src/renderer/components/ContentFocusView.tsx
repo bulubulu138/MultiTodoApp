@@ -529,6 +529,11 @@ const ContentFocusItem = React.memo(
             onChange={handleContentChange}
             placeholder="编辑待办内容..."
             style={{ minHeight: '150px' }}
+            enableFlowchartEmbed={true}
+            flowchartContext={{
+              todoId: todo.id,
+              todoTitle: todo.title,
+            }}
           />
         </div>
 

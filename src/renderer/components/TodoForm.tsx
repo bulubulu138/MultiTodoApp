@@ -282,6 +282,11 @@ const TodoForm: React.FC<TodoFormProps> = ({
                   value={richContent}
                   onChange={handleContentChange}
                   placeholder="输入内容，支持格式化文本、粘贴图片等..."
+                  enableFlowchartEmbed={true}
+                  flowchartContext={{
+                    todoId: todo?.id,
+                    todoTitle: todo?.title || '待办事项',
+                  }}
                 />
               </div>
             ) : (

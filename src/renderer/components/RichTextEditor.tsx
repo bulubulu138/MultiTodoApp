@@ -1,19 +1,38 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import Quill from 'quill';
 import ReactQuill from 'react-quill-new';
 import 'quill/dist/quill.snow.css';
+import type { EmbeddedFlowchartV1 } from '../../shared/types';
+import { FlowchartModal } from './FlowchartModal';
+import { registerFlowchartBlot } from './quill-blots/FlowchartBlot';
+import {
+  createEmptyEmbeddedFlowchart,
+  normalizeEmbeddedFlowchart,
+  parseEmbeddedFlowchart,
+} from '../utils/embeddedFlowchart';
+import { generateFlowchartThumbnail } from '../utils/flowchartThumbnailGenerator';
+
+registerFlowchartBlot();
 
 interface RichTextEditorProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   style?: React.CSSProperties;
+  enableFlowchartEmbed?: boolean;
+  flowchartContext?: {
+    todoId?: number;
+    todoTitle?: string;
+  };
 }
 
 const RichTextEditor: React.FC<RichTextEditorProps> = ({
   value,
   onChange,
   placeholder = '输入内容...',
-  style
+  style,
+  enableFlowchartEmbed = false,
+  flowchartContext,
 }) => {
   const quillRef = useRef<ReactQuill>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -21,21 +40,24 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const [isMounted, setIsMounted] = useState(false);
   const [editorInstance, setEditorInstance] = useState<any>(null);
   const [hasError, setHasError] = useState(false);
-  
+
+  const [flowchartModalOpen, setFlowchartModalOpen] = useState(false);
+  const [activeFlowchart, setActiveFlowchart] = useState<EmbeddedFlowchartV1 | null>(null);
+  const [flowchartInsertIndex, setFlowchartInsertIndex] = useState<number | null>(null);
+  const [isEditingEmbeddedFlowchart, setIsEditingEmbeddedFlowchart] = useState(false);
+
   // 添加输入状态和焦点状态追踪
   const isComposingRef = useRef(false);
   const isFocusedRef = useRef(false);
-  const lastValueRef = useRef(value);
 
   useEffect(() => {
     setIsMounted(true);
     setHasError(false);
-    
-    // react-quill-new has better lifecycle management, so we can reduce the delay
+
     const timer = setTimeout(() => {
       setIsReady(true);
     }, 50);
-    
+
     return () => {
       clearTimeout(timer);
       setIsMounted(false);
@@ -43,60 +65,46 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     };
   }, []);
 
-  // 监听 value 变化，确保内容同步（优化：仅在非输入状态时同步）
   useEffect(() => {
     if (isReady && editorInstance && value !== editorInstance.root.innerHTML) {
       try {
-        // 关键优化：仅在用户未输入且编辑器未聚焦时才同步内容
-        // 这避免了在用户输入时被外部更新打断
         if (isComposingRef.current || isFocusedRef.current) {
-          // 用户正在输入或编辑器有焦点，跳过同步
           return;
         }
-        
-        // 安全地更新编辑器内容
+
         const currentText = editorInstance.getText();
-        
-        // 只有当内容真正不同时才更新
+
         if (currentText.trim() !== value.replace(/<[^>]*>/g, '').trim()) {
-          // 保存光标位置
           const selection = editorInstance.getSelection();
-          
-          // 方案2：在使用 dangerouslyPasteHTML 前清空历史记录
-          // 双重保障，确保程序化更新不会污染撤销栈
+
           try {
             const historyModule = editorInstance.getModule('history');
             if (historyModule) {
-              historyModule.clear();  // 清空历史记录
+              historyModule.clear();
             }
           } catch (error) {
             console.warn('Failed to clear history:', error);
           }
-          
-          // 更新内容
+
           editorInstance.clipboard.dangerouslyPasteHTML(value);
-          
-          // 恢复光标位置（如果之前有选择）
+
           if (selection) {
             try {
               editorInstance.setSelection(selection.index, selection.length);
-            } catch (error) {
-              // 光标恢复失败，静默处理
+            } catch {
+              // noop
             }
           }
         }
-        
-        lastValueRef.current = value;
       } catch (error) {
         console.warn('Content sync failed:', error);
       }
     }
   }, [value, isReady, editorInstance]);
 
-  // 安全获取编辑器实例的方法
   const getEditorSafely = useCallback(() => {
     if (!isMounted || !quillRef.current) return null;
-    
+
     try {
       if (!editorInstance) {
         const editor = quillRef.current.getEditor();
@@ -106,8 +114,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         }
         return null;
       }
-      
-      // 返回现有实例
+
       return editorInstance;
     } catch (error) {
       console.warn('Editor access failed:', error);
@@ -116,26 +123,20 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     }
   }, [isMounted, editorInstance]);
 
-  // 设置输入法和焦点事件监听
   useEffect(() => {
     const editor = getEditorSafely();
     if (!editor) return;
-    
+
     const editorElement = editor.root;
     if (!editorElement) return;
-    
-    // 输入法事件监听
+
     const handleCompositionStart = () => {
-      console.log('[RichTextEditor] 输入法开始');
       isComposingRef.current = true;
     };
-    
+
     const handleCompositionEnd = () => {
-      console.log('[RichTextEditor] 输入法结束');
       isComposingRef.current = false;
-      
-      // 关键修复：输入法结束后，手动触发一次 onChange
-      // 这样可以确保输入法结束后的最终内容被正确保存
+
       try {
         const currentContent = editor.root.innerHTML;
         onChange(currentContent);
@@ -143,23 +144,20 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         console.warn('Failed to trigger onChange after composition:', error);
       }
     };
-    
-    // 焦点事件监听
+
     const handleFocus = () => {
       isFocusedRef.current = true;
     };
-    
+
     const handleBlur = () => {
       isFocusedRef.current = false;
     };
-    
-    // 添加事件监听
+
     editorElement.addEventListener('compositionstart', handleCompositionStart);
     editorElement.addEventListener('compositionend', handleCompositionEnd);
     editorElement.addEventListener('focus', handleFocus);
     editorElement.addEventListener('blur', handleBlur);
-    
-    // 清理函数
+
     return () => {
       editorElement.removeEventListener('compositionstart', handleCompositionStart);
       editorElement.removeEventListener('compositionend', handleCompositionEnd);
@@ -168,41 +166,75 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     };
   }, [editorInstance, getEditorSafely, onChange]);
 
-  // Toolbar configuration - react-quill-new handles DOM operations better
-  const modules = {
-    toolbar: [
-      [{ 'header': [1, 2, 3, false] }],
-      ['bold', 'italic', 'underline', 'strike'],
-      [{ 'color': [] }, { 'background': [] }],
-      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-      [{ 'indent': '-1'}, { 'indent': '+1' }],
-      ['link', 'image'],
-      ['clean']
-    ],
-    clipboard: {
-      matchVisual: false,
+  const openFlowchartModal = useCallback(
+    (index: number, flowchart: EmbeddedFlowchartV1, editingExisting: boolean) => {
+      setFlowchartInsertIndex(index);
+      setActiveFlowchart(flowchart);
+      setIsEditingEmbeddedFlowchart(editingExisting);
+      setFlowchartModalOpen(true);
     },
-    history: {
-      delay: 1000,
-      maxStack: 50,
-      userOnly: true  // 只记录用户操作，不记录程序化更新，避免 Ctrl+Z 删除内容
+    []
+  );
+
+  useEffect(() => {
+    if (!enableFlowchartEmbed) {
+      return;
     }
-  };
 
-  // 支持的格式
-  const formats = [
-    'header',
-    'bold', 'italic', 'underline', 'strike',
-    'color', 'background',
-    'list', 'indent',  // 'bullet' 是 'list' 的一部分，不需要单独注册
-    'link', 'image'
-  ];
+    const editor = getEditorSafely();
+    if (!editor?.root) {
+      return;
+    }
 
-  // Image upload handler - simplified for react-quill-new
+    const handleFlowchartClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) {
+        return;
+      }
+
+      const flowchartElement = target.closest('flowchart-preview') as HTMLElement | null;
+      if (!flowchartElement) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const blot = Quill.find(flowchartElement);
+      if (!blot) {
+        return;
+      }
+
+      const index = editor.getIndex(blot);
+      const raw = flowchartElement.getAttribute('data-flowchart') ?? flowchartElement.dataset.flowchart ?? '';
+      const flowchart = parseEmbeddedFlowchart(raw);
+      openFlowchartModal(index, flowchart, true);
+    };
+
+    editor.root.addEventListener('click', handleFlowchartClick);
+
+    return () => {
+      editor.root.removeEventListener('click', handleFlowchartClick);
+    };
+  }, [enableFlowchartEmbed, getEditorSafely, openFlowchartModal]);
+
+  useEffect(() => {
+    if (!enableFlowchartEmbed || !containerRef.current) {
+      return;
+    }
+
+    const button = containerRef.current.querySelector('.ql-flowchart') as HTMLButtonElement | null;
+    if (button && !button.dataset.customized) {
+      button.textContent = 'Flow';
+      button.title = '插入流程图';
+      button.dataset.customized = 'true';
+    }
+  }, [enableFlowchartEmbed, isReady]);
+
   const imageHandler = async () => {
     const editor = getEditorSafely();
     if (!editor) return;
-    
+
     try {
       const imagePath = await window.electronAPI.image.upload();
       if (imagePath) {
@@ -210,14 +242,13 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         if (range) {
           const safePath = imagePath.replace(/\\/g, '/');
           editor.insertEmbed(range.index, 'image', `file://${safePath}`);
-          
-          // 自动将光标移动到图片后面，但不强制
+
           setTimeout(() => {
             try {
               const newPosition = range.index + 1;
               editor.setSelection(newPosition, 0);
-            } catch (error) {
-              // Silent fail - selection will be handled by the editor
+            } catch {
+              // noop
             }
           }, 0);
         }
@@ -227,23 +258,111 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     }
   };
 
-  // 自定义工具栏配置，包含图片上传处理
-  const modulesWithImageHandler = {
-    ...modules,
-    toolbar: {
-      container: modules.toolbar,
-      handlers: {
-        image: imageHandler
-      }
+  const flowchartHandler = useCallback(() => {
+    if (!enableFlowchartEmbed) {
+      return;
     }
+
+    const editor = getEditorSafely();
+    if (!editor) {
+      return;
+    }
+
+    const range = editor.getSelection(true);
+    const index = range ? range.index : editor.getLength();
+
+    openFlowchartModal(index, createEmptyEmbeddedFlowchart(), false);
+  }, [enableFlowchartEmbed, getEditorSafely, openFlowchartModal]);
+
+  const closeFlowchartModal = useCallback(() => {
+    setFlowchartModalOpen(false);
+    setActiveFlowchart(null);
+    setFlowchartInsertIndex(null);
+    setIsEditingEmbeddedFlowchart(false);
+  }, []);
+
+  const handleFlowchartSave = useCallback(
+    async (flowchart: EmbeddedFlowchartV1) => {
+      const editor = getEditorSafely();
+      if (!editor) {
+        closeFlowchartModal();
+        return;
+      }
+
+      const index =
+        flowchartInsertIndex ??
+        (editor.getSelection(true)?.index ?? editor.getLength());
+
+      try {
+        const thumbnail = await generateFlowchartThumbnail(
+          flowchart.nodes,
+          flowchart.edges,
+          flowchart.viewport
+        );
+
+        const valueToInsert = normalizeEmbeddedFlowchart({
+          ...flowchart,
+          thumbnail,
+          updatedAt: Date.now(),
+        });
+
+        if (isEditingEmbeddedFlowchart) {
+          editor.deleteText(index, 1, 'user');
+        }
+
+        editor.insertEmbed(index, 'flowchart', valueToInsert, 'user');
+        editor.setSelection(index + 1, 0, 'silent');
+      } catch (error) {
+        console.error('Failed to insert flowchart embed:', error);
+      } finally {
+        closeFlowchartModal();
+      }
+    },
+    [closeFlowchartModal, flowchartInsertIndex, getEditorSafely, isEditingEmbeddedFlowchart]
+  );
+
+  const toolbarConfig = [
+    [{ header: [1, 2, 3, false] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ color: [] }, { background: [] }],
+    [{ list: 'ordered' }, { list: 'bullet' }],
+    [{ indent: '-1' }, { indent: '+1' }],
+    enableFlowchartEmbed ? ['link', 'image', 'flowchart'] : ['link', 'image'],
+    ['clean'],
+  ];
+
+  const modules = {
+    toolbar: {
+      container: toolbarConfig,
+      handlers: {
+        image: imageHandler,
+        ...(enableFlowchartEmbed ? { flowchart: flowchartHandler } : {}),
+      },
+    },
+    clipboard: {
+      matchVisual: false,
+    },
+    history: {
+      delay: 1000,
+      maxStack: 50,
+      userOnly: true,
+    },
   };
 
-  // 错误处理组件
+  const formats = [
+    'header',
+    'bold', 'italic', 'underline', 'strike',
+    'color', 'background',
+    'list', 'indent',
+    'link', 'image',
+    ...(enableFlowchartEmbed ? ['flowchart'] : []),
+  ];
+
   if (hasError) {
     return (
       <div style={{ ...style, minHeight: '250px' }}>
-        <div style={{ 
-          padding: '20px', 
+        <div style={{
+          padding: '20px',
           border: '1px solid #ff4d4f',
           borderRadius: '6px',
           backgroundColor: '#fff2f0',
@@ -259,7 +378,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               borderRadius: '4px',
               resize: 'vertical'
             }}
-            value={value.replace(/<[^>]*>/g, '')} // 移除HTML标签显示纯文本
+            value={value.replace(/<[^>]*>/g, '')}
             onChange={(e) => onChange(e.target.value)}
             placeholder={placeholder}
           />
@@ -273,35 +392,44 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   }
 
   return (
-    <div ref={containerRef} style={{ ...style, minHeight: '250px' }}>
-      <ReactQuill
-        ref={quillRef}
-        theme="snow"
-        value={value}
-        onChange={(content) => {
-          try {
-            // 关键修复：输入法期间不触发 onChange，避免频繁状态更新导致重渲染
-            // 这样可以防止中文输入法被打断
-            if (isComposingRef.current) {
-              console.log('[RichTextEditor] 输入法期间，跳过 onChange');
-              return;
+    <>
+      <div ref={containerRef} style={{ ...style, minHeight: '250px' }}>
+        <ReactQuill
+          ref={quillRef}
+          theme="snow"
+          value={value}
+          onChange={(content) => {
+            try {
+              if (isComposingRef.current) {
+                return;
+              }
+
+              onChange(content);
+            } catch (error) {
+              console.warn('Content change handling failed:', error);
+              setHasError(true);
             }
-            
-            // 非输入法状态，正常触发 onChange
-            onChange(content);
-          } catch (error) {
-            console.warn('Content change handling failed:', error);
-            setHasError(true);
-          }
-        }}
-        modules={modulesWithImageHandler}
-        formats={formats}
-        placeholder={placeholder}
-        preserveWhitespace={false}
-        bounds={containerRef.current || undefined}
-      />
-    </div>
+          }}
+          modules={modules}
+          formats={formats}
+          placeholder={placeholder}
+          preserveWhitespace={false}
+          bounds={containerRef.current || undefined}
+        />
+      </div>
+
+      {enableFlowchartEmbed && (
+        <FlowchartModal
+          open={flowchartModalOpen}
+          initialValue={activeFlowchart}
+          todoTitle={flowchartContext?.todoTitle}
+          onCancel={closeFlowchartModal}
+          onSave={handleFlowchartSave}
+        />
+      )}
+    </>
   );
 };
 
 export default RichTextEditor;
+

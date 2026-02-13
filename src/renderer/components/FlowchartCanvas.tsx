@@ -195,22 +195,7 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
   // 9. Handle 可见性控制
   const handleVisibility = useHandleVisibility();
 
-  // 10. 流程图与待办关联状态
-  const [associatedTodoIds, setAssociatedTodoIds] = useState<number[]>([]);
-
-  // 10.1 加载当前流程图的关联待办列表
-  useEffect(() => {
-    const loadAssociations = async () => {
-      try {
-        const ids = await window.electronAPI.flowchartTodoAssociation.queryByFlowchart(flowchartId);
-        setAssociatedTodoIds(ids);
-      } catch (error) {
-        console.error('加载流程图关联失败:', error);
-      }
-    };
-
-    loadAssociations();
-  }, [flowchartId]);
+  // 10. 流程图与待办关联在内嵌模式下禁用，独立流程图模式由外层控制。
 
   // 5. 当持久化数据变化时，更新运行时数据
   // 关键修复：完全保留节点位置，只更新数据内容
@@ -1387,37 +1372,6 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     applyPatches([patch]);
   }, [applyPatches]);
 
-  // 20. 处理待办关联
-  const handleAssociate = useCallback(async (todoId: number) => {
-    try {
-      const result = await window.electronAPI.flowchartTodoAssociation.create(flowchartId, todoId);
-      if (result.success) {
-        // 更新本地状态
-        setAssociatedTodoIds(prev => [...prev, todoId]);
-      } else {
-        throw new Error('关联失败');
-      }
-    } catch (error) {
-      console.error('创建关联失败:', error);
-      throw error;
-    }
-  }, [flowchartId]);
-
-  // 21. 处理取消待办关联
-  const handleDisassociate = useCallback(async (todoId: number) => {
-    try {
-      const result = await window.electronAPI.flowchartTodoAssociation.delete(flowchartId, todoId);
-      if (result.success) {
-        // 更新本地状态
-        setAssociatedTodoIds(prev => prev.filter(id => id !== todoId));
-      } else {
-        throw new Error('取消关联失败');
-      }
-    } catch (error) {
-      console.error('取消关联失败:', error);
-      throw error;
-    }
-  }, [flowchartId]);
 
   return (
     <HandleVisibilityProvider value={{

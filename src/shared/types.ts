@@ -409,3 +409,19 @@ export interface FlowchartAssociationDisplay {
   nodeLabel?: string;  // 仅节点级别关联有值
   createdAt?: number;
 }
+
+// ============================================
+// 内嵌流程图类型 (Embedded Flowchart Types)
+// ============================================
+
+export interface EmbeddedFlowchartV1 {
+  version: 1;
+  id: string;
+  nodes: PersistedNode[];
+  edges: PersistedEdge[];
+  viewport: ViewportSchema;
+  thumbnail: string;
+  updatedAt: number;
+}
+
+export type EmbeddedFlowchart = EmbeddedFlowchartV1;

@@ -8,6 +8,53 @@ export interface HtmlContentProcessorOptions {
   preserveHtml?: boolean;
 }
 
+interface FlowchartSummary {
+  nodeCount: number;
+  edgeCount: number;
+}
+
+function parseFlowchartSummary(flowchartElement: Element): FlowchartSummary {
+  const flowchartRaw = flowchartElement.getAttribute('data-flowchart');
+
+  if (flowchartRaw) {
+    try {
+      const parsed = JSON.parse(flowchartRaw) as { nodes?: unknown[]; edges?: unknown[] };
+      return {
+        nodeCount: Array.isArray(parsed.nodes) ? parsed.nodes.length : 0,
+        edgeCount: Array.isArray(parsed.edges) ? parsed.edges.length : 0,
+      };
+    } catch {
+      // use fallback below
+    }
+  }
+
+  const nodesRaw = flowchartElement.getAttribute('data-nodes');
+  const edgesRaw = flowchartElement.getAttribute('data-edges');
+
+  let nodeCount = 0;
+  let edgeCount = 0;
+
+  if (nodesRaw) {
+    try {
+      const nodes = JSON.parse(nodesRaw) as unknown[];
+      nodeCount = Array.isArray(nodes) ? nodes.length : 0;
+    } catch {
+      nodeCount = 0;
+    }
+  }
+
+  if (edgesRaw) {
+    try {
+      const edges = JSON.parse(edgesRaw) as unknown[];
+      edgeCount = Array.isArray(edges) ? edges.length : 0;
+    } catch {
+      edgeCount = 0;
+    }
+  }
+
+  return { nodeCount, edgeCount };
+}
+
 /**
  * 处理HTML内容，根据目标格式转换为合适的文本
  */
@@ -30,7 +77,15 @@ export function processHtmlContent(
   const parser = new DOMParser();
   const doc = parser.parseFromString(content, 'text/html');
 
-  // 统计图片数量
+  // 先处理流程图，避免缩略图中的 img 被统计为普通图片。
+  const flowchartElements = Array.from(doc.querySelectorAll('flowchart-preview'));
+  const flowchartNotes = flowchartElements.map((element, index) => {
+    const summary = parseFlowchartSummary(element);
+    return `[流程图${index + 1}: ${summary.nodeCount}个节点, ${summary.edgeCount}条连线]`;
+  });
+  flowchartElements.forEach((element) => element.remove());
+
+  // 统计普通图片数量
   const images = doc.querySelectorAll('img');
   const imgCount = images.length;
 
@@ -52,10 +107,19 @@ export function processHtmlContent(
       break;
   }
 
-  // 添加图片标记
+  // 添加流程图和图片标记
+  const appendNotes: string[] = [];
+
+  if (flowchartNotes.length > 0) {
+    appendNotes.push(flowchartNotes.join('\n'));
+  }
+
   if (imgCount > 0) {
-    const imageNote = imgCount === 1 ? '【图片1张】' : `【图片${imgCount}张】`;
-    result = result.trim() ? `${result.trim()}\n\n${imageNote}` : imageNote;
+    appendNotes.push(imgCount === 1 ? '【图片1张】' : `【图片${imgCount}张】`);
+  }
+
+  if (appendNotes.length > 0) {
+    result = result.trim() ? `${result.trim()}\n\n${appendNotes.join('\n')}` : appendNotes.join('\n');
   }
 
   return result;
