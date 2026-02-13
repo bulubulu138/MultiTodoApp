@@ -2,7 +2,7 @@ import { Todo, TodoRelation } from '../../shared/types';
 import React, { useState, useMemo, useCallback, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { Divider, Button, Checkbox, Space, Spin, Empty, App, InputNumber, Tag, Tooltip } from 'antd';
 import { SaveOutlined, EyeOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import RichTextEditor from './RichTextEditor';
+import RichTextEditor, { RichTextEditorRef } from './RichTextEditor';
 import RelationIndicators from './RelationIndicators';
 import { formatCompletedTime } from '../utils/timeFormatter';
 
@@ -64,6 +64,7 @@ const ContentFocusItem = React.memo(
     const [savingOrder, setSavingOrder] = useState(false);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const isComposingRef = useRef(false); // 追踪输入法状态
+    const editorRef = useRef<RichTextEditorRef>(null);
     
     const lastSavedContentRef = useRef(todo.content);
 
@@ -76,6 +77,10 @@ const ContentFocusItem = React.memo(
       }
     }, [todo.content, isSaving]);
 
+    const getLatestContent = useCallback(() => {
+      return editorRef.current?.getLatestHtml() ?? editedContent;
+    }, [editedContent]);
+
     // 检查内容是否被修改
     const hasChanges = useMemo(() => {
       return editedContent !== lastSavedContentRef.current;
@@ -83,16 +88,17 @@ const ContentFocusItem = React.memo(
 
     // 保存内容（静默保存，不显示提示）
     const handleSave = useCallback(async () => {
-      if (!hasChanges || !todo.id) return;
-      
-      // 如果内容与上次保存的内容相同，跳过保存
-      if (editedContent === lastSavedContentRef.current) return;
-      
+      if (!todo.id) return;
+
+      const latestContent = getLatestContent();
+      if (latestContent === lastSavedContentRef.current) return;
+
       setIsSaving(true);
       try {
-        await onUpdate(todo.id, { content: editedContent });
+        await onUpdate(todo.id, { content: latestContent });
         // 更新最后保存的内容引用
-        lastSavedContentRef.current = editedContent;
+        lastSavedContentRef.current = latestContent;
+        setEditedContent(latestContent);
         // 静默保存，不显示提示
       } catch (error) {
         message.error('保存失败');
@@ -100,7 +106,7 @@ const ContentFocusItem = React.memo(
       } finally {
         setIsSaving(false);
       }
-    }, [hasChanges, todo.id, editedContent, onUpdate, message]);
+    }, [todo.id, getLatestContent, onUpdate, message]);
 
     // 智能保存调度函数 - 检查输入法状态
     const scheduleAutoSave = useCallback(() => {
@@ -126,17 +132,15 @@ const ContentFocusItem = React.memo(
     // 暴露给父组件的保存方法
     useImperativeHandle(ref, () => ({
       saveNow: async () => {
-        if (hasChanges && editedContent !== lastSavedContentRef.current) {
-          // 清除防抖定时器
-          if (saveTimeoutRef.current) {
-            clearTimeout(saveTimeoutRef.current);
-            saveTimeoutRef.current = null;
-          }
-          // 立即保存（即使在输入法状态也保存，因为是用户主动触发）
-          await handleSave();
+        // 清除防抖定时器
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+          saveTimeoutRef.current = null;
         }
+        // 立即保存（即使在输入法状态也保存，因为是用户主动触发）
+        await handleSave();
       }
-    }), [hasChanges, editedContent, handleSave]);
+    }), [handleSave]);
 
     // 组件卸载时保存未保存的更改
     useEffect(() => {
@@ -145,9 +149,9 @@ const ContentFocusItem = React.memo(
           clearTimeout(saveTimeoutRef.current);
         }
         // 如果有未保存的更改，立即保存
-        const currentContent = editedContent;
+        const currentContent = editorRef.current?.getLatestHtml() ?? lastSavedContentRef.current;
         const currentTodoId = todo.id;
-        if (currentContent !== todo.content && currentTodoId) {
+        if (currentContent !== lastSavedContentRef.current && currentTodoId) {
           onUpdate(currentTodoId, { content: currentContent });
         }
       };
@@ -317,8 +321,8 @@ const ContentFocusItem = React.memo(
 
     // 失去焦点时立即保存
     const handleBlur = useCallback(() => {
-      // 失去焦点时，如果不在输入法状态且有更改，立即保存
-      if (!isComposingRef.current && hasChanges) {
+      // 失去焦点时，如果不在输入法状态，立即保存最新内容
+      if (!isComposingRef.current) {
         // 清除防抖定时器
         if (saveTimeoutRef.current) {
           clearTimeout(saveTimeoutRef.current);
@@ -327,32 +331,34 @@ const ContentFocusItem = React.memo(
         // 立即保存
         handleSave();
       }
-    }, [hasChanges, handleSave]);
+    }, [handleSave]);
 
     // 键盘事件处理 - Ctrl+S / Cmd+S 手动保存
     const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
       // 检测 Ctrl+S (Windows/Linux) 或 Cmd+S (Mac)
       if ((event.ctrlKey || event.metaKey) && event.key === 's') {
         event.preventDefault(); // 阻止浏览器默认的保存行为
-        
+
+        const latestContent = getLatestContent();
+
         // 立即保存（即使在输入法状态也保存）
-        if (hasChanges) {
+        if (latestContent !== lastSavedContentRef.current) {
           // 清除自动保存定时器
           if (saveTimeoutRef.current) {
             clearTimeout(saveTimeoutRef.current);
             saveTimeoutRef.current = null;
           }
-          
+
           // 立即保存
           handleSave();
-          
+
           // 显示保存提示
           message.success('已手动保存', 1);
         } else {
           message.info('没有需要保存的更改', 1);
         }
       }
-    }, [hasChanges, handleSave, message]);
+    }, [getLatestContent, handleSave, message]);
 
     // 计算分组边界和并列关系
     const isInParallelGroup = parallelGroup && parallelGroup.size > 1;
@@ -525,6 +531,7 @@ const ContentFocusItem = React.memo(
           tabIndex={-1}
         >
           <RichTextEditor
+            ref={editorRef}
             value={editedContent}
             onChange={handleContentChange}
             placeholder="编辑待办内容..."

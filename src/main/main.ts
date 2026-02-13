@@ -1041,15 +1041,81 @@ class Application {
         if (!db) {
           throw new Error('Database not initialized');
         }
-        
+
         const repo = new FlowchartRepository(db);
         repo.savePatches(flowchartId, patches);
-        
+
         console.log(`[Flowchart] Saved ${patches.length} patches for flowchart: ${flowchartId}`);
         return { success: true };
       } catch (error) {
         console.error('Error saving flowchart patches:', error);
         throw error;
+      }
+    });
+
+    // Flowchart migration handlers
+    ipcMain.handle('flowchart-migration:getStatus', async () => {
+      try {
+        const { FlowchartMigrationService } = await import('./services/FlowchartMigrationService');
+        const migrationService = new FlowchartMigrationService(this.dbManager);
+        return await migrationService.getStatus();
+      } catch (error) {
+        console.error('Error getting migration status:', error);
+        return {
+          hasLegacyFlowcharts: false,
+          flowchartCount: 0,
+          totalNodes: 0,
+          totalEdges: 0,
+          canMigrate: false
+        };
+      }
+    });
+
+    ipcMain.handle('flowchart-migration:getFlowcharts', async () => {
+      try {
+        const { FlowchartMigrationService } = await import('./services/FlowchartMigrationService');
+        const migrationService = new FlowchartMigrationService(this.dbManager);
+        return await migrationService.getFlowchartsForMigration();
+      } catch (error) {
+        console.error('Error getting flowcharts for migration:', error);
+        return [];
+      }
+    });
+
+    ipcMain.handle('flowchart-migration:migrate', async (_, options) => {
+      try {
+        const { FlowchartMigrationService } = await import('./services/FlowchartMigrationService');
+        const migrationService = new FlowchartMigrationService(this.dbManager);
+        return await migrationService.migrate(options);
+      } catch (error) {
+        console.error('Error migrating flowcharts:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('flowchart-migration:cleanup', async () => {
+      try {
+        const { FlowchartMigrationService } = await import('./services/FlowchartMigrationService');
+        const migrationService = new FlowchartMigrationService(this.dbManager);
+        return await migrationService.cleanupLegacyFlowcharts();
+      } catch (error) {
+        console.error('Error cleaning up legacy flowcharts:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    ipcMain.handle('flowchart-migration:verify', async () => {
+      try {
+        const { FlowchartMigrationService } = await import('./services/FlowchartMigrationService');
+        const migrationService = new FlowchartMigrationService(this.dbManager);
+        return await migrationService.verifyMigration();
+      } catch (error) {
+        console.error('Error verifying migration:', error);
+        return {
+          success: false,
+          message: (error as Error).message,
+          remainingFlowcharts: -1
+        };
       }
     });
   }

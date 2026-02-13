@@ -82,7 +82,12 @@ export async function generateFlowchartThumbnail(
       height,
     });
   } catch (error) {
-    console.warn('Flowchart thumbnail generation failed, fallback is used:', error);
+    console.error('[FlowchartThumbnail] Generation failed:', {
+      error,
+      nodesCount: nodes.length,
+      edgesCount: edges.length,
+      hasViewport: !!viewport
+    });
     return createFallbackThumbnail(width, height);
   } finally {
     root.unmount();

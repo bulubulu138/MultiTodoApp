@@ -13,8 +13,6 @@ import ExportModal from './components/ExportModal';
 import TodoViewDrawer from './components/TodoViewDrawer';
 import NotesDrawer from './components/NotesDrawer';
 import CalendarDrawer from './components/CalendarDrawer';
-import { FlowchartDrawer } from './components/flowchart/FlowchartDrawer';
-import { FlowchartList } from './components/FlowchartList';
 import ContentFocusView, { ContentFocusViewRef } from './components/ContentFocusView';
 import { getTheme, ThemeMode } from './theme/themes';
 import { buildParallelGroups, selectGroupRepresentatives, sortWithGroups, getSortComparator } from './utils/sortWithGroups';
@@ -51,10 +49,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
   const [showViewDrawer, setShowViewDrawer] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
-  const [showFlowchart, setShowFlowchart] = useState(false);
-  const [currentFlowchartId, setCurrentFlowchartId] = useState<string | null>(null);
-  const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
-  const [flowchartDrawerKey, setFlowchartDrawerKey] = useState(0);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [viewingTodo, setViewingTodo] = useState<Todo | null>(null);
   const [settings, setSettings] = useState<Record<string, string>>({});
@@ -144,33 +138,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       window.electronAPI.removeQuickCreateListener();
     };
   }, [message]);
-
-  // 创建新流程图的回调函数
-  const handleCreateNewFlowchart = useCallback(() => {
-    setCurrentFlowchartId(null);
-    setHighlightedNodeId(null);
-    setFlowchartDrawerKey(prev => prev + 1); // 强制重新挂载FlowchartDrawer
-    setShowFlowchart(true);
-  }, []);
-
-  // 显示流程图列表（切换Tab）
-  const handleShowFlowchartList = useCallback(() => {
-    setActiveTab('flowcharts');
-  }, []);
-
-  // 监听创建新流程图事件（从FlowchartDrawer内部触发）
-  useEffect(() => {
-    const handleCreateNewFlowchartEvent = () => {
-      console.log('[App] 收到创建新流程图事件');
-      handleCreateNewFlowchart();
-    };
-    
-    window.addEventListener('create-new-flowchart', handleCreateNewFlowchartEvent);
-    
-    return () => {
-      window.removeEventListener('create-new-flowchart', handleCreateNewFlowchartEvent);
-    };
-  }, [handleCreateNewFlowchart]);
 
   // 检查首次运行，显示快捷键引导
   useEffect(() => {
@@ -991,10 +958,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       key: 'paused',
       label: `已暂停 (${statusCounts.paused})`,
     },
-    {
-      key: 'flowcharts',
-      label: '📊 流程图',
-    },
   ];
 
     // 添加自定义标签Tab
@@ -1033,66 +996,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     };
   }, [activeTab, tabSettings]);
 
-  // 打开流程图
-  const handleOpenFlowchart = useCallback((flowchartId: string) => {
-    setCurrentFlowchartId(flowchartId);
-    setShowFlowchart(true);
-  }, []);
-
-  // 关闭流程图
-  const handleCloseFlowchart = useCallback(() => {
-    setShowFlowchart(false);
-    setCurrentFlowchartId(null);
-    setHighlightedNodeId(null);
-  }, []);
-
-  // 跳转到流程图并高亮节点
-  const handleNavigateToFlowchart = useCallback(async (flowchartId: string, nodeId?: string) => {
-    try {
-      // 验证流程图是否存在（从数据库查询）
-      const flowchartData = await window.electronAPI.flowchart.load(flowchartId);
-      
-      if (!flowchartData) {
-        message.error('流程图不存在或已被删除');
-        console.error(`[导航错误] 流程图 ${flowchartId} 不存在`);
-        return;
-      }
-      
-      // 如果提供了nodeId，验证节点是否存在
-      if (nodeId) {
-        const nodeExists = flowchartData.nodes?.some((node: any) => node.id === nodeId);
-        
-        if (!nodeExists) {
-          message.warning('节点不存在，但已跳转到流程图');
-          console.warn(`[导航警告] 节点 ${nodeId} 在流程图 ${flowchartId} 中不存在`);
-          // 继续跳转，但不高亮节点
-          setHighlightedNodeId(null);
-        } else {
-          // 设置需要高亮的节点 ID
-          setHighlightedNodeId(nodeId);
-        }
-      } else {
-        // 没有提供nodeId，不高亮任何节点
-        setHighlightedNodeId(null);
-      }
-      
-      // 1. 切换到流程图标签页
-      setActiveTab('flowcharts');
-      
-      // 2. 设置当前流程图 ID
-      setCurrentFlowchartId(flowchartId);
-      
-      // 3. 打开流程图抽屉
-      setShowFlowchart(true);
-      
-      // 4. 显示成功消息
-      message.success('已跳转到流程图');
-    } catch (error) {
-      console.error('[导航错误] 验证流程图失败:', error);
-      message.error('无法打开流程图，请稍后重试');
-    }
-  }, [message]);
-
   // Tab 切换处理（带自动保存）
   const handleTabChange = useCallback(async (newTab: string) => {
     // 如果当前在专注模式，先保存所有未保存的内容
@@ -1115,7 +1018,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         onShowExport={() => setShowExport(true)}
         onShowNotes={() => setShowNotes(true)}
         onShowCalendar={() => setShowCalendar(true)}
-        onShowFlowchart={handleShowFlowchartList}
         sortOption={currentTabSettings.sortOption}
         onSortChange={handleSortChange}
         viewMode={currentTabSettings.viewMode}
@@ -1141,13 +1043,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
               animate="visible"
               exit="exit"
             >
-              {activeTab === 'flowcharts' ? (
-                <FlowchartList
-                  message={message}
-                  onOpenFlowchart={handleOpenFlowchart}
-                  onCreateNew={handleCreateNewFlowchart}
-                />
-              ) : currentTabSettings.viewMode === 'content-focus' ? (
+              {currentTabSettings.viewMode === 'content-focus' ? (
                 <ContentFocusView
                   ref={contentFocusRef}
                   todos={filteredTodos}
@@ -1176,7 +1072,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
                   onUpdateDisplayOrder={handleUpdateDisplayOrder}
                   viewMode={currentTabSettings.viewMode}
                   enableVirtualScroll={false}
-                  onNavigateToFlowchart={handleNavigateToFlowchart}
                   hasMoreData={hasMoreData}
                   onLoadMore={loadMore}
                   totalCount={filteredTodos.length}
@@ -1239,7 +1134,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
           setViewingTodo(null);
         }}
         onEdit={handleEditFromView}
-        onOpenFlowchart={handleNavigateToFlowchart}
         onRelationsChange={loadRelations}
       />
 
@@ -1254,16 +1148,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         onClose={() => setShowCalendar(false)}
         onSelectTodo={handleEditTodo}
         viewSize={(settings.calendarViewSize as CalendarViewSize) || 'compact'}
-      />
-
-      <FlowchartDrawer
-        key={currentFlowchartId ? `flowchart-${currentFlowchartId}` : `new-${flowchartDrawerKey}`}
-        visible={showFlowchart}
-        todos={todos}
-        onClose={handleCloseFlowchart}
-        message={message}
-        flowchartId={currentFlowchartId}
-        highlightedNodeId={highlightedNodeId}
       />
 
       {/* 回到顶部按钮 */}

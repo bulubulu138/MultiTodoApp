@@ -112,10 +112,45 @@ export interface ElectronAPI {
       createdAt: number;
     }>>>;
   };
-  
+
+  // 流程图迁移API
+  flowchartMigration: {
+    getStatus: () => Promise<{
+      hasLegacyFlowcharts: boolean;
+      flowchartCount: number;
+      totalNodes: number;
+      totalEdges: number;
+      canMigrate: boolean;
+    }>;
+    getFlowcharts: () => Promise<Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      nodes: any[];
+      edges: any[];
+      created_at: number;
+      updated_at: number;
+    }>>;
+    migrate: (options: {createNewTodos?: boolean; targetTodoId?: number}) => Promise<{
+      success: boolean;
+      migratedCount: number;
+      skippedCount: number;
+      errors: string[];
+      details: Array<{
+        flowchartId: string;
+        flowchartName: string;
+        success: boolean;
+        todoId?: number;
+        error?: string;
+      }>;
+    }>;
+    cleanup: () => Promise<{success: boolean; error?: string}>;
+    verify: () => Promise<{success: boolean; message: string; remainingFlowcharts: number}>;
+  };
+
   // Shell API
   openExternal: (url: string) => Promise<{success: boolean; error?: string}>;
-  
+
   // 快速创建待办 API
   onQuickCreateTodo: (callback: (data: { content: string }) => void) => void;
   removeQuickCreateListener: () => void;
@@ -200,16 +235,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('flowchart:savePatches', flowchartId, patches),
   },
   flowchartTodoAssociation: {
-    create: (flowchartId: string, todoId: number) => 
+    create: (flowchartId: string, todoId: number) =>
       ipcRenderer.invoke('flowchart-todo-association:create', flowchartId, todoId),
-    delete: (flowchartId: string, todoId: number) => 
+    delete: (flowchartId: string, todoId: number) =>
       ipcRenderer.invoke('flowchart-todo-association:delete', flowchartId, todoId),
-    queryByFlowchart: (flowchartId: string) => 
+    queryByFlowchart: (flowchartId: string) =>
       ipcRenderer.invoke('flowchart-todo-association:query-by-flowchart', flowchartId),
-    queryByTodo: (todoId: number) => 
+    queryByTodo: (todoId: number) =>
       ipcRenderer.invoke('flowchart-todo-association:query-by-todo', todoId),
-    queryByTodos: (todoIds: number[]) => 
+    queryByTodos: (todoIds: number[]) =>
       ipcRenderer.invoke('flowchart-todo-association:query-by-todos', todoIds),
+  },
+  flowchartMigration: {
+    getStatus: () => ipcRenderer.invoke('flowchart-migration:getStatus'),
+    getFlowcharts: () => ipcRenderer.invoke('flowchart-migration:getFlowcharts'),
+    migrate: (options) => ipcRenderer.invoke('flowchart-migration:migrate', options),
+    cleanup: () => ipcRenderer.invoke('flowchart-migration:cleanup'),
+    verify: () => ipcRenderer.invoke('flowchart-migration:verify'),
   },
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
   

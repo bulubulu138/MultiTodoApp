@@ -25,7 +25,7 @@ interface ToolbarProps {
   onShowExport: () => void;
   onShowNotes: () => void;
   onShowCalendar: () => void;
-  onShowFlowchart: () => void;
+  onShowFlowchart?: () => void;
   sortOption?: SortOption;
   onSortChange?: (option: SortOption) => void;
   viewMode?: ViewMode;
@@ -127,16 +127,18 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
             <span className="btn-text">日历</span>
           </Button>
         </Tooltip>
-        
-        <Tooltip title="流程图">
-          <Button
-            icon={<ApartmentOutlined />}
-            onClick={onShowFlowchart}
-            className="toolbar-btn-with-text"
-          >
-            <span className="btn-text">流程图</span>
-          </Button>
-        </Tooltip>
+
+        {onShowFlowchart && (
+          <Tooltip title="流程图">
+            <Button
+              icon={<ApartmentOutlined />}
+              onClick={onShowFlowchart}
+              className="toolbar-btn-with-text"
+            >
+              <span className="btn-text">流程图</span>
+            </Button>
+          </Tooltip>
+        )}
 
         <Button
           type="primary"

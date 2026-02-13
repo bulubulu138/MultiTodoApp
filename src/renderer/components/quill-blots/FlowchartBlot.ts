@@ -83,17 +83,24 @@ let hasRegistered = false;
 
 export function registerFlowchartBlot(): void {
   if (hasRegistered) {
+    console.log('[FlowchartBlot] Already registered, skipping');
     return;
   }
 
   try {
-    Quill.import('formats/flowchart');
-    hasRegistered = true;
-    return;
-  } catch {
-    // ignore and register below
-  }
+    // Check if already registered (prevent duplicate registration)
+    const existingFormats = (Quill as any).imports?.['formats'] || {};
+    if (existingFormats['flowchart']) {
+      console.log('[FlowchartBlot] Found existing flowchart format');
+      hasRegistered = true;
+      return;
+    }
 
-  Quill.register({ 'formats/flowchart': FlowchartBlot }, true);
-  hasRegistered = true;
+    Quill.register({ 'formats/flowchart': FlowchartBlot }, true);
+    hasRegistered = true;
+    console.log('[FlowchartBlot] Successfully registered');
+  } catch (error) {
+    console.error('[FlowchartBlot] Registration failed:', error);
+    throw error;
+  }
 }

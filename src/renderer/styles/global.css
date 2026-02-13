@@ -290,9 +290,17 @@ body {
 }
 
 .ql-toolbar .ql-flowchart {
-  min-width: 48px;
-  font-size: 11px;
-  font-weight: 500;
+  width: 32px;
+  min-width: 32px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ql-toolbar .ql-flowchart svg {
+  width: 14px;
+  height: 14px;
 }
 
 flowchart-preview.flowchart-embedded {
@@ -314,6 +322,11 @@ flowchart-preview.flowchart-embedded img {
 flowchart-preview.flowchart-embedded:hover {
   border-color: #40a9ff;
   box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.15);
+}
+
+.ql-editor flowchart-preview.flowchart-embedded[data-selected='true'] {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.2);
 }
 
 /* Modal 中的 Quill 编辑器特殊样式 */
@@ -363,6 +376,11 @@ flowchart-preview.flowchart-embedded:hover {
 [data-theme='dark'] flowchart-preview.flowchart-embedded:hover {
   border-color: #40a9ff;
   box-shadow: 0 0 0 2px rgba(64, 169, 255, 0.2);
+}
+
+[data-theme='dark'] .ql-editor flowchart-preview.flowchart-embedded[data-selected='true'] {
+  border-color: #69b1ff;
+  box-shadow: 0 0 0 2px rgba(105, 177, 255, 0.25);
 }
 
 [data-theme='dark'] .ql-toolbar .ql-stroke {

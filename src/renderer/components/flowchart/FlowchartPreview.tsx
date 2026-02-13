@@ -5,7 +5,8 @@ import ReactFlow, {
   Controls,
   Node,
   Edge,
-  BackgroundVariant
+  BackgroundVariant,
+  ConnectionMode
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import '../../styles/flowchart-dark-mode.css';
@@ -288,6 +289,8 @@ const FlowchartPreviewInner: React.FC<FlowchartPreviewProps> = ({
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        // 与编辑器一致，支持 source/source 句柄连线渲染
+        connectionMode={ConnectionMode.Loose}
         // 禁用所有编辑功能
         nodesDraggable={false}
         nodesConnectable={false}

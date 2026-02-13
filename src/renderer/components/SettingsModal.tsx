@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert } from 'antd';
-import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, ExportOutlined } from '@ant-design/icons';
 import { App } from 'antd';
 import { Todo, CustomTab } from '../../shared/types';
 import TagManagement from './TagManagement';
 import BackupSettings from './BackupSettings';
 import CustomTabManager from './CustomTabManager';
+import FlowchartMigrationPanel from './FlowchartMigrationModal';
 
 const { Text } = Typography;
 
@@ -520,6 +521,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         </span>
       ),
       children: <BackupSettings />,
+    },
+    {
+      key: 'flowchart-migration',
+      label: (
+        <span>
+          <ExportOutlined />
+          流程图迁移
+        </span>
+      ),
+      children: (
+        <FlowchartMigrationPanel
+          visible={visible && activeTab === 'flowchart-migration'}
+          onClose={() => {}}
+        />
+      ),
     },
   ];
 

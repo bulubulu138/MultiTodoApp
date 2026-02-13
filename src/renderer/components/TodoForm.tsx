@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Modal, Form, Input, Select, Button, App, Tag, Space, Switch, DatePicker, InputNumber, Typography } from 'antd';
 const { Text } = Typography;
 import { EditOutlined, FileTextOutlined, CopyOutlined } from '@ant-design/icons';
-import RichTextEditor from './RichTextEditor';
+import RichTextEditor, { RichTextEditorRef } from './RichTextEditor';
 import PlainTextFallback from './PlainTextFallback';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import dayjs from 'dayjs';
@@ -39,6 +39,8 @@ const TodoForm: React.FC<TodoFormProps> = ({
   const [isEditorReady, setIsEditorReady] = useState(false);
   const [useRichEditor, setUseRichEditor] = useState(true);
   const [editorError, setEditorError] = useState(false);
+
+  const richEditorRef = React.useRef<RichTextEditorRef>(null);
 
   // 添加编辑器焦点状态追踪
   const editorHasFocusRef = React.useRef(false);
@@ -142,24 +144,35 @@ const TodoForm: React.FC<TodoFormProps> = ({
     try {
       const values = await form.validateFields();
 
+      const submitContent = useRichEditor && !editorError
+        ? (richEditorRef.current?.getLatestHtml() ?? richContent)
+        : richContent;
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[TodoForm] Submit content snapshot', {
+          length: submitContent.length,
+          hasFlowchart: /<flowchart-preview\b|data-flowchart=/i.test(submitContent),
+        });
+      }
+
       // 如果标题为空，自动从内容中提取
       let title = values.title?.trim();
       if (!title) {
-        title = extractFirstLineFromContent(richContent);
+        title = extractFirstLineFromContent(submitContent);
         if (!title) {
           title = '未命名待办';
         }
       }
 
       // 生成内容哈希
-      const contentHash = await window.electronAPI.todo.generateHash(title, richContent);
+      const contentHash = await window.electronAPI.todo.generateHash(title, submitContent);
 
       // 检测重复（编辑时排除自己）
       const duplicate = await window.electronAPI.todo.findDuplicate(contentHash, todo?.id);
 
       const todoData: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'> = {
         title: title,
-        content: richContent,
+        content: submitContent,
         status: values.status || 'pending',
         startTime: values.startTime ? values.startTime.toISOString() : new Date().toISOString(),
         deadline: values.deadline ? values.deadline.toISOString() : undefined,
@@ -279,6 +292,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
                 }}
               >
                 <RichTextEditor
+                  ref={richEditorRef}
                   value={richContent}
                   onChange={handleContentChange}
                   placeholder="输入内容，支持格式化文本、粘贴图片等..."
