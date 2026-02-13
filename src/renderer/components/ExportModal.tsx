@@ -2,7 +2,7 @@ import { Todo } from '../../shared/types';
 import React, { useState } from 'react';
 import { Modal, Radio, Button, Space, App, Typography, Divider } from 'antd';
 import { DownloadOutlined, CopyOutlined } from '@ant-design/icons';
-import { processImagesInHtml } from '../utils/processImagesInHtml';
+import { processHtmlContent } from '../utils/htmlContentProcessor';
 
 const { Text, Paragraph } = Typography;
 
@@ -31,8 +31,8 @@ const ExportModal: React.FC<ExportModalProps> = ({
         const csvRows = [headers.join(',')];
         
         todos.forEach(todo => {
-          // 处理content中的图片，移除base64数据并添加图片数量标记
-          const processedContent = processImagesInHtml(todo.content || '');
+          // 处理content中的HTML标签和图片，移除base64数据并添加图片数量标记
+          const processedContent = processHtmlContent(todo.content || '', { format: 'csv' });
 
           const row = [
             todo.id?.toString() || '',
@@ -63,8 +63,8 @@ const ExportModal: React.FC<ExportModalProps> = ({
           }
           
           if (todo.content) {
-            // 处理content中的图片，移除base64数据并添加图片数量标记
-            const processedContent = processImagesInHtml(todo.content);
+            // 处理content中的HTML标签和图片，转换为Markdown格式并添加图片数量标记
+            const processedContent = processHtmlContent(todo.content, { format: 'markdown' });
             markdown += `**描述**:\n${processedContent}\n`;
           }
           

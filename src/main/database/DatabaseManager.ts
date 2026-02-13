@@ -36,6 +36,43 @@ export class DatabaseManager {
     }
   }
 
+  private normalizeDateString(value: unknown): string {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') {
+      const d = new Date(value);
+      return Number.isNaN(d.getTime()) ? '' : d.toISOString();
+    }
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? '' : value.toISOString();
+    }
+    return '';
+  }
+
+  private parseNote(row: any): Note {
+    return {
+      id: row?.id,
+      title: row?.title ?? '',
+      content: row?.content ?? '',
+      // notes 表使用 snake_case（created_at/updated_at），前端类型使用 camelCase（createdAt/updatedAt）。
+      createdAt: this.normalizeDateString(row?.createdAt ?? row?.created_at),
+      updatedAt: this.normalizeDateString(row?.updatedAt ?? row?.updated_at),
+    };
+  }
+
+  private parseDisplayOrdersSafely(displayOrders: unknown): Record<string, any> {
+    if (typeof displayOrders !== 'string' || !displayOrders) {
+      return {};
+    }
+
+    try {
+      const parsed = JSON.parse(displayOrders);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
   private async createTables(): Promise<void> {
     const tables = [
       `CREATE TABLE IF NOT EXISTS todos (
@@ -585,6 +622,180 @@ export class DatabaseManager {
     });
   }
 
+
+  public createTodoManualAtTop(todo: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'>, tabKey: string): Promise<Todo> {
+    return new Promise((resolve, reject) => {
+      try {
+        if (!tabKey) {
+          throw new Error('tabKey is required for manual sort insertion');
+        }
+
+        let createdTodo: Todo | null = null;
+
+        const transaction = this.db!.transaction(() => {
+          const now = new Date().toISOString();
+          const contentHash = todo.contentHash || generateContentHash(todo.title, todo.content);
+          const keywordsJSON = todo.keywords ? JSON.stringify(todo.keywords) : '[]';
+          const completedAt = todo.status === 'completed' ? (todo.completedAt || now) : null;
+
+          const initialDisplayOrders = { ...(todo.displayOrders || {}) };
+          initialDisplayOrders[tabKey] = 1;
+
+          const insertStmt = this.db!.prepare(
+            `INSERT INTO todos (title, content, status, priority, tags, imageUrl, images, startTime, deadline, displayOrder, displayOrders, contentHash, keywords, completedAt, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          );
+
+          const insertResult = insertStmt.run(
+            todo.title,
+            todo.content || '',
+            todo.status,
+            todo.priority,
+            todo.tags || '',
+            todo.imageUrl || null,
+            todo.images || '',
+            todo.startTime || null,
+            todo.deadline || null,
+            todo.displayOrder !== undefined ? todo.displayOrder : null,
+            JSON.stringify(initialDisplayOrders),
+            contentHash,
+            keywordsJSON,
+            completedAt,
+            now,
+            now
+          );
+
+          const newTodoId = Number(insertResult.lastInsertRowid);
+
+          const rows = this.db!.prepare('SELECT id, displayOrders FROM todos').all() as any[];
+          const displayOrdersByTodoId = new Map<number, Record<string, any>>();
+          const oldOrderByTodoId = new Map<number, number>();
+
+          for (const row of rows) {
+            const todoId = Number(row.id);
+            if (!Number.isFinite(todoId)) {
+              continue;
+            }
+
+            const parsedOrders = this.parseDisplayOrdersSafely(row.displayOrders);
+            displayOrdersByTodoId.set(todoId, parsedOrders);
+
+            const rawOrder = parsedOrders[tabKey];
+            const numericOrder = typeof rawOrder === 'number' ? rawOrder : Number(rawOrder);
+            if (Number.isFinite(numericOrder)) {
+              oldOrderByTodoId.set(todoId, numericOrder);
+            }
+          }
+
+          const orderedTodoIds = Array.from(oldOrderByTodoId.keys());
+          const orderedTodoIdSet = new Set<number>(orderedTodoIds);
+          const adjacency = new Map<number, Set<number>>();
+
+          orderedTodoIds.forEach(todoId => adjacency.set(todoId, new Set<number>()));
+
+          const parallelRelations = this.db!
+            .prepare("SELECT source_id, target_id FROM todo_relations WHERE relation_type = 'parallel'")
+            .all() as Array<{ source_id: number; target_id: number }>;
+
+          for (const relation of parallelRelations) {
+            const sourceId = Number(relation.source_id);
+            const targetId = Number(relation.target_id);
+            if (!orderedTodoIdSet.has(sourceId) || !orderedTodoIdSet.has(targetId)) {
+              continue;
+            }
+
+            adjacency.get(sourceId)!.add(targetId);
+            adjacency.get(targetId)!.add(sourceId);
+          }
+
+          const visited = new Set<number>();
+          const groups: Array<{
+            members: number[];
+            containsNewTodo: boolean;
+            minOldOrder: number;
+            minTodoId: number;
+          }> = [];
+
+          for (const todoId of orderedTodoIds) {
+            if (visited.has(todoId)) {
+              continue;
+            }
+
+            const stack = [todoId];
+            const members: number[] = [];
+            let containsNewTodo = false;
+            let minOldOrder = Number.POSITIVE_INFINITY;
+            let minTodoId = Number.POSITIVE_INFINITY;
+
+            while (stack.length > 0) {
+              const currentId = stack.pop()!;
+              if (visited.has(currentId)) {
+                continue;
+              }
+
+              visited.add(currentId);
+              members.push(currentId);
+
+              if (currentId === newTodoId) {
+                containsNewTodo = true;
+              }
+
+              const currentOrder = oldOrderByTodoId.get(currentId);
+              if (currentOrder !== undefined) {
+                minOldOrder = Math.min(minOldOrder, currentOrder);
+              }
+              minTodoId = Math.min(minTodoId, currentId);
+
+              const neighbors = adjacency.get(currentId);
+              if (neighbors) {
+                neighbors.forEach(neighborId => {
+                  if (!visited.has(neighborId)) {
+                    stack.push(neighborId);
+                  }
+                });
+              }
+            }
+
+            members.sort((a, b) => a - b);
+            groups.push({ members, containsNewTodo, minOldOrder, minTodoId });
+          }
+
+          groups.sort((a, b) => {
+            if (a.containsNewTodo && !b.containsNewTodo) return -1;
+            if (!a.containsNewTodo && b.containsNewTodo) return 1;
+            if (a.minOldOrder !== b.minOldOrder) return a.minOldOrder - b.minOldOrder;
+            return a.minTodoId - b.minTodoId;
+          });
+
+          const updateStmt = this.db!.prepare('UPDATE todos SET displayOrders = ?, updatedAt = ? WHERE id = ?');
+
+          let nextOrder = 1;
+          for (const group of groups) {
+            for (const todoId of group.members) {
+              const orders = { ...(displayOrdersByTodoId.get(todoId) || {}) };
+              orders[tabKey] = nextOrder;
+              updateStmt.run(JSON.stringify(orders), now, todoId);
+            }
+            nextOrder += 1;
+          }
+
+          const newTodoRow = this.db!.prepare('SELECT * FROM todos WHERE id = ?').get(newTodoId) as any;
+          createdTodo = this.parseTodo(newTodoRow);
+        });
+
+        transaction();
+
+        if (!createdTodo) {
+          throw new Error('Failed to create todo in manual mode');
+        }
+
+        resolve(createdTodo);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
   public getTodoById(id: number): Promise<Todo | null> {
     return new Promise((resolve, reject) => {
       try {
@@ -984,7 +1195,7 @@ export class DatabaseManager {
   }
 
   // 笔记操作
-  public createNote(note: Omit<Note, 'id' | 'created_at' | 'updated_at'>): Promise<Note> {
+  public createNote(note: Pick<Note, 'title' | 'content'>): Promise<Note> {
     return new Promise((resolve, reject) => {
       try {
         const now = new Date().toISOString();
@@ -992,8 +1203,8 @@ export class DatabaseManager {
           'INSERT INTO notes (title, content, created_at, updated_at) VALUES (?, ?, ?, ?)'
         ).run(note.title, note.content, now, now);
 
-        const newNote = this.db!.prepare('SELECT * FROM notes WHERE id = ?').get(result.lastInsertRowid) as Note;
-        resolve(newNote);
+        const newRow = this.db!.prepare('SELECT * FROM notes WHERE id = ?').get(result.lastInsertRowid) as any;
+        resolve(this.parseNote(newRow));
       } catch (error) {
         reject(error);
       }
@@ -1003,8 +1214,8 @@ export class DatabaseManager {
   public getNoteById(id: number): Promise<Note | null> {
     return new Promise((resolve, reject) => {
       try {
-        const row = this.db!.prepare('SELECT * FROM notes WHERE id = ?').get(id) as Note | undefined;
-        resolve(row || null);
+        const row = this.db!.prepare('SELECT * FROM notes WHERE id = ?').get(id) as any;
+        resolve(row ? this.parseNote(row) : null);
       } catch (error) {
         reject(error);
       }
@@ -1014,27 +1225,27 @@ export class DatabaseManager {
   public getAllNotes(): Promise<Note[]> {
     return new Promise((resolve, reject) => {
       try {
-        const rows = this.db!.prepare('SELECT * FROM notes ORDER BY updated_at DESC').all() as Note[];
-        resolve(rows);
+        const rows = this.db!.prepare('SELECT * FROM notes ORDER BY updated_at DESC').all() as any[];
+        resolve(rows.map(r => this.parseNote(r)));
       } catch (error) {
         reject(error);
       }
     });
   }
 
-  public updateNote(id: number, updates: Partial<Note>): Promise<void> {
+  public updateNote(id: number, updates: Partial<Pick<Note, 'title' | 'content'>>): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-    const now = new Date().toISOString();
+        const now = new Date().toISOString();
         const fields = [];
         const values = [];
 
         if (updates.title !== undefined) { fields.push('title = ?'); values.push(updates.title); }
         if (updates.content !== undefined) { fields.push('content = ?'); values.push(updates.content); }
-    
-    fields.push('updated_at = ?');
-    values.push(now);
-    values.push(id);
+
+        fields.push('updated_at = ?');
+        values.push(now);
+        values.push(id);
 
         const sql = `UPDATE notes SET ${fields.join(', ')} WHERE id = ?`;
         this.db!.prepare(sql).run(...values);

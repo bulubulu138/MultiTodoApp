@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { Note } from '../shared/types';
 
 // 定义API接口
 export interface ElectronAPI {
@@ -6,6 +7,7 @@ export interface ElectronAPI {
   todo: {
     getAll: () => Promise<any[]>;
     create: (todo: any) => Promise<any>;
+    createManualAtTop: (todo: any, tabKey: string) => Promise<any>;
     update: (id: number, updates: any) => Promise<any>;
     delete: (id: number) => Promise<boolean>;
     generateHash: (title: string, content: string) => Promise<string>;
@@ -64,9 +66,9 @@ export interface ElectronAPI {
   
   // 心得API
   notes: {
-    getAll: () => Promise<any[]>;
-    create: (noteData: any) => Promise<any>;
-    update: (id: number, updates: any) => Promise<any>;
+    getAll: () => Promise<Note[]>;
+    create: (noteData: Pick<Note, 'title' | 'content'>) => Promise<Note>;
+    update: (id: number, updates: Partial<Pick<Note, 'title' | 'content'>>) => Promise<void>;
     delete: (id: number) => Promise<void>;
   };
   
@@ -124,6 +126,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   todo: {
     getAll: () => ipcRenderer.invoke('todo:getAll'),
     create: (todo: any) => ipcRenderer.invoke('todo:create', todo),
+    createManualAtTop: (todo: any, tabKey: string) => ipcRenderer.invoke('todo:createManualAtTop', todo, tabKey),
     update: (id: number, updates: any) => ipcRenderer.invoke('todo:update', id, updates),
     delete: (id: number) => ipcRenderer.invoke('todo:delete', id),
     generateHash: (title: string, content: string) => ipcRenderer.invoke('todo:generateHash', title, content),

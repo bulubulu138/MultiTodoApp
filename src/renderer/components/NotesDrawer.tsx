@@ -6,6 +6,21 @@ import RichTextEditor from './RichTextEditor';
 
 const { Title, Text } = Typography;
 
+const pad2 = (n: number) => n.toString().padStart(2, '0');
+
+const formatDateTime = (input?: string): string => {
+  if (!input) return '未知';
+  const d = new Date(input);
+  if (Number.isNaN(d.getTime())) return '未知';
+
+  const y = d.getFullYear();
+  const m = pad2(d.getMonth() + 1);
+  const day = pad2(d.getDate());
+  const hh = pad2(d.getHours());
+  const mm = pad2(d.getMinutes());
+
+  return `${y}-${m}-${day} ${hh}:${mm}`;
+};
 interface NotesDrawerProps {
   visible: boolean;
   onClose: () => void;
@@ -120,8 +135,8 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({ visible, onClose }) => {
       
       const copyText = `${plainText}
 
-创建时间：${new Date(note.createdAt).toLocaleString()}
-更新时间：${new Date(note.updatedAt).toLocaleString()}`;
+创建时间：${formatDateTime(note.createdAt)}
+更新时间：${formatDateTime(note.updatedAt)}`;
       
       await navigator.clipboard.writeText(copyText);
       message.success('心得已复制到剪贴板');
@@ -215,7 +230,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({ visible, onClose }) => {
                     placeholder="记录你的工作心得..."
                   />
                   <Text type="secondary" style={{ fontSize: 12, marginTop: 8, display: 'block' }}>
-                    最后更新: {new Date(note.updatedAt).toLocaleString()}
+                    最后更新: {formatDateTime(note.updatedAt)}
                   </Text>
                 </div>
               ) : (
@@ -230,7 +245,7 @@ const NotesDrawer: React.FC<NotesDrawerProps> = ({ visible, onClose }) => {
                     dangerouslySetInnerHTML={{ __html: note.content }}
                   />
                   <Text type="secondary" style={{ fontSize: 12, marginTop: 8, display: 'block' }}>
-                    最后更新: {new Date(note.updatedAt).toLocaleString()}
+                    最后更新: {formatDateTime(note.updatedAt)}
                   </Text>
                 </>
               )}

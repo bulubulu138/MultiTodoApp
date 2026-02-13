@@ -418,6 +418,17 @@ class Application {
       return createdTodo;
     });
 
+    ipcMain.handle('todo:createManualAtTop', async (_, todo, tabKey: string) => {
+      const createdTodo = await this.dbManager.createTodoManualAtTop(todo, tabKey);
+      // 异步生成关键词（不阻塞创建流程）
+      if (this.keywordProcessor && createdTodo.id) {
+        this.keywordProcessor.queueTodoForKeywordExtraction(createdTodo).catch(err => {
+          console.error('Failed to queue todo for keyword extraction:', err);
+        });
+      }
+      return createdTodo;
+    });
+
     ipcMain.handle('todo:update', async (_, id, updates) => {
       await this.dbManager.updateTodo(id, updates);
       // 如果标题或内容更新，重新生成关键词

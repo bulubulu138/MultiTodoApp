@@ -474,20 +474,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
       // 获取当前tab的排序设置
       const currentSettings = getCurrentTabSettings();
 
-      // 如果当前tab使用手动排序，自动设置displayOrders为1
-      let finalTodoData = { ...todoData };
-      if (currentSettings.sortOption === 'manual') {
-        const displayOrders = todoData.displayOrders || {};
-        finalTodoData = {
-          ...todoData,
-          displayOrders: {
-            ...displayOrders,
-            [activeTab]: 1  // 新增待办默认编号为1
-          }
-        };
-      }
-
-      const newTodo = await window.electronAPI.todo.create(finalTodoData);
+      const newTodo = currentSettings.sortOption === 'manual'
+        ? await window.electronAPI.todo.createManualAtTop(todoData, activeTab)
+        : await window.electronAPI.todo.create(todoData);
 
       // 处理位置选择器中选择的关系
       if (pendingPosition && pendingPosition.mode !== 'root' && pendingPosition.targetTodoId) {
