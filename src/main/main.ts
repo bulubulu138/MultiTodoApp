@@ -8,6 +8,7 @@ import { generateContentHash } from './utils/hashUtils';
 import { KeywordProcessor } from './services/KeywordProcessor';
 import { keywordExtractor, KeywordExtractor } from './services/KeywordExtractor';
 import { aiService } from './services/AIService';
+import { urlTitleService } from './services/URLTitleService';
 import { TodoRecommendation } from '../shared/types';
 
 class Application {
@@ -1116,6 +1117,17 @@ class Application {
           message: (error as Error).message,
           remainingFlowcharts: -1
         };
+      }
+    });
+
+    // URL标题获取
+    ipcMain.handle('url-titles:fetch-batch', async (_, urls: string[]) => {
+      try {
+        const result = await urlTitleService.fetchBatchTitles(urls);
+        return Object.fromEntries(result) as Record<string, string>;
+      } catch (error) {
+        console.error('Failed to fetch URL titles:', error);
+        return {};
       }
     });
   }

@@ -151,6 +151,11 @@ export interface ElectronAPI {
   // Shell API
   openExternal: (url: string) => Promise<{success: boolean; error?: string}>;
 
+  // URL标题API
+  urlTitles: {
+    fetchBatch: (urls: string[]) => Promise<Record<string, string>>;
+  };
+
   // 快速创建待办 API
   onQuickCreateTodo: (callback: (data: { content: string }) => void) => void;
   removeQuickCreateListener: () => void;
@@ -254,7 +259,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     verify: () => ipcRenderer.invoke('flowchart-migration:verify'),
   },
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
-  
+
+  // URL标题API
+  urlTitles: {
+    fetchBatch: (urls: string[]) => ipcRenderer.invoke('url-titles:fetch-batch', urls),
+  },
+
   // 快速创建待办
   onQuickCreateTodo: (callback: (data: { content: string }) => void) => {
     ipcRenderer.on('quick-create-todo', (_event, data) => callback(data));

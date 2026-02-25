@@ -26,6 +26,7 @@ export class DatabaseManager {
     try {
       this.db = new Database(this.dbPath);
       this.db.pragma('journal_mode = WAL');
+      this.db.pragma('foreign_keys = ON');
       console.log('Connected to SQLite database');
       
       await this.createTables();

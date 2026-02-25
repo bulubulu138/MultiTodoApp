@@ -7,6 +7,7 @@ import RelationsModal from './RelationsModal';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useFlowchartAssociations } from '../hooks/useFlowchartAssociations';
+import { useURLTitles } from '../hooks/useURLTitles';
 import { LazyFlowchartPreviewCard } from './flowchart/LazyFlowchartPreviewCard';
 
 const { Title, Text, Paragraph } = Typography;
@@ -110,6 +111,9 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
 
   // 关联加载状态
   const associationsLoading = flowchartLevelLoading || nodeLevelLoading;
+
+  // URL标题获取
+  const { titles: urlTitles } = useURLTitles(todo);
 
   // 转换为PNG格式
   const convertToPng = async (blob: Blob): Promise<Blob> => {
@@ -258,38 +262,41 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
     return iconMap[ext || ''] || '📎'; // 默认图标
   };
 
-  // 将文本中的 URL 转换为可点击的链接（扩展支持本地文件路径）
-  const linkifyContent = useCallback((html: string): string => {
-    if (!html) return '';
-    
+  // 渲染内容（支持图片和链接）- 内联 linkifyContent 逻辑以正确响应 urlTitles 变化
+  const renderContentWithImagePreview = useMemo(() => {
+    if (!todo || !todo.content) return null;
+
     // URL 正则表达式（匹配 http/https 开头的链接）
     const urlRegex = /(https?:\/\/[^\s<>"]+)/g;
-    
+
     // 本地文件路径正则
     // Windows 绝对路径: C:\path\file.ext 或 D:\path\file.ext
     const windowsPathRegex = /[A-Za-z]:\\(?:[^\\/:*?"<>|\r\n\s]+\\)*[^\\/:*?"<>|\r\n\s]+\.[a-zA-Z0-9]+/g;
     // UNC 网络路径: \\server\share\file.ext
     const uncPathRegex = /\\\\[^\s\\/:*?"<>|\r\n]+\\[^\s\\/:*?"<>|\r\n]+(?:\\[^\\/:*?"<>|\r\n\s]+)*\.[a-zA-Z0-9]+/g;
-    
+
     // 创建临时 DOM 来解析 HTML
     const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = html;
-    
-    // 遍历所有文本节点
+    tempDiv.innerHTML = todo.content;
+
+    // 遍历所有文本节点，将 URL 和文件路径转换为链接
     const processTextNodes = (node: Node) => {
       if (node.nodeType === Node.TEXT_NODE) {
         const text = node.textContent || '';
         let linkedText = text;
         let hasMatch = false;
-        
-        // 优先处理 HTTP/HTTPS URL
+
+        // 优先处理 HTTP/HTTPS URL（使用 urlTitles 显示标题）
         if (urlRegex.test(text)) {
           linkedText = linkedText.replace(urlRegex, (url) => {
-            return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+            const title = urlTitles.get(url);
+            const displayText = title || url; // 有标题显示标题，否则显示URL
+            const titleAttr = title ? url : ''; // 如果有标题，title属性显示完整URL
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" title="${titleAttr}">${displayText}</a>`;
           });
           hasMatch = true;
         }
-        
+
         // 处理 Windows 路径（C:\path\file）
         if (windowsPathRegex.test(linkedText) && !hasMatch) {
           linkedText = linkedText.replace(windowsPathRegex, (path) => {
@@ -299,7 +306,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
           });
           hasMatch = true;
         }
-        
+
         // 处理 UNC 路径（\\server\share\file）
         if (uncPathRegex.test(linkedText) && !hasMatch) {
           linkedText = linkedText.replace(uncPathRegex, (path) => {
@@ -309,12 +316,12 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
           });
           hasMatch = true;
         }
-        
+
         if (hasMatch) {
           // 创建临时容器并替换节点
           const tempContainer = document.createElement('span');
           tempContainer.innerHTML = linkedText;
-          
+
           const parent = node.parentNode;
           if (parent) {
             // 将所有新节点插入到原节点位置
@@ -333,17 +340,9 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
         }
       }
     };
-    
+
     processTextNodes(tempDiv);
-    return tempDiv.innerHTML;
-  }, []);
-
-  // 渲染内容（支持图片和链接）
-  const renderContentWithImagePreview = useMemo(() => {
-    if (!todo || !todo.content) return null;
-
-    // 自动将 URL 文本转换为链接
-    const processedContent = linkifyContent(todo.content);
+    const processedContent = tempDiv.innerHTML;
 
     return (
       <div
@@ -369,7 +368,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
         dangerouslySetInnerHTML={{ __html: processedContent }}
       />
     );
-  }, [todo?.content, colors.contentBg, linkifyContent, handleContentClick, handleImageClick]);
+  }, [todo?.content, colors.contentBg, urlTitles, handleContentClick, handleImageClick]);
   
   if (!todo) return null;
 

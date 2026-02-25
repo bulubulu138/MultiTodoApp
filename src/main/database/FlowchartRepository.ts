@@ -193,10 +193,36 @@ export class FlowchartRepository {
 
   /**
    * 删除流程图
+   *
+   * 使用显式级联删除，确保所有关联数据被正确清理：
+   * 1. 删除流程图与待办的关联
+   * 2. 删除流程图的边
+   * 3. 删除流程图的节点
+   * 4. 删除流程图本身
+   *
+   * 使用事务确保删除操作的原子性
    */
   delete(id: string): void {
-    // 由于设置了 ON DELETE CASCADE，删除流程图会自动删除相关的节点和边
-    this.db.prepare('DELETE FROM flowcharts WHERE id = ?').run(id);
+    // 使用事务确保删除操作的原子性
+    const transaction = this.db.transaction(() => {
+      // 1. 删除流程图与待办的关联
+      this.db.prepare('DELETE FROM flowchart_todo_associations WHERE flowchart_id = ?').run(id);
+
+      // 2. 删除流程图的边
+      this.db.prepare('DELETE FROM flowchart_edges WHERE flowchart_id = ?').run(id);
+
+      // 3. 删除流程图的节点
+      this.db.prepare('DELETE FROM flowchart_nodes WHERE flowchart_id = ?').run(id);
+
+      // 4. 最后删除流程图本身
+      const result = this.db.prepare('DELETE FROM flowcharts WHERE id = ?').run(id);
+
+      if (result.changes === 0) {
+        throw new Error(`Flowchart ${id} not found`);
+      }
+    });
+
+    transaction();
   }
 
   /**
