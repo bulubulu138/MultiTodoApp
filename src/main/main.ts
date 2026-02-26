@@ -9,6 +9,7 @@ import { KeywordProcessor } from './services/KeywordProcessor';
 import { keywordExtractor, KeywordExtractor } from './services/KeywordExtractor';
 import { aiService } from './services/AIService';
 import { urlTitleService } from './services/URLTitleService';
+import { URLAuthService } from './services/URLAuthService';
 import { TodoRecommendation } from '../shared/types';
 
 class Application {
@@ -20,6 +21,7 @@ class Application {
   private tray: Tray | null = null;
   private isQuitting: boolean = false;
   private hasShownTrayNotification: boolean = false;
+  private urlAuthService: URLAuthService | null = null;
 
   constructor() {
     this.dbManager = new DatabaseManager();
@@ -1130,6 +1132,34 @@ class Application {
         return {};
       }
     });
+
+    // URL授权相关
+    ipcMain.handle('url:authorize', async (_, url: string) => {
+      try {
+        console.log(`[IPC] Authorizing URL: ${url}`);
+        const title = await this.urlAuthService!.authorizeUrl(url);
+
+        if (title) {
+          return { success: true, title };
+        } else {
+          return { success: false, error: '未能获取页面标题，请确保登录完成后页面已完全加载再关闭窗口' };
+        }
+      } catch (error) {
+        console.error('Failed to authorize URL:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    ipcMain.handle('url:refreshTitle', async (_, url: string) => {
+      try {
+        console.log(`[IPC] Refreshing title for URL: ${url}`);
+        const title = await this.urlAuthService!.refreshUrlTitle(url);
+        return { success: true, title };
+      } catch (error) {
+        console.error('Failed to refresh URL title:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
   }
 
   public async initialize(): Promise<void> {
@@ -1218,6 +1248,11 @@ class Application {
         );
       }
       console.log('AI service initialized successfully');
+
+      // Initialize URL auth service
+      console.log('Initializing URL auth service...');
+      this.urlAuthService = new URLAuthService();
+      console.log('URL auth service initialized successfully');
 
       // 设置IPC处理器
       console.log('Setting up IPC handlers...');

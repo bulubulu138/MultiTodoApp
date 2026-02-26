@@ -156,6 +156,12 @@ export interface ElectronAPI {
     fetchBatch: (urls: string[]) => Promise<Record<string, string>>;
   };
 
+  // URL授权API
+  urlAuth: {
+    authorize: (url: string) => Promise<{success: boolean; title?: string; error?: string}>;
+    refreshTitle: (url: string) => Promise<{success: boolean; title?: string; error?: string}>;
+  };
+
   // 快速创建待办 API
   onQuickCreateTodo: (callback: (data: { content: string }) => void) => void;
   removeQuickCreateListener: () => void;
@@ -263,6 +269,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // URL标题API
   urlTitles: {
     fetchBatch: (urls: string[]) => ipcRenderer.invoke('url-titles:fetch-batch', urls),
+  },
+
+  // URL授权API
+  urlAuth: {
+    authorize: (url: string) => ipcRenderer.invoke('url:authorize', url),
+    refreshTitle: (url: string) => ipcRenderer.invoke('url:refreshTitle', url),
   },
 
   // 快速创建待办

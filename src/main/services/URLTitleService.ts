@@ -13,6 +13,74 @@ export class URLTitleService {
   private readonly MAX_TITLE_LENGTH = 100; // 标题最大长度
 
   /**
+   * 通用标题模式列表 - 用于检测无意义的通用标题
+   * 当检测到这些标题时，返回null让前端显示原始URL
+   */
+  private readonly GENERIC_TITLE_PATTERNS: (string | RegExp)[] = [
+    // 钉钉相关
+    '钉钉文档 - 钉钉统一身份认证',
+    '登录 - 钉钉',
+    '钉钉',
+    'DingTalk',
+    '统一身份认证',
+    // 通用登录页
+    /登录.*访问/i,
+    /请.*登录/i,
+    /authentication required/i,
+    /sign in/i,
+    /log in/i,
+    // 其他通用词汇
+    '登录',
+    'Login',
+    '首页',
+    'Home',
+    '主页',
+    'Homepage',
+    '文档',
+    'Document',
+  ];
+
+  /**
+   * 检查是否为通用标题（无意义的标题）
+   * @param title 标题文本
+   * @returns 是否为通用标题
+   */
+  private isGenericTitle(title: string): boolean {
+    if (!title || title.trim().length === 0) {
+      return true;
+    }
+
+    const trimmedTitle = title.trim();
+
+    // 1. 检查是否在通用标题列表中
+    if (this.GENERIC_TITLE_PATTERNS.some(pattern =>
+      typeof pattern === 'string' ? trimmedTitle === pattern : pattern.test(trimmedTitle)
+    )) {
+      return true;
+    }
+
+    // 2. 检查标题是否过短（小于5个字符）
+    if (trimmedTitle.length < 5) {
+      return true;
+    }
+
+    // 3. 检查是否只包含通用词汇
+    const genericWords = ['文档', '首页', '主页', 'Home', '首页', 'Document', '登录', 'Login'];
+    if (genericWords.some(word => trimmedTitle === word)) {
+      return true;
+    }
+
+    // 4. 检查是否只包含域名（例如 "GitHub", "Google" 等）
+    // 如果标题只是域名且没有其他描述性内容，也视为通用标题
+    const domainOnlyPattern = /^[A-Z][a-z]+(\.[a-z]+)?$/;
+    if (domainOnlyPattern.test(trimmedTitle)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * 获取单个URL的标题
    * @param url 目标URL
    * @returns 标题文本，失败返回null
@@ -64,9 +132,32 @@ export class URLTitleService {
   }
 
   /**
+   * Extract URL titles embedded in content as HTML comments
+   * @param content - The todo content containing embedded titles
+   * @returns Map of URLs to their embedded titles
+   */
+  extractEmbeddedTitles(content: string): Map<string, string> {
+    const titles = new Map<string, string>();
+    const regex = /<!-- URL_TITLE:([^:]+):([^>]+) -->/g;
+    let match;
+
+    while ((match = regex.exec(content)) !== null) {
+      try {
+        const url = decodeURIComponent(match[1]);
+        const title = match[2];
+        titles.set(url, title);
+      } catch (error) {
+        console.error('Failed to parse embedded URL title:', error);
+      }
+    }
+
+    return titles;
+  }
+
+  /**
    * 从HTML中提取标题
    * @param html HTML内容
-   * @returns 清理后的标题
+   * @returns 清理后的标题，如果检测到通用标题则返回null
    */
   private extractTitle(html: string): string | null {
     if (!html) return null;
@@ -90,6 +181,12 @@ export class URLTitleService {
     // 截断过长的标题
     if (title.length > this.MAX_TITLE_LENGTH) {
       title = title.substring(0, this.MAX_TITLE_LENGTH) + '...';
+    }
+
+    // 检查是否为通用标题，如果是则返回null让前端显示原始URL
+    if (title && this.isGenericTitle(title)) {
+      console.log(`[URLTitleService] Detected generic title: "${title}", returning null to show original URL`);
+      return null;
     }
 
     return title || null;

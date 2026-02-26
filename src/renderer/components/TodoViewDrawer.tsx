@@ -1,7 +1,7 @@
 import { Todo, TodoRelation, FlowchartAssociationDisplay } from '../../shared/types';
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
-import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message, Image, Card, Empty, Spin } from 'antd';
-import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined, NodeIndexOutlined, FileTextOutlined, LinkOutlined } from '@ant-design/icons';
+import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message, Image, Card, Empty, Spin, Tooltip } from 'antd';
+import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined, NodeIndexOutlined, FileTextOutlined, LinkOutlined, LoginOutlined, ReloadOutlined, SafetyOutlined } from '@ant-design/icons';
 import RelationContext from './RelationContext';
 import RelationsModal from './RelationsModal';
 import { copyTodoToClipboard } from '../utils/copyTodo';
@@ -9,6 +9,7 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import { useFlowchartAssociations } from '../hooks/useFlowchartAssociations';
 import { useURLTitles } from '../hooks/useURLTitles';
 import { LazyFlowchartPreviewCard } from './flowchart/LazyFlowchartPreviewCard';
+import { embedUrlTitleInContent } from '../utils/urlTitleStorage';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -113,7 +114,19 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   const associationsLoading = flowchartLevelLoading || nodeLevelLoading;
 
   // URL标题获取
-  const { titles: urlTitles } = useURLTitles(todo);
+  const { titles: urlTitles, refresh: refreshUrlTitles } = useURLTitles(todo);
+
+  // 提取内容中的所有URL
+  const extractedUrls = useMemo(() => {
+    if (!todo?.content) return [];
+    const urlRegex = /(https?:\/\/[^\s<>"]+)/g;
+    const matches = new Set<string>();
+    let match: RegExpExecArray | null;
+    while ((match = urlRegex.exec(todo.content)) !== null) {
+      matches.add(match[1]);
+    }
+    return Array.from(matches);
+  }, [todo?.content]);
 
   // 转换为PNG格式
   const convertToPng = async (blob: Blob): Promise<Blob> => {
@@ -233,6 +246,89 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
       setShowRelationsModal(false);
     }
   }, [visible]);
+
+  // URL标题处理函数
+  const [authorizingUrl, setAuthorizingUrl] = useState<string | null>(null);
+
+  /**
+   * 检查是否为通用标题
+   */
+  const isGenericTitle = useCallback((title: string): boolean => {
+    if (!title || title.trim().length < 5) return true;
+
+    const genericPatterns = [
+      '钉钉文档 - 钉钉统一身份认证',
+      '登录 - 钉钉',
+      '钉钉',
+      'DingTalk',
+      '统一身份认证',
+    ];
+
+    const trimmedTitle = title.trim();
+    return genericPatterns.some(pattern => trimmedTitle === pattern) ||
+           /登录.*访问/i.test(trimmedTitle) ||
+           /请.*登录/i.test(trimmedTitle);
+  }, []);
+
+  /**
+   * 处理URL授权
+   */
+  const handleAuthorize = useCallback(async (url: string) => {
+    setAuthorizingUrl(url);
+    try {
+      message.loading({ content: '正在打开授权窗口，请在窗口中完成登录...', key: 'url-auth', duration: 0 });
+      const result = await window.electronAPI.urlAuth.authorize(url);
+
+      if (result.success && result.title) {
+        message.success({ content: `成功获取标题: ${result.title}`, key: 'url-auth' });
+
+        // Save the title to the todo's content
+        if (todo && todo.id !== undefined && result.title) {
+          const updatedContent = embedUrlTitleInContent(todo.content || '', url, result.title);
+
+          // Update the todo with the new content
+          await window.electronAPI.todo.update(todo.id, { content: updatedContent });
+
+          // Force refresh URL titles
+          await refreshUrlTitles();
+
+          message.success('标题已保存到待办内容');
+        }
+      } else if (result.success && !result.title) {
+        message.info({ content: '授权窗口已关闭，未能获取标题', key: 'url-auth' });
+      } else {
+        message.error({ content: `授权失败: ${result.error || '未知错误'}`, key: 'url-auth' });
+      }
+    } catch (error) {
+      console.error('Authorization error:', error);
+      message.error({ content: '授权过程中发生错误', key: 'url-auth' });
+    } finally {
+      setAuthorizingUrl(null);
+    }
+  }, [todo, refreshUrlTitles]);
+
+  /**
+   * 处理刷新URL标题
+   */
+  const handleRefreshTitle = useCallback(async (url: string) => {
+    try {
+      message.loading({ content: '正在刷新标题...', key: 'url-refresh', duration: 0 });
+      const result = await window.electronAPI.urlAuth.refreshTitle(url);
+
+      if (result.success && result.title) {
+        message.success({ content: `标题已更新: ${result.title}`, key: 'url-refresh' });
+        // 提示用户重新打开抽屉
+        message.info('请关闭并重新打开详情抽屉以查看更新后的标题');
+      } else if (result.success && !result.title) {
+        message.info({ content: '未能获取标题，可能仍需登录', key: 'url-refresh' });
+      } else {
+        message.error({ content: `刷新失败: ${result.error || '未知错误'}`, key: 'url-refresh' });
+      }
+    } catch (error) {
+      console.error('Refresh error:', error);
+      message.error({ content: '刷新标题时发生错误', key: 'url-refresh' });
+    }
+  }, []);
 
   // 根据文件扩展名获取对应的图标（移到组件外部，避免循环依赖）
   const getFileIcon = (filePath: string): string => {
@@ -566,6 +662,73 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
               </Paragraph>
             )}
           </div>
+
+          {/* URL链接操作 - 如果内容包含URL则显示 */}
+          {extractedUrls.length > 0 && (
+            <>
+              <Divider />
+              <div style={{ marginBottom: 16 }}>
+                <Text strong>链接：</Text>
+                <Space direction="vertical" style={{ width: '100%', marginTop: 8 }} size="small">
+                  {extractedUrls.map((url) => {
+                    const title = urlTitles.get(url);
+                    const isGeneric = title ? isGenericTitle(title) : !title; // 无标题也视为需要处理
+                    const needsAction = isGeneric;
+
+                    return (
+                      <Card
+                        key={url}
+                        size="small"
+                        style={{ backgroundColor: colors.contentBg }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <Typography.Link
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              ellipsis
+                              style={{ marginRight: 8 }}
+                              title={url}
+                            >
+                              {title || url}
+                            </Typography.Link>
+                            {needsAction && (
+                              <Tag color="warning" style={{ marginLeft: 4 }}>需登录</Tag>
+                            )}
+                          </div>
+                          <Space size="small">
+                            {needsAction && (
+                              <Tooltip title="打开授权窗口登录以获取真实标题">
+                                <Button
+                                  size="small"
+                                  type="primary"
+                                  icon={<SafetyOutlined />}
+                                  loading={authorizingUrl === url}
+                                  onClick={() => handleAuthorize(url)}
+                                >
+                                  授权
+                                </Button>
+                              </Tooltip>
+                            )}
+                            <Tooltip title="重新获取标题（如果您已在浏览器登录）">
+                              <Button
+                                size="small"
+                                icon={<ReloadOutlined />}
+                                onClick={() => handleRefreshTitle(url)}
+                              >
+                                刷新
+                              </Button>
+                            </Tooltip>
+                          </Space>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </Space>
+              </div>
+            </>
+          )}
 
           <Divider />
 
