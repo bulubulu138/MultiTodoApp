@@ -55,9 +55,11 @@ export class URLAuthService {
 
           console.log(`[URLAuthService] ${source} - Title: "${currentTitle}", URL: ${currentUrl}`);
 
-          if (currentTitle && currentTitle.length > 0 && currentTitle !== lastTitle) {
-            capturedTitles.push(currentTitle);
-            lastTitle = currentTitle;
+          // Clean title before storing
+          const cleanedTitle = this.cleanTitle(currentTitle);
+          if (cleanedTitle && cleanedTitle.length > 0 && cleanedTitle !== lastTitle) {
+            capturedTitles.push(cleanedTitle);
+            lastTitle = cleanedTitle;
           }
         } catch (error) {
           console.error(`[URLAuthService] Error in ${source}:`, error);
@@ -69,9 +71,11 @@ export class URLAuthService {
       authWindow.webContents.on('dom-ready', () => captureTitle('dom-ready'));
       authWindow.webContents.on('page-title-updated', (_event, title) => {
         console.log(`[URLAuthService] page-title-updated - Title: "${title}"`);
-        if (title && title.length > 0 && title !== lastTitle) {
-          capturedTitles.push(title);
-          lastTitle = title;
+        // Clean title before storing
+        const cleanedTitle = this.cleanTitle(title);
+        if (cleanedTitle && cleanedTitle.length > 0 && cleanedTitle !== lastTitle) {
+          capturedTitles.push(cleanedTitle);
+          lastTitle = cleanedTitle;
         }
       });
 
@@ -111,7 +115,9 @@ export class URLAuthService {
           console.log('[URLAuthService] Window closed, no title captured');
         }
 
-        resolve(bestTitle);
+        // Final cleaning before returning
+        const finalTitle = bestTitle ? this.cleanTitle(bestTitle) : null;
+        resolve(finalTitle);
       });
 
       // 添加开发者工具支持（开发模式）
@@ -125,6 +131,25 @@ export class URLAuthService {
 
       console.log(`[URLAuthService] Opened authorization window for: ${url}`);
     });
+  }
+
+  /**
+   * 清理标题中的不可见 Unicode 字符和控制字符
+   */
+  private cleanTitle(title: string): string {
+    if (!title) return '';
+
+    // 移除零宽字符和其他不可见字符
+    // U+200B-ZWS, U+200C-ZWNJ, U+200D-ZWJ, U+FEFF-ZWNBSP
+    let cleaned = title.replace(/[\u200B-\u200D\uFEFF\u00AD\u034F\u180B-\u180D\u200B-\u200D\uFEFF]/g, '');
+
+    // 移除其他控制字符（保留换行、制表符）
+    cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+
+    // 移除多余的空格
+    cleaned = cleaned.trim().replace(/\s+/g, ' ');
+
+    return cleaned;
   }
 
   /**
@@ -155,6 +180,29 @@ export class URLAuthService {
     return SPECIFIC_LOGIN_TITLES.some(pattern =>
       typeof pattern === 'string' ? trimmedTitle === pattern : pattern.test(trimmedTitle)
     );
+  }
+
+  /**
+   * 获取授权窗口当前页面的标题（使用 webContents.executeJavaScript）
+   * 用于在授权成功后直接从已登录的页面获取标题
+   */
+  async getCurrentPageTitle(url: string): Promise<string | null> {
+    const authWindow = this.authWindows.get(url);
+    if (!authWindow || authWindow.isDestroyed()) {
+      return null;
+    }
+
+    try {
+      const title = await authWindow.webContents.executeJavaScript(`
+        document.title || null
+      `);
+      const cleanedTitle = this.cleanTitle(title);
+      console.log(`[URLAuthService] getCurrentPageTitle: "${cleanedTitle}"`);
+      return cleanedTitle;
+    } catch (error) {
+      console.error('[URLAuthService] Failed to get current page title:', error);
+      return null;
+    }
   }
 
   /**

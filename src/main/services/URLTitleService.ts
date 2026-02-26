@@ -41,6 +41,25 @@ export class URLTitleService {
   ];
 
   /**
+   * 清理标题中的不可见 Unicode 字符和控制字符
+   */
+  private cleanTitle(title: string): string {
+    if (!title) return '';
+
+    // 移除零宽字符和其他不可见字符
+    // U+200B-ZWS, U+200C-ZWNJ, U+200D-ZWJ, U+FEFF-ZWNBSP
+    let cleaned = title.replace(/[\u200B-\u200D\uFEFF\u00AD\u034F\u180B-\u180D\u200B-\u200D\uFEFF]/g, '');
+
+    // 移除其他控制字符（保留换行、制表符）
+    cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+
+    // 移除多余的空格
+    cleaned = cleaned.trim().replace(/\s+/g, ' ');
+
+    return cleaned;
+  }
+
+  /**
    * 检查是否为通用标题（无意义的标题）
    * @param title 标题文本
    * @returns 是否为通用标题
@@ -177,6 +196,9 @@ export class URLTitleService {
       .replace(/&amp;/g, '&')
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>');
+
+    // 清理不可见 Unicode 字符和控制字符
+    title = this.cleanTitle(title);
 
     // 截断过长的标题
     if (title.length > this.MAX_TITLE_LENGTH) {
