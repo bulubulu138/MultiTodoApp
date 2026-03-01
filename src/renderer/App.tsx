@@ -635,6 +635,19 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     setShowForm(true);
   };
 
+  const handleUpdateViewingTodo = useCallback((updatedTodo: Todo) => {
+    if (viewingTodo && viewingTodo.id === updatedTodo.id) {
+      console.log(`[App] Updating viewingTodo: ${updatedTodo.id}`);
+      setViewingTodo(updatedTodo);
+
+      // 同时更新todos列表中的对应项，确保数据一致性
+      setTodos(prevTodos =>
+        prevTodos.map(t => t.id === updatedTodo.id ? updatedTodo : t)
+      );
+      console.log(`[App] Updated todo in todos list: ${updatedTodo.id}`);
+    }
+  }, [viewingTodo]);
+
   const handleSortChange = async (option: SortOption) => {
     updateCurrentTabSettings({ sortOption: option });
   };
@@ -1135,6 +1148,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         }}
         onEdit={handleEditFromView}
         onRelationsChange={loadRelations}
+        onUpdateViewingTodo={handleUpdateViewingTodo}
       />
 
       <NotesDrawer

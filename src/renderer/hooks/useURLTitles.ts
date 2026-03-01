@@ -92,7 +92,7 @@ function extractURLs(text: string): string[] {
 export function useURLTitles(todo: Todo | null): {
   titles: Map<string, string>;
   loading: boolean;
-  refresh: () => Promise<void>;
+  refresh: (content?: string) => Promise<void>;
 } {
   const [titles, setTitles] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
@@ -149,15 +149,32 @@ export function useURLTitles(todo: Todo | null): {
 
   /**
    * 刷新标题获取
+   * @param content - 可选的 content 参数，如果提供则使用该内容而不是 todo.content
    */
-  const refresh = useCallback(async () => {
-    if (!todo?.content) return;
+  const refresh = useCallback(async (content?: string) => {
+    // 使用传入的 content，如果没有则使用 todo.content
+    const contentToUse = content || todo?.content;
 
-    const urls = extractURLs(todo.content);
+    console.log('[useURLTitles] refresh called:', {
+      hasContentParam: !!content,
+      hasTodoContent: !!todo?.content,
+      contentToUse: contentToUse?.substring(0, 100),
+      contentToUseLength: contentToUse?.length
+    });
+
+    if (!contentToUse) return;
+
+    const urls = extractURLs(contentToUse);
+    console.log('[useURLTitles] URLs extracted:', urls.length, urls);
+
     if (urls.length > 0) {
+      // Log embedded titles for debugging
+      const embeddedTitles = extractUrlTitlesFromContent(contentToUse);
+      console.log('[useURLTitles] Embedded titles found:', Object.fromEntries(embeddedTitles));
+
       // Clear cache and fetch fresh titles (including embedded ones)
       cache.current.clear();
-      await fetchTitles(urls, todo.content);
+      await fetchTitles(urls, contentToUse);
     }
   }, [todo?.content, fetchTitles]);
 

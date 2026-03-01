@@ -22,6 +22,7 @@ interface TodoViewDrawerProps {
   onEdit: (todo: Todo) => void;
   onOpenFlowchart?: (flowchartId: string, nodeId?: string) => void; // 修改：nodeId改为可选
   onRelationsChange?: () => Promise<void>; // 新增
+  onUpdateViewingTodo?: (todo: Todo) => void; // 新增
 }
 
 const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
@@ -32,7 +33,8 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   onClose,
   onEdit,
   onOpenFlowchart, // 新增
-  onRelationsChange // 新增
+  onRelationsChange, // 新增
+  onUpdateViewingTodo // 新增
 }) => {
   const colors = useThemeColors();
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -286,11 +288,33 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
         if (todo && todo.id !== undefined && result.title) {
           const updatedContent = embedUrlTitleInContent(todo.content || '', url, result.title);
 
+          console.log('[TodoViewDrawer] Embedding title in content:', {
+            url,
+            title: result.title,
+            updatedContent
+          });
+
           // Update the todo with the new content
           await window.electronAPI.todo.update(todo.id, { content: updatedContent });
 
-          // Force refresh URL titles
-          await refreshUrlTitles();
+          // 创建更新后的todo对象
+          const syncedTodo = { ...todo, content: updatedContent };
+
+          // 同时更新viewingTodo和allTodos
+          if (onUpdateViewingTodo) {
+            onUpdateViewingTodo(syncedTodo);
+            console.log('[TodoViewDrawer] Synced viewingTodo with updated content:', {
+              todoId: todo.id,
+              hasUpdatedContent: syncedTodo.content !== todo.content
+            });
+          }
+
+          // 等待状态更新完成后再refresh
+          await new Promise(resolve => setTimeout(resolve, 0));
+          console.log('[TodoViewDrawer] Refreshing URL titles with updated content');
+
+          // Force refresh URL titles with updated content
+          await refreshUrlTitles(updatedContent);
 
           message.success('标题已保存到待办内容');
         }
@@ -305,7 +329,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
     } finally {
       setAuthorizingUrl(null);
     }
-  }, [todo, refreshUrlTitles]);
+  }, [todo, refreshUrlTitles, onUpdateViewingTodo]);
 
   /**
    * 处理刷新URL标题

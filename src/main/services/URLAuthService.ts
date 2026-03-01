@@ -44,8 +44,13 @@ export class URLAuthService {
       });
 
       // Track ALL titles, not just non-generic ones
+      interface CapturedTitle {
+        title: string;
+        url: string;
+        timestamp: number;
+      }
       let lastTitle = '';
-      let capturedTitles: string[] = [];
+      let capturedTitles: CapturedTitle[] = [];
 
       // Helper function to capture title from any source
       const captureTitle = (source: string) => {
@@ -57,13 +62,32 @@ export class URLAuthService {
 
           // Clean title before storing
           const cleanedTitle = this.cleanTitle(currentTitle);
-          if (cleanedTitle && cleanedTitle.length > 0 && cleanedTitle !== lastTitle) {
-            capturedTitles.push(cleanedTitle);
+          if (cleanedTitle && cleanedTitle.length > 0) {
+            capturedTitles.push({
+              title: cleanedTitle,
+              url: currentUrl,
+              timestamp: Date.now()
+            });
             lastTitle = cleanedTitle;
           }
         } catch (error) {
           console.error(`[URLAuthService] Error in ${source}:`, error);
         }
+      };
+
+      // Helper function to determine if we should auto-close the window
+      const shouldAutoClose = (title: string): boolean => {
+        const cleaned = this.cleanTitle(title);
+        const finalUrl = this.extractFinalUrl(url);
+
+        // 如果有redirect_uri，不自动关闭（等待跳转到最终页面）
+        if (finalUrl) {
+          console.log(`[URLAuthService] Has redirect_uri, disabling auto-close`);
+          return false;
+        }
+
+        // Auto-close when we get a title that's sufficiently long and non-generic
+        return cleaned.length >= 5 && !this.isGenericTitle(cleaned);
       };
 
       // Listen to multiple events for comprehensive title capture
@@ -73,9 +97,27 @@ export class URLAuthService {
         console.log(`[URLAuthService] page-title-updated - Title: "${title}"`);
         // Clean title before storing
         const cleanedTitle = this.cleanTitle(title);
-        if (cleanedTitle && cleanedTitle.length > 0 && cleanedTitle !== lastTitle) {
-          capturedTitles.push(cleanedTitle);
+        if (cleanedTitle && cleanedTitle.length > 0) {
+          capturedTitles.push({
+            title: cleanedTitle,
+            url: authWindow.webContents.getURL(),
+            timestamp: Date.now()
+          });
           lastTitle = cleanedTitle;
+
+          // DISABLED: Auto-close after capturing a valid non-generic title
+          // 用户需要手动关闭窗口，确保页面完全加载并捕获实际文档标题
+          // 保留 shouldAutoClose 检查的日志用于调试
+          if (shouldAutoClose(cleanedTitle)) {
+            console.log(`[URLAuthService] Valid title captured: "${cleanedTitle}" (waiting for user to close window)`);
+            // Auto-close disabled to allow dynamic content to load fully
+            // setTimeout(() => {
+            //   if (!authWindow.isDestroyed()) {
+            //     console.log(`[URLAuthService] Auto-closing authorization window`);
+            //     authWindow.close();
+            //   }
+            // }, 500);
+          }
         }
       });
 
@@ -92,20 +134,37 @@ export class URLAuthService {
         clearTimeout(safetyTimeout);
         this.authWindows.delete(url);
 
-        // Use smart title selection: prefer non-generic, but accept any title
         let bestTitle: string | null = null;
+        const finalUrl = this.extractFinalUrl(url);
 
-        // Try to find a non-generic title
-        for (const title of capturedTitles) {
-          if (!this.isGenericTitle(title)) {
-            bestTitle = title;
-            break;
+        // 优先级1: 选择来自最终URL的标题
+        if (finalUrl) {
+          const finalUrlTitles = capturedTitles
+            .filter(t => t.url === finalUrl || t.url.startsWith(finalUrl))
+            .filter(t => !this.isGenericTitle(t.title));
+
+          if (finalUrlTitles.length > 0) {
+            // 选择最后一个（最新的）
+            bestTitle = finalUrlTitles[finalUrlTitles.length - 1].title;
+            console.log(`[URLAuthService] Using title from final URL: "${bestTitle}"`);
           }
         }
 
-        // Fallback: use the last captured title even if generic
+        // 优先级2: 选择非通用标题（优先选择最新的标题）
+        if (!bestTitle) {
+          const nonGenericTitles = capturedTitles.filter(entry => !this.isGenericTitle(entry.title));
+          if (nonGenericTitles.length > 0) {
+            // 按时间戳排序，选择最新的标题（动态网页的实际标题通常最后加载）
+            nonGenericTitles.sort((a, b) => b.timestamp - a.timestamp);
+            bestTitle = nonGenericTitles[0].title;
+            console.log(`[URLAuthService] Using non-generic title (selected from ${nonGenericTitles.length} candidates): "${bestTitle}" from ${nonGenericTitles[0].url}`);
+          }
+        }
+
+        // 优先级3: 使用最后捕获的标题
         if (!bestTitle && capturedTitles.length > 0) {
-          bestTitle = capturedTitles[capturedTitles.length - 1];
+          bestTitle = capturedTitles[capturedTitles.length - 1].title;
+          console.log(`[URLAuthService] Using last captured title as fallback: "${bestTitle}"`);
           console.log(`[URLAuthService] Using generic title as fallback: "${bestTitle}"`);
         }
 
@@ -134,14 +193,44 @@ export class URLAuthService {
   }
 
   /**
+   * 从登录URL中提取最终目标URL（从redirect_uri参数）
+   * @param url 登录页面URL
+   * @returns 最终目标URL，如果无redirect_uri则返回null
+   */
+  private extractFinalUrl(url: string): string | null {
+    try {
+      const urlObj = new URL(url);
+      const redirectUri = urlObj.searchParams.get('redirect_uri');
+      if (redirectUri) {
+        // redirect_uri 可能是 URL 编码的
+        const decodedUri = decodeURIComponent(redirectUri);
+        console.log(`[URLAuthService] Extracted final URL: ${decodedUri}`);
+        return decodedUri;
+      }
+    } catch (error) {
+      console.error('[URLAuthService] Failed to extract redirect_uri:', error);
+    }
+    return null;
+  }
+
+  /**
    * 清理标题中的不可见 Unicode 字符和控制字符
+   * 增强版正则表达式，覆盖更多不可见字符类型
    */
   private cleanTitle(title: string): string {
     if (!title) return '';
 
-    // 移除零宽字符和其他不可见字符
-    // U+200B-ZWS, U+200C-ZWNJ, U+200D-ZWJ, U+FEFF-ZWNBSP
-    let cleaned = title.replace(/[\u200B-\u200D\uFEFF\u00AD\u034F\u180B-\u180D\u200B-\u200D\uFEFF]/g, '');
+    // 移除零宽字符和其他不可见字符（增强版）
+    // - 零宽字符: U+200B-U+200D (ZWSP, ZWNJ, ZWJ)
+    // - 零宽非断空格: U+FEFF (ZWNBSP, BOM)
+    // - 软连字符: U+00AD
+    // - 组合用符号: U+034F
+    // - 蒙古文字符变体: U+180B-U+180D
+    // - 双向文本控制: U+202A-U+202E (LRE, RLE, PDF, LRO, RLO)
+    // - 其他格式控制: U+2060-U+206F
+    // - 对象替换字符等: U+FFFC, U+FFFD
+    // - 其他特殊控制字符: U+FFF9-U+FFFB
+    let cleaned = title.replace(/[\u200B-\u200D\uFEFF\u00AD\u034F\u180B-\u180D\u202A-\u202E\u2060-\u206F\uFFF9-\uFFFB\uFFFC\uFFFD]/g, '');
 
     // 移除其他控制字符（保留换行、制表符）
     cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
@@ -165,6 +254,29 @@ export class URLAuthService {
 
     // Very short titles are likely generic
     if (trimmedTitle.length < 5) {
+      return true;
+    }
+
+    // 通用平台标题 - 这些是平台级别的通用标题，不是实际文档标题
+    const GENERIC_PLATFORM_TITLES = [
+      '飞书云文档',
+      'Lark云文档',
+      '腾讯文档',
+      '钉钉文档',
+      '石墨文档',
+      '语雀',
+      '金山文档',
+      'WPS云文档',
+      '在线文档',
+      '云文档',
+      'Docs',
+      '文档',
+      '在线预览',
+    ];
+
+    // Check if title contains generic platform terms
+    if (GENERIC_PLATFORM_TITLES.some(generic => trimmedTitle.includes(generic))) {
+      console.log(`[URLAuthService] Title "${trimmedTitle}" contains generic platform term`);
       return true;
     }
 

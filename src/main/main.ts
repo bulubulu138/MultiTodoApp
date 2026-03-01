@@ -85,7 +85,7 @@ class Application {
   }
 
   private createWindow(): void {
-    const isDev = process.env.NODE_ENV === 'development';
+    const isDev = !app.isPackaged;
     
     this.mainWindow = new BrowserWindow({
       height: 800,

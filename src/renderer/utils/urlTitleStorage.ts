@@ -32,10 +32,13 @@ export function embedUrlTitleInContent(content: string, url: string, title: stri
   const encodedUrl = encodeURIComponent(url);
   const comment = `<!-- URL_TITLE:${encodedUrl}:${title} -->`;
 
+  console.log('[urlTitleStorage] Embedding title:', { url, encodedUrl, title, comment });
+
   // Check if title comment already exists for this URL
   const existingCommentRegex = new RegExp(`<!-- URL_TITLE:${escapeRegex(encodedUrl)}:[^>]* -->`);
   if (existingCommentRegex.test(content)) {
     // Replace existing title comment
+    console.log('[urlTitleStorage] Replacing existing title comment for URL:', url);
     return content.replace(existingCommentRegex, comment);
   }
 
@@ -44,10 +47,12 @@ export function embedUrlTitleInContent(content: string, url: string, title: stri
   if (urlIndex > -1) {
     // Find the start of the line containing the URL
     const insertIndex = content.lastIndexOf('\n', urlIndex) + 1;
+    console.log('[urlTitleStorage] Inserting title comment before URL:', { urlIndex, insertIndex });
     return content.slice(0, insertIndex) + comment + '\n' + content.slice(insertIndex);
   }
 
   // Append to end if URL not found
+  console.log('[urlTitleStorage] URL not found in content, appending comment to end');
   return content + '\n' + comment;
 }
 
@@ -65,11 +70,13 @@ export function extractUrlTitlesFromContent(content: string): Map<string, string
     try {
       const url = decodeURIComponent(match[1]); // 添加解码
       const title = match[2];
+      console.log('[urlTitleStorage] Extracted embedded title:', { url, title });
       titles.set(url, title);
     } catch (error) {
       console.error('Failed to parse embedded URL title:', error);
     }
   }
 
+  console.log('[urlTitleStorage] Total embedded titles extracted:', titles.size);
   return titles;
 }
