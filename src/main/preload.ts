@@ -160,6 +160,46 @@ export interface ElectronAPI {
   urlAuth: {
     authorize: (url: string) => Promise<{success: boolean; title?: string; error?: string}>;
     refreshTitle: (url: string) => Promise<{success: boolean; title?: string; error?: string}>;
+    getAllAuthorizations: () => Promise<Array<{
+      id: number;
+      url: string;
+      domain: string;
+      title: string | null;
+      first_authorized_at: string;
+      last_refreshed_at: string;
+      refresh_count: number;
+      status: 'active' | 'expired' | 'failed';
+      error_message: string | null;
+      created_at: string;
+      updated_at: string;
+    }>>;
+    getAllUrls: () => Promise<{
+      success: boolean;
+      data?: Array<{
+        url: string;
+        todoId: number;
+        hasAuthorization: boolean;
+        authorization: {
+          id: number;
+          url: string;
+          domain: string;
+          title: string | null;
+          first_authorized_at: string;
+          last_refreshed_at: string;
+          refresh_count: number;
+          status: 'active' | 'expired' | 'failed';
+          error_message: string | null;
+          created_at: string;
+          updated_at: string;
+        } | null;
+      }>;
+      error?: string;
+    }>;
+    refreshAll: () => Promise<{success: boolean; successCount?: number; failedCount?: number; error?: string}>;
+    cleanup: () => Promise<{success: boolean; count?: number; error?: string}>;
+    delete: (url: string) => Promise<{success: boolean; error?: string}>;
+    getTitles: (urls: string[]) => Promise<Record<string, string>>;
+    initialize: () => Promise<{success: boolean; count?: number; error?: string}>;
   };
 
   // 快速创建待办 API
@@ -275,6 +315,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   urlAuth: {
     authorize: (url: string) => ipcRenderer.invoke('url:authorize', url),
     refreshTitle: (url: string) => ipcRenderer.invoke('url:refreshTitle', url),
+    getAllAuthorizations: () => ipcRenderer.invoke('url-auth:getAll'),
+    getAllUrls: () => ipcRenderer.invoke('url-auth:getAllUrls'),
+    refreshAll: () => ipcRenderer.invoke('url-auth:refresh'),
+    cleanup: () => ipcRenderer.invoke('url-auth:cleanup'),
+    delete: (url: string) => ipcRenderer.invoke('url-auth:delete', url),
+    getTitles: (urls: string[]) => ipcRenderer.invoke('url-auth:getTitles', urls),
+    initialize: () => ipcRenderer.invoke('url-auth:initialize'),
   },
 
   // 快速创建待办

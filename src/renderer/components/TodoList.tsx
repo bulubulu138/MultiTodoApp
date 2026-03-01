@@ -623,9 +623,10 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
               {/* 原有卡片 */}
               <Card
                 className="todo-card"
-                style={{ 
+                style={{
                   flex: 1,
-                  borderLeft: hasParallel ? '4px solid #fa8c16' : undefined
+                  borderLeft: hasParallel ? '4px solid #fa8c16' : undefined,
+                  backgroundColor: todo.status === 'completed' ? colors.completedBg : undefined,
                 }}
                 styles={{ body: { padding: '8px' } }}
                 variant="borderless"

@@ -199,7 +199,8 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
         style={{
           height: '100%',
           borderLeft: todo.id && relations.some(r => r.relation_type === 'parallel' &&
-            (r.source_id === todo.id || r.target_id === todo.id)) ? '4px solid #fa8c16' : undefined
+            (r.source_id === todo.id || r.target_id === todo.id)) ? '4px solid #fa8c16' : undefined,
+          backgroundColor: todo.status === 'completed' ? colors.completedBg : undefined,
         }}
         styles={{ body: { padding: '12px', height: '100%' } }}
         variant="borderless"

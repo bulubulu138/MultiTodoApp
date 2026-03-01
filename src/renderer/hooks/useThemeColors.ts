@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { COLOR_SCHEMES, ColorTheme } from '../theme/themes';
 
 export interface ThemeColors {
   listItemBg: string;
@@ -11,6 +12,7 @@ export interface ThemeColors {
   textColor: string;
   cardBg: string;
   textPrimary: string;
+  completedBg: string; // 已完成待办的背景色
 }
 
 /**
@@ -25,44 +27,54 @@ export const useThemeColors = (): ThemeColors => {
   const [isDark, setIsDark] = useState(
     document.documentElement.dataset.theme === 'dark'
   );
-  
+  const [colorTheme, setColorTheme] = useState<ColorTheme>(
+    (document.documentElement.dataset.colorTheme as ColorTheme) || 'purple'
+  );
+
   useEffect(() => {
-    // 使用 MutationObserver 监听 data-theme 属性变化
+    // 使用 MutationObserver 监听 data-theme 和 data-color-theme 属性变化
     const observer = new MutationObserver(() => {
       const newTheme = document.documentElement.dataset.theme;
       setIsDark(newTheme === 'dark');
+      const newColorTheme = (document.documentElement.dataset.colorTheme as ColorTheme) || 'purple';
+      setColorTheme(newColorTheme);
     });
-    
+
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['data-theme']
+      attributeFilter: ['data-theme', 'data-color-theme']
     });
-    
+
     return () => observer.disconnect();
   }, []);
   
   // 根据当前主题返回对应的颜色（使用 useMemo 避免每次渲染都创建新对象）
-  return useMemo(() => ({
-    // 列表项背景 - 深色模式下使用浅色（关联上下文卡片用）
-    listItemBg: isDark ? '#f5f5f5' : '#fff',
-    // 列表项悬停背景
-    listItemHoverBg: isDark ? '#262626' : '#f5f5f5',
-    // 逾期待办背景
-    listItemOverdueBg: isDark ? '#2a1215' : '#fff1f0',
-    // 逾期待办悬停背景
-    listItemOverdueHoverBg: isDark ? '#3d1a1f' : '#ffe7e6',
-    // 当前待办高亮背景 - 深色模式下使用浅蓝色（可读性优先）
-    listItemCurrentBg: isDark ? '#e6f7ff' : '#f0f9ff',
-    // 内容区域背景 - 深色模式下使用浅色（可读性优先）
-    contentBg: isDark ? '#f5f5f5' : '#f5f5f5',
-    // 边框颜色
-    borderColor: isDark ? '#404040' : '#f0f0f0',
-    // 文本颜色 - 根据主题自动调整
-    textColor: isDark ? '#ffffff' : '#000000',
-    // 卡片背景 - 用于报告等卡片组件
-    cardBg: isDark ? '#1f1f1f' : '#ffffff',
-    // 主文本颜色 - 用于标题等
-    textPrimary: isDark ? '#ffffff' : '#000000',
-  }), [isDark]);
+  return useMemo(() => {
+    const scheme = COLOR_SCHEMES[colorTheme];
+    return {
+      // 列表项背景 - 深色模式下使用浅色（关联上下文卡片用）
+      listItemBg: isDark ? '#f5f5f5' : '#fff',
+      // 列表项悬停背景
+      listItemHoverBg: isDark ? '#262626' : '#f5f5f5',
+      // 逾期待办背景
+      listItemOverdueBg: isDark ? '#2a1215' : '#fff1f0',
+      // 逾期待办悬停背景
+      listItemOverdueHoverBg: isDark ? '#3d1a1f' : '#ffe7e6',
+      // 当前待办高亮背景 - 深色模式下使用浅蓝色（可读性优先）
+      listItemCurrentBg: isDark ? '#e6f7ff' : '#f0f9ff',
+      // 内容区域背景 - 深色模式下使用浅色（可读性优先）
+      contentBg: isDark ? '#f5f5f5' : '#f5f5f5',
+      // 边框颜色
+      borderColor: isDark ? '#404040' : '#f0f0f0',
+      // 文本颜色 - 根据主题自动调整
+      textColor: isDark ? '#ffffff' : '#000000',
+      // 卡片背景 - 用于报告等卡片组件
+      cardBg: isDark ? '#1f1f1f' : '#ffffff',
+      // 主文本颜色 - 用于标题等
+      textPrimary: isDark ? '#ffffff' : '#000000',
+      // 已完成待办的背景色 - 使用当前主题色的 primaryLight
+      completedBg: scheme.primaryLight,
+    };
+  }, [isDark, colorTheme]);
 };
 

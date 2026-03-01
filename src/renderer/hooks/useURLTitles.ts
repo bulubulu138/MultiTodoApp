@@ -101,7 +101,7 @@ export function useURLTitles(todo: Todo | null): {
 
   /**
    * 获取URL标题
-   * First extracts embedded titles from content, then fetches missing ones
+   * Priority: embedded titles > authorization database > cache > network
    */
   const fetchTitles = useCallback(async (urls: string[], content?: string) => {
     if (urls.length === 0) {
@@ -112,24 +112,31 @@ export function useURLTitles(todo: Todo | null): {
     setLoading(true);
 
     try {
-      // First, extract embedded titles from content
+      // 1. Extract embedded titles from content (highest priority)
       const embeddedTitles = content
         ? extractUrlTitlesFromContent(content)
         : new Map<string, string>();
 
-      // Only fetch URLs without embedded titles
-      const urlsToFetch = urls.filter(url => !embeddedTitles.has(url));
+      // 2. Get titles from authorization database (second priority)
+      const urlsToCheckAuth = urls.filter(url => !embeddedTitles.has(url));
+      const authTitles = urlsToCheckAuth.length > 0
+        ? await window.electronAPI.urlAuth.getTitles?.(urlsToCheckAuth)
+        : {};
 
-      // Fetch remaining URLs from the network
+      // 3. Only fetch URLs without embedded or auth titles
+      const urlsToFetch = urls.filter(url =>
+        !embeddedTitles.has(url) && !authTitles[url]
+      );
+
+      // 4. Fetch remaining URLs from the network
       const fetchedTitles = urlsToFetch.length > 0
         ? await window.electronAPI.urlTitles.fetchBatch(urlsToFetch)
         : {};
 
-      // Combine embedded and fetched titles
+      // 5. Combine all titles by priority
       const allTitles = new Map<string, string>();
       urls.forEach(url => {
-        // Priority: embedded title > fetched title > no title
-        const title = embeddedTitles.get(url) || fetchedTitles[url];
+        const title = embeddedTitles.get(url) || authTitles[url] || fetchedTitles[url];
         if (title) {
           cache.current.set(url, title);
           allTitles.set(url, title);
@@ -201,46 +208,58 @@ export function useURLTitles(todo: Todo | null): {
       return;
     }
 
-    // Extract embedded titles first
+    // Extract embedded titles first (highest priority)
     const embeddedTitles = extractUrlTitlesFromContent(todo.content);
 
-    // Separate cached and uncached URLs (excluding embedded titles)
-    const uncachedUrls: string[] = [];
-    const cachedTitles = new Map<string, string>();
+    // Get URLs that need titles (not in embedded)
+    const urlsNeedingTitles = urls.filter(url => !embeddedTitles.has(url));
 
-    urls.forEach(url => {
-      const embeddedTitle = embeddedTitles.get(url);
-      if (embeddedTitle) {
-        // Use embedded title immediately
-        cachedTitles.set(url, embeddedTitle);
-      } else {
+    // Load titles from authorization database (async)
+    const loadTitles = async () => {
+      // Separate cached and uncached URLs (excluding embedded titles)
+      const uncachedUrls: string[] = [];
+      const initialTitles = new Map<string, string>();
+
+      // Add embedded titles immediately
+      embeddedTitles.forEach((title, url) => {
+        initialTitles.set(url, title);
+      });
+
+      // Check cache for remaining URLs
+      urlsNeedingTitles.forEach(url => {
         const cachedTitle = cache.current.get(url);
         if (cachedTitle) {
-          cachedTitles.set(url, cachedTitle);
+          initialTitles.set(url, cachedTitle);
         } else {
           uncachedUrls.push(url);
         }
+      });
+
+      // If all URLs have embedded or cached titles, use them
+      if (uncachedUrls.length === 0) {
+        setTitles(initialTitles);
+        return;
       }
-    });
 
-    // If all URLs have embedded or cached titles, use them
-    if (uncachedUrls.length === 0) {
-      setTitles(cachedTitles);
-      return;
-    }
+      // Fetch remaining URL titles (will check auth db then network)
+      const fetchedTitles = await fetchTitles(uncachedUrls, todo.content);
 
-    // Fetch remaining URL titles
-    fetchTitles(uncachedUrls, todo.content).then((fetchedTitles) => {
-      // Merge all titles
+      // Merge all titles by priority: embedded > auth > cache > fetched
       const finalTitles = new Map<string, string>();
       urls.forEach(url => {
-        const title = embeddedTitles.get(url) || cache.current.get(url);
+        const embeddedTitle = embeddedTitles.get(url);
+        const cachedTitle = cache.current.get(url);
+        const fetchedTitle = fetchedTitles.get(url);
+        const title = embeddedTitle || cachedTitle || fetchedTitle;
         if (title) {
           finalTitles.set(url, title);
         }
       });
+
       setTitles(finalTitles);
-    });
+    };
+
+    loadTitles();
   }, [todo?.content, fetchTitles]);
 
   return {

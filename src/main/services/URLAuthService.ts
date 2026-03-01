@@ -1,5 +1,6 @@
 import { BrowserWindow, Session, session } from 'electron';
 import { URLTitleService } from './URLTitleService';
+import { URLAuthorizationService } from './URLAuthorizationService';
 
 /**
  * URL授权服务
@@ -9,11 +10,19 @@ export class URLAuthService {
   private authWindows: Map<string, BrowserWindow> = new Map();
   private urlTitleService: URLTitleService;
   private authSession: Session;
+  private urlAuthorizationService: URLAuthorizationService | null = null;
 
   constructor() {
     this.urlTitleService = new URLTitleService();
     // 创建独立的session用于授权窗口，不应用CSP限制
     this.authSession = session.fromPartition('persist:auth-session');
+  }
+
+  /**
+   * 设置URL授权记录服务
+   */
+  setURLAuthorizationService(service: URLAuthorizationService): void {
+    this.urlAuthorizationService = service;
   }
 
   /**
@@ -176,6 +185,14 @@ export class URLAuthService {
 
         // Final cleaning before returning
         const finalTitle = bestTitle ? this.cleanTitle(bestTitle) : null;
+
+        // 记录授权信息到数据库
+        if (finalTitle && !this.isGenericTitle(finalTitle) && this.urlAuthorizationService) {
+          this.urlAuthorizationService.recordAuthorization(url, finalTitle).catch(err => {
+            console.error('[URLAuthService] Failed to record authorization:', err);
+          });
+        }
+
         resolve(finalTitle);
       });
 

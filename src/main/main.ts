@@ -10,6 +10,8 @@ import { keywordExtractor, KeywordExtractor } from './services/KeywordExtractor'
 import { aiService } from './services/AIService';
 import { urlTitleService } from './services/URLTitleService';
 import { URLAuthService } from './services/URLAuthService';
+import { URLAuthorizationService } from './services/URLAuthorizationService';
+import { AuthorizationRefreshScheduler } from './services/AuthorizationRefreshScheduler';
 import { TodoRecommendation } from '../shared/types';
 
 class Application {
@@ -22,6 +24,8 @@ class Application {
   private isQuitting: boolean = false;
   private hasShownTrayNotification: boolean = false;
   private urlAuthService: URLAuthService | null = null;
+  private urlAuthorizationService: URLAuthorizationService | null = null;
+  private authorizationRefreshScheduler: AuthorizationRefreshScheduler | null = null;
 
   constructor() {
     this.dbManager = new DatabaseManager();
@@ -1160,6 +1164,124 @@ class Application {
         return { success: false, error: (error as Error).message };
       }
     });
+
+    // URL授权管理相关
+    ipcMain.handle('url-auth:getAll', async () => {
+      try {
+        return await this.urlAuthorizationService!.getAllAuthorizations();
+      } catch (error) {
+        console.error('Failed to get authorizations:', error);
+        return [];
+      }
+    });
+
+    ipcMain.handle('url-auth:refresh', async () => {
+      try {
+        const result = await this.urlAuthorizationService!.batchRefreshAuthorizations();
+        return { success: true, successCount: result.success, failedCount: result.failed };
+      } catch (error) {
+        console.error('Failed to refresh authorizations:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    ipcMain.handle('url-auth:cleanup', async () => {
+      try {
+        const count = await this.urlAuthorizationService!.cleanupExpiredAuthorizations();
+        return { success: true, count };
+      } catch (error) {
+        console.error('Failed to cleanup authorizations:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    ipcMain.handle('url-auth:delete', async (_, url: string) => {
+      try {
+        const success = await this.urlAuthorizationService!.deleteAuthorization(url);
+        return { success };
+      } catch (error) {
+        console.error('Failed to delete authorization:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // 批量获取授权记录中的标题
+    ipcMain.handle('url-auth:getTitles', async (_, urls: string[]) => {
+      try {
+        const titleMap = await this.urlAuthorizationService!.getAuthorizationsByUrls(urls);
+        // Convert Map to plain object for IPC serialization
+        return Object.fromEntries(titleMap);
+      } catch (error) {
+        console.error('Failed to get authorization titles:', error);
+        return {};
+      }
+    });
+
+    // 初始化授权数据库（从现有待办事项迁移）
+    ipcMain.handle('url-auth:initialize', async () => {
+      try {
+        const count = await this.urlAuthorizationService!.initializeFromExistingTodos();
+        return { success: true, count };
+      } catch (error) {
+        console.error('Failed to initialize authorizations:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // 获取所有待办事项中的URL（包括未授权的）
+    ipcMain.handle('url-auth:getAllUrls', async () => {
+      try {
+        const db = this.dbManager.getDb();
+        if (!db) {
+          return { success: false, error: 'Database not available' };
+        }
+
+        // 获取所有待办事项的content
+        const todos = db
+          .prepare('SELECT id, content FROM todos WHERE content IS NOT NULL AND LENGTH(content) > 0')
+          .all() as Array<{ id: number; content: string }>;
+
+        // 提取所有URL
+        const urlPattern = /(https?:\/\/[^\s<>"]+)/g;
+        const urlMap = new Map<string, { todoId: number; url: string }>();
+
+        todos.forEach(todo => {
+          let match: RegExpExecArray | null;
+          // Reset regex state for each todo
+          urlPattern.lastIndex = 0;
+          while ((match = urlPattern.exec(todo.content)) !== null) {
+            const url = match[1];
+            // 去重（保留第一次出现）
+            if (!urlMap.has(url)) {
+              urlMap.set(url, { todoId: todo.id, url });
+            }
+          }
+        });
+
+        // 获取已授权的URL
+        const authRecords = await this.urlAuthorizationService!.getAllAuthorizations();
+        const authorizedRecords = new Map<string, any>();
+        authRecords.forEach(record => {
+          authorizedRecords.set(record.url, record);
+        });
+
+        // 合并数据，标记状态
+        const allUrls = Array.from(urlMap.values()).map(item => {
+          const authRecord = authorizedRecords.get(item.url);
+          return {
+            url: item.url,
+            todoId: item.todoId,
+            hasAuthorization: !!authRecord,
+            authorization: authRecord || null,
+          };
+        });
+
+        return { success: true, data: allUrls };
+      } catch (error) {
+        console.error('Failed to get all URLs:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
   }
 
   public async initialize(): Promise<void> {
@@ -1254,6 +1376,23 @@ class Application {
       this.urlAuthService = new URLAuthService();
       console.log('URL auth service initialized successfully');
 
+      // Initialize URL authorization service
+      console.log('Initializing URL authorization service...');
+      const db = this.dbManager.getDb();
+      if (db) {
+        this.urlAuthorizationService = new URLAuthorizationService(db);
+        this.urlAuthService.setURLAuthorizationService(this.urlAuthorizationService);
+        console.log('URL authorization service initialized successfully');
+
+        // Start authorization refresh scheduler
+        console.log('Starting authorization refresh scheduler...');
+        this.authorizationRefreshScheduler = new AuthorizationRefreshScheduler(this.urlAuthorizationService);
+        this.authorizationRefreshScheduler.start();
+        console.log('Authorization refresh scheduler started successfully');
+      } else {
+        console.error('Failed to initialize URL authorization service: database is null');
+      }
+
       // 设置IPC处理器
       console.log('Setting up IPC handlers...');
       this.setupIpcHandlers();
@@ -1305,7 +1444,8 @@ class Application {
     app.on('will-quit', () => {
       globalShortcut.unregisterAll();
       this.backupManager?.stopAutoBackup();
-      console.log('Global shortcuts unregistered and backup stopped');
+      this.authorizationRefreshScheduler?.stop();
+      console.log('Global shortcuts unregistered, backup stopped, and authorization scheduler stopped');
     });
 
     app.on('activate', () => {

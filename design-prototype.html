@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MultiTodo 设计原型</title>
+  <style>
+    /* ============================================
+       CSS Reset
+    ============================================ */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+      color: var(--text-primary);
+      background: var(--bg-layout);
+    }
+
+    /* ============================================
+       CSS Variables - Theme System
+    ============================================ */
+
+    /* Color Themes - Purple (Default) */
+    :root {
+      --hue: 260;
+      --color-primary: hsl(260, 80%, 60%);
+      --color-primary-dark: hsl(260, 80%, 45%);
+      --color-primary-light: hsl(260, 80%, 92%);
+    }
+
+    [data-color-theme="blue"] {
+      --hue: 210;
+      --color-primary: hsl(210, 80%, 60%);
+      --color-primary-dark: hsl(210, 80%, 45%);
+      --color-primary-light: hsl(210, 80%, 92%);
+    }
+
+    [data-color-theme="green"] {
+      --hue: 150;
+      --color-primary: hsl(150, 80%, 45%);
+      --color-primary-dark: hsl(150, 80%, 35%);
+      --color-primary-light: hsl(150, 80%, 92%);
+    }
+
+    [data-color-theme="orange"] {
+      --hue: 35;
+      --color-primary: hsl(35, 90%, 60%);
+      --color-primary-dark: hsl(35, 90%, 45%);
+      --color-primary-light: hsl(35, 90%, 92%);
+    }
+
+    [data-color-theme="red"] {
+      --hue: 0;
+      --color-primary: hsl(0, 80%, 60%);
+      --color-primary-dark: hsl(0, 80%, 45%);
+      --color-primary-light: hsl(0, 80%, 92%);
+    }
+
+    /* Light Mode (Default) */
+    :root {
+      --bg-base: #ffffff;
+      --bg-container: #ffffff;
+      --bg-layout: #fafafa;
+      --bg-tertiary: #f5f5f5;
+      --border-color: #e5e5e5;
+      --text-primary: #1a1a1a;
+      --text-secondary: #666666;
+      --text-tertiary: #999999;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 1px 4px rgba(0, 0, 0, 0.08);
+      --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.15);
+      --scroll-track-bg: #f1f1f1;
+      --scroll-thumb-bg: #c1c1c1;
+      --scroll-thumb-hover-bg: #a8a8a8;
+    }
+
+    /* Dark Mode */
+    [data-theme="dark"] {
+      --bg-base: #000000;
+      --bg-container: #141414;
+      --bg-layout: #000000;
+      --bg-tertiary: #1a1a1a;
+      --border-color: #404040;
+      --text-primary: #ffffff;
+      --text-secondary: #a0a0a0;
+      --text-tertiary: #737373;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 1px 4px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.5);
+      --scroll-track-bg: #1a1a1a;
+      --scroll-thumb-bg: #404040;
+      --scroll-thumb-hover-bg: #525252;
+    }
+
+    /* Semantic Colors */
+    :root {
+      --priority-high: #ef4444;
+      --priority-medium: #f59e0b;
+      --priority-low: #10b981;
+      --status-pending: #faad14;
+      --status-in-progress: #1890ff;
+      --status-completed: #52c41a;
+      --status-paused: #8c8c8c;
+    }
+
+    /* ============================================
+       Base Typography
+    ============================================ */
+    h1, h2, h3, h4, h5, h6 {
+      font-weight: 600;
+      margin: 0;
+    }
+
+    p {
+      margin: 0;
+    }
+
+    a {
+      color: var(--color-primary);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    a:hover {
+      color: var(--color-primary-dark);
+    }
+
+    /* ============================================
+       Custom Scrollbar
+    ============================================ */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--scroll-track-bg);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--scroll-thumb-bg);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--scroll-thumb-hover-bg);
+    }
+
+    /* ============================================
+       Layout Styles
+    ============================================ */
+    .app-container {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-layout);
+    }
+
+    /* ============================================
+       Toolbar Styles
+    ============================================ */
+    .toolbar {
+      background: var(--bg-container);
+      border-bottom: 1px solid var(--border-color);
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+      background: rgba(255, 255, 255, 0.95);
+    }
+
+    [data-theme="dark"] .toolbar {
+      background: rgba(20, 20, 20, 0.95);
+    }
+
+    .toolbar-left {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar-search {
+      width: 100%;
+      max-width: 300px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 8px 12px 8px 36px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 14px;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      transition: all 0.2s ease;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px var(--color-primary-light);
+    }
+
+    .search-wrapper {
+      position: relative;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-tertiary);
+      font-size: 16px;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: var(--bg-base);
+      color: var(--text-primary);
+    }
+
+    .btn:hover {
+      background: var(--bg-tertiary);
+      border-color: var(--color-primary);
+    }
+
+    .btn-primary {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--color-primary-dark);
+      border-color: var(--color-primary-dark);
+      color: white;
+    }
+
+    .btn-icon {
+      padding: 8px;
+      aspect-ratio: 1;
+    }
+
+    .btn-text {
+      font-size: 14px;
+    }
+
+    @media (max-width: 768px) {
+      .btn-text {
+        display: none;
+      }
+    }
+
+    .sort-select {
+      padding: 8px 32px 8px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 14px;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+    }
+
+    [data-theme="dark"] .sort-select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a0a0a0' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    }
+
+    /* ============================================
+       Status Tabs Styles
+    ============================================ */
+    .main-content {
+      flex: 1;
+      padding: 16px 24px;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .status-tabs {
+      background: var(--bg-container);
+      padding: 12px 16px 0;
+      border-radius: 8px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 16px;
+    }
+
+    .tabs-list {
+      display: flex;
+      gap: 4px;
+      overflow-x: auto;
+    }
+
+    .tab-item {
+      padding: 10px 20px;
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      position: relative;
+    }
+
+    .tab-item:hover {
+      color: var(--text-primary);
+    }
+
+    .tab-item.active {
+      font-weight: 600;
+      color: var(--color-primary);
+      border-bottom-color: var(--color-primary);
+    }
+
+    .tab-count {
+      font-size: 13px;
+      color: var(--text-tertiary);
+      margin-left: 4px;
+    }
+
+    .tab-item.active .tab-count {
+      color: var(--color-primary);
+    }
+
+    /* ============================================
+       Todo List & Card Styles
+    ============================================ */
+    .todo-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .todo-card {
+      background: var(--bg-container);
+      border-radius: 8px;
+      box-shadow: var(--shadow-md);
+      transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                  box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+    }
+
+    .todo-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .todo-card.completed {
+      opacity: 0.7;
+    }
+
+    .todo-card.completed .todo-title {
+      text-decoration: line-through;
+      color: var(--text-tertiary);
+    }
+
+    .todo-card-body {
+      padding: 12px 16px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .todo-checkbox {
+      width: 20px;
+      height: 20px;
+      margin-top: 2px;
+      cursor: pointer;
+      accent-color: var(--color-primary);
+    }
+
+    .todo-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .todo-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .todo-title {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-primary);
+      flex: 1;
+      line-height: 1.4;
+    }
+
+    .priority-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .priority-high {
+      background: #fee2e2;
+      color: var(--priority-high);
+    }
+
+    [data-theme="dark"] .priority-high {
+      background: rgba(239, 68, 68, 0.2);
+    }
+
+    .priority-medium {
+      background: #fef3c7;
+      color: var(--priority-medium);
+    }
+
+    [data-theme="dark"] .priority-medium {
+      background: rgba(245, 158, 11, 0.2);
+    }
+
+    .priority-low {
+      background: #d1fae5;
+      color: var(--priority-low);
+    }
+
+    [data-theme="dark"] .priority-low {
+      background: rgba(16, 185, 129, 0.2);
+    }
+
+    .todo-description {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin: 4px 0 8px;
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .todo-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .todo-tags {
+      display: inline-flex;
+      gap: 4px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      background: var(--color-primary-light);
+      color: var(--color-primary-dark);
+      font-weight: 500;
+    }
+
+    .todo-deadline {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    .todo-deadline.overdue {
+      color: var(--priority-high);
+    }
+
+    .todo-actions {
+      display: flex;
+      gap: 4px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .todo-card:hover .todo-actions {
+      opacity: 1;
+    }
+
+    .action-btn {
+      padding: 4px 8px;
+      font-size: 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-base);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .action-btn:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+
+    /* Status indicator */
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .status-pending { color: var(--status-pending); }
+    .status-in-progress { color: var(--status-in-progress); }
+    .status-completed { color: var(--status-completed); }
+    .status-paused { color: var(--status-paused); }
+
+    /* ============================================
+       Theme Switcher
+    ============================================ */
+    .theme-switcher {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg-container);
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      padding: 16px;
+      z-index: 1000;
+      border: 1px solid var(--border-color);
+    }
+
+    .theme-switcher-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    .theme-modes {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .theme-mode-btn {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background: var(--bg-base);
+      color: var(--text-secondary);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .theme-mode-btn.active {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+      background: var(--color-primary-light);
+    }
+
+    .color-themes {
+      display: flex;
+      gap: 8px;
+    }
+
+    .color-theme-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .color-theme-btn:hover {
+      transform: scale(1.1);
+    }
+
+    .color-theme-btn.active {
+      border-color: var(--text-primary);
+    }
+
+    .color-theme-btn.active::after {
+      content: '✓';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .color-theme-purple { background: #8B5CF6; }
+    .color-theme-blue { background: #3B82F6; }
+    .color-theme-green { background: #10B981; }
+    .color-theme-orange { background: #F59E0B; }
+    .color-theme-red { background: #EF4444; }
+
+    /* ============================================
+       Animation
+    ============================================ */
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .todo-card {
+      animation: fadeIn 0.3s ease backwards;
+    }
+
+    .todo-card:nth-child(1) { animation-delay: 0.05s; }
+    .todo-card:nth-child(2) { animation-delay: 0.1s; }
+    .todo-card:nth-child(3) { animation-delay: 0.15s; }
+    .todo-card:nth-child(4) { animation-delay: 0.2s; }
+    .todo-card:nth-child(5) { animation-delay: 0.25s; }
+    .todo-card:nth-child(6) { animation-delay: 0.3s; }
+    .todo-card:nth-child(7) { animation-delay: 0.35s; }
+
+    /* ============================================
+       Responsive Design
+    ============================================ */
+    @media (max-width: 768px) {
+      .toolbar {
+        padding: 12px 16px;
+      }
+
+      .toolbar-right {
+        gap: 8px;
+      }
+
+      .main-content {
+        padding: 12px 16px;
+      }
+
+      .status-tabs {
+        padding: 8px 12px 0;
+      }
+
+      .tab-item {
+        padding: 8px 12px;
+        font-size: 14px;
+      }
+
+      .todo-card-body {
+        padding: 10px 12px;
+      }
+
+      .theme-switcher {
+        bottom: 16px;
+        right: 16px;
+        padding: 12px;
+      }
+    }
+
+    /* ============================================
+       Empty State
+    ============================================ */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-tertiary);
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .empty-state-text {
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container" data-theme="light" data-color-theme="purple">
+
+    <!-- Toolbar -->
+    <header class="toolbar">
+      <div class="toolbar-left">
+        <div class="search-wrapper">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="search-input" placeholder="搜索标题或内容..." id="searchInput">
+        </div>
+      </div>
+
+      <div class="toolbar-right">
+        <select class="sort-select" id="sortSelect">
+          <option value="createdAt-desc">创建时间 ↓</option>
+          <option value="createdAt-asc">创建时间 ↑</option>
+          <option value="deadline-asc">截止时间 ↑</option>
+          <option value="deadline-desc">截止时间 ↓</option>
+        </select>
+
+        <button class="btn">
+          <span>📊</span>
+          <span class="btn-text">导出</span>
+        </button>
+
+        <button class="btn">
+          <span>💡</span>
+          <span class="btn-text">心得</span>
+        </button>
+
+        <button class="btn">
+          <span>📅</span>
+          <span class="btn-text">日历</span>
+        </button>
+
+        <button class="btn btn-primary">
+          <span>➕</span>
+          <span class="btn-text">新建待办</span>
+        </button>
+
+        <button class="btn btn-icon" title="设置">
+          <span>⚙️</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Status Tabs -->
+      <nav class="status-tabs">
+        <div class="tabs-list" id="tabsList">
+          <div class="tab-item active" data-tab="all">
+            全部<span class="tab-count" id="count-all">(7)</span>
+          </div>
+          <div class="tab-item" data-tab="pending">
+            待处理<span class="tab-count" id="count-pending">(3)</span>
+          </div>
+          <div class="tab-item" data-tab="in_progress">
+            进行中<span class="tab-count" id="count-in-progress">(2)</span>
+          </div>
+          <div class="tab-item" data-tab="completed">
+            已完成<span class="tab-count" id="count-completed">(1)</span>
+          </div>
+          <div class="tab-item" data-tab="paused">
+            已暂停<span class="tab-count" id="count-paused">(1)</span>
+          </div>
+        </div>
+      </nav>
+
+      <!-- Todo List -->
+      <div class="todo-list" id="todoList">
+        <!-- Todos will be rendered here -->
+      </div>
+    </main>
+
+    <!-- Theme Switcher -->
+    <div class="theme-switcher">
+      <div class="theme-switcher-title">🎨 主题设置</div>
+      <div class="theme-modes">
+        <button class="theme-mode-btn active" data-theme="light">◐ 明亮</button>
+        <button class="theme-mode-btn" data-theme="dark">◑ 深色</button>
+      </div>
+      <div class="theme-switcher-title" style="margin-bottom: 8px;">颜色主题</div>
+      <div class="color-themes">
+        <button class="color-theme-btn color-theme-purple active" data-color="purple" title="紫色"></button>
+        <button class="color-theme-btn color-theme-blue" data-color="blue" title="蓝色"></button>
+        <button class="color-theme-btn color-theme-green" data-color="green" title="绿色"></button>
+        <button class="color-theme-btn color-theme-orange" data-color="orange" title="橙色"></button>
+        <button class="color-theme-btn color-theme-red" data-color="red" title="红色"></button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ============================================
+    // Mock Data
+    // ============================================
+    const mockTodos = [
+      {
+        id: 1,
+        title: "完成项目设计稿",
+        content: "需要包含首页、列表页和详情页的完整设计，确保用户体验流畅",
+        status: "pending",
+        priority: "high",
+        tags: ["工作", "UI设计"],
+        deadline: "今天 18:00",
+        overdue: false
+      },
+      {
+        id: 2,
+        title: "代码审查",
+        content: "审查前端团队的 PR，确保代码质量和规范性",
+        status: "in_progress",
+        priority: "medium",
+        tags: ["开发"],
+        deadline: "明天 12:00",
+        overdue: false
+      },
+      {
+        id: 3,
+        title: "更新产品文档",
+        content: "根据最新功能更新 API 文档和用户手册",
+        status: "completed",
+        priority: "low",
+        tags: ["文档"],
+        deadline: "已提前完成",
+        overdue: false
+      },
+      {
+        id: 4,
+        title: "团队周会",
+        content: "准备周会 PPT，汇总本周进度和下周计划",
+        status: "pending",
+        priority: "medium",
+        tags: ["会议", "工作"],
+        deadline: "周五 15:00",
+        overdue: false
+      },
+      {
+        id: 5,
+        title: "优化首屏加载速度",
+        content: "分析性能瓶颈，实施懒加载和代码分割策略",
+        status: "paused",
+        priority: "high",
+        tags: ["性能优化", "开发"],
+        deadline: "暂无",
+        overdue: false
+      },
+      {
+        id: 6,
+        title: "设计系统组件库",
+        content: "建立统一的组件库，包含按钮、表单、卡片等基础组件",
+        status: "pending",
+        priority: "low",
+        tags: ["设计系统", "前端"],
+        deadline: "下个月",
+        overdue: false
+      },
+      {
+        id: 7,
+        title: "用户反馈分析",
+        content: "整理和分析本月的用户反馈，提出改进建议",
+        status: "in_progress",
+        priority: "medium",
+        tags: ["产品", "数据分析"],
+        deadline: "后天",
+        overdue: false
+      }
+    ];
+
+    // ============================================
+    // State
+    // ============================================
+    let currentTab = 'all';
+    let currentTheme = localStorage.getItem('theme') || 'light';
+    let currentColorTheme = localStorage.getItem('colorTheme') || 'purple';
+    let searchText = '';
+    let todos = [...mockTodos];
+
+    // ============================================
+    // DOM Elements
+    // ============================================
+    const appContainer = document.querySelector('.app-container');
+    const todoList = document.getElementById('todoList');
+    const tabsList = document.getElementById('tabsList');
+    const searchInput = document.getElementById('searchInput');
+
+    // ============================================
+    // Theme Functions
+    // ============================================
+    function setTheme(theme) {
+      currentTheme = theme;
+      appContainer.setAttribute('data-theme', theme);
+      localStorage.setItem('theme', theme);
+
+      // Update theme mode buttons
+      document.querySelectorAll('.theme-mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.theme === theme);
+      });
+    }
+
+    function setColorTheme(colorTheme) {
+      currentColorTheme = colorTheme;
+      appContainer.setAttribute('data-color-theme', colorTheme);
+      localStorage.setItem('colorTheme', colorTheme);
+
+      // Update color theme buttons
+      document.querySelectorAll('.color-theme-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.color === colorTheme);
+      });
+    }
+
+    // ============================================
+    // Render Functions
+    // ============================================
+    function getPriorityLabel(priority) {
+      const labels = {
+        high: '高',
+        medium: '中',
+        low: '低'
+      };
+      return labels[priority] || '';
+    }
+
+    function getStatusLabel(status) {
+      const labels = {
+        pending: '待处理',
+        in_progress: '进行中',
+        completed: '已完成',
+        paused: '已暂停'
+      };
+      return labels[status] || '';
+    }
+
+    function renderTodoCard(todo) {
+      const priorityClass = `priority-${todo.priority}`;
+      const statusClass = `status-${todo.status}`;
+      const completedClass = todo.status === 'completed' ? 'completed' : '';
+      const overdueClass = todo.overdue ? 'overdue' : '';
+
+      const tagsHtml = todo.tags.map(tag => `<span class="tag">${tag}</span>`).join('');
+
+      return `
+        <div class="todo-card ${completedClass}" data-id="${todo.id}" data-status="${todo.status}">
+          <div class="todo-card-body">
+            <input type="checkbox" class="todo-checkbox" ${todo.status === 'completed' ? 'checked' : ''}>
+            <div class="todo-content">
+              <div class="todo-header">
+                <h3 class="todo-title">${todo.title}</h3>
+                <span class="priority-badge ${priorityClass}">${getPriorityLabel(todo.priority)}</span>
+              </div>
+              <p class="todo-description">${todo.content}</p>
+              <div class="todo-meta">
+                <div class="todo-tags">${tagsHtml}</div>
+                <span class="todo-deadline ${overdueClass}">
+                  ⏰ ${todo.deadline}
+                </span>
+                <span class="status-indicator ${statusClass}">
+                  ${getStatusLabel(todo.status)}
+                </span>
+              </div>
+            </div>
+            <div class="todo-actions">
+              <button class="action-btn">编辑</button>
+              <button class="action-btn">删除</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTodos() {
+      // Filter by tab
+      let filteredTodos = todos;
+      if (currentTab !== 'all') {
+        filteredTodos = todos.filter(todo => todo.status === currentTab);
+      }
+
+      // Filter by search text
+      if (searchText.trim()) {
+        const searchLower = searchText.toLowerCase();
+        filteredTodos = filteredTodos.filter(todo =>
+          todo.title.toLowerCase().includes(searchLower) ||
+          todo.content.toLowerCase().includes(searchLower)
+        );
+      }
+
+      // Update counts
+      updateCounts();
+
+      // Render or show empty state
+      if (filteredTodos.length === 0) {
+        todoList.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <div class="empty-state-text">暂无待办事项</div>
+          </div>
+        `;
+      } else {
+        todoList.innerHTML = filteredTodos.map(renderTodoCard).join('');
+
+        // Add checkbox event listeners
+        document.querySelectorAll('.todo-checkbox').forEach(checkbox => {
+          checkbox.addEventListener('change', handleCheckboxChange);
+        });
+      }
+    }
+
+    function updateCounts() {
+      document.getElementById('count-all').textContent = `(${todos.length})`;
+      document.getElementById('count-pending').textContent = `(${todos.filter(t => t.status === 'pending').length})`;
+      document.getElementById('count-in-progress').textContent = `(${todos.filter(t => t.status === 'in_progress').length})`;
+      document.getElementById('count-completed').textContent = `(${todos.filter(t => t.status === 'completed').length})`;
+      document.getElementById('count-paused').textContent = `(${todos.filter(t => t.status === 'paused').length})`;
+    }
+
+    // ============================================
+    // Event Handlers
+    // ============================================
+    function handleTabClick(e) {
+      const tabItem = e.target.closest('.tab-item');
+      if (!tabItem) return;
+
+      // Update active tab
+      document.querySelectorAll('.tab-item').forEach(item => item.classList.remove('active'));
+      tabItem.classList.add('active');
+
+      // Update current tab and re-render
+      currentTab = tabItem.dataset.tab;
+      renderTodos();
+    }
+
+    function handleCheckboxChange(e) {
+      const checkbox = e.target;
+      const card = checkbox.closest('.todo-card');
+      const todoId = parseInt(card.dataset.id);
+
+      // Find and update todo
+      const todo = todos.find(t => t.id === todoId);
+      if (todo) {
+        todo.status = checkbox.checked ? 'completed' : 'pending';
+        renderTodos();
+      }
+    }
+
+    function handleSearch(e) {
+      searchText = e.target.value;
+      renderTodos();
+    }
+
+    // ============================================
+    // Initialize Theme Switcher
+    // ============================================
+    function initThemeSwitcher() {
+      // Theme mode buttons
+      document.querySelectorAll('.theme-mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          setTheme(btn.dataset.theme);
+        });
+      });
+
+      // Color theme buttons
+      document.querySelectorAll('.color-theme-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          setColorTheme(btn.dataset.color);
+        });
+      });
+    }
+
+    // ============================================
+    // Initialize App
+    // ============================================
+    function init() {
+      // Apply saved theme
+      setTheme(currentTheme);
+      setColorTheme(currentColorTheme);
+
+      // Initialize theme switcher
+      initThemeSwitcher();
+
+      // Add tab click listeners
+      tabsList.addEventListener('click', handleTabClick);
+
+      // Add search listener
+      searchInput.addEventListener('input', handleSearch);
+
+      // Initial render
+      renderTodos();
+    }
+
+    // Start the app
+    init();
+  </script>
+</body>
+</html>

@@ -191,7 +191,26 @@ export class DatabaseManager {
       )`,
       
       `CREATE INDEX IF NOT EXISTS idx_flowchart_todo_assoc_flowchart ON flowchart_todo_associations(flowchart_id)`,
-      `CREATE INDEX IF NOT EXISTS idx_flowchart_todo_assoc_todo ON flowchart_todo_associations(todo_id)`
+      `CREATE INDEX IF NOT EXISTS idx_flowchart_todo_assoc_todo ON flowchart_todo_associations(todo_id)`,
+
+      // URL授权记录表
+      `CREATE TABLE IF NOT EXISTS url_authorizations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        url TEXT NOT NULL UNIQUE,
+        domain TEXT NOT NULL,
+        title TEXT,
+        first_authorized_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_refreshed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        refresh_count INTEGER DEFAULT 1,
+        status TEXT DEFAULT 'active',
+        error_message TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
+
+      `CREATE INDEX IF NOT EXISTS idx_url_auth_domain ON url_authorizations(domain)`,
+      `CREATE INDEX IF NOT EXISTS idx_url_auth_last_refreshed ON url_authorizations(last_refreshed_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_url_auth_status ON url_authorizations(status)`
     ];
 
     for (const sql of tables) {

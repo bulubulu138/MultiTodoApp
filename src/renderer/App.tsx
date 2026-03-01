@@ -1031,7 +1031,11 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   }, [currentTabSettings.viewMode]);
 
   return (
-    <Layout style={{ height: '100vh' }} data-theme={themeMode}>
+    <Layout
+      style={{ height: '100vh' }}
+      data-theme={themeMode}
+      data-color-theme={colorTheme}
+    >
         <Toolbar
           onAddTodo={() => setShowPositionSelector(true)}
         onShowSettings={() => setShowSettings(true)}
