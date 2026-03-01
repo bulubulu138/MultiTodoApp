@@ -14,7 +14,7 @@ import TodoViewDrawer from './components/TodoViewDrawer';
 import NotesDrawer from './components/NotesDrawer';
 import CalendarDrawer from './components/CalendarDrawer';
 import ContentFocusView, { ContentFocusViewRef } from './components/ContentFocusView';
-import { getTheme, ThemeMode } from './theme/themes';
+import { getTheme, ThemeMode, ColorTheme } from './theme/themes';
 import { buildParallelGroups, selectGroupRepresentatives, sortWithGroups, getSortComparator } from './utils/sortWithGroups';
 import { optimizedMotionVariants, useConditionalAnimation, shouldReduceMotion, useMotionPerformanceMonitor } from './utils/optimizedMotionVariants';
 import { PerformanceMonitor } from './utils/performanceMonitor';
@@ -36,10 +36,12 @@ type TabSettingsMap = {
 interface AppContentProps {
   themeMode: ThemeMode;
   onThemeChange: (mode: ThemeMode) => void;
+  colorTheme: ColorTheme;
+  onColorThemeChange: (theme: ColorTheme) => void;
 }
 
 // 内部组件，可以使用 App.useApp()
-const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => {
+const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, colorTheme, onColorThemeChange }) => {
   const { message } = AntApp.useApp();
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -586,12 +588,17 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
     try {
       await window.electronAPI.settings.update(newSettings);
       setSettings(newSettings);
-      
+
       // 更新主题
       if (newSettings.theme) {
         onThemeChange(newSettings.theme as ThemeMode);
       }
-      
+
+      // 更新颜色主题
+      if (newSettings.colorTheme) {
+        onColorThemeChange(newSettings.colorTheme as ColorTheme);
+      }
+
       setShowSettings(false);
       message.success('设置保存成功');
     } catch (error) {
@@ -1135,6 +1142,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
         customTabs={customTabs}
         onSaveCustomTabs={handleSaveCustomTabs}
         existingTags={existingTags}
+        colorTheme={colorTheme}
+        onColorThemeChange={onColorThemeChange}
       />
 
       <TodoViewDrawer
@@ -1219,7 +1228,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange }) => 
 // 外部组件，提供 ConfigProvider 和 App context
 const App: React.FC = () => {
   const [themeMode, setThemeMode] = useState<ThemeMode>('light');
-  
+  const [colorTheme, setColorTheme] = useState<ColorTheme>('purple');
+
   // 加载主题设置
   useEffect(() => {
     const loadTheme = async () => {
@@ -1228,6 +1238,9 @@ const App: React.FC = () => {
         if (appSettings.theme) {
           setThemeMode(appSettings.theme as ThemeMode);
         }
+        if (appSettings.colorTheme) {
+          setColorTheme(appSettings.colorTheme as ColorTheme);
+        }
       } catch (error) {
         console.error('Error loading theme:', error);
       }
@@ -1235,17 +1248,30 @@ const App: React.FC = () => {
     loadTheme();
   }, []);
 
+  const handleColorThemeChange = (theme: ColorTheme) => {
+    setColorTheme(theme);
+    // Also persist the color theme to settings
+    window.electronAPI.settings.update({ colorTheme: theme }).catch(err => {
+      console.error('Error saving color theme:', err);
+    });
+  };
+
   return (
-    <ConfigProvider 
-      locale={zhCN} 
-      theme={getTheme(themeMode)}
+    <ConfigProvider
+      locale={zhCN}
+      theme={getTheme(themeMode, colorTheme)}
       // 性能优化：减少不必要的动画效果
       virtual={false}
       // 优化波纹效果和动画时长
       wave={{ disabled: false }}
     >
       <AntApp>
-        <AppContent themeMode={themeMode} onThemeChange={setThemeMode} />
+        <AppContent
+          themeMode={themeMode}
+          onThemeChange={setThemeMode}
+          colorTheme={colorTheme}
+          onColorThemeChange={handleColorThemeChange}
+        />
       </AntApp>
     </ConfigProvider>
   );

@@ -1,14 +1,59 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert } from 'antd';
-import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, ExportOutlined } from '@ant-design/icons';
+import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert, Tooltip } from 'antd';
+import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, ExportOutlined, LinkOutlined, BgColorsOutlined } from '@ant-design/icons';
 import { App } from 'antd';
 import { Todo, CustomTab } from '../../shared/types';
+import { ColorTheme } from '../theme/themes';
 import TagManagement from './TagManagement';
 import BackupSettings from './BackupSettings';
 import CustomTabManager from './CustomTabManager';
 import FlowchartMigrationPanel from './FlowchartMigrationModal';
+import URLAuthorizationManager from './URLAuthorizationManager';
 
 const { Text } = Typography;
+
+// Color theme selector component
+interface ColorThemeSelectorProps {
+  value: ColorTheme;
+  onChange: (theme: ColorTheme) => void;
+}
+
+const ColorThemeSelector: React.FC<ColorThemeSelectorProps> = ({ value, onChange }) => {
+  const colors: Array<{ key: ColorTheme; color: string; label: string }> = [
+    { key: 'purple', color: '#8B5CF6', label: '紫色' },
+    { key: 'blue', color: '#3B82F6', label: '蓝色' },
+    { key: 'green', color: '#10B981', label: '绿色' },
+    { key: 'orange', color: '#F59E0B', label: '橙色' },
+    { key: 'red', color: '#EF4444', label: '红色' },
+  ];
+
+  return (
+    <Space size={12}>
+      {colors.map(({ key, color, label }) => (
+        <Tooltip key={key} title={label}>
+          <div
+            onClick={() => onChange(key)}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              backgroundColor: color,
+              cursor: 'pointer',
+              border: value === key ? '3px solid var(--ant-colorText)' : '3px solid transparent',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.15)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          />
+        </Tooltip>
+      ))}
+    </Space>
+  );
+};
 
 interface SettingsModalProps {
   visible: boolean;
@@ -20,6 +65,8 @@ interface SettingsModalProps {
   customTabs?: CustomTab[];
   onSaveCustomTabs?: (tabs: CustomTab[]) => void;
   existingTags?: string[];
+  colorTheme?: ColorTheme;
+  onColorThemeChange?: (theme: ColorTheme) => void;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -31,7 +78,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   onReload,
   customTabs = [],
   onSaveCustomTabs,
-  existingTags = []
+  existingTags = [],
+  colorTheme = 'purple',
+  onColorThemeChange
 }) => {
   const [form] = Form.useForm();
   const [aiForm] = Form.useForm();
@@ -42,13 +91,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionTestResult, setConnectionTestResult] = useState<{success: boolean; message: string} | null>(null);
   const [generatingKeywords, setGeneratingKeywords] = useState(false);
+  const [localColorTheme, setLocalColorTheme] = useState<ColorTheme>(colorTheme);
 
   useEffect(() => {
     if (visible) {
       form.setFieldsValue({
         theme: settings.theme || 'light',
         calendarViewSize: settings.calendarViewSize || 'compact',
+        colorTheme: settings.colorTheme || 'purple',
       });
+      setLocalColorTheme((settings.colorTheme as ColorTheme) || 'purple');
       
       // 加载AI配置
       aiForm.setFieldsValue({
@@ -222,7 +274,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             placeholder="选择主题"
           />
         </Form.Item>
-        
+
+        <Form.Item
+          name="colorTheme"
+          label={
+            <span>
+              <BgColorsOutlined style={{ marginRight: 8 }} />
+              主题颜色
+            </span>
+          }
+          tooltip="选择您喜欢的主题颜色"
+        >
+          <ColorThemeSelector value={localColorTheme} onChange={(theme) => {
+            setLocalColorTheme(theme);
+            onColorThemeChange?.(theme);
+          }} />
+        </Form.Item>
+
         <Form.Item
           name="calendarViewSize"
           label="📅 日历视图大小"
@@ -537,6 +605,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         />
       ),
     },
+    {
+      key: 'urlAuthorization',
+      label: (
+        <span>
+          <LinkOutlined />
+          URL授权管理
+        </span>
+      ),
+      children: <URLAuthorizationManager />,
+    },
   ];
 
   return (
@@ -546,7 +624,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       onOk={activeTab === 'general' ? handleSubmit : onCancel}
       onCancel={onCancel}
       okText={activeTab === 'general' || activeTab === 'ai' ? '保存' : '关闭'}
-      cancelText={(activeTab === 'general' || activeTab === 'ai') ? '取消' : undefined}
+      cancelText={(activeTab === 'general' || activeTab === 'ai' || activeTab === 'urlAuthorization') ? '取消' : undefined}
       width={800}
       styles={{ body: { padding: '16px 24px' } }}
     >
