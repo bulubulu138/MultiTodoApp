@@ -10,9 +10,11 @@ import ContentFocusView from './ContentFocusView';
 import RelationIndicators from './RelationIndicators';
 import { FlowchartIndicator } from './FlowchartIndicator';
 import VirtualizedTodoList from './VirtualizedTodoList';
+import TodoLinksPreview from './TodoLinksPreview';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useFlowchartAssociations } from '../hooks/useFlowchartAssociations';
+import { useBatchURLTitles } from '../hooks/useBatchURLTitles';
 import { formatCompletedTime } from '../utils/timeFormatter';
 import { PerformanceMonitor } from '../utils/performanceMonitor';
 import dayjs from 'dayjs';
@@ -104,7 +106,10 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   // 获取所有待办的流程图关联数据
   const todoIds = useMemo(() => todos.map(t => t.id!).filter(id => id !== undefined), [todos]);
   const { associationsByTodo, loading: associationsLoading } = useFlowchartAssociations(todoIds);
-  
+
+  // 批量获取所有待办的URL标题
+  const { getUrlTitlesForTodo, loading: urlTitlesLoading } = useBatchURLTitles(todos);
+
   // 性能监控：记录待办列表渲染时间
   useEffect(() => {
     if (process.env.NODE_ENV === 'development' && todos.length > 0) {
@@ -482,6 +487,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
         onUpdateDisplayOrder={onUpdateDisplayOrder}
         viewMode={viewMode}
         onUpdateInPlace={onUpdateInPlace}
+        getUrlTitlesForTodo={getUrlTitlesForTodo}
       />
     );
   }
@@ -770,11 +776,12 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                 </div>
               )}
 
-              {/* 内容预览 - 使用优化的纯文本显示 */}
+              {/* 内容预览 - 显示链接或纯文本 */}
               {todo.content && (
-                <div style={{ marginBottom: 6 }}>
-                  {getFirstLine(extractPlainText(todo.content))}
-                </div>
+                <TodoLinksPreview
+                  content={todo.content}
+                  urlTitles={getUrlTitlesForTodo(todo.id!)}
+                />
               )}
 
               {/* 底部：优先级 + 状态 + 时间信息 */}

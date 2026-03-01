@@ -1,3 +1,7 @@
+rm -rf node_modules/.cache/webpack
+
+
+
 # MultiTodo - 智能多功能待办应用
 
 ![Build Status](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-blue)

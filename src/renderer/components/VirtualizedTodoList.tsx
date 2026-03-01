@@ -8,6 +8,7 @@ import { SortOption, ViewMode } from './Toolbar';
 import RelationsModal from './RelationsModal';
 import RelationContext from './RelationContext';
 import RelationIndicators from './RelationIndicators';
+import TodoLinksPreview from './TodoLinksPreview';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { formatCompletedTime } from '../utils/timeFormatter';
@@ -32,13 +33,14 @@ interface VirtualizedTodoListProps {
   onUpdateDisplayOrder?: (id: number, tabKey: string, order: number | null) => Promise<void>;
   viewMode?: ViewMode;
   onUpdateInPlace?: (id: number, updates: Partial<Todo>) => void;
+  getUrlTitlesForTodo?: (todoId: number) => Map<string, string>;
 }
 
 // 虚拟化列表项的高度
 const ITEM_HEIGHT = 240; // 根据实际卡片高度调整
 
-// 优化的单个待办事项组件
-const VirtualizedTodoItem = memo<{
+// VirtualizedTodoItem props interface
+interface VirtualizedTodoItemProps {
   todo: Todo;
   allTodos?: Todo[];
   index: number;
@@ -52,7 +54,11 @@ const VirtualizedTodoItem = memo<{
   onView: (todo: Todo) => void;
   onRelationsChange?: () => Promise<void>;
   onUpdateDisplayOrder?: (id: number, tabKey: string, order: number | null) => Promise<void>;
-}>(({
+  urlTitles?: Map<string, string>;
+}
+
+// 优化的单个待办事项组件
+const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
   todo,
   allTodos,
   index,
@@ -65,7 +71,8 @@ const VirtualizedTodoItem = memo<{
   onStatusChange,
   onView,
   onRelationsChange,
-  onUpdateDisplayOrder
+  onUpdateDisplayOrder,
+  urlTitles
 }) => {
   const { message } = App.useApp();
   const colors = useThemeColors();
@@ -322,17 +329,10 @@ const VirtualizedTodoItem = memo<{
 
         {/* 内容预览 */}
         {todo.content && (
-          <div style={{
-            marginBottom: 8,
-            color: '#666',
-            fontSize: 13,
-            lineHeight: '20px',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}>
-            {getFirstLine(extractPlainText(todo.content))}
-          </div>
+          <TodoLinksPreview
+            content={todo.content}
+            urlTitles={urlTitles || new Map()}
+          />
         )}
 
         {/* 底部：优先级 + 状态 + 时间信息 */}
@@ -434,7 +434,8 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
   activeTab,
   onUpdateDisplayOrder,
   viewMode,
-  onUpdateInPlace
+  onUpdateInPlace,
+  getUrlTitlesForTodo
 }) => {
   const [showRelationsModal, setShowRelationsModal] = useState(false);
   const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
@@ -457,6 +458,7 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
     onView: (todo: Todo) => void;
     onRelationsChange?: () => Promise<void>;
     onUpdateDisplayOrder?: (id: number, tabKey: string, order: number | null) => Promise<void>;
+    getUrlTitlesForTodo?: (todoId: number) => Map<string, string>;
   };
 
   const rowPropsData: RowPropsType = useMemo(() => ({
@@ -470,15 +472,16 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
     onStatusChange,
     onView,
     onRelationsChange,
-    onUpdateDisplayOrder
-  }), [todos, allTodos, relations, sortOption, activeTab, onEdit, onDelete, onStatusChange, onView, onRelationsChange, onUpdateDisplayOrder]);
+    onUpdateDisplayOrder,
+    getUrlTitlesForTodo
+  }), [todos, allTodos, relations, sortOption, activeTab, onEdit, onDelete, onStatusChange, onView, onRelationsChange, onUpdateDisplayOrder, getUrlTitlesForTodo]);
 
   // 渲染虚拟化列表项 - 接收List自动提供的index和style，以及我们传入的rowProps
-  const RowComponent = useCallback((props: { 
-    index: number; 
+  const RowComponent = useCallback((props: {
+    index: number;
     style: React.CSSProperties;
   } & RowPropsType) => {
-    const { index, style, todos, allTodos, relations, sortOption, activeTab, onEdit, onDelete, onStatusChange, onView, onRelationsChange, onUpdateDisplayOrder } = props;
+    const { index, style, todos, allTodos, relations, sortOption, activeTab, onEdit, onDelete, onStatusChange, onView, onRelationsChange, onUpdateDisplayOrder, getUrlTitlesForTodo } = props;
     const todo = todos[index];
     if (!todo || !todo.id) return <div style={style} />;
 
@@ -497,6 +500,7 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
         onView={onView}
         onRelationsChange={onRelationsChange}
         onUpdateDisplayOrder={onUpdateDisplayOrder}
+        urlTitles={getUrlTitlesForTodo ? getUrlTitlesForTodo(todo.id) : undefined}
       />
     );
   }, []);
