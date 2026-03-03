@@ -1,6 +1,7 @@
 import { BrowserWindow, Session, session } from 'electron';
 import { URLTitleService } from './URLTitleService';
 import { URLAuthorizationService } from './URLAuthorizationService';
+import { BatchAuthorizationService } from './BatchAuthorizationService';
 
 /**
  * URL授权服务
@@ -11,6 +12,8 @@ export class URLAuthService {
   private urlTitleService: URLTitleService;
   private authSession: Session;
   private urlAuthorizationService: URLAuthorizationService | null = null;
+  private batchAuthService: BatchAuthorizationService | null = null;
+  private mainWindow: Electron.BrowserWindow | null = null;
 
   constructor() {
     this.urlTitleService = new URLTitleService();
@@ -19,10 +22,18 @@ export class URLAuthService {
   }
 
   /**
-   * 设置URL授权记录服务
+   * 设置URL授权记录服务和批量授权服务
    */
-  setURLAuthorizationService(service: URLAuthorizationService): void {
+  setURLAuthorizationService(service: URLAuthorizationService, db: any): void {
     this.urlAuthorizationService = service;
+    this.batchAuthService = new BatchAuthorizationService(db, this.authSession);
+  }
+
+  /**
+   * 设置主窗口引用（用于发送事件通知）
+   */
+  setMainWindow(window: Electron.BrowserWindow): void {
+    this.mainWindow = window;
   }
 
   /**
@@ -191,6 +202,26 @@ export class URLAuthService {
           this.urlAuthorizationService.recordAuthorization(url, finalTitle).catch(err => {
             console.error('[URLAuthService] Failed to record authorization:', err);
           });
+
+          // 新增：触发批量授权
+          if (this.batchAuthService) {
+            const domain = this.extractDomain(url);
+            console.log(`[URLAuthService] Triggering batch authorization for domain: ${domain}`);
+
+            // 异步执行，不阻塞主流程
+            this.batchAuthService.batchAuthorizeByDomain(domain, url, finalTitle)
+              .then(result => {
+                console.log(`[URLAuthService] Batch authorization completed:`, result);
+
+                // 通知前端
+                if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                  this.mainWindow.webContents.send('url-auth:batch-completed', result);
+                }
+              })
+              .catch(err => {
+                console.error('[URLAuthService] Batch authorization failed:', err);
+              });
+          }
         }
 
         resolve(finalTitle);
@@ -335,17 +366,45 @@ export class URLAuthService {
   }
 
   /**
-   * 刷新单个URL的标题
+   * 刷新单个URL的标题（数据库优先策略）
    * @param url 要刷新的URL
-   * @returns Promise<string | null> 成功返回标题，失败返回null
+   * @returns Promise<{title, source, unchanged}> 成功返回标题和来源，失败返回null
    */
-  async refreshUrlTitle(url: string): Promise<string | null> {
+  async refreshUrlTitle(url: string): Promise<{
+    title: string | null;
+    source: 'database' | 'network';
+    unchanged: boolean;
+  }> {
     try {
       console.log(`[URLAuthService] Refreshing title for: ${url}`);
-      return await this.urlTitleService.fetchTitle(url);
+
+      // 步骤1：检查授权数据库（优先）
+      if (this.urlAuthorizationService) {
+        const cachedTitle = await this.urlAuthorizationService.getAuthorizationByUrl(url);
+
+        if (cachedTitle) {
+          console.log(`[URLAuthService] Title found in authorization database: "${cachedTitle}"`);
+          return { title: cachedTitle, source: 'database', unchanged: true };
+        }
+      }
+
+      // 步骤2：后备方案 - 网络请求
+      console.log(`[URLAuthService] No cached title found, fetching from network...`);
+      const fetchedTitle = await this.urlTitleService.fetchTitle(url);
+
+      if (fetchedTitle) {
+        // 步骤3：更新授权数据库
+        if (this.urlAuthorizationService) {
+          await this.urlAuthorizationService.recordAuthorization(url, fetchedTitle);
+        }
+        console.log(`[URLAuthService] Title fetched from network: "${fetchedTitle}"`);
+        return { title: fetchedTitle, source: 'network', unchanged: false };
+      }
+
+      return { title: null, source: 'network', unchanged: false };
     } catch (error) {
       console.error(`[URLAuthService] Failed to refresh title for ${url}:`, error);
-      return null;
+      return { title: null, source: 'network', unchanged: false };
     }
   }
 
@@ -359,6 +418,18 @@ export class URLAuthService {
       }
     });
     this.authWindows.clear();
+  }
+
+  /**
+   * 从URL中提取域名
+   */
+  private extractDomain(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname;
+    } catch {
+      return 'unknown';
+    }
   }
 }
 

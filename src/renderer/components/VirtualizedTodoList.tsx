@@ -1,18 +1,17 @@
 import { Todo, TodoRelation } from '../../shared/types';
 import React, { useState, useMemo, useCallback, memo } from 'react';
 import { Card, Tag, Button, Space, Popconfirm, Select, Typography, Tooltip, InputNumber, App } from 'antd';
-import { EditOutlined, DeleteOutlined, LinkOutlined, EyeOutlined, EyeInvisibleOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { DeleteOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 import { List as VirtualList } from 'react-window';
 import { SortOption, ViewMode } from './Toolbar';
-import RelationsModal from './RelationsModal';
-import RelationContext from './RelationContext';
 import RelationIndicators from './RelationIndicators';
 import TodoLinksPreview from './TodoLinksPreview';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { formatCompletedTime } from '../utils/timeFormatter';
 import { optimizedMotionVariants, shouldReduceMotion } from '../utils/optimizedMotionVariants';
+import { ColorTheme } from '../theme/themes';
 import dayjs from 'dayjs';
 
 const { Text } = Typography;
@@ -34,6 +33,7 @@ interface VirtualizedTodoListProps {
   viewMode?: ViewMode;
   onUpdateInPlace?: (id: number, updates: Partial<Todo>) => void;
   getUrlTitlesForTodo?: (todoId: number) => Map<string, string>;
+  colorTheme?: ColorTheme; // 主题色
 }
 
 // 虚拟化列表项的高度
@@ -76,7 +76,6 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
 }) => {
   const { message } = App.useApp();
   const colors = useThemeColors();
-  const [expandedRelations, setExpandedRelations] = useState(false);
   const [editingOrder, setEditingOrder] = useState<number | null>(null);
 
   // 工具函数
@@ -227,10 +226,19 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
                 style={{
                   fontSize: 15,
                   cursor: 'pointer',
-                  transition: 'color 0.3s'
+                  transition: 'color 0.3s',
+                  color: todo.status === 'completed' ? colors.completedText : undefined
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.color = '#40a9ff'}
-                onMouseLeave={(e) => e.currentTarget.style.color = 'inherit'}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = todo.status === 'completed'
+                    ? (document.documentElement.dataset.theme === 'dark' ? '#40a9ff' : '#1890ff')
+                    : '#40a9ff';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = todo.status === 'completed'
+                    ? colors.completedText
+                    : 'inherit';
+                }}
                 onClick={() => onView(todo)}
               >
                 {todo.title}
@@ -262,35 +270,6 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
                 style={{ padding: '0 4px' }}
               />
             </Tooltip>
-            <Tooltip title="编辑">
-              <Button
-                type="text"
-                icon={<EditOutlined />}
-                size="small"
-                onClick={() => onEdit(todo)}
-                style={{ padding: '0 4px' }}
-              />
-            </Tooltip>
-            <Tooltip title="关联">
-              <Button
-                type="text"
-                icon={<LinkOutlined />}
-                size="small"
-                onClick={() => {
-                  // 实现关联逻辑
-                }}
-                style={{ padding: '0 4px' }}
-              />
-            </Tooltip>
-            <Tooltip title={expandedRelations ? "收起上下文" : "查看上下文"}>
-              <Button
-                type="text"
-                icon={expandedRelations ? <EyeInvisibleOutlined /> : <EyeOutlined />}
-                size="small"
-                onClick={() => setExpandedRelations(!expandedRelations)}
-                style={{ padding: '0 4px' }}
-              />
-            </Tooltip>
             <Popconfirm
               title="确定要删除吗？"
               onConfirm={() => onDelete(todo.id!)}
@@ -309,24 +288,6 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
             </Popconfirm>
           </Space>
         </div>
-
-        {/* 时间信息标签 */}
-        {(todo.startTime || todo.deadline) && (
-          <div style={{ marginBottom: 8 }}>
-            <Space size={4}>
-              {todo.startTime && (
-                <Tag icon={<PlayCircleOutlined />} color="green" style={{ fontSize: 11, padding: '0 6px', lineHeight: '20px' }}>
-                  开始: {formatCompactTime(todo.startTime)}
-                </Tag>
-              )}
-              {todo.deadline && (
-                <Tag icon={<ClockCircleOutlined />} color="red" style={{ fontSize: 11, padding: '0 6px', lineHeight: '20px' }}>
-                  截止: {formatCompactTime(todo.deadline)}
-                </Tag>
-              )}
-            </Space>
-          </div>
-        )}
 
         {/* 内容预览 */}
         {todo.content && (
@@ -378,41 +339,33 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
 
           <div style={{
             fontSize: 11,
-            color: '#999',
+            color: todo.status === 'completed' ? colors.completedText : '#999',
             whiteSpace: 'nowrap',
             lineHeight: '16px'
           }}>
             <Space size={8} split={<span>|</span>}>
+              {todo.startTime && (
+                <span style={{ color: '#52c41a' }}>
+                  <PlayCircleOutlined /> 开始: {formatCompactTime(todo.startTime)}
+                </span>
+              )}
+              {todo.deadline && (
+                <span style={{ color: '#ff4d4f' }}>
+                  <ClockCircleOutlined /> 截止: {formatCompactTime(todo.deadline)}
+                </span>
+              )}
               <span>创建: {formatCompactTime(todo.createdAt)}</span>
               {todo.updatedAt !== todo.createdAt && (
                 <span>更新: {formatCompactTime(todo.updatedAt)}</span>
               )}
               {todo.status === 'completed' && todo.completedAt && (
-                <span style={{ color: '#52c41a' }}>
+                <span style={{ color: colors.completedText }}>
                   <CheckCircleOutlined /> 完成于 {formatCompletedTime(todo.completedAt)}
                 </span>
               )}
             </Space>
           </div>
         </div>
-
-        {/* 关联上下文展开区域 */}
-        {expandedRelations && todo.id && (
-          <div style={{
-            marginTop: 16,
-            padding: 12,
-            backgroundColor: colors.contentBg,
-            borderRadius: 6,
-            borderTop: `1px solid ${colors.borderColor}`
-          }}>
-            <RelationContext
-              currentTodo={todo}
-              allTodos={allTodos || []}
-              relations={relations}
-              compact
-            />
-          </div>
-        )}
       </Card>
     </div>
   );
@@ -436,16 +389,9 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
   onUpdateDisplayOrder,
   viewMode,
   onUpdateInPlace,
-  getUrlTitlesForTodo
+  getUrlTitlesForTodo,
+  colorTheme = 'purple',
 }) => {
-  const [showRelationsModal, setShowRelationsModal] = useState(false);
-  const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
-
-  const handleShowRelations = useCallback((todo: Todo) => {
-    setSelectedTodo(todo);
-    setShowRelationsModal(true);
-  }, []);
-
   // 创建行组件的props（不包括index和style，这些由List自动提供）
   type RowPropsType = {
     todos: Todo[];
@@ -508,17 +454,6 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
 
   return (
     <>
-      <RelationsModal
-        visible={showRelationsModal}
-        todo={selectedTodo}
-        todos={allTodos || todos}
-        onClose={() => {
-          setShowRelationsModal(false);
-          setSelectedTodo(null);
-        }}
-        onRelationsChange={onRelationsChange}
-      />
-
       {loading ? (
         <div style={{ textAlign: 'center', padding: '50px' }}>加载中...</div>
       ) : (

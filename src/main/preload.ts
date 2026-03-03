@@ -1,6 +1,23 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { Note } from '../shared/types';
 
+/**
+ * 批量授权结果
+ */
+export interface BatchAuthorizationResult {
+  domain: string;
+  totalUrls: number;
+  succeeded: number;
+  failed: number;
+  skipped: number;
+  details: Array<{
+    url: string;
+    success: boolean;
+    title?: string;
+    error?: string;
+  }>;
+}
+
 // 定义API接口
 export interface ElectronAPI {
   // 待办事项API
@@ -159,7 +176,13 @@ export interface ElectronAPI {
   // URL授权API
   urlAuth: {
     authorize: (url: string) => Promise<{success: boolean; title?: string; error?: string}>;
-    refreshTitle: (url: string) => Promise<{success: boolean; title?: string; error?: string}>;
+    refreshTitle: (url: string) => Promise<{
+      success: boolean;
+      title?: string;
+      source?: 'database' | 'network';
+      unchanged?: boolean;
+      error?: string;
+    }>;
     getAllAuthorizations: () => Promise<Array<{
       id: number;
       url: string;
@@ -200,6 +223,9 @@ export interface ElectronAPI {
     delete: (url: string) => Promise<{success: boolean; error?: string}>;
     getTitles: (urls: string[]) => Promise<Record<string, string>>;
     initialize: () => Promise<{success: boolean; count?: number; error?: string}>;
+    // 批量授权事件监听
+    onBatchCompleted: (callback: (result: BatchAuthorizationResult) => void) => void;
+    removeBatchListener: () => void;
   };
 
   // 快速创建待办 API
@@ -322,6 +348,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     delete: (url: string) => ipcRenderer.invoke('url-auth:delete', url),
     getTitles: (urls: string[]) => ipcRenderer.invoke('url-auth:getTitles', urls),
     initialize: () => ipcRenderer.invoke('url-auth:initialize'),
+    // 批量授权事件监听
+    onBatchCompleted: (callback: (result: BatchAuthorizationResult) => void) => {
+      ipcRenderer.on('url-auth:batch-completed', (_event, result) => {
+        callback(result);
+      });
+    },
+    removeBatchListener: () => {
+      ipcRenderer.removeAllListeners('url-auth:batch-completed');
+    },
   },
 
   // 快速创建待办

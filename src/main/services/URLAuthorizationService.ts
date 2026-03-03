@@ -450,4 +450,32 @@ export class URLAuthorizationService {
       return new Map();
     }
   }
+
+  /**
+   * 获取单个URL的授权记录（优化单URL查询）
+   * @param url 要查询的URL
+   * @returns 授权标题，如果不存在或状态不是active则返回null
+   */
+  async getAuthorizationByUrl(url: string): Promise<string | null> {
+    if (!this.db) {
+      return null;
+    }
+
+    try {
+      const record = this.db
+        .prepare(`
+          SELECT title FROM url_authorizations
+          WHERE url = ?
+          AND status = 'active'
+          AND title IS NOT NULL
+          LIMIT 1
+        `)
+        .get(url) as { title: string } | undefined;
+
+      return record?.title || null;
+    } catch (error) {
+      console.error('[URLAuthorizationService] Failed to get authorization by URL:', error);
+      return null;
+    }
+  }
 }

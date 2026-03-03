@@ -1157,8 +1157,13 @@ class Application {
     ipcMain.handle('url:refreshTitle', async (_, url: string) => {
       try {
         console.log(`[IPC] Refreshing title for URL: ${url}`);
-        const title = await this.urlAuthService!.refreshUrlTitle(url);
-        return { success: true, title };
+        const result = await this.urlAuthService!.refreshUrlTitle(url);
+        return {
+          success: true,
+          title: result.title,
+          source: result.source,
+          unchanged: result.unchanged
+        };
       } catch (error) {
         console.error('Failed to refresh URL title:', error);
         return { success: false, error: (error as Error).message };
@@ -1381,7 +1386,7 @@ class Application {
       const db = this.dbManager.getDb();
       if (db) {
         this.urlAuthorizationService = new URLAuthorizationService(db);
-        this.urlAuthService.setURLAuthorizationService(this.urlAuthorizationService);
+        this.urlAuthService.setURLAuthorizationService(this.urlAuthorizationService, db);
         console.log('URL authorization service initialized successfully');
 
         // Start authorization refresh scheduler
@@ -1402,6 +1407,12 @@ class Application {
       console.log('Creating main window...');
       this.createWindow();
       console.log('Main window created successfully');
+
+      // 设置主窗口引用到URLAuthService（用于发送批量授权事件）
+      if (this.mainWindow && this.urlAuthService) {
+        this.urlAuthService.setMainWindow(this.mainWindow);
+        console.log('Main window reference set to URLAuthService');
+      }
 
       // 创建系统托盘
       console.log('Creating system tray...');

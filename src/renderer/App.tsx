@@ -1099,6 +1099,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
                   hasMoreData={hasMoreData}
                   onLoadMore={loadMore}
                   totalCount={filteredTodos.length}
+                  colorTheme={colorTheme}
                 />
               )}
             </motion.div>

@@ -1,11 +1,9 @@
 import { Todo, TodoRelation } from '../../shared/types';
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { List, Card, Tag, Button, Space, Popconfirm, Select, Typography, Image, Tooltip, App, InputNumber } from 'antd';
-import { EditOutlined, DeleteOutlined, LinkOutlined, EyeOutlined, EyeInvisibleOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { DeleteOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 import { SortOption, ViewMode } from './Toolbar';
-import RelationsModal from './RelationsModal';
-import RelationContext from './RelationContext';
 import ContentFocusView from './ContentFocusView';
 import RelationIndicators from './RelationIndicators';
 import { FlowchartIndicator } from './FlowchartIndicator';
@@ -17,6 +15,7 @@ import { useFlowchartAssociations } from '../hooks/useFlowchartAssociations';
 import { useBatchURLTitles } from '../hooks/useBatchURLTitles';
 import { formatCompletedTime } from '../utils/timeFormatter';
 import { PerformanceMonitor } from '../utils/performanceMonitor';
+import { ColorTheme } from '../theme/themes';
 import dayjs from 'dayjs';
 
 const { Text, Paragraph } = Typography;
@@ -42,6 +41,7 @@ interface TodoListProps {
   hasMoreData?: boolean; // 是否还有更多数据
   onLoadMore?: () => void; // 加载更多数据的回调
   totalCount?: number; // 总数据量
+  colorTheme?: ColorTheme; // 主题色
 }
 
 // 性能优化：使用 React.memo 避免不必要的重渲染
@@ -64,13 +64,11 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   onNavigateToFlowchart,
   hasMoreData = false,
   onLoadMore,
-  totalCount = 0
+  totalCount = 0,
+  colorTheme = 'purple',
 }) => {
   const { message } = App.useApp();
   const colors = useThemeColors();
-  const [showRelationsModal, setShowRelationsModal] = useState(false);
-  const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
-  const [expandedRelations, setExpandedRelations] = useState<Set<number>>(new Set());
   const [editingOrder, setEditingOrder] = useState<{[key: number]: number | null}>({});
   const [savingOrder, setSavingOrder] = useState<Set<number>>(new Set());
   
@@ -223,22 +221,6 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
       </>
     );
   };
-
-  // 性能优化：使用 useCallback 缓存函数
-  const handleShowRelations = useCallback((todo: Todo) => {
-    setSelectedTodo(todo);
-    setShowRelationsModal(true);
-  }, []);
-
-  const toggleRelationContext = useCallback((todoId: number) => {
-    const newExpanded = new Set(expandedRelations);
-    if (newExpanded.has(todoId)) {
-      newExpanded.delete(todoId);
-    } else {
-      newExpanded.add(todoId);
-    }
-    setExpandedRelations(newExpanded);
-  }, [expandedRelations]);
 
   const formatCompactTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -494,16 +476,6 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
 
   return (
     <div ref={listContainerRef}>
-      <RelationsModal
-        visible={showRelationsModal}
-        todo={selectedTodo}
-        todos={allTodos || todos}
-        onClose={() => {
-          setShowRelationsModal(false);
-          setSelectedTodo(null);
-        }}
-        onRelationsChange={onRelationsChange}
-      />
     <List
       loading={loading}
       dataSource={todos}
@@ -656,15 +628,24 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                         逾期 {dayjs().diff(dayjs(todo.deadline), 'hour')}h
                       </Tag>
                     )}
-                    <Text 
-                      strong 
-                      style={{ 
-                        fontSize: 15, 
+                    <Text
+                      strong
+                      style={{
+                        fontSize: 15,
                         cursor: 'pointer',
-                        transition: 'color 0.3s'
+                        transition: 'color 0.3s',
+                        color: todo.status === 'completed' ? colors.completedText : undefined
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = '#40a9ff'}
-                      onMouseLeave={(e) => e.currentTarget.style.color = 'inherit'}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = todo.status === 'completed'
+                          ? (document.documentElement.dataset.theme === 'dark' ? '#40a9ff' : '#1890ff')
+                          : '#40a9ff';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = todo.status === 'completed'
+                          ? colors.completedText
+                          : 'inherit';
+                      }}
                       onClick={() => onView(todo)}
                     >
                       {todo.title}
@@ -697,9 +678,9 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                 {/* 右侧：操作按钮组 */}
                 <Space size={2}>
                   <Tooltip title="复制">
-                    <Button 
-                      type="text" 
-                      icon={<CopyOutlined />} 
+                    <Button
+                      type="text"
+                      icon={<CopyOutlined />}
                       size="small"
                       onClick={async (e) => {
                         e.stopPropagation();
@@ -710,33 +691,6 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                           message.error(result.message);
                         }
                       }}
-                      style={{ padding: '0 4px' }}
-                    />
-                  </Tooltip>
-                  <Tooltip title="编辑">
-                    <Button 
-                      type="text" 
-                      icon={<EditOutlined />} 
-                      size="small"
-                      onClick={() => onEdit(todo)}
-                      style={{ padding: '0 4px' }}
-                    />
-                  </Tooltip>
-                  <Tooltip title="关联">
-                    <Button 
-                      type="text" 
-                      icon={<LinkOutlined />} 
-                      size="small"
-                      onClick={() => handleShowRelations(todo)}
-                      style={{ padding: '0 4px' }}
-                    />
-                  </Tooltip>
-                  <Tooltip title={expandedRelations.has(todo.id!) ? "收起上下文" : "查看上下文"}>
-                    <Button 
-                      type="text" 
-                      icon={expandedRelations.has(todo.id!) ? <EyeInvisibleOutlined /> : <EyeOutlined />}
-                      size="small"
-                      onClick={() => toggleRelationContext(todo.id!)}
                       style={{ padding: '0 4px' }}
                     />
                   </Tooltip>
@@ -758,24 +712,6 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                   </Popconfirm>
                 </Space>
               </div>
-
-              {/* 时间信息标签 */}
-              {(todo.startTime || todo.deadline) && (
-                <div style={{ marginBottom: 6, marginTop: 6 }}>
-                  <Space size={4}>
-                    {todo.startTime && (
-                      <Tag icon={<PlayCircleOutlined />} color="green" style={{ fontSize: 11, padding: '0 6px', lineHeight: '20px' }}>
-                        开始: {formatCompactTime(todo.startTime)}
-                      </Tag>
-                    )}
-                    {todo.deadline && (
-                      <Tag icon={<ClockCircleOutlined />} color="red" style={{ fontSize: 11, padding: '0 6px', lineHeight: '20px' }}>
-                        截止: {formatCompactTime(todo.deadline)}
-                      </Tag>
-                    )}
-                  </Space>
-                </div>
-              )}
 
               {/* 内容预览 - 显示链接或纯文本 */}
               {todo.content && (
@@ -811,43 +747,35 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                 </Space>
                 
                 {/* 右侧：时间信息 */}
-                <div style={{ 
-                  fontSize: 11, 
-                  color: '#999', 
+                <div style={{
+                  fontSize: 11,
+                  color: todo.status === 'completed' ? colors.completedText : '#999',
                   whiteSpace: 'nowrap',
                   lineHeight: '16px'
                 }}>
                   <Space size={8} split={<span>|</span>}>
+                    {todo.startTime && (
+                      <span style={{ color: '#52c41a' }}>
+                        <PlayCircleOutlined /> 开始: {formatCompactTime(todo.startTime)}
+                      </span>
+                    )}
+                    {todo.deadline && (
+                      <span style={{ color: '#ff4d4f' }}>
+                        <ClockCircleOutlined /> 截止: {formatCompactTime(todo.deadline)}
+                      </span>
+                    )}
                     <span>创建: {formatCompactTime(todo.createdAt)}</span>
                     {todo.updatedAt !== todo.createdAt && (
                       <span>更新: {formatCompactTime(todo.updatedAt)}</span>
                     )}
                     {todo.status === 'completed' && todo.completedAt && (
-                      <span style={{ color: '#52c41a' }}>
+                      <span style={{ color: colors.completedText }}>
                         <CheckCircleOutlined /> 完成于 {formatCompletedTime(todo.completedAt)}
                       </span>
                     )}
                   </Space>
                 </div>
               </div>
-            
-            {/* 关联上下文展开区域 */}
-            {expandedRelations.has(todo.id!) && (
-              <div style={{
-                marginTop: 16,
-                padding: 12,
-                backgroundColor: colors.contentBg,
-                borderRadius: 6,
-                borderTop: `1px solid ${colors.borderColor}`
-              }}>
-                <RelationContext
-                  currentTodo={todo}
-                  allTodos={allTodos || todos}
-                  relations={relations}
-                  compact
-                />
-              </div>
-            )}
             </Card>
               </div>
               {/* 关闭内容div */}

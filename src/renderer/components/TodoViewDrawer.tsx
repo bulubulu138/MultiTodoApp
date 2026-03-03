@@ -41,6 +41,13 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   const [previewImage, setPreviewImage] = useState('');
   const [showRelationsModal, setShowRelationsModal] = useState(false); // 新增
 
+  // 批量授权进度状态
+  const [batchAuthProgress, setBatchAuthProgress] = useState<{
+    domain: string;
+    completed: number;
+    total: number;
+  } | null>(null);
+
   // 流程图级别关联状态
   const [flowchartLevelAssociations, setFlowchartLevelAssociations] = useState<FlowchartAssociationDisplay[]>([]);
   const [flowchartLevelLoading, setFlowchartLevelLoading] = useState(false);
@@ -117,6 +124,42 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
 
   // URL标题获取
   const { titles: urlTitles, refresh: refreshUrlTitles } = useURLTitles(todo);
+
+  // 批量授权完成监听
+  useEffect(() => {
+    const handleBatchCompleted = (result: any) => {
+      console.log('[TodoViewDrawer] Batch authorization completed:', result);
+
+      if (result.succeeded > 0) {
+        message.success({
+          content: `已为 ${result.domain} 域名下的 ${result.succeeded} 个链接完成授权`,
+          duration: 5,
+          key: 'batch-auth-complete'
+        });
+      }
+
+      if (result.failed > 0) {
+        message.warning({
+          content: `${result.failed} 个链接授权失败`,
+          duration: 3,
+          key: 'batch-auth-failed'
+        });
+      }
+
+      // 刷新URL标题以显示新授权的链接
+      if (todo && result.succeeded > 0) {
+        refreshUrlTitles(todo.content || '');
+      }
+
+      setBatchAuthProgress(null);
+    };
+
+    window.electronAPI.urlAuth.onBatchCompleted(handleBatchCompleted);
+
+    return () => {
+      window.electronAPI.urlAuth.removeBatchListener();
+    };
+  }, [todo, refreshUrlTitles]);
 
   // 提取内容中的所有URL
   const extractedUrls = useMemo(() => {
@@ -284,6 +327,13 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
       if (result.success && result.title) {
         message.success({ content: `成功获取标题: ${result.title}`, key: 'url-auth' });
 
+        // 显示批量授权提示
+        message.loading({
+          content: '正在为该域名下的其他链接批量授权...',
+          key: 'batch-auth',
+          duration: 0
+        });
+
         // Save the title to the todo's content
         if (todo && todo.id !== undefined && result.title) {
           const updatedContent = embedUrlTitleInContent(todo.content || '', url, result.title);
@@ -340,13 +390,33 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
       const result = await window.electronAPI.urlAuth.refreshTitle(url);
 
       if (result.success && result.title) {
-        message.success({ content: `标题已更新: ${result.title}`, key: 'url-refresh' });
-        // 提示用户重新打开抽屉
-        message.info('请关闭并重新打开详情抽屉以查看更新后的标题');
+        // 根据数据来源和变化情况显示不同提示
+        if (result.source === 'database') {
+          // 从授权数据库获取的标题
+          message.success({
+            content: `标题已从授权记录中获取: ${result.title}`,
+            key: 'url-refresh'
+          });
+        } else if (result.source === 'network') {
+          // 从网络刷新的标题
+          message.success({
+            content: `标题已从网络刷新: ${result.title}`,
+            key: 'url-refresh'
+          });
+          message.info('请关闭并重新打开详情抽屉以查看更新后的标题');
+        }
       } else if (result.success && !result.title) {
-        message.info({ content: '未能获取标题，可能仍需登录', key: 'url-refresh' });
+        // 未获取到标题
+        message.warning({
+          content: '未能获取标题，该URL可能需要授权才能访问',
+          key: 'url-refresh'
+        });
       } else {
-        message.error({ content: `刷新失败: ${result.error || '未知错误'}`, key: 'url-refresh' });
+        // 刷新失败
+        message.error({
+          content: `刷新失败: ${result.error || '未知错误'}`,
+          key: 'url-refresh'
+        });
       }
     } catch (error) {
       console.error('Refresh error:', error);

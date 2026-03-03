@@ -13,6 +13,7 @@ export interface ThemeColors {
   cardBg: string;
   textPrimary: string;
   completedBg: string; // 已完成待办的背景色
+  completedText: string; // 已完成待办的文字颜色
 }
 
 /**
@@ -72,8 +73,14 @@ export const useThemeColors = (): ThemeColors => {
       cardBg: isDark ? '#1f1f1f' : '#ffffff',
       // 主文本颜色 - 用于标题等
       textPrimary: isDark ? '#ffffff' : '#000000',
-      // 已完成待办的背景色 - 使用当前主题色的 primaryLight
-      completedBg: scheme.primaryLight,
+      // 已完成待办的背景色 - 暗黑模式使用深色背景，亮色模式使用浅色背景
+      completedBg: isDark
+        ? `hsl(${scheme.hue}, 80%, 20%)`  // 暗黑模式：使用20%亮度的深色背景
+        : scheme.primaryLight,             // 亮色模式：保持92%亮度的浅色背景
+      // 已完成待办的文字颜色 - 暗黑模式使用浅色文字，亮色模式使用深色文字
+      completedText: isDark
+        ? 'rgba(255, 255, 255, 0.95)'     // 暗黑模式：浅色文字，与深色背景形成对比
+        : '#1a1a1a',                       // 亮色模式：深色文字，与浅色背景形成对比
     };
   }, [isDark, colorTheme]);
 };
