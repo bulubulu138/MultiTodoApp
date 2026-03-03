@@ -150,6 +150,15 @@ class Application {
       this.mainWindow?.show();
     });
 
+    // Debug: Track loading events
+    this.mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+      console.error('=== Load failed ===', errorCode, errorDescription);
+    });
+
+    this.mainWindow.webContents.on('did-finish-load', () => {
+      console.log('=== Load finished successfully ===');
+    });
+
     // 修改窗口关闭行为：不退出应用，而是最小化到托盘
     this.mainWindow.on('close', (event) => {
       console.log('=== Window close event triggered ===');

@@ -73,6 +73,11 @@ if (typeof window !== 'undefined') {
   };
 }
 
+// Debug logging
+console.log('=== Renderer init started ===');
+console.log('Root element:', document.getElementById('root'));
+console.log('electronAPI:', window.electronAPI);
+
 const container = document.getElementById('root');
 if (!container) throw new Error('Root element not found');
 

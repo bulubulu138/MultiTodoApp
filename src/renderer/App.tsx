@@ -106,6 +106,17 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     }
   }, []);
 
+  // Debug logging - Check App mount and API availability
+  useEffect(() => {
+    console.log('=== App mounted ===');
+    console.log('API available:', typeof window.electronAPI !== 'undefined');
+    console.log('API keys:', window.electronAPI ? Object.keys(window.electronAPI) : 'undefined');
+
+    if (typeof window.electronAPI === 'undefined') {
+      console.error('electronAPI is not available!');
+    }
+  }, []);
+
   // 加载数据
   useEffect(() => {
     loadTodos();
