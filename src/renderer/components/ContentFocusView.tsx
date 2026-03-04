@@ -1,6 +1,6 @@
 import { Todo, TodoRelation } from '../../shared/types';
 import React, { useState, useMemo, useCallback, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
-import { Divider, Button, Checkbox, Space, Spin, Empty, App, InputNumber, Tag, Tooltip } from 'antd';
+import { Divider, Button, Checkbox, Space, Spin, Empty, App, Input, InputNumber, Tag, Tooltip } from 'antd';
 import { SaveOutlined, EyeOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import RichTextEditor, { RichTextEditorRef } from './RichTextEditor';
 import RelationIndicators from './RelationIndicators';
@@ -59,14 +59,18 @@ const ContentFocusItem = React.memo(
   }, ref) => {
     const { message } = App.useApp();
     const [editedContent, setEditedContent] = useState<string>(todo.content);
+    const [editedTitle, setEditedTitle] = useState<string>(todo.title);
     const [isSaving, setIsSaving] = useState(false);
+    const [isSavingTitle, setIsSavingTitle] = useState(false);
     const [editingOrder, setEditingOrder] = useState<number | undefined>(undefined);
     const [savingOrder, setSavingOrder] = useState(false);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const titleSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const isComposingRef = useRef(false); // 追踪输入法状态
     const editorRef = useRef<RichTextEditorRef>(null);
-    
+
     const lastSavedContentRef = useRef(todo.content);
+    const lastSavedTitleRef = useRef(todo.title);
 
     // 同步外部更新的 todo.content（仅在保存完成后更新）
     useEffect(() => {
@@ -76,6 +80,14 @@ const ContentFocusItem = React.memo(
         lastSavedContentRef.current = todo.content;
       }
     }, [todo.content, isSaving]);
+
+    // 同步外部更新的 todo.title（仅在保存完成后更新）
+    useEffect(() => {
+      if (todo.title !== lastSavedTitleRef.current && !isSavingTitle) {
+        setEditedTitle(todo.title);
+        lastSavedTitleRef.current = todo.title;
+      }
+    }, [todo.title, isSavingTitle]);
 
     const getLatestContent = useCallback(() => {
       return editorRef.current?.getLatestHtml() ?? editedContent;
@@ -107,6 +119,56 @@ const ContentFocusItem = React.memo(
         setIsSaving(false);
       }
     }, [todo.id, getLatestContent, onUpdate, message]);
+
+    // 保存标题（防抖）
+    const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const newTitle = e.target.value;
+      setEditedTitle(newTitle);
+
+      // 清除之前的定时器
+      if (titleSaveTimeoutRef.current) {
+        clearTimeout(titleSaveTimeoutRef.current);
+      }
+
+      // 设置防抖保存（1秒）
+      titleSaveTimeoutRef.current = setTimeout(async () => {
+        if (newTitle !== lastSavedTitleRef.current && newTitle.trim() && todo.id) {
+          setIsSavingTitle(true);
+          try {
+            await onUpdate(todo.id, { title: newTitle.trim() });
+            lastSavedTitleRef.current = newTitle.trim();
+            setEditedTitle(newTitle.trim());
+          } catch (error) {
+            message.error('标题保存失败');
+            console.error('Title save error:', error);
+            // 恢复原标题
+            setEditedTitle(lastSavedTitleRef.current);
+          } finally {
+            setIsSavingTitle(false);
+          }
+        }
+      }, 1000);
+    }, [todo.id, onUpdate, message]);
+
+    // 失去焦点时立即保存标题
+    const handleTitleBlur = useCallback(async () => {
+      if (titleSaveTimeoutRef.current) {
+        clearTimeout(titleSaveTimeoutRef.current);
+        titleSaveTimeoutRef.current = null;
+      }
+
+      const trimmedTitle = editedTitle.trim();
+      if (trimmedTitle !== lastSavedTitleRef.current && trimmedTitle && todo.id) {
+        try {
+          await onUpdate(todo.id, { title: trimmedTitle });
+          lastSavedTitleRef.current = trimmedTitle;
+          setEditedTitle(trimmedTitle);
+        } catch {
+          message.error('标题保存失败');
+          setEditedTitle(lastSavedTitleRef.current);
+        }
+      }
+    }, [editedTitle, todo.id, onUpdate, message]);
 
     // 智能保存调度函数 - 检查输入法状态
     const scheduleAutoSave = useCallback(() => {
@@ -148,11 +210,19 @@ const ContentFocusItem = React.memo(
         if (saveTimeoutRef.current) {
           clearTimeout(saveTimeoutRef.current);
         }
+        if (titleSaveTimeoutRef.current) {
+          clearTimeout(titleSaveTimeoutRef.current);
+        }
         // 如果有未保存的更改，立即保存
         const currentContent = editorRef.current?.getLatestHtml() ?? lastSavedContentRef.current;
         const currentTodoId = todo.id;
         if (currentContent !== lastSavedContentRef.current && currentTodoId) {
           onUpdate(currentTodoId, { content: currentContent });
+        }
+        // 保存未保存的标题
+        const currentTitle = editedTitle.trim();
+        if (currentTitle !== lastSavedTitleRef.current && currentTitle && currentTodoId) {
+          onUpdate(currentTodoId, { title: currentTitle });
         }
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -397,13 +467,6 @@ const ContentFocusItem = React.memo(
         {/* 顶部工具栏 */}
         <div className="content-focus-item-header">
           <Space>
-            <Checkbox
-              checked={todo.status === 'completed'}
-              onChange={(e) => handleToggleComplete(e.target.checked)}
-            >
-              {todo.status === 'completed' ? '已完成' : '标记完成'}
-            </Checkbox>
-            
             {/* 完成时间显示 */}
             {todo.status === 'completed' && todo.completedAt && (
               <span style={{ fontSize: 11, color: '#52c41a' }}>
@@ -503,12 +566,12 @@ const ContentFocusItem = React.memo(
             </Space>
             
             {/* 保存状态指示器 */}
-            {isSaving && (
+            {(isSaving || isSavingTitle) && (
               <span style={{ fontSize: 12, color: '#1890ff' }}>
                 <SaveOutlined /> 保存中...
               </span>
             )}
-            {!isSaving && !hasChanges && !savingOrder && (
+            {!isSaving && !isSavingTitle && !hasChanges && !savingOrder && (
               <span style={{ fontSize: 12, color: '#52c41a' }}>
                 <CheckCircleOutlined /> 已保存
               </span>
@@ -521,27 +584,51 @@ const ContentFocusItem = React.memo(
           </Space>
         </div>
 
-        {/* 富文本编辑器 - 添加输入法事件、失去焦点保存和键盘快捷键 */}
-        <div 
-          className="content-focus-item-editor" 
-          onCompositionStart={handleCompositionStart}
-          onCompositionEnd={handleCompositionEnd}
-          onBlur={handleBlur}
-          onKeyDown={handleKeyDown}
-          tabIndex={-1}
-        >
-          <RichTextEditor
-            ref={editorRef}
-            value={editedContent}
-            onChange={handleContentChange}
-            placeholder="编辑待办内容..."
-            style={{ minHeight: '150px' }}
-            enableFlowchartEmbed={true}
-            flowchartContext={{
-              todoId: todo.id,
-              todoTitle: todo.title,
-            }}
+        {/* 主内容区：复选框 + 标题输入框 + 编辑器 */}
+        <div className="content-focus-item-main">
+          {/* 完成状态复选框 */}
+          <Checkbox
+            className="content-focus-checkbox"
+            checked={todo.status === 'completed'}
+            onChange={(e) => handleToggleComplete(e.target.checked)}
           />
+
+          {/* 标题和内容区域 */}
+          <div className="content-focus-item-content">
+            {/* 可编辑标题输入框 */}
+            <Input.TextArea
+              value={editedTitle}
+              onChange={handleTitleChange}
+              onBlur={handleTitleBlur}
+              placeholder="待办标题..."
+              autoSize={{ minRows: 1, maxRows: 3 }}
+              className="content-focus-title-input"
+              disabled={isSavingTitle}
+            />
+
+            {/* 富文本编辑器 - 添加输入法事件、失去焦点保存和键盘快捷键 */}
+            <div
+              className="content-focus-item-editor"
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDown}
+              tabIndex={-1}
+            >
+            <RichTextEditor
+              ref={editorRef}
+              value={editedContent}
+              onChange={handleContentChange}
+              placeholder="编辑待办内容..."
+              style={{ minHeight: '150px' }}
+              enableFlowchartEmbed={true}
+              flowchartContext={{
+                todoId: todo.id,
+                todoTitle: todo.title,
+              }}
+            />
+            </div>
+          </div>
         </div>
 
         {/* 分割线 */}

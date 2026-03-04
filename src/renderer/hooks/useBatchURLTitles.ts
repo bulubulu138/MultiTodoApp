@@ -174,9 +174,19 @@ export function useBatchURLTitles(todos: Todo[]): {
         }
       });
 
-      // 批量获取未缓存的URL标题
-      const fetchedTitles = urlsToFetch.length > 0
-        ? await window.electronAPI.urlTitles.fetchBatch(urlsToFetch)
+      // 从URL授权数据库获取标题
+      const authTitles: Record<string, string> = urlsToFetch.length > 0
+        ? await window.electronAPI.urlAuth.getTitles?.(urlsToFetch) || {}
+        : {};
+
+      // 过滤出需要从网络获取的URL（既没有嵌入标题，也没有授权标题）
+      const urlsToFetchFromNetwork = urlsToFetch.filter(url =>
+        !authTitles[url]
+      );
+
+      // 批量获取未缓存的URL标题（从网络）
+      const fetchedTitles = urlsToFetchFromNetwork.length > 0
+        ? await window.electronAPI.urlTitles.fetchBatch(urlsToFetchFromNetwork)
         : {};
 
       // 更新缓存
@@ -196,8 +206,9 @@ export function useBatchURLTitles(todos: Todo[]): {
         const embeddedTitles = embeddedTitlesByTodo.get(todo.id!) || new Map();
 
         urls.forEach(url => {
-          // 优先级：嵌入标题 > 缓存标题 > 新获取的标题
+          // 优先级：嵌入标题 > 授权数据库 > 缓存标题 > 新获取的标题
           const title = embeddedTitles.get(url)
+            || authTitles[url]
             || cachedTitles.get(url)
             || fetchedTitles[url];
 

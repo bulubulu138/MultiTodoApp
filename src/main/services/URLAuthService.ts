@@ -209,7 +209,12 @@ export class URLAuthService {
             console.log(`[URLAuthService] Triggering batch authorization for domain: ${domain}`);
 
             // 异步执行，不阻塞主流程
-            this.batchAuthService.batchAuthorizeByDomain(domain, url, finalTitle)
+            this.batchAuthService.batchAuthorizeByDomain(domain, url, finalTitle, (progress) => {
+              // 发送进度更新到前端
+              if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('url-auth:batch-progress', progress);
+              }
+            })
               .then(result => {
                 console.log(`[URLAuthService] Batch authorization completed:`, result);
 

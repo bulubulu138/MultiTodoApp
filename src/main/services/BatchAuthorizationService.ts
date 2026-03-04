@@ -20,6 +20,26 @@ export interface BatchAuthorizationResult {
 }
 
 /**
+ * 批量授权进度
+ */
+export interface BatchAuthorizationProgress {
+  domain: string;
+  current: number;
+  total: number;
+  stage: 'extracting' | 'filtering' | 'fetching' | 'saving' | 'completed';
+  currentUrl?: string;
+  succeeded: number;
+  failed: number;
+}
+
+/**
+ * 进度回调函数
+ */
+export interface ProgressCallback {
+  (progress: BatchAuthorizationProgress): void;
+}
+
+/**
  * 批量授权服务
  * 用户授权一个链接后，自动为该域名下的所有其他链接完成授权
  */
@@ -37,11 +57,13 @@ export class BatchAuthorizationService {
    * @param domain 域名
    * @param authorizedUrl 已授权的URL（将被排除）
    * @param authorizedTitle 已授权的标题
+   * @param onProgress 可选的进度回调函数
    */
   async batchAuthorizeByDomain(
     domain: string,
     authorizedUrl: string,
-    authorizedTitle: string
+    authorizedTitle: string,
+    onProgress?: ProgressCallback
   ): Promise<BatchAuthorizationResult> {
     console.log(`[BatchAuthorizationService] Starting batch authorization for domain: ${domain}`);
 
@@ -56,36 +78,89 @@ export class BatchAuthorizationService {
 
     try {
       // 步骤1：从所有待办中提取指定域名的URL
+      onProgress?.({
+        domain,
+        current: 0,
+        total: 0,
+        stage: 'extracting',
+        succeeded: 0,
+        failed: 0
+      });
+
       const allUrls = await this.extractUrlsByDomain(domain);
       console.log(`[BatchAuthorizationService] Found ${allUrls.length} URLs for domain ${domain}`);
 
       if (allUrls.length === 0) {
         console.log(`[BatchAuthorizationService] No URLs found for domain ${domain}`);
+        onProgress?.({
+          domain,
+          current: 0,
+          total: 0,
+          stage: 'completed',
+          succeeded: 0,
+          failed: 0
+        });
         return result;
       }
 
       result.totalUrls = allUrls.length;
 
       // 步骤2：过滤出未授权的URL（排除已授权的URL）
+      onProgress?.({
+        domain,
+        current: allUrls.length,
+        total: allUrls.length,
+        stage: 'filtering',
+        succeeded: 0,
+        failed: 0
+      });
+
       const unauthorizedUrls = await this.filterUnauthorizedUrls(allUrls, authorizedUrl);
       console.log(`[BatchAuthorizationService] ${unauthorizedUrls.length} URLs need authorization`);
 
       if (unauthorizedUrls.length === 0) {
         console.log(`[BatchAuthorizationService] All URLs already authorized`);
         result.skipped = allUrls.length;
+        onProgress?.({
+          domain,
+          current: allUrls.length,
+          total: allUrls.length,
+          stage: 'completed',
+          succeeded: 0,
+          failed: 0
+        });
         return result;
       }
 
       // 步骤3：使用隐藏窗口批量获取标题
-      const batchResult = await this.fetchBatchTitles(unauthorizedUrls, domain);
+      const batchResult = await this.fetchBatchTitles(unauthorizedUrls, domain, onProgress);
 
-      // 步骤4：合并结果
+      // 步骤4：保存授权记录
+      onProgress?.({
+        domain,
+        current: unauthorizedUrls.length,
+        total: unauthorizedUrls.length,
+        stage: 'saving',
+        succeeded: batchResult.succeeded,
+        failed: batchResult.failed
+      });
+
+      // 步骤5：合并结果
       result.succeeded = batchResult.succeeded;
       result.failed = batchResult.failed;
       result.skipped = allUrls.length - unauthorizedUrls.length;
       result.details = batchResult.details;
 
       console.log(`[BatchAuthorizationService] Batch authorization completed:`, result);
+
+      onProgress?.({
+        domain,
+        current: unauthorizedUrls.length,
+        total: unauthorizedUrls.length,
+        stage: 'completed',
+        succeeded: result.succeeded,
+        failed: result.failed
+      });
 
       return result;
     } catch (error) {
@@ -181,7 +256,8 @@ export class BatchAuthorizationService {
    */
   private async fetchBatchTitles(
     urls: string[],
-    domain: string
+    domain: string,
+    onProgress?: ProgressCallback
   ): Promise<BatchAuthorizationResult> {
     const result: BatchAuthorizationResult = {
       domain,
@@ -239,6 +315,17 @@ export class BatchAuthorizationService {
           });
         }
       }
+
+      // 每批完成后发送进度更新
+      const completedCount = i + batch.length;
+      onProgress?.({
+        domain,
+        current: completedCount,
+        total: urls.length,
+        stage: 'fetching',
+        succeeded: result.succeeded,
+        failed: result.failed
+      });
     }
 
     // 批量保存成功的授权记录

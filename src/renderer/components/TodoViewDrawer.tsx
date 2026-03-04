@@ -1,6 +1,6 @@
 import { Todo, TodoRelation, FlowchartAssociationDisplay } from '../../shared/types';
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
-import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message, Image, Card, Empty, Spin, Tooltip } from 'antd';
+import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message, Image, Card, Empty, Spin, Tooltip, Progress, Alert } from 'antd';
 import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined, NodeIndexOutlined, FileTextOutlined, LinkOutlined, LoginOutlined, ReloadOutlined, SafetyOutlined } from '@ant-design/icons';
 import RelationContext from './RelationContext';
 import RelationsModal from './RelationsModal';
@@ -12,6 +12,19 @@ import { LazyFlowchartPreviewCard } from './flowchart/LazyFlowchartPreviewCard';
 import { embedUrlTitleInContent } from '../utils/urlTitleStorage';
 
 const { Title, Text, Paragraph } = Typography;
+
+/**
+ * 批量授权进度接口
+ */
+interface BatchAuthorizationProgress {
+  domain: string;
+  current: number;
+  total: number;
+  stage: 'extracting' | 'filtering' | 'fetching' | 'saving' | 'completed';
+  currentUrl?: string;
+  succeeded: number;
+  failed: number;
+}
 
 interface TodoViewDrawerProps {
   visible: boolean;
@@ -42,11 +55,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   const [showRelationsModal, setShowRelationsModal] = useState(false); // 新增
 
   // 批量授权进度状态
-  const [batchAuthProgress, setBatchAuthProgress] = useState<{
-    domain: string;
-    completed: number;
-    total: number;
-  } | null>(null);
+  const [batchAuthProgress, setBatchAuthProgress] = useState<BatchAuthorizationProgress | null>(null);
 
   // 流程图级别关联状态
   const [flowchartLevelAssociations, setFlowchartLevelAssociations] = useState<FlowchartAssociationDisplay[]>([]);
@@ -125,8 +134,13 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   // URL标题获取
   const { titles: urlTitles, refresh: refreshUrlTitles } = useURLTitles(todo);
 
-  // 批量授权完成监听
+  // 批量授权监听
   useEffect(() => {
+    const handleProgress = (progress: BatchAuthorizationProgress) => {
+      console.log('[TodoViewDrawer] Batch authorization progress:', progress);
+      setBatchAuthProgress(progress);
+    };
+
     const handleBatchCompleted = (result: any) => {
       console.log('[TodoViewDrawer] Batch authorization completed:', result);
 
@@ -154,10 +168,11 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
       setBatchAuthProgress(null);
     };
 
+    window.electronAPI.urlAuth.onBatchProgress(handleProgress);
     window.electronAPI.urlAuth.onBatchCompleted(handleBatchCompleted);
 
     return () => {
-      window.electronAPI.urlAuth.removeBatchListener();
+      window.electronAPI.urlAuth.removeBatchListeners();
     };
   }, [todo, refreshUrlTitles]);
 
@@ -315,6 +330,18 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
            /请.*登录/i.test(trimmedTitle);
   }, []);
 
+  // 获取批量授权阶段文本
+  const getBatchAuthStageText = (stage: BatchAuthorizationProgress['stage']): string => {
+    const stageMap = {
+      extracting: '提取URL中',
+      filtering: '过滤未授权URL',
+      fetching: '获取标题中',
+      saving: '保存授权记录',
+      completed: '已完成'
+    };
+    return stageMap[stage];
+  };
+
   /**
    * 处理URL授权
    */
@@ -326,13 +353,6 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
 
       if (result.success && result.title) {
         message.success({ content: `成功获取标题: ${result.title}`, key: 'url-auth' });
-
-        // 显示批量授权提示
-        message.loading({
-          content: '正在为该域名下的其他链接批量授权...',
-          key: 'batch-auth',
-          duration: 0
-        });
 
         // Save the title to the todo's content
         if (todo && todo.id !== undefined && result.title) {
@@ -756,6 +776,33 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
               </Paragraph>
             )}
           </div>
+
+          {/* 批量授权进度提示 */}
+          {batchAuthProgress && (
+            <Alert
+              message="批量授权中"
+              description={
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Space>
+                    <Text strong>{getBatchAuthStageText(batchAuthProgress.stage)}</Text>
+                    <Text type="secondary">({batchAuthProgress.current}/{batchAuthProgress.total})</Text>
+                  </Space>
+                  <Progress
+                    percent={batchAuthProgress.total > 0 ? Math.round((batchAuthProgress.current / batchAuthProgress.total) * 100) : 0}
+                    size="small"
+                    status="active"
+                  />
+                  <Space>
+                    <Tag color="success">成功: {batchAuthProgress.succeeded}</Tag>
+                    <Tag color="error">失败: {batchAuthProgress.failed}</Tag>
+                  </Space>
+                </Space>
+              }
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
+          )}
 
           {/* URL链接操作 - 如果内容包含URL则显示 */}
           {extractedUrls.length > 0 && (

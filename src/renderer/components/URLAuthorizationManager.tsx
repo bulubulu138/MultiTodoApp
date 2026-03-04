@@ -1,9 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Space, Tag, Typography, Statistic, Row, Col, message, Popconfirm, Tooltip, Alert } from 'antd';
-import { ReloadOutlined, DeleteOutlined, ClearOutlined, LinkOutlined, CloudDownloadOutlined, CopyOutlined } from '@ant-design/icons';
+import { Table, Button, Space, Tag, Typography, Statistic, Row, Col, message, Popconfirm, Tooltip, Alert, Progress, Card, Drawer, List, Tabs } from 'antd';
+import { ReloadOutlined, DeleteOutlined, ClearOutlined, LinkOutlined, CloudDownloadOutlined, CopyOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { App } from 'antd';
 
 const { Text } = Typography;
+
+/**
+ * 批量授权进度接口
+ */
+interface BatchAuthorizationProgress {
+  domain: string;
+  current: number;
+  total: number;
+  stage: 'extracting' | 'filtering' | 'fetching' | 'saving' | 'completed';
+  currentUrl?: string;
+  succeeded: number;
+  failed: number;
+}
+
+/**
+ * 批量授权结果接口
+ */
+interface BatchAuthorizationResult {
+  domain: string;
+  totalUrls: number;
+  succeeded: number;
+  failed: number;
+  skipped: number;
+  details: Array<{
+    url: string;
+    success: boolean;
+    title?: string;
+    error?: string;
+  }>;
+}
 
 /**
  * URL授权记录接口
@@ -49,6 +79,11 @@ const URLAuthorizationManager: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [initializing, setInitializing] = useState(false);
   const [showInitPrompt, setShowInitPrompt] = useState(false);
+
+  // 批量授权进度状态
+  const [batchProgress, setBatchProgress] = useState<BatchAuthorizationProgress | null>(null);
+  const [batchResult, setBatchResult] = useState<BatchAuthorizationResult | null>(null);
+  const [showResultDrawer, setShowResultDrawer] = useState(false);
 
   // 域名提取工具函数
   const extractDomain = (url: string): string => {
@@ -112,6 +147,28 @@ const URLAuthorizationManager: React.FC = () => {
   // 组件挂载时加载数据
   useEffect(() => {
     loadRecords();
+
+    // 监听批量授权进度
+    const handleProgress = (progress: BatchAuthorizationProgress) => {
+      setBatchProgress(progress);
+    };
+
+    // 监听批量授权完成
+    const handleCompleted = (result: BatchAuthorizationResult) => {
+      setBatchResult(result);
+      setBatchProgress(null);
+      setShowResultDrawer(true);
+      messageApi.success(`批量授权完成！成功: ${result.succeeded}, 失败: ${result.failed}`);
+      // 重新加载列表
+      loadRecords();
+    };
+
+    window.electronAPI.urlAuth.onBatchProgress(handleProgress);
+    window.electronAPI.urlAuth.onBatchCompleted(handleCompleted);
+
+    return () => {
+      window.electronAPI.urlAuth.removeBatchListeners();
+    };
   }, []);
 
   // 检查是否需要显示初始化提示
@@ -280,6 +337,156 @@ const URLAuthorizationManager: React.FC = () => {
     );
   };
 
+  // 获取阶段文本
+  const getStageText = (stage: BatchAuthorizationProgress['stage']): string => {
+    const stageMap = {
+      extracting: '提取URL中',
+      filtering: '过滤未授权URL',
+      fetching: '获取标题中',
+      saving: '保存授权记录',
+      completed: '已完成'
+    };
+    return stageMap[stage];
+  };
+
+  // 批量授权进度卡片组件
+  const BatchProgressCard: React.FC<{ progress: BatchAuthorizationProgress }> = ({ progress }) => {
+    const percent = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
+
+    return (
+      <Card size="small" style={{ marginBottom: 16 }}>
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Space>
+            <Text strong>批量授权进度</Text>
+            <Tag color="processing">{getStageText(progress.stage)}</Tag>
+          </Space>
+          <Progress
+            percent={percent}
+            status="active"
+          />
+          <Text type="secondary">
+            正在处理 {progress.current}/{progress.total}
+          </Text>
+          <Space>
+            <Tag color="success">成功: {progress.succeeded}</Tag>
+            <Tag color="error">失败: {progress.failed}</Tag>
+          </Space>
+        </Space>
+      </Card>
+    );
+  };
+
+  // 批量授权结果详情抽屉组件
+  const BatchResultDrawer: React.FC<{
+    visible: boolean;
+    result: BatchAuthorizationResult | null;
+    onClose: () => void;
+  }> = ({ visible, result, onClose }) => {
+    const [activeTab, setActiveTab] = useState<'success' | 'failed'>('success');
+
+    if (!result) return null;
+
+    const successItems = result.details.filter(d => d.success);
+    const failedItems = result.details.filter(d => !d.success);
+
+    return (
+      <Drawer
+        title="批量授权结果"
+        placement="right"
+        width={600}
+        open={visible}
+        onClose={onClose}
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size="large">
+          {/* 总体统计 */}
+          <Row gutter={16}>
+            <Col span={6}>
+              <Statistic title="总数" value={result.totalUrls} />
+            </Col>
+            <Col span={6}>
+              <Statistic
+                title="成功"
+                value={result.succeeded}
+                valueStyle={{ color: '#52c41a' }}
+              />
+            </Col>
+            <Col span={6}>
+              <Statistic
+                title="失败"
+                value={result.failed}
+                valueStyle={{ color: '#ff4d4f' }}
+              />
+            </Col>
+            <Col span={6}>
+              <Statistic
+                title="跳过"
+                value={result.skipped}
+                valueStyle={{ color: '#8c8c8c' }}
+              />
+            </Col>
+          </Row>
+
+          {/* 详细列表 */}
+          <Tabs
+            activeKey={activeTab}
+            onChange={(key) => setActiveTab(key as 'success' | 'failed')}
+            items={[
+              {
+                key: 'success',
+                label: `成功 (${successItems.length})`,
+                children: (
+                  <List
+                    dataSource={successItems}
+                    renderItem={(item) => (
+                      <List.Item
+                        actions={[
+                          <Button
+                            size="small"
+                            icon={<CopyOutlined />}
+                            onClick={() => navigator.clipboard.writeText(item.url)}
+                          >
+                            复制
+                          </Button>
+                        ]}
+                      >
+                        <List.Item.Meta
+                          title={item.title}
+                          description={item.url}
+                        />
+                      </List.Item>
+                    )}
+                  />
+                )
+              },
+              {
+                key: 'failed',
+                label: `失败 (${failedItems.length})`,
+                children: (
+                  <List
+                    dataSource={failedItems}
+                    renderItem={(item) => (
+                      <List.Item>
+                        <List.Item.Meta
+                          title={<Text type="danger">失败</Text>}
+                          description={
+                            <Space direction="vertical">
+                              <Text>{item.url}</Text>
+                              <Text type="secondary">{item.error}</Text>
+                            </Space>
+                          }
+                        />
+                      </List.Item>
+                    )}
+                  />
+                )
+              }
+            ]}
+          />
+        </Space>
+      </Drawer>
+    );
+  };
+
   // 统计数据
   const stats = {
     total: records.length,
@@ -415,6 +622,16 @@ const URLAuthorizationManager: React.FC = () => {
           />
         </Col>
       </Row>
+
+      {/* 批量授权进度卡片 */}
+      {batchProgress && <BatchProgressCard progress={batchProgress} />}
+
+      {/* 批量授权结果详情抽屉 */}
+      <BatchResultDrawer
+        visible={showResultDrawer}
+        result={batchResult}
+        onClose={() => setShowResultDrawer(false)}
+      />
 
       {/* 初始化提示 */}
       {showInitPrompt && (

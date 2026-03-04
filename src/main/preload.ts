@@ -18,6 +18,19 @@ export interface BatchAuthorizationResult {
   }>;
 }
 
+/**
+ * 批量授权进度
+ */
+export interface BatchAuthorizationProgress {
+  domain: string;
+  current: number;
+  total: number;
+  stage: 'extracting' | 'filtering' | 'fetching' | 'saving' | 'completed';
+  currentUrl?: string;
+  succeeded: number;
+  failed: number;
+}
+
 // 定义API接口
 export interface ElectronAPI {
   // 待办事项API
@@ -224,8 +237,9 @@ export interface ElectronAPI {
     getTitles: (urls: string[]) => Promise<Record<string, string>>;
     initialize: () => Promise<{success: boolean; count?: number; error?: string}>;
     // 批量授权事件监听
+    onBatchProgress: (callback: (progress: BatchAuthorizationProgress) => void) => void;
     onBatchCompleted: (callback: (result: BatchAuthorizationResult) => void) => void;
-    removeBatchListener: () => void;
+    removeBatchListeners: () => void;
   };
 
   // 快速创建待办 API
@@ -349,12 +363,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getTitles: (urls: string[]) => ipcRenderer.invoke('url-auth:getTitles', urls),
     initialize: () => ipcRenderer.invoke('url-auth:initialize'),
     // 批量授权事件监听
+    onBatchProgress: (callback: (progress: BatchAuthorizationProgress) => void) => {
+      ipcRenderer.on('url-auth:batch-progress', (_event, progress) => {
+        callback(progress);
+      });
+    },
     onBatchCompleted: (callback: (result: BatchAuthorizationResult) => void) => {
       ipcRenderer.on('url-auth:batch-completed', (_event, result) => {
         callback(result);
       });
     },
-    removeBatchListener: () => {
+    removeBatchListeners: () => {
+      ipcRenderer.removeAllListeners('url-auth:batch-progress');
       ipcRenderer.removeAllListeners('url-auth:batch-completed');
     },
   },
