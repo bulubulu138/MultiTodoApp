@@ -123,60 +123,6 @@ export interface ElectronAPI {
     delete: (flowchartId: string) => Promise<{success: boolean}>;
     savePatches: (flowchartId: string, patches: any[]) => Promise<{success: boolean}>;
   };
-  
-  // 流程图与待办关联API（流程图级别）
-  flowchartTodoAssociation: {
-    create: (flowchartId: string, todoId: number) => Promise<{success: boolean}>;
-    delete: (flowchartId: string, todoId: number) => Promise<{success: boolean}>;
-    queryByFlowchart: (flowchartId: string) => Promise<number[]>;
-    queryByTodo: (todoId: number) => Promise<Array<{
-      flowchartId: string;
-      flowchartName: string;
-      flowchartDescription?: string;
-      createdAt: number;
-    }>>;
-    queryByTodos: (todoIds: number[]) => Promise<Record<number, Array<{
-      flowchartId: string;
-      flowchartName: string;
-      flowchartDescription?: string;
-      createdAt: number;
-    }>>>;
-  };
-
-  // 流程图迁移API
-  flowchartMigration: {
-    getStatus: () => Promise<{
-      hasLegacyFlowcharts: boolean;
-      flowchartCount: number;
-      totalNodes: number;
-      totalEdges: number;
-      canMigrate: boolean;
-    }>;
-    getFlowcharts: () => Promise<Array<{
-      id: string;
-      name: string;
-      description: string | null;
-      nodes: any[];
-      edges: any[];
-      created_at: number;
-      updated_at: number;
-    }>>;
-    migrate: (options: {createNewTodos?: boolean; targetTodoId?: number}) => Promise<{
-      success: boolean;
-      migratedCount: number;
-      skippedCount: number;
-      errors: string[];
-      details: Array<{
-        flowchartId: string;
-        flowchartName: string;
-        success: boolean;
-        todoId?: number;
-        error?: string;
-      }>;
-    }>;
-    cleanup: () => Promise<{success: boolean; error?: string}>;
-    verify: () => Promise<{success: boolean; message: string; remainingFlowcharts: number}>;
-  };
 
   // Shell API
   openExternal: (url: string) => Promise<{success: boolean; error?: string}>;
@@ -312,37 +258,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     restore: (backupPath: string) => ipcRenderer.invoke('backup:restore', backupPath),
   },
   flowchart: {
-    getAssociationsByTodoIds: (todoIds: number[]) => 
-      ipcRenderer.invoke('flowchart:getAssociationsByTodoIds', todoIds),
-    save: (flowchartData: any) => 
+    save: (flowchartData: any) =>
       ipcRenderer.invoke('flowchart:save', flowchartData),
-    load: (flowchartId: string) => 
+    load: (flowchartId: string) =>
       ipcRenderer.invoke('flowchart:load', flowchartId),
-    list: () => 
+    list: () =>
       ipcRenderer.invoke('flowchart:list'),
-    delete: (flowchartId: string) => 
+    delete: (flowchartId: string) =>
       ipcRenderer.invoke('flowchart:delete', flowchartId),
-    savePatches: (flowchartId: string, patches: any[]) => 
+    savePatches: (flowchartId: string, patches: any[]) =>
       ipcRenderer.invoke('flowchart:savePatches', flowchartId, patches),
-  },
-  flowchartTodoAssociation: {
-    create: (flowchartId: string, todoId: number) =>
-      ipcRenderer.invoke('flowchart-todo-association:create', flowchartId, todoId),
-    delete: (flowchartId: string, todoId: number) =>
-      ipcRenderer.invoke('flowchart-todo-association:delete', flowchartId, todoId),
-    queryByFlowchart: (flowchartId: string) =>
-      ipcRenderer.invoke('flowchart-todo-association:query-by-flowchart', flowchartId),
-    queryByTodo: (todoId: number) =>
-      ipcRenderer.invoke('flowchart-todo-association:query-by-todo', todoId),
-    queryByTodos: (todoIds: number[]) =>
-      ipcRenderer.invoke('flowchart-todo-association:query-by-todos', todoIds),
-  },
-  flowchartMigration: {
-    getStatus: () => ipcRenderer.invoke('flowchart-migration:getStatus'),
-    getFlowcharts: () => ipcRenderer.invoke('flowchart-migration:getFlowcharts'),
-    migrate: (options) => ipcRenderer.invoke('flowchart-migration:migrate', options),
-    cleanup: () => ipcRenderer.invoke('flowchart-migration:cleanup'),
-    verify: () => ipcRenderer.invoke('flowchart-migration:verify'),
   },
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
 

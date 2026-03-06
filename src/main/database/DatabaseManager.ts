@@ -220,7 +220,8 @@ export class DatabaseManager {
     // 执行表迁移
     await this.migrateTodosTable();
     await this.migrateFlowchartEdgesTable();
-    
+    await this.dropFlowchartTodoAssociationsTable();
+
     // 创建流程图查询索引
     await this.createFlowchartIndexes();
   }
@@ -352,6 +353,24 @@ export class DatabaseManager {
       console.log('Flowchart edges table migration completed');
     } catch (error) {
       console.error('Flowchart edges migration error:', error);
+    }
+  }
+
+  private async dropFlowchartTodoAssociationsTable(): Promise<void> {
+    try {
+      // 检查表是否存在
+      const tableExists = this.db!.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='flowchart_todo_associations'"
+      ).get() as any;
+
+      if (tableExists) {
+        console.log('Dropping flowchart_todo_associations table...');
+        this.db!.exec('DROP TABLE IF EXISTS flowchart_todo_associations');
+        console.log('flowchart_todo_associations table dropped successfully');
+      }
+    } catch (error) {
+      console.error('Error dropping flowchart_todo_associations table:', error);
+      // 不抛出错误，允许应用继续运行
     }
   }
 
@@ -541,20 +560,7 @@ export class DatabaseManager {
 
         transaction();
         console.log(`[批量删除] 成功删除 ${ids.length} 个待办事项`);
-        
-        // 异步清理流程图节点引用（不阻塞删除操作）
-        try {
-          const { FlowchartRepository } = await import('./FlowchartRepository');
-          const flowchartRepo = new FlowchartRepository(this.db!);
-          for (const id of ids) {
-            await flowchartRepo.cleanupInvalidTodoReferences(String(id));
-          }
-          console.log(`[数据一致性] 已清理 ${ids.length} 个待办的流程图节点引用`);
-        } catch (cleanupError) {
-          // 清理失败不影响删除操作
-          console.error('[数据一致性] 批量清理流程图节点引用失败:', cleanupError);
-        }
-        
+
         resolve();
       } catch (error) {
         console.error('[批量删除] 删除失败:', error);
@@ -959,18 +965,7 @@ export class DatabaseManager {
         });
         
         transaction();
-        
-        // 3. 异步清理流程图节点引用（不阻塞删除操作）
-        try {
-          const { FlowchartRepository } = await import('./FlowchartRepository');
-          const flowchartRepo = new FlowchartRepository(this.db!);
-          await flowchartRepo.cleanupInvalidTodoReferences(String(id));
-          console.log(`[数据一致性] 已清理待办 ${id} 的流程图节点引用`);
-        } catch (cleanupError) {
-          // 清理失败不影响删除操作
-          console.error('[数据一致性] 清理流程图节点引用失败:', cleanupError);
-        }
-        
+
         resolve();
       } catch (error) {
         reject(error);

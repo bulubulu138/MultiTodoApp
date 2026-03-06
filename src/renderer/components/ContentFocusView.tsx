@@ -72,6 +72,19 @@ const ContentFocusItem = React.memo(
     const lastSavedContentRef = useRef(todo.content);
     const lastSavedTitleRef = useRef(todo.title);
 
+    // 用于存储最新的值，避免组件卸载时的闭包陷阱
+    const latestTitleRef = useRef(editedTitle);
+    const latestTodoIdRef = useRef(todo.id);
+
+    // 同步最新值到 ref
+    useEffect(() => {
+      latestTitleRef.current = editedTitle;
+    }, [editedTitle]);
+
+    useEffect(() => {
+      latestTodoIdRef.current = todo.id;
+    }, [todo.id]);
+
     // 同步外部更新的 todo.content（仅在保存完成后更新）
     useEffect(() => {
       // 只有当外部内容变化且不是由当前组件保存触发时，才更新本地状态
@@ -130,8 +143,18 @@ const ContentFocusItem = React.memo(
         clearTimeout(titleSaveTimeoutRef.current);
       }
 
+      // ⭐ 如果正在使用输入法，不调度保存
+      if (isComposingRef.current) {
+        return;
+      }
+
       // 设置防抖保存（1秒）
       titleSaveTimeoutRef.current = setTimeout(async () => {
+        // ⭐ 再次检查输入法状态（防止在定时器执行时正在使用输入法）
+        if (isComposingRef.current) {
+          return;
+        }
+
         if (newTitle !== lastSavedTitleRef.current && newTitle.trim() && todo.id) {
           setIsSavingTitle(true);
           try {
@@ -207,26 +230,28 @@ const ContentFocusItem = React.memo(
     // 组件卸载时保存未保存的更改
     useEffect(() => {
       return () => {
+        // 清除定时器
         if (saveTimeoutRef.current) {
           clearTimeout(saveTimeoutRef.current);
         }
         if (titleSaveTimeoutRef.current) {
           clearTimeout(titleSaveTimeoutRef.current);
         }
-        // 如果有未保存的更改，立即保存
+
+        // 保存内容（同步，不等待）
         const currentContent = editorRef.current?.getLatestHtml() ?? lastSavedContentRef.current;
-        const currentTodoId = todo.id;
+        const currentTodoId = latestTodoIdRef.current;
         if (currentContent !== lastSavedContentRef.current && currentTodoId) {
           onUpdate(currentTodoId, { content: currentContent });
         }
-        // 保存未保存的标题
-        const currentTitle = editedTitle.trim();
+
+        // 保存标题（同步，不等待）
+        const currentTitle = latestTitleRef.current.trim();
         if (currentTitle !== lastSavedTitleRef.current && currentTitle && currentTodoId) {
           onUpdate(currentTodoId, { title: currentTitle });
         }
       };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // 仅在组件卸载时执行
+    }, []); // 空依赖数组是正确的，因为我们使用 ref 来获取最新值
 
     // 切换完成状态
     const handleToggleComplete = useCallback(async (checked: boolean) => {
@@ -405,6 +430,13 @@ const ContentFocusItem = React.memo(
 
     // 键盘事件处理 - Ctrl+S / Cmd+S 手动保存
     const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+      // 在输入法期间阻止空格键的默认滚动行为
+      if (isComposingRef.current && event.key === ' ') {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
       // 检测 Ctrl+S (Windows/Linux) 或 Cmd+S (Mac)
       if ((event.ctrlKey || event.metaKey) && event.key === 's') {
         event.preventDefault(); // 阻止浏览器默认的保存行为
@@ -600,6 +632,8 @@ const ContentFocusItem = React.memo(
               value={editedTitle}
               onChange={handleTitleChange}
               onBlur={handleTitleBlur}
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
               placeholder="待办标题..."
               autoSize={{ minRows: 1, maxRows: 3 }}
               className="content-focus-title-input"
@@ -621,11 +655,6 @@ const ContentFocusItem = React.memo(
               onChange={handleContentChange}
               placeholder="编辑待办内容..."
               style={{ minHeight: '150px' }}
-              enableFlowchartEmbed={true}
-              flowchartContext={{
-                todoId: todo.id,
-                todoTitle: todo.title,
-              }}
             />
             </div>
           </div>

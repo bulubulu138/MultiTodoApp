@@ -1,4 +1,4 @@
-import { Todo, TodoRelation, FlowchartAssociationDisplay } from '../../shared/types';
+import { Todo, TodoRelation } from '../../shared/types';
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message, Image, Card, Empty, Spin, Tooltip, Progress, Alert } from 'antd';
 import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined, NodeIndexOutlined, FileTextOutlined, LinkOutlined, LoginOutlined, ReloadOutlined, SafetyOutlined } from '@ant-design/icons';
@@ -6,9 +6,7 @@ import RelationContext from './RelationContext';
 import RelationsModal from './RelationsModal';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
-import { useFlowchartAssociations } from '../hooks/useFlowchartAssociations';
 import { useURLTitles } from '../hooks/useURLTitles';
-import { LazyFlowchartPreviewCard } from './flowchart/LazyFlowchartPreviewCard';
 import { embedUrlTitleInContent } from '../utils/urlTitleStorage';
 
 const { Title, Text, Paragraph } = Typography;
@@ -56,80 +54,6 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
 
   // 批量授权进度状态
   const [batchAuthProgress, setBatchAuthProgress] = useState<BatchAuthorizationProgress | null>(null);
-
-  // 流程图级别关联状态
-  const [flowchartLevelAssociations, setFlowchartLevelAssociations] = useState<FlowchartAssociationDisplay[]>([]);
-  const [flowchartLevelLoading, setFlowchartLevelLoading] = useState(false);
-
-  // 查询流程图级别关联
-  useEffect(() => {
-    const loadFlowchartLevelAssociations = async () => {
-      if (!todo?.id || !visible) {
-        setFlowchartLevelAssociations([]);
-        setFlowchartLevelLoading(false);
-        return;
-      }
-
-      setFlowchartLevelLoading(true);
-      try {
-        const associations = await window.electronAPI.flowchartTodoAssociation.queryByTodo(todo.id);
-        // 转换为统一的显示格式
-        const displayAssociations: FlowchartAssociationDisplay[] = associations.map(assoc => ({
-          type: 'flowchart' as const,
-          flowchartId: assoc.flowchartId,
-          flowchartName: assoc.flowchartName,
-          flowchartDescription: assoc.flowchartDescription,
-          createdAt: assoc.createdAt
-        }));
-        console.log('[TodoViewDrawer] Loaded flowchart-level associations:', displayAssociations);
-        setFlowchartLevelAssociations(displayAssociations);
-      } catch (error) {
-        console.error('查询流程图级别关联失败:', error);
-        setFlowchartLevelAssociations([]);
-      } finally {
-        setFlowchartLevelLoading(false);
-      }
-    };
-
-    loadFlowchartLevelAssociations();
-  }, [todo?.id, visible]);
-
-  // 缓存 todoIds 数组，避免每次渲染都创建新数组
-  const todoIds = useMemo(() => {
-    return todo?.id ? [todo.id] : [];
-  }, [todo?.id]);
-
-  // 查询节点级别关联（使用现有的hook）
-  const { associationsByTodo, loading: nodeLevelLoading, refresh: refreshNodeAssociations } = useFlowchartAssociations(todoIds);
-
-  // 当抽屉打开时，强制刷新节点级别关联
-  useEffect(() => {
-    if (visible && todo?.id) {
-      refreshNodeAssociations();
-    }
-  }, [visible, todo?.id, refreshNodeAssociations]);
-
-  // 获取当前待办的节点级别关联
-  const nodeLevelAssociations = useMemo(() => {
-    if (!todo?.id) return [];
-    const nodeAssocs = associationsByTodo.get(todo.id) || [];
-    // 转换为统一的显示格式
-    return nodeAssocs.map(assoc => ({
-      type: 'node' as const,
-      flowchartId: assoc.flowchartId,
-      flowchartName: assoc.flowchartName,
-      nodeId: assoc.nodeId,
-      nodeLabel: assoc.nodeLabel
-    } as FlowchartAssociationDisplay));
-  }, [todo?.id, associationsByTodo]);
-
-  // 合并两种类型的关联
-  const allAssociations = useMemo(() => {
-    return [...flowchartLevelAssociations, ...nodeLevelAssociations];
-  }, [flowchartLevelAssociations, nodeLevelAssociations]);
-
-  // 关联加载状态
-  const associationsLoading = flowchartLevelLoading || nodeLevelLoading;
 
   // URL标题获取
   const { titles: urlTitles, refresh: refreshUrlTitles } = useURLTitles(todo);
@@ -870,77 +794,6 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
               </div>
             </>
           )}
-
-          <Divider />
-
-          {/* 流程图关联 */}
-          <div style={{ marginBottom: 16 }}>
-            <Text strong>关联的流程图：</Text>
-            {associationsLoading ? (
-              <div style={{ marginTop: 8, textAlign: 'center', padding: 16 }}>
-                <Spin size="small" />
-                <Text type="secondary" style={{ marginLeft: 8 }}>加载中...</Text>
-              </div>
-            ) : allAssociations.length === 0 ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="暂无关联的流程图"
-                style={{ marginTop: 8 }}
-              />
-            ) : (
-              <Space direction="vertical" style={{ width: '100%', marginTop: 8 }} size="middle">
-                {/* 流程图级别关联 - 使用懒加载预览卡片 */}
-                {flowchartLevelAssociations.length > 0 && (
-                  <>
-                    <Text type="secondary" style={{ fontSize: 12, marginTop: 8 }}>
-                      流程图级别关联 ({flowchartLevelAssociations.length})
-                    </Text>
-                    {flowchartLevelAssociations.map((assoc) => (
-                      <LazyFlowchartPreviewCard
-                        key={`flowchart-${assoc.flowchartId}-${visible}`}
-                        flowchartId={assoc.flowchartId}
-                        flowchartName={assoc.flowchartName}
-                        flowchartDescription={assoc.flowchartDescription}
-                        onPreviewClick={(flowchartId) => {
-                          if (onOpenFlowchart) {
-                            onOpenFlowchart(flowchartId);
-                            onClose();
-                          }
-                        }}
-                        previewHeight={300}
-                        showActions={true}
-                      />
-                    ))}
-                  </>
-                )}
-
-                {/* 节点级别关联 - 使用懒加载预览卡片（带节点高亮） */}
-                {nodeLevelAssociations.length > 0 && (
-                  <>
-                    <Text type="secondary" style={{ fontSize: 12, marginTop: 8 }}>
-                      节点级别关联 ({nodeLevelAssociations.length})
-                    </Text>
-                    {nodeLevelAssociations.map((assoc) => (
-                      <LazyFlowchartPreviewCard
-                        key={`node-${assoc.flowchartId}-${assoc.nodeId}-${visible}`}
-                        flowchartId={assoc.flowchartId}
-                        flowchartName={assoc.flowchartName}
-                        highlightedNodeId={assoc.nodeId}
-                        onPreviewClick={(flowchartId, nodeId) => {
-                          if (onOpenFlowchart) {
-                            onOpenFlowchart(flowchartId, nodeId);
-                            onClose();
-                          }
-                        }}
-                        previewHeight={300}
-                        showActions={true}
-                      />
-                    ))}
-                  </>
-                )}
-              </Space>
-            )}
-          </div>
         </div>
 
         {/* 右侧：关系上下文 */}

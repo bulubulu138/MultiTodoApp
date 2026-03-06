@@ -7,7 +7,6 @@ import { ColorTheme } from '../theme/themes';
 import TagManagement from './TagManagement';
 import BackupSettings from './BackupSettings';
 import CustomTabManager from './CustomTabManager';
-import FlowchartMigrationPanel from './FlowchartMigrationModal';
 import URLAuthorizationManager from './URLAuthorizationManager';
 
 const { Text } = Typography;
@@ -589,21 +588,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         </span>
       ),
       children: <BackupSettings />,
-    },
-    {
-      key: 'flowchart-migration',
-      label: (
-        <span>
-          <ExportOutlined />
-          流程图迁移
-        </span>
-      ),
-      children: (
-        <FlowchartMigrationPanel
-          visible={visible && activeTab === 'flowchart-migration'}
-          onClose={() => {}}
-        />
-      ),
     },
     {
       key: 'urlAuthorization',

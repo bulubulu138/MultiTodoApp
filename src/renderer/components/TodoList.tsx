@@ -6,12 +6,10 @@ import { motion } from 'framer-motion';
 import { SortOption, ViewMode } from './Toolbar';
 import ContentFocusView from './ContentFocusView';
 import RelationIndicators from './RelationIndicators';
-import { FlowchartIndicator } from './FlowchartIndicator';
 import VirtualizedTodoList from './VirtualizedTodoList';
 import TodoLinksPreview from './TodoLinksPreview';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
-import { useFlowchartAssociations } from '../hooks/useFlowchartAssociations';
 import { useBatchURLTitles } from '../hooks/useBatchURLTitles';
 import { formatCompletedTime } from '../utils/timeFormatter';
 import { PerformanceMonitor } from '../utils/performanceMonitor';
@@ -100,10 +98,6 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
       window.removeEventListener('scroll', handleScroll);
     };
   }, [hasMoreData, onLoadMore]);
-  
-  // 获取所有待办的流程图关联数据
-  const todoIds = useMemo(() => todos.map(t => t.id!).filter(id => id !== undefined), [todos]);
-  const { associationsByTodo, loading: associationsLoading } = useFlowchartAssociations(todoIds);
 
   // 批量获取所有待办的URL标题
   const { getUrlTitlesForTodo, loading: urlTitlesLoading } = useBatchURLTitles(todos);
@@ -659,16 +653,6 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                         size="small"
                         showLabels={false}
                         onViewRelations={() => onView(todo)}
-                      />
-                    )}
-                    {/* 流程图关联指示器 */}
-                    {todo.id && onNavigateToFlowchart && (
-                      <FlowchartIndicator
-                        todoId={todo.id}
-                        associations={associationsByTodo.get(todo.id) || []}
-                        onNavigate={onNavigateToFlowchart}
-                        size="small"
-                        showLabel={false}
                       />
                     )}
                     {renderTags(todo.tags)}

@@ -41,8 +41,6 @@ import { NodeContextMenu } from './flowchart/NodeContextMenu';
 import { EdgeLabelEditor } from './flowchart/EdgeLabelEditor';
 import { EdgeStylePanel } from './flowchart/EdgeStylePanel';
 import { wouldCreateCycle } from '../utils/cycleDetection';
-import { migrateEdges as migrateEdgesBasic, needsEdgesMigration as needsEdgesMigrationBasic } from '../utils/flowchartMigration';
-import { migrateEdges as migrateEdgesEnhancements, migrateNodes as migrateNodesEnhancements, needsEdgesMigration as needsEdgesMigrationEnhancements, needsNodesMigration } from '../utils/flowchartEnhancementsMigration';
 import { HandleVisibilityProvider } from '../contexts/HandleVisibilityContext';
 
 /**
@@ -113,31 +111,9 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
     console.log('[FlowchartCanvas] Props changed, updating persisted data');
     console.log('[FlowchartCanvas] New nodes count:', initialPersistedNodes.length);
     console.log('[FlowchartCanvas] New edges count:', initialPersistedEdges.length);
-    
-    // 应用数据迁移 - 按顺序应用两个迁移
-    let migratedNodes = initialPersistedNodes;
-    let migratedEdges = initialPersistedEdges;
-    
-    // 1. 应用基础迁移（marker, type, animated）
-    if (needsEdgesMigrationBasic(initialPersistedEdges)) {
-      console.log('[FlowchartCanvas] Applying basic edge migration...');
-      migratedEdges = migrateEdgesBasic(migratedEdges);
-    }
-    
-    // 2. 应用增强迁移（style, labelStyle）
-    if (needsEdgesMigrationEnhancements(migratedEdges)) {
-      console.log('[FlowchartCanvas] Applying enhancements edge migration...');
-      migratedEdges = migrateEdgesEnhancements(migratedEdges);
-    }
-    
-    // 3. 应用节点迁移（目前为空，但为未来扩展预留）
-    if (needsNodesMigration(initialPersistedNodes)) {
-      console.log('[FlowchartCanvas] Applying node migration...');
-      migratedNodes = migrateNodesEnhancements(migratedNodes);
-    }
-    
-    setPersistedNodes(migratedNodes);
-    setPersistedEdges(migratedEdges);
+
+    setPersistedNodes(initialPersistedNodes);
+    setPersistedEdges(initialPersistedEdges);
   }, [initialPersistedNodes, initialPersistedEdges]);
 
   // 2. 通过 selector 计算业务领域层数据
