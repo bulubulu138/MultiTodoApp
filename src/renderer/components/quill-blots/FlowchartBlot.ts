@@ -63,7 +63,7 @@ export class FlowchartBlot extends (BlockEmbed as any) {
     node.setAttribute('contenteditable', 'false');
     node.setAttribute('data-flowchart', serializeEmbeddedFlowchart(normalized));
 
-    renderPreview(node, normalized.thumbnail);
+    renderPreview(node, normalized.thumbnail ?? '');
 
     return node;
   }
