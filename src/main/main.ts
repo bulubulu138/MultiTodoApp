@@ -920,6 +920,62 @@ class Application {
       }
     });
 
+    // 流程图待办关联API
+    ipcMain.handle('flowchart-todo-association:queryByFlowchart', async (_, flowchartId: string) => {
+      try {
+        const { FlowchartTodoAssociationRepository } = await import('./database/FlowchartTodoAssociationRepository');
+        const db = this.dbManager.getDb();
+        if (!db) {
+          throw new Error('Database not initialized');
+        }
+
+        const repo = new FlowchartTodoAssociationRepository(db);
+        const todoIds = repo.queryByFlowchartId(flowchartId);
+
+        console.log(`[FlowchartAssociation] Queried ${todoIds.length} todos for flowchart: ${flowchartId}`);
+        return todoIds;
+      } catch (error) {
+        console.error('Error querying flowchart associations:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('flowchart-todo-association:create', async (_, flowchartId: string, todoId: number) => {
+      try {
+        const { FlowchartTodoAssociationRepository } = await import('./database/FlowchartTodoAssociationRepository');
+        const db = this.dbManager.getDb();
+        if (!db) {
+          throw new Error('Database not initialized');
+        }
+
+        const repo = new FlowchartTodoAssociationRepository(db);
+        repo.create(flowchartId, todoId);
+
+        console.log(`[FlowchartAssociation] Created association: flowchart=${flowchartId}, todo=${todoId}`);
+      } catch (error) {
+        console.error('Error creating flowchart association:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('flowchart-todo-association:delete', async (_, flowchartId: string, todoId: number) => {
+      try {
+        const { FlowchartTodoAssociationRepository } = await import('./database/FlowchartTodoAssociationRepository');
+        const db = this.dbManager.getDb();
+        if (!db) {
+          throw new Error('Database not initialized');
+        }
+
+        const repo = new FlowchartTodoAssociationRepository(db);
+        repo.delete(flowchartId, todoId);
+
+        console.log(`[FlowchartAssociation] Deleted association: flowchart=${flowchartId}, todo=${todoId}`);
+      } catch (error) {
+        console.error('Error deleting flowchart association:', error);
+        throw error;
+      }
+    });
+
     // URL标题获取
     ipcMain.handle('url-titles:fetch-batch', async (_, urls: string[]) => {
       try {

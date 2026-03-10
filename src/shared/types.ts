@@ -379,3 +379,30 @@ export interface ExportResult {
   content: string;
   filename: string;
 }
+
+// ============================================
+// 流程图待办关联类型
+// ============================================
+
+export interface FlowchartAssociation {
+  flowchartId: string;
+  flowchartName: string;
+  nodeId: string;
+  nodeLabel: string;
+  createdAt: string;
+}
+
+// ============================================
+// 嵌入式流程图类型 (Embedded Flowchart)
+// 用于在待办内容中嵌入小型流程图
+// ============================================
+
+export interface EmbeddedFlowchartV1 {
+  version: 1;
+  id: string;
+  nodes: PersistedNode[];
+  edges: PersistedEdge[];
+  viewport: ViewportSchema;
+  thumbnail?: string;
+  updatedAt: number;
+}

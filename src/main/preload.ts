@@ -124,6 +124,13 @@ export interface ElectronAPI {
     savePatches: (flowchartId: string, patches: any[]) => Promise<{success: boolean}>;
   };
 
+  // 流程图待办关联API
+  flowchartTodoAssociation: {
+    queryByFlowchart: (flowchartId: string) => Promise<number[]>;
+    create: (flowchartId: string, todoId: number) => Promise<void>;
+    delete: (flowchartId: string, todoId: number) => Promise<void>;
+  };
+
   // Shell API
   openExternal: (url: string) => Promise<{success: boolean; error?: string}>;
 
@@ -268,6 +275,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('flowchart:delete', flowchartId),
     savePatches: (flowchartId: string, patches: any[]) =>
       ipcRenderer.invoke('flowchart:savePatches', flowchartId, patches),
+  },
+  flowchartTodoAssociation: {
+    queryByFlowchart: (flowchartId: string) =>
+      ipcRenderer.invoke('flowchart-todo-association:queryByFlowchart', flowchartId),
+    create: (flowchartId: string, todoId: number) =>
+      ipcRenderer.invoke('flowchart-todo-association:create', flowchartId, todoId),
+    delete: (flowchartId: string, todoId: number) =>
+      ipcRenderer.invoke('flowchart-todo-association:delete', flowchartId, todoId),
   },
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
 
