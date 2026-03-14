@@ -173,20 +173,6 @@ export function getSortComparator(sortOption: SortOption): (a: Todo, b: Todo) =>
       return (a, b) => getTimestamp(a.updatedAt) - getTimestamp(b.updatedAt);
     case 'updatedAt-desc':
       return (a, b) => getTimestamp(b.updatedAt) - getTimestamp(a.updatedAt);
-    case 'deadline-asc':
-      return (a, b) => {
-        if (!a.deadline && !b.deadline) return 0;
-        if (!a.deadline) return 1;
-        if (!b.deadline) return -1;
-        return getTimestamp(a.deadline) - getTimestamp(b.deadline);
-      };
-    case 'deadline-desc':
-      return (a, b) => {
-        if (!a.deadline && !b.deadline) return 0;
-        if (!a.deadline) return 1;
-        if (!b.deadline) return -1;
-        return getTimestamp(b.deadline) - getTimestamp(a.deadline);
-      };
     default:
       return () => 0;
   }

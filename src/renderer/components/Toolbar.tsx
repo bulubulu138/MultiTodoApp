@@ -6,13 +6,9 @@ import { motion } from 'framer-motion';
 const { Option } = Select;
 const { Search } = Input;
 
-export type SortOption = 
-  | 'createdAt-desc' 
-  | 'createdAt-asc' 
-  | 'startTime-desc' 
-  | 'startTime-asc' 
-  | 'deadline-desc' 
-  | 'deadline-asc'
+export type SortOption =
+  | 'createdAt-desc'
+  | 'createdAt-asc'
   | 'updatedAt-desc'
   | 'updatedAt-asc'
   | 'manual';
@@ -73,10 +69,6 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
           <Option value="createdAt-asc">创建时间 ↑ 旧→新</Option>
           <Option value="updatedAt-desc">更新时间 ↓ 新→旧</Option>
           <Option value="updatedAt-asc">更新时间 ↑ 旧→新</Option>
-          <Option value="startTime-desc">开始时间 ↓ 晚→早</Option>
-          <Option value="startTime-asc">开始时间 ↑ 早→晚</Option>
-          <Option value="deadline-desc">截止时间 ↓ 晚→早</Option>
-          <Option value="deadline-asc">截止时间 ↑ 早→晚</Option>
         </Select>
         
         <Tooltip title="切换视图模式">
