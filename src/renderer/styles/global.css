@@ -176,15 +176,21 @@ body {
 .todo-card {
   margin-bottom: 6px;
   border-radius: 8px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
   /* 移除全局will-change，仅在hover时动态添加 */
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
-              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  /* 明确移除底部边框 */
+  border-bottom: none !important;
+}
+
+/* 同时确保 Ant Design Card 的边框也被移除 */
+.todo-card.ant-card {
+  border-bottom: none !important;
 }
 
 .todo-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: none;
   will-change: transform; /* 仅在hover时启用 */
 }
 
@@ -756,13 +762,11 @@ flowchart-preview.flowchart-embedded:hover {
 
 /* 深色主题下的卡片样式 */
 [data-theme='dark'] .todo-card {
-  border: 1px solid #404040;
-  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.03);
+  box-shadow: none;
 }
 
 [data-theme='dark'] .todo-card:hover {
-  border-color: #505050;
-  box-shadow: 0 4px 16px rgba(255, 255, 255, 0.08);
+  box-shadow: none;
 }
 
 [data-theme='dark'] .todo-content-preview {
