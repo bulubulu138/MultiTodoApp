@@ -5,6 +5,7 @@ import { SaveOutlined, EyeOutlined, CheckCircleOutlined } from '@ant-design/icon
 import RichTextEditor, { RichTextEditorRef } from './RichTextEditor';
 import RelationIndicators from './RelationIndicators';
 import { formatCompletedTime } from '../utils/timeFormatter';
+import { ColorTheme } from '../theme/themes';
 
 interface ContentFocusViewProps {
   todos: Todo[];
@@ -15,6 +16,7 @@ interface ContentFocusViewProps {
   activeTab: string;
   relations: TodoRelation[];
   onUpdateDisplayOrder: (todoId: number, tabKey: string, displayOrder: number) => Promise<void>;
+  colorTheme?: ColorTheme;
 }
 
 // 暴露给父组件的方法

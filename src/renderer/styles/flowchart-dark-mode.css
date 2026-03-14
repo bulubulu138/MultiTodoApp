@@ -288,12 +288,6 @@
   color: #e8e8e8;
 }
 
-[data-theme='dark'] .react-flow__node-todo[data-status='paused'] {
-  background-color: #141414;
-  border-color: #434343;
-  color: #8c8c8c;
-}
-
 
 /* 连接点基础样式优化 */
 .react-flow__handle {

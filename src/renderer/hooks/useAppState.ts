@@ -113,8 +113,7 @@ export const useAppState = () => {
     all: todos.filter(t => t && t.id).length,
     pending: todos.filter(t => t && t.status === 'pending').length,
     in_progress: todos.filter(t => t && t.status === 'in_progress').length,
-    completed: todos.filter(t => t && t.status === 'completed').length,
-    paused: todos.filter(t => t && t.status === 'paused').length
+    completed: todos.filter(t => t && t.status === 'completed').length
   }), []);
 
   const getExistingTags = useCallback((todos: Todo[]) => {

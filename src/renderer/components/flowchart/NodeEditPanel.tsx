@@ -74,8 +74,7 @@ export const NodeEditPanel: React.FC<NodeEditPanelProps> = ({
     const statusMap = {
       pending: { color: 'default', text: '待办' },
       in_progress: { color: 'processing', text: '进行中' },
-      completed: { color: 'success', text: '已完成' },
-      paused: { color: 'warning', text: '已暂停' }
+      completed: { color: 'success', text: '已完成' }
     };
     const config = statusMap[status];
     return <Tag color={config.color}>{config.text}</Tag>;

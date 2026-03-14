@@ -256,8 +256,7 @@ export class TextExporter {
     const statusNames: Record<string, string> = {
       'pending': '待办',
       'in_progress': '进行中',
-      'completed': '已完成',
-      'paused': '已暂停'
+      'completed': '已完成'
     };
 
     return statusNames[status] || status;

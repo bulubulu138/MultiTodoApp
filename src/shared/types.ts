@@ -5,7 +5,7 @@ export interface Todo {
   id?: number;
   title: string;
   content: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'paused';
+  status: 'pending' | 'in_progress' | 'completed';
   priority: 'low' | 'medium' | 'high';
   tags: string;
   imageUrl?: string;
@@ -167,7 +167,6 @@ export interface TodoNodeStyleMap {
   completed: TodoNodeStyleConfig;
   in_progress: TodoNodeStyleConfig;
   pending: TodoNodeStyleConfig;
-  paused: TodoNodeStyleConfig;
 }
 
 // 待办节点主题样式配置

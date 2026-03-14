@@ -84,6 +84,11 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   // 启用全局键盘处理 - 防止中文输入法的空格/退格键滚动
   useGlobalKeyboardHandler();
 
+  // 同步 colorTheme 到 documentElement，供 useThemeColors hook 的 MutationObserver 使用
+  useEffect(() => {
+    document.documentElement.dataset.colorTheme = colorTheme;
+  }, [colorTheme]);
+
   // 性能监控 - 仅在开发环境启用
   const { startMonitoring } = useMotionPerformanceMonitor();
   useEffect(() => {
@@ -827,8 +832,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     all: todos.filter(t => t && t.id).length,
     pending: todos.filter(t => t && t.status === 'pending').length,
     in_progress: todos.filter(t => t && t.status === 'in_progress').length,
-    completed: todos.filter(t => t && t.status === 'completed').length,
-    paused: todos.filter(t => t && t.status === 'paused').length
+    completed: todos.filter(t => t && t.status === 'completed').length
   }), [todos]);
 
   // 性能优化：分层缓存计算结果
@@ -989,10 +993,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       key: 'completed',
       label: `已完成 (${statusCounts.completed})`,
     },
-    {
-      key: 'paused',
-      label: `已暂停 (${statusCounts.paused})`,
-    },
   ];
 
     // 添加自定义标签Tab
@@ -1093,6 +1093,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
                   activeTab={activeTab}
                   relations={relations}
                   onUpdateDisplayOrder={handleUpdateDisplayOrder}
+                  colorTheme={colorTheme}
                 />
               ) : (
                 <TodoList

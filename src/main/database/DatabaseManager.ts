@@ -221,6 +221,7 @@ export class DatabaseManager {
     await this.migrateTodosTable();
     await this.migrateFlowchartEdgesTable();
     await this.dropFlowchartTodoAssociationsTable();
+    await this.deletePausedTodos();
 
     // 创建流程图查询索引
     await this.createFlowchartIndexes();
@@ -417,6 +418,30 @@ export class DatabaseManager {
     } catch (error) {
       console.error('Error migrating displayOrders:', error);
       throw error;
+    }
+  }
+
+  private async deletePausedTodos(): Promise<void> {
+    try {
+      // 检查是否有 paused 状态的待办
+      const checkStmt = this.db!.prepare("SELECT COUNT(*) as count FROM todos WHERE status = 'paused'");
+      const result = checkStmt.get() as any;
+      const pausedCount = result.count;
+
+      if (pausedCount > 0) {
+        console.log(`Found ${pausedCount} paused todos, deleting...`);
+
+        // 删除所有 paused 状态的待办
+        const deleteStmt = this.db!.prepare("DELETE FROM todos WHERE status = 'paused'");
+        const deleteResult = deleteStmt.run();
+
+        console.log(`Deleted ${deleteResult.changes} paused todos successfully`);
+      } else {
+        console.log('No paused todos found, skipping deletion');
+      }
+    } catch (error) {
+      console.error('Error deleting paused todos:', error);
+      // 不抛出错误，允许应用继续运行
     }
   }
 

@@ -63,16 +63,6 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
   const [savingOrder, setSavingOrder] = useState(false);
 
   // 性能优化：使用useCallback缓存函数
-  const getStatusColor = useCallback((status: string) => {
-    switch (status) {
-      case 'pending': return 'orange';
-      case 'in_progress': return 'blue';
-      case 'completed': return 'green';
-      case 'paused': return 'default';
-      default: return 'default';
-    }
-  }, []);
-
   const getPriorityColor = useCallback((priority: string) => {
     switch (priority) {
       case 'high': return 'red';
@@ -251,7 +241,8 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
           className="todo-card"
           style={{
             flex: 1,
-            borderLeft: hasParallel ? '4px solid #fa8c16' : undefined
+            borderLeft: hasParallel ? '4px solid #fa8c16' : undefined,
+            backgroundColor: todo.status === 'completed' ? colors.completedBg : undefined
           }}
           styles={{ body: { padding: '8px' } }}
           variant="borderless"
@@ -281,10 +272,17 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
                   style={{
                     fontSize: 15,
                     cursor: 'pointer',
-                    transition: 'color 0.3s'
+                    transition: 'color 0.3s',
+                    color: todo.status === 'completed' ? colors.completedText : undefined
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = '#40a9ff'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = 'inherit'}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#40a9ff';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = todo.status === 'completed'
+                      ? colors.completedText
+                      : 'inherit';
+                  }}
                   onClick={() => onView(todo)}
                 >
                   {todo.title}
@@ -412,21 +410,17 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
                 <Option value="pending">待办</Option>
                 <Option value="in_progress">进行中</Option>
                 <Option value="completed">已完成</Option>
-                <Option value="paused">暂停</Option>
               </Select>
             </Space>
 
             <div style={{
               fontSize: 11,
-              color: '#999',
+              color: todo.status === 'completed' ? colors.completedText : '#999',
               whiteSpace: 'nowrap',
               lineHeight: '16px'
             }}>
               <Space size={8} split={<span>|</span>}>
-                <span>创建: {formatCompactTime(todo.createdAt)}</span>
-                {todo.updatedAt !== todo.createdAt && (
-                  <span>更新: {formatCompactTime(todo.updatedAt)}</span>
-                )}
+                <span>更新: {formatCompactTime(todo.updatedAt)}</span>
                 {todo.status === 'completed' && todo.completedAt && (
                   <span style={{ color: '#52c41a' }}>
                     <CheckCircleOutlined /> 完成于 {formatCompletedTime(todo.completedAt)}
@@ -456,17 +450,6 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
         </Card>
       </div>
     </div>
-  );
-}, (prevProps, nextProps) => {
-  // 自定义比较函数：只在关键props改变时重新渲染
-  return (
-    prevProps.todo.id === nextProps.todo.id &&
-    prevProps.todo.updatedAt === nextProps.todo.updatedAt &&
-    prevProps.todo.status === nextProps.todo.status &&
-    prevProps.todo.title === nextProps.todo.title &&
-    prevProps.activeTab === nextProps.activeTab &&
-    prevProps.sortOption === nextProps.sortOption &&
-    prevProps.relations.length === nextProps.relations.length
   );
 });
 

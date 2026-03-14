@@ -133,8 +133,7 @@ function getStatusText(status: string): string {
   const statusMap: Record<string, string> = {
     pending: '待办',
     in_progress: '进行中',
-    completed: '已完成',
-    paused: '暂停'
+    completed: '已完成'
   };
   return statusMap[status] || status;
 }

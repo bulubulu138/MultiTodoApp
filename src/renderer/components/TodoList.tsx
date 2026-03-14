@@ -125,7 +125,6 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
       case 'pending': return 'orange';
       case 'in_progress': return 'blue';
       case 'completed': return 'green';
-      case 'paused': return 'default';
       default: return 'default';
     }
   }, []);
@@ -135,7 +134,6 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
       case 'pending': return '待办';
       case 'in_progress': return '进行中';
       case 'completed': return '已完成';
-      case 'paused': return '暂停';
       default: return status;
     }
   }, []);
@@ -464,6 +462,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
         viewMode={viewMode}
         onUpdateInPlace={onUpdateInPlace}
         getUrlTitlesForTodo={getUrlTitlesForTodo}
+        colorTheme={colorTheme}
       />
     );
   }
@@ -726,7 +725,6 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                     <Option value="pending">待办</Option>
                     <Option value="in_progress">进行中</Option>
                     <Option value="completed">已完成</Option>
-                    <Option value="paused">暂停</Option>
                   </Select>
                 </Space>
                 
@@ -748,10 +746,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                         <ClockCircleOutlined /> 截止: {formatCompactTime(todo.deadline)}
                       </span>
                     )}
-                    <span>创建: {formatCompactTime(todo.createdAt)}</span>
-                    {todo.updatedAt !== todo.createdAt && (
-                      <span>更新: {formatCompactTime(todo.updatedAt)}</span>
-                    )}
+                    <span>更新: {formatCompactTime(todo.updatedAt)}</span>
                     {todo.status === 'completed' && todo.completedAt && (
                       <span style={{ color: colors.completedText }}>
                         <CheckCircleOutlined /> 完成于 {formatCompletedTime(todo.completedAt)}
@@ -819,7 +814,8 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
     prevProps.activeTab === nextProps.activeTab &&
     prevProps.sortOption === nextProps.sortOption &&
     prevProps.viewMode === nextProps.viewMode &&
-    prevProps.enableVirtualScroll === nextProps.enableVirtualScroll
+    prevProps.enableVirtualScroll === nextProps.enableVirtualScroll &&
+    prevProps.colorTheme === nextProps.colorTheme
   );
 });
 

@@ -522,7 +522,6 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
       case 'pending': return 'orange';
       case 'in_progress': return 'blue';
       case 'completed': return 'green';
-      case 'paused': return 'default';
       default: return 'default';
     }
   };
@@ -532,7 +531,6 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
       case 'pending': return '待办';
       case 'in_progress': return '进行中';
       case 'completed': return '已完成';
-      case 'paused': return '暂停';
       default: return status;
     }
   };

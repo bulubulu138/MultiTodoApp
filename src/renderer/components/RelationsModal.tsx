@@ -383,7 +383,7 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
                           )}
                         </div>
                         <Text type="secondary" style={{ fontSize: '12px' }}>
-                          {new Date(item.todo.createdAt).toLocaleString()} · {item.todo.status === 'completed' ? '✅已完成' : item.todo.status === 'in_progress' ? '⏳进行中' : item.todo.status === 'paused' ? '⏸暂停' : '📋待办'}
+                          {new Date(item.todo.createdAt).toLocaleString()} · {item.todo.status === 'completed' ? '✅已完成' : item.todo.status === 'in_progress' ? '⏳进行中' : '📋待办'}
                         </Text>
                         {item.todo.content && (
                           <Text 
@@ -417,7 +417,7 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
                         <Text strong>{todo.title}</Text>
                       </div>
                       <Text type="secondary" style={{ fontSize: '12px' }}>
-                        {new Date(todo.createdAt).toLocaleString()} · {todo.status === 'completed' ? '✅已完成' : todo.status === 'in_progress' ? '⏳进行中' : todo.status === 'paused' ? '⏸暂停' : '📋待办'}
+                        {new Date(todo.createdAt).toLocaleString()} · {todo.status === 'completed' ? '✅已完成' : todo.status === 'in_progress' ? '⏳进行中' : '📋待办'}
                       </Text>
                     </Space>
                   </Card>

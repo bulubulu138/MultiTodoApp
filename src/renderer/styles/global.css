@@ -94,10 +94,6 @@ body {
   color: #52c41a;
 }
 
-.status-paused {
-  color: #d9d9d9;
-}
-
 /* 优先级颜色 */
 .priority-high {
   color: #ff4d4f;

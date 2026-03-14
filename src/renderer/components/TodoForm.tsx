@@ -1,10 +1,9 @@
 import { Todo, TodoRelation } from '../../shared/types';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Modal, Form, Input, Select, Button, App, Tag, Space, Switch, DatePicker, InputNumber, Typography } from 'antd';
+import { Modal, Form, Input, Select, Button, App, Tag, Space, DatePicker, InputNumber, Typography } from 'antd';
 const { Text } = Typography;
-import { EditOutlined, FileTextOutlined, CopyOutlined } from '@ant-design/icons';
+import { CopyOutlined } from '@ant-design/icons';
 import RichTextEditor, { RichTextEditorRef } from './RichTextEditor';
-import PlainTextFallback from './PlainTextFallback';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import dayjs from 'dayjs';
 // import TipTapEditor from './TipTapEditor'; // Temporarily disabled until dependencies are installed
@@ -37,7 +36,6 @@ const TodoForm: React.FC<TodoFormProps> = ({
   const [tags, setTags] = useState<string[]>([]);
   const [richContent, setRichContent] = useState<string>('');
   const [isEditorReady, setIsEditorReady] = useState(false);
-  const [useRichEditor, setUseRichEditor] = useState(true);
   const [editorError, setEditorError] = useState(false);
 
   const richEditorRef = React.useRef<RichTextEditorRef>(null);
@@ -111,7 +109,6 @@ const TodoForm: React.FC<TodoFormProps> = ({
       // Modal 关闭时重置编辑器状态
       setIsEditorReady(false);
       setEditorError(false);
-      setUseRichEditor(true);
     }
   }, [visible, todo, form, quickCreateContent]);
 
@@ -144,9 +141,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
     try {
       const values = await form.validateFields();
 
-      const submitContent = useRichEditor && !editorError
-        ? (richEditorRef.current?.getLatestHtml() ?? richContent)
-        : richContent;
+      const submitContent = richEditorRef.current?.getLatestHtml() ?? richContent;
 
       if (process.env.NODE_ENV === 'development') {
         console.log('[TodoForm] Submit content snapshot', {
@@ -259,52 +254,25 @@ const TodoForm: React.FC<TodoFormProps> = ({
           <Input placeholder="留空则自动从内容第一行生成" />
         </Form.Item>
 
-        <Form.Item
-          label={
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-              <span>内容描述</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FileTextOutlined />
-                <Switch
-                  size="small"
-                  checked={useRichEditor}
-                  onChange={setUseRichEditor}
-                  checkedChildren={<EditOutlined />}
-                  unCheckedChildren="纯文本"
-                />
-                <span style={{ fontSize: '12px', color: '#666' }}>
-                  {useRichEditor ? '富文本' : '纯文本'}
-                </span>
-              </div>
-            </div>
-          }
-        >
+        <Form.Item label="内容描述">
           {isEditorReady ? (
-            useRichEditor && !editorError ? (
-              <div
-                onCompositionStart={() => {
-                  console.log('[TodoForm] 输入法开始');
-                  isComposingRef.current = true;
-                }}
-                onCompositionEnd={() => {
-                  console.log('[TodoForm] 输入法结束');
-                  isComposingRef.current = false;
-                }}
-              >
-                <RichTextEditor
-                  ref={richEditorRef}
-                  value={richContent}
-                  onChange={handleContentChange}
-                  placeholder="输入内容，支持格式化文本、粘贴图片等..."
-                />
-              </div>
-            ) : (
-              <PlainTextFallback
+            <div
+              onCompositionStart={() => {
+                console.log('[TodoForm] 输入法开始');
+                isComposingRef.current = true;
+              }}
+              onCompositionEnd={() => {
+                console.log('[TodoForm] 输入法结束');
+                isComposingRef.current = false;
+              }}
+            >
+              <RichTextEditor
+                ref={richEditorRef}
                 value={richContent}
                 onChange={handleContentChange}
-                placeholder="输入内容..."
+                placeholder="输入内容，支持格式化文本、粘贴图片等..."
               />
-            )
+            </div>
           ) : (
             <div style={{
               minHeight: '250px',
@@ -340,7 +308,6 @@ const TodoForm: React.FC<TodoFormProps> = ({
             <Option value="pending">待办</Option>
             <Option value="in_progress">进行中</Option>
             <Option value="completed">已完成</Option>
-            <Option value="paused">暂停</Option>
           </Select>
         </Form.Item>
 

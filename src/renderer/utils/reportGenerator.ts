@@ -652,7 +652,6 @@ function getStatusText(status: string): string {
     case 'pending': return '待办';
     case 'in_progress': return '进行中';
     case 'completed': return '已完成';
-    case 'paused': return '暂停';
     default: return status;
   }
 }
@@ -662,7 +661,6 @@ function getStatusEmoji(status: string): string {
     case 'pending': return '📋';
     case 'in_progress': return '🔄';
     case 'completed': return '✅';
-    case 'paused': return '⏸';
     default: return '';
   }
 }

@@ -62,8 +62,6 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selec
         return <CheckCircleOutlined style={{ ...iconStyle, color: '#52c41a' }} />;
       case 'in_progress':
         return <ClockCircleOutlined style={{ ...iconStyle, color: '#faad14' }} />;
-      case 'paused':
-        return <PauseCircleOutlined style={{ ...iconStyle, color: '#8c8c8c' }} />;
       default:
         return null;
     }

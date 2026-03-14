@@ -55,6 +55,7 @@ interface VirtualizedTodoItemProps {
   onRelationsChange?: () => Promise<void>;
   onUpdateDisplayOrder?: (id: number, tabKey: string, order: number | null) => Promise<void>;
   urlTitles?: Map<string, string>;
+  colorTheme?: ColorTheme;
 }
 
 // 优化的单个待办事项组件
@@ -72,7 +73,8 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
   onView,
   onRelationsChange,
   onUpdateDisplayOrder,
-  urlTitles
+  urlTitles,
+  colorTheme = 'purple'
 }) => {
   const { message } = App.useApp();
   const colors = useThemeColors();
@@ -84,7 +86,6 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
       case 'pending': return 'orange';
       case 'in_progress': return 'blue';
       case 'completed': return 'green';
-      case 'paused': return 'default';
       default: return 'default';
     }
   }, []);
@@ -333,7 +334,6 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
               <Option value="pending">待办</Option>
               <Option value="in_progress">进行中</Option>
               <Option value="completed">已完成</Option>
-              <Option value="paused">暂停</Option>
             </Select>
           </Space>
 
@@ -354,10 +354,7 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
                   <ClockCircleOutlined /> 截止: {formatCompactTime(todo.deadline)}
                 </span>
               )}
-              <span>创建: {formatCompactTime(todo.createdAt)}</span>
-              {todo.updatedAt !== todo.createdAt && (
-                <span>更新: {formatCompactTime(todo.updatedAt)}</span>
-              )}
+              <span>更新: {formatCompactTime(todo.updatedAt)}</span>
               {todo.status === 'completed' && todo.completedAt && (
                 <span style={{ color: colors.completedText }}>
                   <CheckCircleOutlined /> 完成于 {formatCompletedTime(todo.completedAt)}
@@ -368,6 +365,14 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
         </div>
       </Card>
     </div>
+  );
+}, (prevProps, nextProps) => {
+  // 自定义比较函数，只在关键 props 改变时重新渲染
+  return (
+    prevProps.colorTheme === nextProps.colorTheme &&
+    prevProps.todo.id === nextProps.todo.id &&
+    prevProps.todo.status === nextProps.todo.status &&
+    prevProps.todo.updatedAt === nextProps.todo.updatedAt
   );
 });
 
@@ -406,6 +411,7 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
     onRelationsChange?: () => Promise<void>;
     onUpdateDisplayOrder?: (id: number, tabKey: string, order: number | null) => Promise<void>;
     getUrlTitlesForTodo?: (todoId: number) => Map<string, string>;
+    colorTheme?: ColorTheme;
   };
 
   const rowPropsData: RowPropsType = useMemo(() => ({
@@ -420,15 +426,16 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
     onView,
     onRelationsChange,
     onUpdateDisplayOrder,
-    getUrlTitlesForTodo
-  }), [todos, allTodos, relations, sortOption, activeTab, onEdit, onDelete, onStatusChange, onView, onRelationsChange, onUpdateDisplayOrder, getUrlTitlesForTodo]);
+    getUrlTitlesForTodo,
+    colorTheme
+  }), [todos, allTodos, relations, sortOption, activeTab, onEdit, onDelete, onStatusChange, onView, onRelationsChange, onUpdateDisplayOrder, getUrlTitlesForTodo, colorTheme]);
 
   // 渲染虚拟化列表项 - 接收List自动提供的index和style，以及我们传入的rowProps
   const RowComponent = useCallback((props: {
     index: number;
     style: React.CSSProperties;
   } & RowPropsType) => {
-    const { index, style, todos, allTodos, relations, sortOption, activeTab, onEdit, onDelete, onStatusChange, onView, onRelationsChange, onUpdateDisplayOrder, getUrlTitlesForTodo } = props;
+    const { index, style, todos, allTodos, relations, sortOption, activeTab, onEdit, onDelete, onStatusChange, onView, onRelationsChange, onUpdateDisplayOrder, getUrlTitlesForTodo, colorTheme } = props;
     const todo = todos[index];
     if (!todo || !todo.id) return <div style={style} />;
 
@@ -448,9 +455,10 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
         onRelationsChange={onRelationsChange}
         onUpdateDisplayOrder={onUpdateDisplayOrder}
         urlTitles={getUrlTitlesForTodo ? getUrlTitlesForTodo(todo.id) : undefined}
+        colorTheme={colorTheme}
       />
     );
-  }, []);
+  }, [rowPropsData, colorTheme]);
 
   return (
     <>
@@ -468,6 +476,16 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
         />
       )}
     </>
+  );
+}, (prevProps, nextProps) => {
+  // 自定义比较函数，只在关键 props 改变时重新渲染
+  return (
+    prevProps.colorTheme === nextProps.colorTheme &&
+    prevProps.todos.length === nextProps.todos.length &&
+    prevProps.loading === nextProps.loading &&
+    prevProps.sortOption === nextProps.sortOption &&
+    prevProps.activeTab === nextProps.activeTab &&
+    prevProps.viewMode === nextProps.viewMode
   );
 });
 

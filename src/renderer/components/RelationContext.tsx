@@ -31,7 +31,6 @@ const TodoContextCard: React.FC<TodoContextCardProps> = ({
     switch (status) {
       case 'completed': return '✅';
       case 'in_progress': return '⏳';
-      case 'paused': return '⏸';
       default: return '📋';
     }
   };
@@ -51,7 +50,6 @@ const TodoContextCard: React.FC<TodoContextCardProps> = ({
       case 'pending': return 'orange';
       case 'in_progress': return 'blue';
       case 'completed': return 'green';
-      case 'paused': return 'default';
       default: return 'default';
     }
   };
@@ -61,7 +59,6 @@ const TodoContextCard: React.FC<TodoContextCardProps> = ({
       case 'pending': return '待办';
       case 'in_progress': return '进行中';
       case 'completed': return '已完成';
-      case 'paused': return '暂停';
       default: return status;
     }
   };

@@ -26,12 +26,6 @@ export const TODO_NODE_STYLES: TodoNodeThemeStyles = {
       borderColor: '#d9d9d9',     // 灰色边框
       borderWidth: 2,
       color: '#262626'            // 深灰色文字（对比度 12.6:1）
-    },
-    paused: {
-      backgroundColor: '#f5f5f5', // 浅灰色背景
-      borderColor: '#8c8c8c',     // 中灰色边框
-      borderWidth: 2,
-      color: '#595959'            // 深灰色文字（对比度 7.1:1）
     }
   },
   
@@ -54,12 +48,6 @@ export const TODO_NODE_STYLES: TodoNodeThemeStyles = {
       borderColor: '#595959',     // 中灰色边框
       borderWidth: 2,
       color: '#e8e8e8'            // 浅灰色文字（对比度 10.2:1）
-    },
-    paused: {
-      backgroundColor: '#141414', // 更深灰色背景
-      borderColor: '#434343',     // 深灰色边框
-      borderWidth: 2,
-      color: '#8c8c8c'            // 中灰色文字（对比度 4.6:1）
     }
   }
 };

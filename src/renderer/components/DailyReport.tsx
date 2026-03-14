@@ -38,7 +38,6 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
       case 'completed': return 'green';
       case 'in_progress': return 'blue';
       case 'pending': return 'orange';
-      case 'paused': return 'default';
       default: return 'default';
     }
   };
@@ -48,7 +47,6 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
       case 'completed': return '已完成';
       case 'in_progress': return '进行中';
       case 'pending': return '待办';
-      case 'paused': return '暂停';
       default: return status;
     }
   };
