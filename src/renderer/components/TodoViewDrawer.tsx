@@ -65,6 +65,16 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
       setBatchAuthProgress(progress);
     };
 
+    const handleBatchInfo = (info: any) => {
+      console.log('[TodoViewDrawer] Batch authorization info:', info);
+
+      message.info({
+        content: info.message,
+        duration: 3,
+        key: 'batch-auth-info'
+      });
+    };
+
     const handleBatchCompleted = (result: any) => {
       console.log('[TodoViewDrawer] Batch authorization completed:', result);
 
@@ -93,6 +103,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
     };
 
     window.electronAPI.urlAuth.onBatchProgress(handleProgress);
+    window.electronAPI.urlAuth.onBatchInfo(handleBatchInfo);
     window.electronAPI.urlAuth.onBatchCompleted(handleBatchCompleted);
 
     return () => {

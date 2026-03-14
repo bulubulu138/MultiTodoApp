@@ -192,6 +192,13 @@ export interface ElectronAPI {
     // 批量授权事件监听
     onBatchProgress: (callback: (progress: BatchAuthorizationProgress) => void) => void;
     onBatchCompleted: (callback: (result: BatchAuthorizationResult) => void) => void;
+    onBatchInfo: (callback: (info: {
+      message: string;
+      domain: string;
+      totalUrls: number;
+      succeeded: number;
+      failed: number;
+    }) => void) => void;
     removeBatchListeners: () => void;
   };
 
@@ -313,9 +320,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
         callback(result);
       });
     },
+    onBatchInfo: (callback: (info: any) => void) => {
+      ipcRenderer.on('url-auth:batch-info', (_event, info) => {
+        callback(info);
+      });
+    },
     removeBatchListeners: () => {
       ipcRenderer.removeAllListeners('url-auth:batch-progress');
       ipcRenderer.removeAllListeners('url-auth:batch-completed');
+      ipcRenderer.removeAllListeners('url-auth:batch-info');
     },
   },
 

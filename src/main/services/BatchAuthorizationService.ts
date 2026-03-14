@@ -88,10 +88,19 @@ export class BatchAuthorizationService {
       });
 
       const allUrls = await this.extractUrlsByDomain(domain);
-      console.log(`[BatchAuthorizationService] Found ${allUrls.length} URLs for domain ${domain}`);
+      console.log(`[BatchAuthorizationService] Domain scan results:`, {
+        domain,
+        totalCount: allUrls.length,
+        sampleUrls: allUrls.slice(0, 5), // 只打印前5个避免日志过长
+        message: allUrls.length === 0
+          ? `No URLs found for domain ${domain}. This is normal if you only have one link from this domain.`
+          : `Found ${allUrls.length} URLs for batch authorization`
+      });
 
       if (allUrls.length === 0) {
         console.log(`[BatchAuthorizationService] No URLs found for domain ${domain}`);
+
+        // 发送进度更新（即使是空结果），让前端知道已经完成扫描
         onProgress?.({
           domain,
           current: 0,
@@ -100,6 +109,7 @@ export class BatchAuthorizationService {
           succeeded: 0,
           failed: 0
         });
+
         return result;
       }
 
@@ -171,7 +181,7 @@ export class BatchAuthorizationService {
   }
 
   /**
-   * 从所有待办中提取指定域名的URL
+   * 从所有待办中提取指定域名的URL（支持根域名匹配）
    */
   private async extractUrlsByDomain(domain: string): Promise<string[]> {
     if (!this.db) {
@@ -199,7 +209,9 @@ export class BatchAuthorizationService {
           const url = match[1];
           try {
             const urlObj = new URL(url);
-            if (urlObj.hostname === domain) {
+            const normalizedUrlDomain = this.normalizeDomain(urlObj.hostname);
+            // 检查完整域名或根域名是否匹配
+            if (urlObj.hostname === domain || normalizedUrlDomain === domain) {
               urlSet.add(url);
             }
           } catch {
@@ -450,6 +462,35 @@ export class BatchAuthorizationService {
       return urlObj.hostname;
     } catch {
       return 'unknown';
+    }
+  }
+
+  /**
+   * 规范化域名，提取根域名用于批量授权匹配
+   * 例如：docs.dingtalk.com -> dingtalk.com
+   *       login.dingtalk.com -> dingtalk.com
+   */
+  private normalizeDomain(domain: string): string {
+    try {
+      const parts = domain.split('.');
+      // 对于常见的域名结构，提取最后两个部分作为根域名
+      // 例如：docs.dingtalk.com -> dingtalk.com
+      if (parts.length >= 2) {
+        // 处理特殊情况：如 .com.cn、.co.uk 等
+        const lastPart = parts[parts.length - 1];
+        const secondLastPart = parts[parts.length - 2];
+
+        // 如果是常见的多级后缀，返回最后三个部分
+        if (['com.cn', 'co.uk', 'org.cn', 'net.cn', 'gov.cn'].includes(`${secondLastPart}.${lastPart}`)) {
+          return parts.slice(-3).join('.');
+        }
+
+        // 默认返回最后两个部分
+        return parts.slice(-2).join('.');
+      }
+      return domain;
+    } catch {
+      return domain;
     }
   }
 

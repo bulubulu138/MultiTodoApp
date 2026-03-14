@@ -197,15 +197,28 @@ export class URLAuthService {
         // Final cleaning before returning
         const finalTitle = bestTitle ? this.cleanTitle(bestTitle) : null;
 
+        // 添加调试日志
+        const normalizedDomain = this.normalizeDomain(this.extractDomain(url));
+        console.log(`[URLAuthService] Authorization completed, checking batch authorization conditions:`, {
+          url,
+          hasFinalTitle: !!finalTitle,
+          finalTitle: finalTitle ? `"${finalTitle}"` : null,
+          isGeneric: finalTitle ? this.isGenericTitle(finalTitle) : null,
+          hasUrlAuthService: !!this.urlAuthorizationService,
+          hasBatchAuthService: !!this.batchAuthService,
+          domain: normalizedDomain
+        });
+
         // 记录授权信息到数据库
-        if (finalTitle && !this.isGenericTitle(finalTitle) && this.urlAuthorizationService) {
+        // 放宽触发条件：只要成功获取到标题（无论是否为通用标题），就应该触发批量授权
+        if (finalTitle && this.urlAuthorizationService) {
           this.urlAuthorizationService.recordAuthorization(url, finalTitle).catch(err => {
             console.error('[URLAuthService] Failed to record authorization:', err);
           });
 
           // 新增：触发批量授权
           if (this.batchAuthService) {
-            const domain = this.extractDomain(url);
+            const domain = normalizedDomain;
             console.log(`[URLAuthService] Triggering batch authorization for domain: ${domain}`);
 
             // 异步执行，不阻塞主流程
@@ -218,9 +231,21 @@ export class URLAuthService {
               .then(result => {
                 console.log(`[URLAuthService] Batch authorization completed:`, result);
 
-                // 通知前端
+                // 通知前端批量授权完成
                 if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-                  this.mainWindow.webContents.send('url-auth:batch-completed', result);
+                  // 即使没有找到任何 URL，也发送信息通知
+                  if (result.totalUrls === 0) {
+                    this.mainWindow.webContents.send('url-auth:batch-info', {
+                      message: `已扫描 ${domain} 域名，未发现其他需要授权的链接`,
+                      domain,
+                      totalUrls: 0,
+                      succeeded: 0,
+                      failed: 0
+                    });
+                  } else {
+                    // 原有的完成通知
+                    this.mainWindow.webContents.send('url-auth:batch-completed', result);
+                  }
                 }
               })
               .catch(err => {
@@ -434,6 +459,35 @@ export class URLAuthService {
       return urlObj.hostname;
     } catch {
       return 'unknown';
+    }
+  }
+
+  /**
+   * 规范化域名，提取根域名用于批量授权匹配
+   * 例如：docs.dingtalk.com -> dingtalk.com
+   *       login.dingtalk.com -> dingtalk.com
+   */
+  private normalizeDomain(domain: string): string {
+    try {
+      const parts = domain.split('.');
+      // 对于常见的域名结构，提取最后两个部分作为根域名
+      // 例如：docs.dingtalk.com -> dingtalk.com
+      if (parts.length >= 2) {
+        // 处理特殊情况：如 .com.cn、.co.uk 等
+        const lastPart = parts[parts.length - 1];
+        const secondLastPart = parts[parts.length - 2];
+
+        // 如果是常见的多级后缀，返回最后三个部分
+        if (['com.cn', 'co.uk', 'org.cn', 'net.cn', 'gov.cn'].includes(`${secondLastPart}.${lastPart}`)) {
+          return parts.slice(-3).join('.');
+        }
+
+        // 默认返回最后两个部分
+        return parts.slice(-2).join('.');
+      }
+      return domain;
+    } catch {
+      return domain;
     }
   }
 }
