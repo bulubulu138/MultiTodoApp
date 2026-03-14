@@ -385,22 +385,34 @@ const ContentFocusItem = React.memo(
     const handleCompositionStart = useCallback(() => {
       console.log('[AutoSave] 输入法开始');
       isComposingRef.current = true;
-      
+
+      // 在容器上设置 composition 状态标记
+      const container = document.querySelector(`[data-todo-id="${todo.id}"]`);
+      if (container) {
+        container.setAttribute('data-composing', 'true');
+      }
+
       // 清除所有待触发的保存定时器
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
       }
-    }, []);
+    }, [todo.id]);
 
     // 输入法结束事件
     const handleCompositionEnd = useCallback(() => {
       console.log('[AutoSave] 输入法结束');
       isComposingRef.current = false;
-      
+
+      // 移除容器上的 composition 状态标记
+      const container = document.querySelector(`[data-todo-id="${todo.id}"]`);
+      if (container) {
+        container.removeAttribute('data-composing');
+      }
+
       // 输入法结束后，重新启动防抖保存
       scheduleAutoSave();
-    }, [scheduleAutoSave]);
+    }, [todo.id, scheduleAutoSave]);
 
     // 内容变化处理
     const handleContentChange = useCallback((content: string) => {
@@ -483,8 +495,9 @@ const ContentFocusItem = React.memo(
       : (todo.displayOrders && todo.displayOrders[activeTab]);
 
     return (
-      <div 
+      <div
         className="content-focus-item"
+        data-todo-id={todo.id}
         style={{
           borderTop: isGroupStart ? '2px dashed #fa8c16' : undefined,
           borderBottom: isGroupEnd ? '2px dashed #fa8c16' : undefined,

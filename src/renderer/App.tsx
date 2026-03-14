@@ -18,6 +18,7 @@ import { getTheme, ThemeMode, ColorTheme } from './theme/themes';
 import { buildParallelGroups, selectGroupRepresentatives, sortWithGroups, getSortComparator } from './utils/sortWithGroups';
 import { optimizedMotionVariants, useConditionalAnimation, shouldReduceMotion, useMotionPerformanceMonitor } from './utils/optimizedMotionVariants';
 import { PerformanceMonitor } from './utils/performanceMonitor';
+import { useGlobalKeyboardHandler } from './hooks/useGlobalKeyboardHandler';
 import dayjs from 'dayjs';
 
 const { Content } = Layout;
@@ -79,6 +80,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   
   // ContentFocusView 的 ref，用于切换视图时保存
   const contentFocusRef = useRef<ContentFocusViewRef>(null);
+
+  // 启用全局键盘处理 - 防止中文输入法的空格/退格键滚动
+  useGlobalKeyboardHandler();
 
   // 性能监控 - 仅在开发环境启用
   const { startMonitoring } = useMotionPerformanceMonitor();

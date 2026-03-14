@@ -129,10 +129,18 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
 
     const handleCompositionStart = () => {
       isComposingRef.current = true;
+      // 在编辑器根元素设置 composition 状态标记
+      if (editor.root) {
+        editor.root.setAttribute('data-composing', 'true');
+      }
     };
 
     const handleCompositionEnd = () => {
       isComposingRef.current = false;
+      // 移除 composition 状态标记
+      if (editor.root) {
+        editor.root.removeAttribute('data-composing');
+      }
 
       try {
         const currentContent = editor.root.innerHTML;
