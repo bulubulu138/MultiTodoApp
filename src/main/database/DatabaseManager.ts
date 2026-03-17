@@ -210,7 +210,24 @@ export class DatabaseManager {
 
       `CREATE INDEX IF NOT EXISTS idx_url_auth_domain ON url_authorizations(domain)`,
       `CREATE INDEX IF NOT EXISTS idx_url_auth_last_refreshed ON url_authorizations(last_refreshed_at)`,
-      `CREATE INDEX IF NOT EXISTS idx_url_auth_status ON url_authorizations(status)`
+      `CREATE INDEX IF NOT EXISTS idx_url_auth_status ON url_authorizations(status)`,
+
+      // 批量授权任务表（用于防重复机制）
+      `CREATE TABLE IF NOT EXISTS batch_authorization_tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        domain TEXT NOT NULL,
+        status TEXT DEFAULT 'pending',
+        total_urls INTEGER DEFAULT 0,
+        succeeded INTEGER DEFAULT 0,
+        failed INTEGER DEFAULT 0,
+        started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        completed_at DATETIME,
+        error_message TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
+
+      `CREATE INDEX IF NOT EXISTS idx_batch_task_domain_status ON batch_authorization_tasks(domain, status)`
     ];
 
     for (const sql of tables) {

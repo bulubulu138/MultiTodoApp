@@ -1137,6 +1137,67 @@ class Application {
         return { success: false, error: (error as Error).message };
       }
     });
+
+    // 单链接授权（用于失败链接的重新授权）
+    ipcMain.handle('url-auth:authorizeSingle', async (_, url: string) => {
+      try {
+        console.log(`[IPC] Authorizing single URL: ${url}`);
+
+        if (!this.urlAuthService) {
+          return { success: false, error: 'URL authorization service not available' };
+        }
+
+        // 获取 BatchAuthorizationService 实例
+        const { BatchAuthorizationService } = await import('./services/BatchAuthorizationService');
+        const db = this.dbManager.getDb();
+
+        if (!db) {
+          return { success: false, error: 'Database not available' };
+        }
+
+        // 创建临时 BatchAuthorizationService 实例
+        const batchAuthService = new BatchAuthorizationService(db, this.urlAuthService.getAuthSession());
+
+        const result = await batchAuthService.authorizeSingleUrl(
+          url,
+          (progress) => {
+            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+              this.mainWindow.webContents.send('url-auth:single-progress', progress);
+            }
+          }
+        );
+
+        return result;
+      } catch (error) {
+        console.error('Failed to authorize single URL:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // 查询批量授权任务状态
+    ipcMain.handle('url-auth:getBatchTaskStatus', async (_, domain: string) => {
+      try {
+        if (!this.urlAuthService) {
+          return { success: false, error: 'Service not available' };
+        }
+
+        const { BatchAuthorizationService } = await import('./services/BatchAuthorizationService');
+        const db = this.dbManager.getDb();
+
+        if (!db) {
+          return { success: false, error: 'Database not available' };
+        }
+
+        // 创建临时 BatchAuthorizationService 实例
+        const batchAuthService = new BatchAuthorizationService(db, this.urlAuthService.getAuthSession());
+
+        const task = await batchAuthService.getActiveTask(domain);
+        return { success: true, task };
+      } catch (error) {
+        console.error('Failed to get batch task status:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
   }
 
   public async initialize(): Promise<void> {

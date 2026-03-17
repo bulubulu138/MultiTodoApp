@@ -142,6 +142,16 @@ export interface ElectronAPI {
   // URL授权API
   urlAuth: {
     authorize: (url: string) => Promise<{success: boolean; title?: string; error?: string}>;
+    authorizeSingle: (url: string) => Promise<{
+      success: boolean;
+      title?: string;
+      error?: string;
+    }>;
+    getBatchTaskStatus: (domain: string) => Promise<{
+      success: boolean;
+      task?: any;
+      error?: string;
+    }>;
     refreshTitle: (url: string) => Promise<{
       success: boolean;
       title?: string;
@@ -192,6 +202,7 @@ export interface ElectronAPI {
     // 批量授权事件监听
     onBatchProgress: (callback: (progress: BatchAuthorizationProgress) => void) => void;
     onBatchCompleted: (callback: (result: BatchAuthorizationResult) => void) => void;
+    onSingleProgress: (callback: (progress: BatchAuthorizationProgress) => void) => void;
     onBatchInfo: (callback: (info: {
       message: string;
       domain: string;
@@ -301,6 +312,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // URL授权API
   urlAuth: {
     authorize: (url: string) => ipcRenderer.invoke('url:authorize', url),
+    authorizeSingle: (url: string) => ipcRenderer.invoke('url-auth:authorizeSingle', url),
+    getBatchTaskStatus: (domain: string) => ipcRenderer.invoke('url-auth:getBatchTaskStatus', domain),
     refreshTitle: (url: string) => ipcRenderer.invoke('url:refreshTitle', url),
     getAllAuthorizations: () => ipcRenderer.invoke('url-auth:getAll'),
     getAllUrls: () => ipcRenderer.invoke('url-auth:getAllUrls'),
@@ -320,6 +333,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         callback(result);
       });
     },
+    onSingleProgress: (callback: (progress: BatchAuthorizationProgress) => void) => {
+      ipcRenderer.on('url-auth:single-progress', (_event, progress) => {
+        callback(progress);
+      });
+    },
     onBatchInfo: (callback: (info: any) => void) => {
       ipcRenderer.on('url-auth:batch-info', (_event, info) => {
         callback(info);
@@ -328,6 +346,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     removeBatchListeners: () => {
       ipcRenderer.removeAllListeners('url-auth:batch-progress');
       ipcRenderer.removeAllListeners('url-auth:batch-completed');
+      ipcRenderer.removeAllListeners('url-auth:single-progress');
       ipcRenderer.removeAllListeners('url-auth:batch-info');
     },
   },

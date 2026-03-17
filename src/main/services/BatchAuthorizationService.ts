@@ -40,16 +40,177 @@ export interface ProgressCallback {
 }
 
 /**
+ * 批量授权任务接口
+ */
+export interface BatchAuthorizationTask {
+  taskId: number;
+  status: string;
+  startTime?: number;
+}
+
+/**
  * 批量授权服务
  * 用户授权一个链接后，自动为该域名下的所有其他链接完成授权
  */
 export class BatchAuthorizationService {
   private db: Database.Database | null = null;
   private authSession: Session;
+  private activeTasks: Map<string, BatchAuthorizationTask> = new Map();
+  private readonly TASK_COOLDOWN_MS = 5 * 60 * 1000; // 5分钟冷却时间
 
   constructor(db: Database.Database | null, authSession: Session) {
     this.db = db;
     this.authSession = authSession;
+  }
+
+  /**
+   * 检查是否可以启动批量任务（防重复机制）
+   */
+  async canStartBatchTask(domain: string): Promise<boolean> {
+    // 检查是否有正在运行的任务
+    if (this.activeTasks.has(domain)) {
+      console.log(`[BatchAuthorizationService] Task already running for domain: ${domain}`);
+      return false;
+    }
+
+    // 检查数据库中最近的任务状态
+    const recentTask = this.db?.prepare(`
+      SELECT id, status, created_at
+      FROM batch_authorization_tasks
+      WHERE domain = ?
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get(domain) as any;
+
+    if (recentTask) {
+      const timeSinceLastAttempt = Date.now() - new Date(recentTask.created_at).getTime();
+
+      // 如果在冷却时间内，不允许启动新任务
+      if (timeSinceLastAttempt < this.TASK_COOLDOWN_MS) {
+        console.log(`[BatchAuthorizationService] Domain ${domain} in cooldown period (${Math.ceil((this.TASK_COOLDOWN_MS - timeSinceLastAttempt) / 1000)}s remaining)`);
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * 创建批量授权任务记录
+   */
+  async createTask(domain: string): Promise<number> {
+    const result = this.db?.prepare(`
+      INSERT INTO batch_authorization_tasks (domain, status, started_at)
+      VALUES (?, 'running', CURRENT_TIMESTAMP)
+    `).run(domain);
+
+    const taskId = result?.lastInsertRowid as number;
+    console.log(`[BatchAuthorizationService] Created batch task ${taskId} for domain: ${domain}`);
+    return taskId;
+  }
+
+  /**
+   * 更新批量授权任务状态
+   */
+  async updateTaskStatus(
+    taskId: number,
+    status: string,
+    result?: BatchAuthorizationResult,
+    error?: any
+  ): Promise<void> {
+    const completedAt = (status === 'completed' || status === 'failed') ? 'CURRENT_TIMESTAMP' : null;
+    const errorMessage = error ? (error.message || String(error)) : null;
+
+    this.db?.prepare(`
+      UPDATE batch_authorization_tasks
+      SET status = ?,
+          total_urls = COALESCE(?, total_urls),
+          succeeded = COALESCE(?, succeeded),
+          failed = COALESCE(?, failed),
+          completed_at = ${completedAt},
+          error_message = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(
+      status,
+      result?.totalUrls,
+      result?.succeeded,
+      result?.failed,
+      errorMessage,
+      taskId
+    );
+
+    console.log(`[BatchAuthorizationService] Updated batch task ${taskId} to status: ${status}`);
+  }
+
+  /**
+   * 获取活动的批量授权任务
+   */
+  async getActiveTask(domain: string): Promise<BatchAuthorizationTask | null> {
+    const task = this.activeTasks.get(domain);
+    return task || null;
+  }
+
+  /**
+   * 授权单个链接（用于失败链接的重新授权或已授权链接的刷新）
+   */
+  async authorizeSingleUrl(
+    url: string,
+    onProgress?: ProgressCallback
+  ): Promise<{ success: boolean; title?: string; error?: string }> {
+    try {
+      const progress: BatchAuthorizationProgress = {
+        domain: this.extractDomain(url),
+        current: 0,
+        total: 1,
+        stage: 'fetching',
+        succeeded: 0,
+        failed: 0
+      };
+
+      onProgress?.(progress);
+
+      const title = await this.fetchTitleWithSession(url);
+
+      if (title && !this.isGenericTitle(title)) {
+        // 检查是否已存在授权记录
+        const existing = this.db?.prepare('SELECT url FROM url_authorizations WHERE url = ?').get(url) as any;
+
+        if (existing) {
+          // 更新现有记录
+          const now = new Date().toISOString();
+          this.db?.prepare(`
+            UPDATE url_authorizations
+            SET title = ?, last_refreshed_at = ?, refresh_count = refresh_count + 1,
+                status = 'active', error_message = NULL, updated_at = ?
+            WHERE url = ?
+          `).run(title, now, now, url);
+          console.log(`[BatchAuthorizationService] Updated authorization for ${url}: "${title}"`);
+        } else {
+          // 创建新授权记录
+          await this.saveAuthorizationRecords([{ url, title }]);
+          console.log(`[BatchAuthorizationService] Created authorization for ${url}: "${title}"`);
+        }
+
+        progress.current = 1;
+        progress.succeeded = 1;
+        progress.stage = 'completed';
+        onProgress?.(progress);
+
+        return { success: true, title };
+      } else {
+        progress.current = 1;
+        progress.failed = 1;
+        progress.stage = 'completed';
+        onProgress?.(progress);
+
+        return { success: false, error: 'Invalid or generic title' };
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`[BatchAuthorizationService] Error authorizing single URL ${url}:`, errorMessage);
+      return { success: false, error: errorMessage };
+    }
   }
 
   /**
@@ -65,7 +226,28 @@ export class BatchAuthorizationService {
     authorizedTitle: string,
     onProgress?: ProgressCallback
   ): Promise<BatchAuthorizationResult> {
-    console.log(`[BatchAuthorizationService] Starting batch authorization for domain: ${domain}`);
+    // 1. 检查是否可以启动新任务（防重复机制）
+    if (!await this.canStartBatchTask(domain)) {
+      console.log(`[BatchAuthorizationService] Batch task skipped for domain: ${domain} (already running or in cooldown)`);
+      return {
+        domain,
+        totalUrls: 0,
+        succeeded: 0,
+        failed: 0,
+        skipped: 0,
+        details: []
+      };
+    }
+
+    // 2. 创建任务记录
+    const taskId = await this.createTask(domain);
+    this.activeTasks.set(domain, {
+      taskId,
+      status: 'running',
+      startTime: Date.now()
+    });
+
+    console.log(`[BatchAuthorizationService] Starting batch authorization for domain: ${domain} (task ${taskId})`);
 
     const result: BatchAuthorizationResult = {
       domain,
@@ -110,6 +292,8 @@ export class BatchAuthorizationService {
           failed: 0
         });
 
+        // 更新任务状态为完成
+        await this.updateTaskStatus(taskId, 'completed', result);
         return result;
       }
 
@@ -139,6 +323,9 @@ export class BatchAuthorizationService {
           succeeded: 0,
           failed: 0
         });
+
+        // 更新任务状态为完成
+        await this.updateTaskStatus(taskId, 'completed', result);
         return result;
       }
 
@@ -172,11 +359,18 @@ export class BatchAuthorizationService {
         failed: result.failed
       });
 
+      // 更新任务状态为完成
+      await this.updateTaskStatus(taskId, 'completed', result);
       return result;
     } catch (error) {
       console.error('[BatchAuthorizationService] Batch authorization failed:', error);
       result.failed = result.totalUrls - result.succeeded - result.skipped;
-      return result;
+
+      // 更新任务状态为失败（不自动重试）
+      await this.updateTaskStatus(taskId, 'failed', result, error);
+      throw error;
+    } finally {
+      this.activeTasks.delete(domain);
     }
   }
 

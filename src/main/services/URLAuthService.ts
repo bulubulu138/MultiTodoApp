@@ -22,6 +22,13 @@ export class URLAuthService {
   }
 
   /**
+   * 获取授权会话（用于其他服务复用）
+   */
+  getAuthSession(): Session {
+    return this.authSession;
+  }
+
+  /**
    * 设置URL授权记录服务和批量授权服务
    */
   setURLAuthorizationService(service: URLAuthorizationService, db: any): void {
@@ -216,41 +223,51 @@ export class URLAuthService {
             console.error('[URLAuthService] Failed to record authorization:', err);
           });
 
-          // 新增：触发批量授权
+          // 新增：触发批量授权（添加防重复检查）
           if (this.batchAuthService) {
             const domain = normalizedDomain;
-            console.log(`[URLAuthService] Triggering batch authorization for domain: ${domain}`);
+            console.log(`[URLAuthService] Checking batch authorization conditions for domain: ${domain}`);
 
-            // 异步执行，不阻塞主流程
-            this.batchAuthService.batchAuthorizeByDomain(domain, url, finalTitle, (progress) => {
-              // 发送进度更新到前端
-              if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-                this.mainWindow.webContents.send('url-auth:batch-progress', progress);
-              }
-            })
-              .then(result => {
-                console.log(`[URLAuthService] Batch authorization completed:`, result);
+            // 检查是否可以启动批量授权
+            this.batchAuthService.canStartBatchTask(domain).then(canStart => {
+              if (canStart) {
+                console.log(`[URLAuthService] Triggering batch authorization for domain: ${domain}`);
 
-                // 通知前端批量授权完成
-                if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-                  // 即使没有找到任何 URL，也发送信息通知
-                  if (result.totalUrls === 0) {
-                    this.mainWindow.webContents.send('url-auth:batch-info', {
-                      message: `已扫描 ${domain} 域名，未发现其他需要授权的链接`,
-                      domain,
-                      totalUrls: 0,
-                      succeeded: 0,
-                      failed: 0
-                    });
-                  } else {
-                    // 原有的完成通知
-                    this.mainWindow.webContents.send('url-auth:batch-completed', result);
+                // 异步执行，不阻塞主流程
+                this.batchAuthService!.batchAuthorizeByDomain(domain, url, finalTitle, (progress) => {
+                  // 发送进度更新到前端
+                  if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                    this.mainWindow.webContents.send('url-auth:batch-progress', progress);
                   }
-                }
-              })
-              .catch(err => {
-                console.error('[URLAuthService] Batch authorization failed:', err);
-              });
+                })
+                  .then(result => {
+                    console.log(`[URLAuthService] Batch authorization completed:`, result);
+
+                    // 通知前端批量授权完成
+                    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                      // 即使没有找到任何 URL，也发送信息通知
+                      if (result.totalUrls === 0) {
+                        this.mainWindow.webContents.send('url-auth:batch-info', {
+                          message: `已扫描 ${domain} 域名，未发现其他需要授权的链接`,
+                          domain,
+                          totalUrls: 0,
+                          succeeded: 0,
+                          failed: 0
+                        });
+                      } else {
+                        // 原有的完成通知
+                        this.mainWindow.webContents.send('url-auth:batch-completed', result);
+                      }
+                    }
+                  })
+                  .catch(err => {
+                    console.error('[URLAuthService] Batch authorization failed:', err);
+                    // 不再自动重试，静默失败
+                  });
+              } else {
+                console.log(`[URLAuthService] Batch authorization skipped for domain: ${domain} (task already running or in cooldown)`);
+              }
+            });
           }
         }
 

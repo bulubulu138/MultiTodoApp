@@ -163,8 +163,15 @@ const URLAuthorizationManager: React.FC = () => {
       loadRecords();
     };
 
+    // 监听单链接授权进度
+    const handleSingleProgress = (progress: BatchAuthorizationProgress) => {
+      console.log('Single authorization progress:', progress);
+      // 单链接授权进度暂不显示，因为速度很快
+    };
+
     window.electronAPI.urlAuth.onBatchProgress(handleProgress);
     window.electronAPI.urlAuth.onBatchCompleted(handleCompleted);
+    window.electronAPI.urlAuth.onSingleProgress(handleSingleProgress);
 
     return () => {
       window.electronAPI.urlAuth.removeBatchListeners();
@@ -265,6 +272,22 @@ const URLAuthorizationManager: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to authorize URL:', error);
+      messageApi.error('授权失败');
+    }
+  };
+
+  // 单链接授权处理
+  const handleAuthorizeSingle = async (url: string) => {
+    try {
+      const result = await window.electronAPI.urlAuth.authorizeSingle(url);
+      if (result.success) {
+        messageApi.success(`授权成功！标题: ${result.title}`);
+        await loadRecords();
+      } else {
+        messageApi.error(`授权失败: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Failed to authorize single URL:', error);
       messageApi.error('授权失败');
     }
   };
@@ -537,7 +560,7 @@ const URLAuthorizationManager: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: 200,
       render: (_: unknown, record: URLDisplayRecord) => (
         <Space size="small">
           {/* 未授权URL：显示立即授权按钮 */}
@@ -548,6 +571,28 @@ const URLAuthorizationManager: React.FC = () => {
               onClick={() => handleAuthorize(record.url)}
             >
               立即授权
+            </Button>
+          )}
+
+          {/* 失败的链接：显示单链接重新授权按钮 */}
+          {(record.status === 'failed' || record.status === 'unauthorized') && (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => handleAuthorizeSingle(record.url)}
+            >
+              重新授权
+            </Button>
+          )}
+
+          {/* 已授权的链接：显示刷新按钮 */}
+          {record.status === 'active' && (
+            <Button
+              size="small"
+              icon={<ReloadOutlined />}
+              onClick={() => handleAuthorizeSingle(record.url)}
+            >
+              刷新
             </Button>
           )}
 
