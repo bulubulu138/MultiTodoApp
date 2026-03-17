@@ -32,8 +32,8 @@ export const useGlobalKeyboardHandler = () => {
 
       // 处理退格键
       if (event.key === 'Backspace') {
-        // 如果在输入框中，允许默认行为（删除文本）
-        if (isEditable) {
+        // 如果在输入框或 IME composition 中，允许默认行为
+        if (isEditable || isComposing) {
           return;
         }
         // 否则阻止默认导航/滚动行为
