@@ -662,6 +662,28 @@ const ContentFocusItem = React.memo(
               onCompositionEnd={handleCompositionEnd}
               onBlur={handleBlur}
               onKeyDown={handleKeyDown}
+              onKeyDownCapture={(event) => {
+                // 捕获阶段：阻止键盘事件传播到滚动容器
+                const target = event.target as HTMLElement;
+                const isInEditor = target.closest('.ql-editor') || target.closest('[contenteditable]');
+
+                if (isInEditor) {
+                  // 对于编辑器内的键盘事件，阻止传播
+                  // 保留Escape和Ctrl/Cmd组合键（快捷键）
+                  if (event.key !== 'Escape' && !event.ctrlKey && !event.metaKey) {
+                    event.stopPropagation();
+                  }
+                }
+              }}
+              onWheel={(event) => {
+                // 阻止滚轮事件传播到滚动容器
+                const target = event.target as HTMLElement;
+                const isInEditor = target.closest('.ql-editor');
+
+                if (isInEditor) {
+                  event.stopPropagation();
+                }
+              }}
               tabIndex={-1}
             >
             <RichTextEditor

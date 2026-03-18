@@ -3,8 +3,9 @@ import { useEffect } from 'react';
 /**
  * 全局键盘事件处理 Hook
  * 防止输入法使用时的空格/退格键滚动
+ * 防止富文本编辑器中的键盘事件触发页面滚动
  *
- * 增强：支持 ReactQuill 和其他富文本编辑器的空格键输入
+ * 增强：支持 ReactQuill 和其他富文本编辑器的所有键盘输入
  */
 export const useGlobalKeyboardHandler = () => {
   useEffect(() => {
@@ -25,26 +26,50 @@ export const useGlobalKeyboardHandler = () => {
       const isComposing = target.getAttribute('data-composing') === 'true' ||
                          target.closest('[data-composing="true"]') !== null;
 
-      // 处理空格键
-      if (event.key === ' ' || event.code === 'Space') {
-        // 如果在输入框或 IME composition 中，允许默认行为
-        if (isEditable || isComposing) {
+      // 如果在可编辑元素中，阻止所有可能触发滚动的键盘事件
+      if (isEditable) {
+        // 定义所有可能触发滚动的按键
+        const scrollTriggeringKeys = [
+          // 可打印字符（字母、数字）
+          /^[a-zA-Z0-9]$/,
+          // 符号和标点
+          /^[\!\@\#\$\%\^\&\*\(\)\_\+\-\=\[\]\{\}\|\;\:\'\"\,\.\<\>\/\?\`]$/,
+          // 导航和编辑键
+          'Enter', 'Tab', 'Delete', 'Insert', 'Home', 'End',
+          'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+          'PageUp', 'PageDown',
+          // 空格键
+          ' ', 'Space', 'Backspace'
+        ];
+
+        // 检查当前按键是否应该阻止滚动
+        const shouldPreventScroll = scrollTriggeringKeys.some(pattern => {
+          if (typeof pattern === 'string') {
+            return event.key === pattern || event.code === pattern;
+          }
+          return pattern.test(event.key) || pattern.test(event.code);
+        });
+
+        // 如果是可能触发滚动的按键，且没有修饰键（Ctrl/Cmd），阻止事件传播
+        if (shouldPreventScroll && !event.ctrlKey && !event.metaKey) {
+          event.stopPropagation();
           return;
         }
-        // 否则阻止默认滚动行为
-        event.preventDefault();
-        return;
       }
 
-      // 处理退格键
-      if (event.key === 'Backspace') {
-        // 如果在输入框或 IME composition 中，允许默认行为
-        if (isEditable || isComposing) {
+      // 原有逻辑：非可编辑区域处理空格和退格键
+      if (!isEditable && !isComposing) {
+        // 处理空格键
+        if (event.key === ' ' || event.code === 'Space') {
+          event.preventDefault();
           return;
         }
-        // 否则阻止默认导航/滚动行为
-        event.preventDefault();
-        return;
+
+        // 处理退格键
+        if (event.key === 'Backspace') {
+          event.preventDefault();
+          return;
+        }
       }
     };
 

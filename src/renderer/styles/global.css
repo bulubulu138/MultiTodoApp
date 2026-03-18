@@ -1602,3 +1602,32 @@ flowchart-preview.flowchart-embedded:hover {
     transform: scale(1.2);
   }
 }
+
+/* ============================================
+   富文本编辑器滚动隔离 - 防止输入时页面滚动
+   ============================================ */
+
+/* 专注模式编辑器容器滚动隔离 */
+.content-focus-item-editor {
+  overscroll-behavior: contain;
+  scroll-behavior: auto;
+}
+
+/* Quill 编辑器滚动隔离 */
+.content-focus-item-editor .ql-editor {
+  overscroll-behavior: contain;
+}
+
+/* 防止滚动链 */
+.content-focus-view {
+  scroll-snap-type: none;
+}
+
+/* 确保编辑器内的滚动不会传播到父容器 */
+.ql-editor {
+  overscroll-behavior: contain;
+}
+
+.ql-container {
+  overscroll-behavior: contain;
+}

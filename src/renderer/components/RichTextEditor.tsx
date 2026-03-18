@@ -158,16 +158,42 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       isFocusedRef.current = false;
     };
 
+    // 新增：阻止键盘事件传播到滚动容器
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // 阻止编辑器内的键盘事件冒泡到滚动容器
+      const isInputKey = event.key.length === 1 ||
+                        ['Enter', 'Backspace', 'Delete', 'Tab',
+                         'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+                         'Home', 'End', 'PageUp', 'PageDown'].includes(event.key);
+
+      // 允许编辑器正常工作，但阻止事件传播
+      if (isInputKey && !event.ctrlKey && !event.metaKey) {
+        event.stopPropagation();
+      }
+    };
+
+    // 新增：阻止滚轮事件传播到滚动容器
+    const handleWheel = (event: WheelEvent) => {
+      // 阻止滚轮事件冒泡到父级滚动容器
+      event.stopPropagation();
+    };
+
     editorElement.addEventListener('compositionstart', handleCompositionStart);
     editorElement.addEventListener('compositionend', handleCompositionEnd);
     editorElement.addEventListener('focus', handleFocus);
     editorElement.addEventListener('blur', handleBlur);
+    // 新增：在捕获阶段添加事件监听器
+    editorElement.addEventListener('keydown', handleKeyDown, { capture: true });
+    editorElement.addEventListener('wheel', handleWheel, { capture: true, passive: false });
 
     return () => {
       editorElement.removeEventListener('compositionstart', handleCompositionStart);
       editorElement.removeEventListener('compositionend', handleCompositionEnd);
       editorElement.removeEventListener('focus', handleFocus);
       editorElement.removeEventListener('blur', handleBlur);
+      // 清理新添加的事件监听器
+      editorElement.removeEventListener('keydown', handleKeyDown);
+      editorElement.removeEventListener('wheel', handleWheel);
     };
   }, [editorInstance, getEditorSafely, onChange]);
 
