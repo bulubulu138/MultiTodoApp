@@ -1611,11 +1611,13 @@ flowchart-preview.flowchart-embedded:hover {
 .content-focus-item-editor {
   overscroll-behavior: contain;
   scroll-behavior: auto;
+  isolation: isolate;  /* 增强：防止任何滚动链 */
 }
 
 /* Quill 编辑器滚动隔离 */
 .content-focus-item-editor .ql-editor {
   overscroll-behavior: contain;
+  touch-action: none;  /* 增强：防止触摸滚动 */
 }
 
 /* 防止滚动链 */

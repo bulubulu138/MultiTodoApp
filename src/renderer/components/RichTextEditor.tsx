@@ -164,11 +164,12 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       const isInputKey = event.key.length === 1 ||
                         ['Enter', 'Backspace', 'Delete', 'Tab',
                          'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-                         'Home', 'End', 'PageUp', 'PageDown'].includes(event.key);
+                         'Home', 'End', 'PageUp', 'PageDown', ' '].includes(event.key);
 
-      // 允许编辑器正常工作，但阻止事件传播
+      // 允许编辑器正常工作，但阻止事件传播和默认滚动行为
       if (isInputKey && !event.ctrlKey && !event.metaKey) {
         event.stopPropagation();
+        event.preventDefault();  // 关键：阻止默认滚动行为
       }
     };
 

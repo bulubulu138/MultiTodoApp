@@ -668,10 +668,17 @@ const ContentFocusItem = React.memo(
                 const isInEditor = target.closest('.ql-editor') || target.closest('[contenteditable]');
 
                 if (isInEditor) {
-                  // 对于编辑器内的键盘事件，阻止传播
-                  // 保留Escape和Ctrl/Cmd组合键（快捷键）
-                  if (event.key !== 'Escape' && !event.ctrlKey && !event.metaKey) {
+                  // 检查是否是可能触发滚动的按键
+                  const isScrollTriggeringKey =
+                    event.key.length === 1 ||  // 任何可打印字符
+                    ['Enter', 'Backspace', 'Delete', 'Tab',
+                     'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+                     'Home', 'End', 'PageUp', 'PageDown', ' '].includes(event.key);
+
+                  // 对于可能触发滚动的按键，同时阻止传播和默认行为
+                  if (isScrollTriggeringKey && !event.ctrlKey && !event.metaKey) {
                     event.stopPropagation();
+                    event.preventDefault();  // 关键：阻止默认滚动行为
                   }
                 }
               }}
