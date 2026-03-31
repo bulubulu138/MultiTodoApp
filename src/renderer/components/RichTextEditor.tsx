@@ -166,10 +166,10 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
                          'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
                          'Home', 'End', 'PageUp', 'PageDown', ' '].includes(event.key);
 
-      // 允许编辑器正常工作，但阻止事件传播和默认滚动行为
+      // 允许编辑器正常工作，只阻止事件传播
       if (isInputKey && !event.ctrlKey && !event.metaKey) {
         event.stopPropagation();
-        event.preventDefault();  // 关键：阻止默认滚动行为
+        // 移除 preventDefault() 以允许正常的输入行为（空格、删除键等）
       }
     };
 

@@ -50,10 +50,10 @@ export const useGlobalKeyboardHandler = () => {
           return pattern.test(event.key) || pattern.test(event.code);
         });
 
-        // 如果是可能触发滚动的按键，且没有修饰键（Ctrl/Cmd），阻止事件传播和默认行为
+        // 如果是可能触发滚动的按键，且没有修饰键（Ctrl/Cmd），阻止事件传播
         if (shouldPreventScroll && !event.ctrlKey && !event.metaKey) {
           event.stopPropagation();
-          event.preventDefault();  // 关键：阻止默认滚动行为
+          // 移除 preventDefault() 以允许正常的输入行为（空格、删除键等）
           return;
         }
       }

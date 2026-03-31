@@ -675,10 +675,10 @@ const ContentFocusItem = React.memo(
                      'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
                      'Home', 'End', 'PageUp', 'PageDown', ' '].includes(event.key);
 
-                  // 对于可能触发滚动的按键，同时阻止传播和默认行为
+                  // 对于可能触发滚动的按键，阻止事件传播但保留默认行为
                   if (isScrollTriggeringKey && !event.ctrlKey && !event.metaKey) {
                     event.stopPropagation();
-                    event.preventDefault();  // 关键：阻止默认滚动行为
+                    // 移除 preventDefault() 以允许正常的输入行为（空格、删除键等）
                   }
                 }
               }}
