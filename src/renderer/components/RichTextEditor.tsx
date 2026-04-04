@@ -158,19 +158,16 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       isFocusedRef.current = false;
     };
 
-    // 新增：阻止键盘事件传播到滚动容器
+    // 优化：只阻止可能触发页面滚动的按键，完全不干预输入键
     const handleKeyDown = (event: KeyboardEvent) => {
-      // 阻止编辑器内的键盘事件冒泡到滚动容器
-      const isInputKey = event.key.length === 1 ||
-                        ['Enter', 'Backspace', 'Delete', 'Tab',
-                         'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-                         'Home', 'End', 'PageUp', 'PageDown', ' '].includes(event.key);
+      // 只阻止可能触发父级滚动容器滚动的按键
+      const isScrollKey = ['PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key);
 
-      // 允许编辑器正常工作，只阻止事件传播
-      if (isInputKey && !event.ctrlKey && !event.metaKey) {
+      if (isScrollKey && !event.ctrlKey && !event.metaKey) {
+        // 只阻止传播，不阻止默认行为
         event.stopPropagation();
-        // 移除 preventDefault() 以允许正常的输入行为（空格、删除键等）
       }
+      // 对于其他按键（包括空格、删除、Enter等输入键），完全不干预
     };
 
     // 新增：阻止滚轮事件传播到滚动容器
@@ -183,16 +180,16 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
     editorElement.addEventListener('compositionend', handleCompositionEnd);
     editorElement.addEventListener('focus', handleFocus);
     editorElement.addEventListener('blur', handleBlur);
-    // 新增：在捕获阶段添加事件监听器
-    editorElement.addEventListener('keydown', handleKeyDown, { capture: true });
-    editorElement.addEventListener('wheel', handleWheel, { capture: true, passive: false });
+    // 优化：在冒泡阶段添加事件监听器，避免干扰Quill内部处理
+    editorElement.addEventListener('keydown', handleKeyDown);
+    editorElement.addEventListener('wheel', handleWheel, { passive: false });
 
     return () => {
       editorElement.removeEventListener('compositionstart', handleCompositionStart);
       editorElement.removeEventListener('compositionend', handleCompositionEnd);
       editorElement.removeEventListener('focus', handleFocus);
       editorElement.removeEventListener('blur', handleBlur);
-      // 清理新添加的事件监听器
+      // 清理事件监听器
       editorElement.removeEventListener('keydown', handleKeyDown);
       editorElement.removeEventListener('wheel', handleWheel);
     };
