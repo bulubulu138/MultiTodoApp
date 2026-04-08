@@ -71,7 +71,13 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
             console.warn('Failed to clear history:', error);
           }
 
+          // 🔥 关键修复：内容替换后重新覆盖 scrollSelectionIntoView，确保始终有效
           editorInstance.clipboard.dangerouslyPasteHTML(value);
+
+          // 🔥 确保滚动覆盖在内容替换后仍然有效
+          editorInstance.scrollSelectionIntoView = function() {
+            return;
+          };
 
           if (selection) {
             try {
