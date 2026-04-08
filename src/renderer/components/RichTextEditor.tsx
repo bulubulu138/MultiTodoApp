@@ -75,7 +75,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
 
           if (selection) {
             try {
-              editorInstance.setSelection(selection.index, selection.length, Quill.sources.SILENT);
+              editorInstance.setSelection(selection.index, selection.length);
             } catch {
               // noop
             }
@@ -94,6 +94,13 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       if (!editorInstance) {
         const editor = quillRef.current.getEditor();
         if (editor) {
+          // 🔥 核心修复：覆盖 scrollSelectionIntoView 方法，阻止输入时触发页面滚动
+          const originalScrollIntoView = editor.scrollSelectionIntoView.bind(editor);
+          editor.scrollSelectionIntoView = function() {
+            // 不做任何操作，直接返回，阻止 window.scrollBy() 调用
+            return;
+          };
+
           setEditorInstance(editor);
           return editor;
         }
@@ -210,7 +217,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
           setTimeout(() => {
             try {
               const newPosition = range.index + 1;
-              editor.setSelection(newPosition, 0, Quill.sources.SILENT);
+              editor.setSelection(newPosition, 0);
             } catch {
               // noop
             }
