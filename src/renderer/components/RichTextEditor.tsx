@@ -75,7 +75,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
 
           if (selection) {
             try {
-              editorInstance.setSelection(selection.index, selection.length);
+              editorInstance.setSelection(selection.index, selection.length, Quill.sources.SILENT);
             } catch {
               // noop
             }
@@ -210,7 +210,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
           setTimeout(() => {
             try {
               const newPosition = range.index + 1;
-              editor.setSelection(newPosition, 0);
+              editor.setSelection(newPosition, 0, Quill.sources.SILENT);
             } catch {
               // noop
             }
