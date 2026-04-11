@@ -65,6 +65,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const [debouncedSearchText, setDebouncedSearchText] = useState<string>('');
   const [showPositionSelector, setShowPositionSelector] = useState(false);
   const [pendingPosition, setPendingPosition] = useState<PositionSelection | null>(null);
+
+  // AI 建议相关状态
+  const [promptTemplates, setPromptTemplates] = useState<any[]>([]);
   
   // 分页状态管理
   const [displayCount, setDisplayCount] = useState<number>(50); // 初始显示50条
@@ -385,6 +388,14 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       }
       
       setTabSettings(loadedTabSettings);
+
+      // 加载 Prompt 模板
+      try {
+        const templates = await window.electronAPI.promptTemplates.getAll();
+        setPromptTemplates(templates);
+      } catch (error) {
+        console.error('Failed to load prompt templates:', error);
+      }
     } catch (error) {
       message.error('加载设置失败');
       console.error('Error loading settings:', error);
@@ -395,12 +406,21 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     try {
       const allRelations = await window.electronAPI.relations.getAll();
       setRelations(allRelations);
-      
+
       // 自动同步并列关系的displayOrder（静默执行）
       await syncParallelGroupsSilently();
     } catch (error) {
       console.error('Error loading relations:', error);
       message.error('加载关系失败');
+    }
+  };
+
+  const handleReloadPromptTemplates = async () => {
+    try {
+      const templates = await window.electronAPI.promptTemplates.getAll();
+      setPromptTemplates(templates);
+    } catch (error) {
+      console.error('Failed to reload prompt templates:', error);
     }
   };
 
@@ -700,7 +720,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       if (!todo) {
         throw new Error('Todo not found');
       }
-      
+
       // 更新指定 tab 的序号
       const newDisplayOrders = { ...(todo.displayOrders || {}) };
       if (displayOrder === null) {
@@ -716,6 +736,48 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       message.error('更新排序失败');
       console.error('Error updating display order:', error);
       throw error;
+    }
+  };
+
+  // AI 建议处理函数
+  const handleGenerateSuggestion = async (todoId: number, templateId?: number) => {
+    try {
+      const result = await window.electronAPI.aiSuggestion.generate(todoId, templateId);
+      if (result.success && result.suggestion) {
+        // 重新加载待办以获取最新的AI建议
+        await loadTodos();
+        return { success: true, suggestion: result.suggestion };
+      } else {
+        return { success: false, error: result.error };
+      }
+    } catch (error: any) {
+      return { success: false, error: error.message || '生成失败' };
+    }
+  };
+
+  const handleSaveSuggestion = async (todoId: number, suggestion: string) => {
+    try {
+      const result = await window.electronAPI.aiSuggestion.save(todoId, suggestion);
+      if (result.success) {
+        // 重新加载待办以获取最新的AI建议
+        await loadTodos();
+      }
+      return result;
+    } catch (error: any) {
+      return { success: false, error: error.message || '保存失败' };
+    }
+  };
+
+  const handleDeleteSuggestion = async (todoId: number) => {
+    try {
+      const result = await window.electronAPI.aiSuggestion.delete(todoId);
+      if (result.success) {
+        // 重新加载待办以获取最新的AI建议
+        await loadTodos();
+      }
+      return result;
+    } catch (error: any) {
+      return { success: false, error: error.message || '删除失败' };
     }
   };
 
@@ -1081,6 +1143,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
               initial="hidden"
               animate="visible"
               exit="exit"
+              style={currentTabSettings.viewMode === 'content-focus' ? {
+                height: 'calc(100vh - 73px - 64px - 32px)',
+                overflow: 'hidden'
+              } : {}}
             >
               {currentTabSettings.viewMode === 'content-focus' ? (
                 <ContentFocusView
@@ -1094,6 +1160,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
                   relations={relations}
                   onUpdateDisplayOrder={handleUpdateDisplayOrder}
                   colorTheme={colorTheme}
+                  promptTemplates={promptTemplates}
+                  onGenerateSuggestion={handleGenerateSuggestion}
+                  onSaveSuggestion={handleSaveSuggestion}
+                  onDeleteSuggestion={handleDeleteSuggestion}
                 />
               ) : (
                 <TodoList
@@ -1165,6 +1235,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         existingTags={existingTags}
         colorTheme={colorTheme}
         onColorThemeChange={onColorThemeChange}
+        promptTemplates={promptTemplates}
+        onTemplatesChange={handleReloadPromptTemplates}
       />
 
       <TodoViewDrawer

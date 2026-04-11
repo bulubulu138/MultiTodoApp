@@ -132,7 +132,17 @@ export class DatabaseManager {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )`,
-      
+
+      // Prompt 模板表
+      `CREATE TABLE IF NOT EXISTS prompt_templates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        content TEXT NOT NULL,
+        category TEXT DEFAULT 'general',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
+
       // 流程图相关表
       `CREATE TABLE IF NOT EXISTS flowcharts (
         id TEXT PRIMARY KEY,
@@ -267,6 +277,8 @@ export class DatabaseManager {
       const hasContentHash = tableInfo.some((col: any) => col.name === 'contentHash');
       const hasKeywords = tableInfo.some((col: any) => col.name === 'keywords');
       const hasCompletedAt = tableInfo.some((col: any) => col.name === 'completedAt');
+      const hasAiSuggestion = tableInfo.some((col: any) => col.name === 'aiSuggestion');
+      const hasAiSuggestionGeneratedAt = tableInfo.some((col: any) => col.name === 'aiSuggestionGeneratedAt');
       
       if (!hasStartTime) {
         console.log('Adding startTime column to todos table...');
@@ -320,6 +332,20 @@ export class DatabaseManager {
           console.warn('Failed to create completedAt index:', indexError);
           // 不阻塞迁移流程，索引创建失败不是致命错误
         }
+      }
+
+      // 添加 aiSuggestion 列用于存储AI生成的建议
+      if (!hasAiSuggestion) {
+        console.log('Adding aiSuggestion column to todos table...');
+        this.db!.prepare('ALTER TABLE todos ADD COLUMN aiSuggestion TEXT').run();
+        console.log('aiSuggestion column added successfully');
+      }
+
+      // 添加 aiSuggestionGeneratedAt 列用于记录AI建议生成时间
+      if (!hasAiSuggestionGeneratedAt) {
+        console.log('Adding aiSuggestionGeneratedAt column to todos table...');
+        this.db!.prepare('ALTER TABLE todos ADD COLUMN aiSuggestionGeneratedAt TEXT').run();
+        console.log('aiSuggestionGeneratedAt column added successfully');
       }
       
       // 迁移 displayOrders
@@ -1340,6 +1366,8 @@ export class DatabaseManager {
       displayOrders: row.displayOrders ? JSON.parse(row.displayOrders) : {},
       contentHash: row.contentHash,
       keywords: row.keywords ? JSON.parse(row.keywords) : [],
+      aiSuggestion: row.aiSuggestion || undefined,
+      aiSuggestionGeneratedAt: row.aiSuggestionGeneratedAt || undefined,
       completedAt: row.completedAt || undefined,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt
@@ -1391,6 +1419,20 @@ export class DatabaseManager {
         const keywordsJSON = JSON.stringify(keywords);
         this.db!.prepare('UPDATE todos SET keywords = ?, updatedAt = ? WHERE id = ?')
           .run(keywordsJSON, new Date().toISOString(), id);
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  // 更新待办AI建议
+  public updateTodoAISuggestion(id: number, suggestion: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        this.db!.prepare(
+          'UPDATE todos SET aiSuggestion = ?, aiSuggestionGeneratedAt = ?, updatedAt = ? WHERE id = ?'
+        ).run(suggestion, new Date().toISOString(), new Date().toISOString(), id);
         resolve();
       } catch (error) {
         reject(error);

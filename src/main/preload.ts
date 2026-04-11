@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { Note } from '../shared/types';
+import type { Note, PromptTemplate, AISuggestionResponse } from '../shared/types';
 
 /**
  * 批量授权结果
@@ -57,9 +57,27 @@ export interface ElectronAPI {
   // AI API
   ai: {
     testConnection: () => Promise<{success: boolean; message: string}>;
-    configure: (provider: string, apiKey: string, endpoint?: string) => Promise<{success: boolean; error?: string}>;
-    getConfig: () => Promise<{provider: string; endpoint: string; enabled: boolean}>;
+    configure: (provider: string, apiKey: string, endpoint?: string, model?: string) => Promise<{success: boolean; error?: string}>;
+    getConfig: () => Promise<{provider: string; endpoint: string; model: string; enabled: boolean}>;
     getSupportedProviders: () => Promise<Array<{value: string; label: string; endpoint: string}>>;
+    getAvailableModels: (provider: string) => Promise<Array<{id: string; name: string; description?: string}>>;
+    fetchModels: (provider: string, apiKey: string, endpoint?: string) => Promise<{success: boolean; models: Array<{id: string; name: string}>; error?: string}>;
+  };
+
+  // AI 建议API
+  aiSuggestion: {
+    generate: (todoId: number, templateId?: number) => Promise<AISuggestionResponse>;
+    save: (todoId: number, suggestion: string) => Promise<{success: boolean; error?: string}>;
+    delete: (todoId: number) => Promise<{success: boolean; error?: string}>;
+  };
+
+  // Prompt 模板API
+  promptTemplates: {
+    getAll: () => Promise<PromptTemplate[]>;
+    getById: (id: number) => Promise<PromptTemplate | null>;
+    create: (template: Omit<PromptTemplate, 'id' | 'createdAt' | 'updatedAt'>) => Promise<PromptTemplate>;
+    update: (id: number, updates: Partial<PromptTemplate>) => Promise<void>;
+    delete: (id: number) => Promise<void>;
   };
   
   // 设置API
@@ -240,10 +258,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   ai: {
     testConnection: () => ipcRenderer.invoke('ai:testConnection'),
-    configure: (provider: string, apiKey: string, endpoint?: string) => 
-      ipcRenderer.invoke('ai:configure', provider, apiKey, endpoint),
+    configure: (provider: string, apiKey: string, endpoint?: string, model?: string) =>
+      ipcRenderer.invoke('ai:configure', provider, apiKey, endpoint, model),
     getConfig: () => ipcRenderer.invoke('ai:getConfig'),
     getSupportedProviders: () => ipcRenderer.invoke('ai:getSupportedProviders'),
+    getAvailableModels: (provider: string) => ipcRenderer.invoke('ai:getAvailableModels', provider),
+    fetchModels: (provider: string, apiKey: string, endpoint?: string) =>
+      ipcRenderer.invoke('ai:fetchModels', provider, apiKey, endpoint),
+  },
+  aiSuggestion: {
+    generate: (todoId: number, templateId?: number) =>
+      ipcRenderer.invoke('ai-suggestion:generate', todoId, templateId),
+    save: (todoId: number, suggestion: string) =>
+      ipcRenderer.invoke('ai-suggestion:save', todoId, suggestion),
+    delete: (todoId: number) =>
+      ipcRenderer.invoke('ai-suggestion:delete', todoId),
+  },
+  promptTemplates: {
+    getAll: () => ipcRenderer.invoke('prompt-templates:getAll'),
+    getById: (id: number) => ipcRenderer.invoke('prompt-templates:getById', id),
+    create: (template: Omit<PromptTemplate, 'id' | 'createdAt' | 'updatedAt'>) =>
+      ipcRenderer.invoke('prompt-templates:create', template),
+    update: (id: number, updates: Partial<PromptTemplate>) =>
+      ipcRenderer.invoke('prompt-templates:update', id, updates),
+    delete: (id: number) => ipcRenderer.invoke('prompt-templates:delete', id),
   },
   settings: {
     get: (key?: string) => ipcRenderer.invoke(key === 'dbPath' ? 'settings:getDbPath' : 'settings:get'),

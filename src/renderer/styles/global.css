@@ -267,6 +267,10 @@ body {
 .ql-editor {
   min-height: 200px;
   max-height: 400px;
+  /* 🔥 修复超长链接不换行的问题 */
+  word-break: break-all;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 .ql-editor.ql-blank::before {
@@ -1478,6 +1482,10 @@ flowchart-preview.flowchart-embedded:hover {
   min-height: 150px;
   max-height: none;
   padding: 16px;
+  /* 🔥 修复专注模式下超长链接不换行的问题 */
+  word-break: break-all;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 /* 分割线 */
@@ -1632,4 +1640,113 @@ flowchart-preview.flowchart-embedded:hover {
 
 .ql-container {
   overscroll-behavior: contain;
+}
+
+/* ============================================
+   只读Markdown样式
+   ============================================ */
+
+.readonly-markdown-content h1 {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin: 0.5em 0;
+}
+
+.readonly-markdown-content h2 {
+  font-size: 1.3em;
+  font-weight: bold;
+  margin: 0.5em 0;
+}
+
+.readonly-markdown-content h3 {
+  font-size: 1.1em;
+  font-weight: bold;
+  margin: 0.5em 0;
+}
+
+.readonly-markdown-content h4 {
+  font-size: 1em;
+  font-weight: bold;
+  margin: 0.5em 0;
+}
+
+.readonly-markdown-content strong {
+  font-weight: bold;
+}
+
+.readonly-markdown-content em {
+  font-style: italic;
+}
+
+.readonly-markdown-content code {
+  background-color: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+[data-theme='dark'] .readonly-markdown-content code {
+  background-color: #2a2a2a;
+}
+
+.readonly-markdown-content pre {
+  background-color: #f5f5f5;
+  padding: 12px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+[data-theme='dark'] .readonly-markdown-content pre {
+  background-color: #2a2a2a;
+}
+
+.readonly-markdown-content pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.readonly-markdown-content ul,
+.readonly-markdown-content ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.readonly-markdown-content li {
+  margin: 0.25em 0;
+}
+
+.readonly-markdown-content p {
+  margin: 0.5em 0;
+}
+
+/* ============================================
+   专注模式布局优化 - 独立滚动
+   ============================================ */
+
+/* 专注模式下,禁用 content-area 的滚动,由内部容器自行处理 */
+/* 注意: 这个样式通过 App.tsx 的内联样式已经处理,这里作为后备方案 */
+
+/* 专注模式下左右两栏的视觉分隔 */
+.content-focus-view {
+  /* 已有的样式保持不变 */
+}
+
+/* 专注模式下的 AI 建议面板视觉优化 */
+/* 增强左右两栏的分隔效果 */
+.content-focus-view + div {
+  /* 左侧边框,增强视觉分隔 */
+  border-left: 1px solid var(--border-color, #f0f0f0);
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='dark'] .content-focus-view + div {
+  border-left: 1px solid var(--border-color, #404040);
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.3);
+}
+
+/* 确保专注模式容器在视口内正确显示 */
+motion.div {
+  /* Flexbox 子元素最小高度修复 */
+  min-height: 0;
 }

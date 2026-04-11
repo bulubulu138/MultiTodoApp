@@ -1,13 +1,14 @@
 import { Todo, TodoRelation } from '../../shared/types';
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message, Image, Card, Empty, Spin, Tooltip, Progress, Alert } from 'antd';
-import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined, NodeIndexOutlined, FileTextOutlined, LinkOutlined, LoginOutlined, ReloadOutlined, SafetyOutlined } from '@ant-design/icons';
+import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined, NodeIndexOutlined, FileTextOutlined, LinkOutlined, LoginOutlined, ReloadOutlined, SafetyOutlined, BulbOutlined } from '@ant-design/icons';
 import RelationContext from './RelationContext';
 import RelationsModal from './RelationsModal';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useURLTitles } from '../hooks/useURLTitles';
 import { embedUrlTitleInContent } from '../utils/urlTitleStorage';
+import ReadOnlyMarkdown from './ReadOnlyMarkdown';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -709,6 +710,24 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
               </Paragraph>
             )}
           </div>
+
+          {/* AI建议 */}
+          {todo.aiSuggestion && (
+            <>
+              <Divider />
+              <div style={{ marginBottom: 16 }}>
+                <Space align="center" style={{ marginBottom: 12 }}>
+                  <BulbOutlined style={{ color: '#1890ff' }} />
+                  <Text strong>AI 建议</Text>
+                </Space>
+                <ReadOnlyMarkdown
+                  content={todo.aiSuggestion}
+                  showCopyButton={true}
+                  maxHeight={400}
+                />
+              </div>
+            </>
+          )}
 
           {/* 批量授权进度提示 */}
           {batchAuthProgress && (

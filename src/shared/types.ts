@@ -16,6 +16,8 @@ export interface Todo {
   displayOrders?: { [tabKey: string]: number }; // 多Tab独立排序序号
   contentHash?: string; // 内容哈希值，用于去重检测
   keywords?: string[]; // 关键词数组，用于智能推荐
+  aiSuggestion?: string; // AI生成的建议内容
+  aiSuggestionGeneratedAt?: string; // AI建议生成时间
   completedAt?: string; // 完成时间，准确记录待办完成的时间点
   createdAt: string;
   updatedAt: string;
@@ -26,13 +28,14 @@ export interface Settings {
 }
 
 // AI 提供商类型
-export type AIProvider = 'disabled' | 'kimi' | 'deepseek' | 'doubao' | 'custom';
+export type AIProvider = 'disabled' | 'kimi' | 'deepseek' | 'doubao' | 'openai' | 'glm' | 'claude' | 'qwen' | 'custom';
 
 // AI 配置接口
 export interface AIConfig {
   provider: AIProvider;
   apiKey: string;
   apiEndpoint?: string; // 自定义端点
+  model?: string; // AI模型选择
   enabled: boolean;
 }
 
@@ -41,6 +44,23 @@ export interface TodoRecommendation {
   todo: Todo;
   similarity: number; // 相似度 0-1
   matchedKeywords: string[]; // 匹配的关键词
+}
+
+// Prompt 模板类型
+export interface PromptTemplate {
+  id?: number;
+  name: string;
+  content: string;
+  category: 'general' | 'planning' | 'analysis' | 'improvement' | 'custom';
+  createdAt: string;
+  updatedAt: string;
+}
+
+// AI 建议响应类型
+export interface AISuggestionResponse {
+  success: boolean;
+  suggestion?: string;
+  error?: string;
 }
 
 export interface CustomTab {

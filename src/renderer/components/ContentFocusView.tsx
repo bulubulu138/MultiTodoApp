@@ -1,9 +1,10 @@
-import { Todo, TodoRelation } from '../../shared/types';
+import { Todo, TodoRelation, PromptTemplate } from '../../shared/types';
 import React, { useState, useMemo, useCallback, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { Divider, Button, Checkbox, Space, Spin, Empty, App, Input, InputNumber, Tag, Tooltip } from 'antd';
 import { SaveOutlined, EyeOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import RichTextEditor, { RichTextEditorRef } from './RichTextEditor';
 import RelationIndicators from './RelationIndicators';
+import AISuggestionPanel from './AISuggestionPanel';
 import { formatCompletedTime } from '../utils/timeFormatter';
 import { ColorTheme } from '../theme/themes';
 
@@ -17,6 +18,10 @@ interface ContentFocusViewProps {
   relations: TodoRelation[];
   onUpdateDisplayOrder: (todoId: number, tabKey: string, displayOrder: number) => Promise<void>;
   colorTheme?: ColorTheme;
+  promptTemplates?: PromptTemplate[];
+  onGenerateSuggestion?: (todoId: number, templateId?: number) => Promise<{ success: boolean; suggestion?: string; error?: string }>;
+  onSaveSuggestion?: (todoId: number, suggestion: string) => Promise<{ success: boolean; error?: string }>;
+  onDeleteSuggestion?: (todoId: number) => Promise<{ success: boolean; error?: string }>;
 }
 
 // 暴露给父组件的方法
@@ -37,6 +42,7 @@ interface ContentFocusItemProps {
   prevTodo: Todo | null;
   nextTodo: Todo | null;
   onUpdateDisplayOrder: (todoId: number, tabKey: string, displayOrder: number) => Promise<void>;
+  onSelectedTodoChange?: (todoId: number | null) => void; // 新增：选中待办变更回调
 }
 
 // 暴露给父组件的方法
@@ -46,10 +52,10 @@ export interface ContentFocusItemRef {
 
 // 单个待办项组件（使用 forwardRef 暴露保存方法）
 const ContentFocusItem = React.memo(
-  forwardRef<ContentFocusItemRef, ContentFocusItemProps>(({ 
-    todo, 
-    onUpdate, 
-    onView, 
+  forwardRef<ContentFocusItemRef, ContentFocusItemProps>(({
+    todo,
+    onUpdate,
+    onView,
     isLast,
     activeTab,
     allTodos,
@@ -57,7 +63,8 @@ const ContentFocusItem = React.memo(
     parallelGroup,
     prevTodo,
     nextTodo,
-    onUpdateDisplayOrder
+    onUpdateDisplayOrder,
+    onSelectedTodoChange // 新增
   }, ref) => {
     const { message } = App.useApp();
     const [editedContent, setEditedContent] = useState<string>(todo.content);
@@ -73,6 +80,7 @@ const ContentFocusItem = React.memo(
 
     const lastSavedContentRef = useRef(todo.content);
     const lastSavedTitleRef = useRef(todo.title);
+    const currentProcessingTodoRef = useRef<number | null>(null); // 追踪当前正在处理的todoId
 
     // 用于存储最新的值，避免组件卸载时的闭包陷阱
     const latestTitleRef = useRef(editedTitle);
@@ -232,12 +240,19 @@ const ContentFocusItem = React.memo(
     // 组件卸载时保存未保存的更改
     useEffect(() => {
       return () => {
+        console.log('[ContentFocusItem] 组件卸载，清理资源，todoId:', todo.id);
+
         // 清除定时器
         if (saveTimeoutRef.current) {
           clearTimeout(saveTimeoutRef.current);
         }
         if (titleSaveTimeoutRef.current) {
           clearTimeout(titleSaveTimeoutRef.current);
+        }
+
+        // 清除当前处理的todoId标志
+        if (currentProcessingTodoRef.current === todo.id) {
+          currentProcessingTodoRef.current = null;
         }
 
         // 保存内容（同步，不等待）
@@ -253,7 +268,7 @@ const ContentFocusItem = React.memo(
           onUpdate(currentTodoId, { title: currentTitle });
         }
       };
-    }, []); // 空依赖数组是正确的，因为我们使用 ref 来获取最新值
+    }, [todo.id]); // 添加todo.id依赖以确保正确的标识
 
     // 切换完成状态
     const handleToggleComplete = useCallback(async (checked: boolean) => {
@@ -430,6 +445,8 @@ const ContentFocusItem = React.memo(
 
     // 失去焦点时立即保存
     const handleBlur = useCallback(() => {
+      console.log('[EditorBlur] 编辑器失焦，todoId:', todo.id);
+
       // 失去焦点时，如果不在输入法状态，立即保存最新内容
       if (!isComposingRef.current) {
         // 清除防抖定时器
@@ -440,7 +457,43 @@ const ContentFocusItem = React.memo(
         // 立即保存
         handleSave();
       }
-    }, [handleSave]);
+    }, [handleSave, todo.id]);
+
+    // 🔥 统一的编辑器激活处理函数（合并 handleFocus 和 handleClick）
+    const handleEditorActivate = useCallback(() => {
+      // 防止同一个todo的重复调用
+      if (currentProcessingTodoRef.current === todo.id) {
+        console.log('[EditorActivate] 防止同一个todo的重复调用:', todo.id);
+        return;
+      }
+
+      if (!todo.id || !onSelectedTodoChange) {
+        return;
+      }
+
+      console.log('[EditorActivate] 激活编辑器，todoId:', todo.id);
+
+      // 设置当前正在处理的todoId
+      currentProcessingTodoRef.current = todo.id;
+
+      // 先更新待办选择状态（这会触发 AI 建议面板的更新）
+      onSelectedTodoChange(todo.id);
+
+      // 延迟清除标志位，确保状态更新完成
+      setTimeout(() => {
+        currentProcessingTodoRef.current = null;
+        console.log('[EditorActivate] 状态更新完成，todoId:', todo.id);
+      }, 100);
+    }, [todo.id, onSelectedTodoChange]);
+
+    // 保留原有函数名以兼容可能的引用（内部实现改为调用新函数）
+    const handleFocus = useCallback(() => {
+      handleEditorActivate();
+    }, [handleEditorActivate]);
+
+    const handleClick = useCallback(() => {
+      handleEditorActivate();
+    }, [handleEditorActivate]);
 
     // 键盘事件处理 - Ctrl+S / Cmd+S 手动保存
     const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
@@ -661,8 +714,10 @@ const ContentFocusItem = React.memo(
               onCompositionStart={handleCompositionStart}
               onCompositionEnd={handleCompositionEnd}
               onBlur={handleBlur}
+              onFocus={handleFocus}
               onKeyDown={handleKeyDown}
               tabIndex={-1}
+              style={{ cursor: 'text' }}
             >
             <RichTextEditor
               ref={editorRef}
@@ -694,9 +749,42 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
   activeTab,
   relations,
   onUpdateDisplayOrder,
+  promptTemplates = [],
+  onGenerateSuggestion,
+  onSaveSuggestion,
+  onDeleteSuggestion,
 }, ref) => {
   // 为每个待办项创建 ref
   const itemRefsMap = useRef<Map<number, ContentFocusItemRef>>(new Map());
+
+  // AI 建议相关状态
+  const [selectedTodoId, setSelectedTodoId] = useState<number | null>(null);
+  const [suggestionPanelWidth, setSuggestionPanelWidth] = useState(300);
+  const [suggestionPanelCollapsed, setSuggestionPanelCollapsed] = useState(false);
+
+  // AI 建议事件处理
+  const handleGenerateSuggestion = async (todoId: number, templateId?: number) => {
+    if (onGenerateSuggestion) {
+      return await onGenerateSuggestion(todoId, templateId);
+    }
+    return { success: false, error: 'AI建议功能未启用' };
+  };
+
+  const handleSaveSuggestion = async (todoId: number, suggestion: string) => {
+    if (onSaveSuggestion) {
+      return await onSaveSuggestion(todoId, suggestion);
+    }
+    return { success: false, error: 'AI建议功能未启用' };
+  };
+
+  const handleDeleteSuggestion = async (todoId: number) => {
+    if (onDeleteSuggestion) {
+      return await onDeleteSuggestion(todoId);
+    }
+    return { success: false, error: 'AI建议功能未启用' };
+  };
+
+  const selectedTodo = todos.find(t => t.id === selectedTodoId) || null;
 
   // 使用 DFS 构建并列关系分组 Map（复用自TodoList）
   const parallelGroups = useMemo(() => {
@@ -773,28 +861,52 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
   }
 
   return (
-    <div className="content-focus-view">
-      {todos.map((todo, index) => (
-        <ContentFocusItem
-          key={todo.id}
-          ref={(itemRef) => {
-            if (itemRef && todo.id) {
-              itemRefsMap.current.set(todo.id, itemRef);
-            }
-          }}
-          todo={todo}
-          onUpdate={onUpdate}
-          onView={onView}
-          isLast={index === todos.length - 1}
-          activeTab={activeTab}
-          allTodos={allTodos || todos}
-          relations={relations}
-          parallelGroup={parallelGroups.get(todo.id!)}
-          prevTodo={index > 0 ? todos[index - 1] : null}
-          nextTodo={index < todos.length - 1 ? todos[index + 1] : null}
-          onUpdateDisplayOrder={onUpdateDisplayOrder}
+    <div style={{ display: 'flex', height: '100%', flexDirection: 'row', minHeight: 0 }}>
+      {/* 主内容区 */}
+      <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+        <div className="content-focus-view">
+          {todos.map((todo, index) => (
+            <ContentFocusItem
+              key={todo.id}
+              ref={(itemRef) => {
+                if (itemRef && todo.id) {
+                  itemRefsMap.current.set(todo.id, itemRef);
+                }
+              }}
+              todo={todo}
+              onUpdate={onUpdate}
+              onView={(todo) => {
+                setSelectedTodoId(todo.id!);
+                onView(todo);
+              }}
+              isLast={index === todos.length - 1}
+              activeTab={activeTab}
+              allTodos={allTodos || todos}
+              relations={relations}
+              parallelGroup={parallelGroups.get(todo.id!)}
+              prevTodo={index > 0 ? todos[index - 1] : null}
+              nextTodo={index < todos.length - 1 ? todos[index + 1] : null}
+              onUpdateDisplayOrder={onUpdateDisplayOrder}
+              onSelectedTodoChange={setSelectedTodoId}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* AI 建议侧边列 */}
+      {onGenerateSuggestion && onSaveSuggestion && onDeleteSuggestion && (
+        <AISuggestionPanel
+          todo={selectedTodo}
+          templates={promptTemplates}
+          onGenerate={handleGenerateSuggestion}
+          onSave={handleSaveSuggestion}
+          onDelete={handleDeleteSuggestion}
+          width={suggestionPanelWidth}
+          onWidthChange={setSuggestionPanelWidth}
+          collapsed={suggestionPanelCollapsed}
+          onToggleCollapse={() => setSuggestionPanelCollapsed(!suggestionPanelCollapsed)}
         />
-      ))}
+      )}
     </div>
   );
 });

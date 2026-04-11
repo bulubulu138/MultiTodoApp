@@ -8,6 +8,7 @@ import { generateContentHash } from './utils/hashUtils';
 import { KeywordProcessor } from './services/KeywordProcessor';
 import { keywordExtractor, KeywordExtractor } from './services/KeywordExtractor';
 import { aiService } from './services/AIService';
+import { PromptTemplateService } from './services/PromptTemplateService';
 import { urlTitleService } from './services/URLTitleService';
 import { URLAuthService } from './services/URLAuthService';
 import { URLAuthorizationService } from './services/URLAuthorizationService';
@@ -26,6 +27,7 @@ class Application {
   private urlAuthService: URLAuthService | null = null;
   private urlAuthorizationService: URLAuthorizationService | null = null;
   private authorizationRefreshScheduler: AuthorizationRefreshScheduler | null = null;
+  private promptTemplateService: PromptTemplateService | null = null;
 
   constructor() {
     this.dbManager = new DatabaseManager();
@@ -417,6 +419,66 @@ class Application {
     }
   }
 
+  /**
+   * 验证所有必需服务是否已正确初始化
+   */
+  private verifyServicesInitialization(): { success: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    // 检查数据库管理器
+    if (!this.dbManager) {
+      errors.push('DatabaseManager is not initialized');
+    }
+
+    // 检查AI服务
+    try {
+      const config = aiService.getConfig();
+      if (!config.enabled) {
+        console.warn('AI service is disabled (this is OK if user has not configured it yet)');
+      }
+    } catch (error) {
+      errors.push('AI service is not available');
+    }
+
+    // 检查Prompt模板服务（可选服务）
+    if (!this.promptTemplateService) {
+      console.warn('PromptTemplateService is not initialized - AI suggestions will use default prompts');
+    }
+
+    return {
+      success: errors.length === 0,
+      errors
+    };
+  }
+
+  /**
+   * 安全地获取Prompt模板（带降级处理）
+   * @param templateId 模板ID
+   * @returns 模板内容或undefined（如果获取失败则使用默认提示词）
+   */
+  private async getPromptTemplateSafely(templateId?: number): Promise<string | undefined> {
+    if (!templateId) {
+      return undefined;
+    }
+
+    if (!this.promptTemplateService) {
+      console.warn('PromptTemplateService not available, using default prompt');
+      return undefined;
+    }
+
+    try {
+      const template = await this.promptTemplateService.getById(templateId);
+      if (template && template.content) {
+        return template.content;
+      }
+      console.warn(`Template ${templateId} not found or empty, using default prompt`);
+      return undefined;
+    } catch (error) {
+      console.error(`Failed to get template ${templateId}:`, error);
+      return undefined;
+    }
+  }
+
   private setupIpcHandlers(): void {
     // 待办事项相关的IPC处理器
     ipcMain.handle('todo:getAll', async () => {
@@ -690,18 +752,29 @@ class Application {
       return await aiService.testConnection();
     });
 
-    ipcMain.handle('ai:configure', async (_, provider: string, apiKey: string, endpoint?: string) => {
+    ipcMain.handle('ai:configure', async (_, provider: string, apiKey: string, endpoint?: string, model?: string) => {
       try {
-        aiService.configure(provider as any, apiKey, endpoint);
-        // 保存到数据库
-        await this.dbManager.updateSettings({
+        console.log('[ai:configure] 接收到配置请求:', { provider, apiKey: apiKey ? '***' : '(empty)', endpoint, model });
+
+        // 配置AI服务（内存）
+        aiService.configure(provider as any, apiKey, endpoint, model);
+
+        // 保存到数据库（持久化）
+        const settingsToSave = {
           ai_provider: provider,
           ai_api_key: apiKey,
           ai_api_endpoint: endpoint || '',
+          ai_model: model || '',
           ai_enabled: provider !== 'disabled' && apiKey ? 'true' : 'false'
-        });
+        };
+
+        console.log('[ai:configure] 准备保存到数据库:', { ...settingsToSave, ai_api_key: settingsToSave.ai_api_key ? '***' : '(empty)' });
+        await this.dbManager.updateSettings(settingsToSave);
+        console.log('[ai:configure] 数据库保存成功');
+
         return { success: true };
       } catch (error) {
+        console.error('[ai:configure] 保存失败:', error);
         return { success: false, error: (error as Error).message };
       }
     });
@@ -713,6 +786,122 @@ class Application {
     ipcMain.handle('ai:getSupportedProviders', async () => {
       const { AIService } = await import('./services/AIService');
       return AIService.getSupportedProviders();
+    });
+
+    ipcMain.handle('ai:getAvailableModels', async (_, provider: string) => {
+      const { AIService } = await import('./services/AIService');
+      return AIService.getAvailableModels(provider as any);
+    });
+
+    ipcMain.handle('ai:fetchModels', async (_, provider: string, apiKey: string, endpoint?: string) => {
+      const { AIService } = await import('./services/AIService');
+      return await AIService.fetchAvailableModels(provider as any, apiKey, endpoint);
+    });
+
+    // AI 建议相关
+    ipcMain.handle('ai-suggestion:generate', async (_, todoId: number, templateId?: number) => {
+      try {
+        console.log('=== AI Suggestion Generation Debug ===');
+        console.log('todoId:', todoId, 'templateId:', templateId);
+        console.log('promptTemplateService initialized:', !!this.promptTemplateService);
+
+        const todo = await this.dbManager.getTodoById(todoId);
+        if (!todo) {
+          console.error('Todo not found:', todoId);
+          return { success: false, error: '待办不存在' };
+        }
+        console.log('Todo found:', todo.title);
+
+        // 使用安全的模板获取方法（带降级处理）
+        const prompt = await this.getPromptTemplateSafely(templateId);
+        if (prompt) {
+          console.log('Using custom template for AI suggestion');
+        } else {
+          console.log('Using default prompt for AI suggestion');
+        }
+
+        console.log('Calling aiService.generateSuggestionWithRetry');
+        const result = await aiService.generateSuggestionWithRetry(todo.title, todo.content, prompt);
+
+        if (result.success && result.content) {
+          console.log('AI suggestion generated successfully, saving to database');
+          await this.dbManager.updateTodoAISuggestion(todoId, result.content);
+        } else {
+          console.error('AI suggestion generation failed:', result.error);
+        }
+
+        return result;
+      } catch (error: any) {
+        console.error('Failed to generate AI suggestion:', error);
+        console.error('Error stack:', error.stack);
+        return { success: false, error: error.message || '生成失败' };
+      }
+    });
+
+    ipcMain.handle('ai-suggestion:save', async (_, todoId: number, suggestion: string) => {
+      try {
+        await this.dbManager.updateTodoAISuggestion(todoId, suggestion);
+        return { success: true };
+      } catch (error: any) {
+        console.error('Failed to save AI suggestion:', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('ai-suggestion:delete', async (_, todoId: number) => {
+      try {
+        await this.dbManager.updateTodoAISuggestion(todoId, '');
+        return { success: true };
+      } catch (error: any) {
+        console.error('Failed to delete AI suggestion:', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // Prompt 模板相关
+    ipcMain.handle('prompt-templates:getAll', async () => {
+      try {
+        return await this.promptTemplateService?.getAll() || [];
+      } catch (error: any) {
+        console.error('Failed to get all prompt templates:', error);
+        return [];
+      }
+    });
+
+    ipcMain.handle('prompt-templates:getById', async (_, id: number) => {
+      try {
+        return await this.promptTemplateService?.getById(id) || null;
+      } catch (error: any) {
+        console.error('Failed to get prompt template by id:', error);
+        return null;
+      }
+    });
+
+    ipcMain.handle('prompt-templates:create', async (_, template) => {
+      try {
+        return await this.promptTemplateService!.create(template);
+      } catch (error: any) {
+        console.error('Failed to create prompt template:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('prompt-templates:update', async (_, id: number, updates) => {
+      try {
+        await this.promptTemplateService!.update(id, updates);
+      } catch (error: any) {
+        console.error('Failed to update prompt template:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('prompt-templates:delete', async (_, id: number) => {
+      try {
+        await this.promptTemplateService!.delete(id);
+      } catch (error: any) {
+        console.error('Failed to delete prompt template:', error);
+        throw error;
+      }
     });
 
     // 打开外部链接
@@ -1278,14 +1467,59 @@ class Application {
       // 初始化 AI 服务
       console.log('Initializing AI service...');
       const settings = await this.dbManager.getSettings();
-      if (settings.ai_enabled === 'true' && settings.ai_provider !== 'disabled') {
-        aiService.configure(
-          settings.ai_provider as any,
-          settings.ai_api_key || '',
-          settings.ai_api_endpoint || undefined
-        );
+
+      // 输出读取到的配置（隐藏敏感信息）
+      console.log('[AI Init] 从数据库读取的配置:', {
+        ai_provider: settings.ai_provider,
+        ai_api_key: settings.ai_api_key ? '***' : '(empty)',
+        ai_enabled: settings.ai_enabled,
+        ai_api_endpoint: settings.ai_api_endpoint,
+        ai_model: settings.ai_model
+      });
+
+      // 宽松的加载条件：只要有provider和apiKey就加载，不依赖ai_enabled字段
+      if (settings.ai_provider && settings.ai_provider !== 'disabled' && settings.ai_api_key && settings.ai_api_key.length > 0) {
+        console.log('[AI Init] 配置有效，开始初始化AI服务');
+        try {
+          aiService.configure(
+            settings.ai_provider as any,
+            settings.ai_api_key,
+            settings.ai_api_endpoint || undefined,
+            settings.ai_model || undefined
+          );
+          console.log('[AI Init] AI服务配置成功');
+        } catch (error) {
+          console.error('[AI Init] AI服务配置失败:', error);
+        }
+      } else {
+        console.log('[AI Init] 配置无效或为空，跳过AI服务初始化:', {
+          hasProvider: !!settings.ai_provider,
+          providerIsDisabled: settings.ai_provider === 'disabled',
+          hasApiKey: !!settings.ai_api_key,
+          apiKeyLength: settings.ai_api_key?.length || 0
+        });
       }
-      console.log('AI service initialized successfully');
+      console.log('AI service initialization completed');
+
+      // 初始化 Prompt 模板服务
+      console.log('Initializing prompt template service...');
+      try {
+        const dbForPrompt = this.dbManager.getDb();
+        if (dbForPrompt) {
+          this.promptTemplateService = new PromptTemplateService(dbForPrompt);
+          console.log('Prompt template service initialized successfully');
+
+          // 验证服务是否可用
+          const testAccess = await this.promptTemplateService.getAll();
+          console.log(`Prompt template service verified: ${testAccess.length} templates loaded`);
+        } else {
+          console.error('Failed to initialize prompt template service: database is null');
+          this.promptTemplateService = null;
+        }
+      } catch (error) {
+        console.error('Failed to initialize prompt template service:', error);
+        this.promptTemplateService = null;
+      }
 
       // Initialize URL auth service
       console.log('Initializing URL auth service...');
@@ -1307,6 +1541,16 @@ class Application {
         console.log('Authorization refresh scheduler started successfully');
       } else {
         console.error('Failed to initialize URL authorization service: database is null');
+      }
+
+      // 验证服务初始化
+      console.log('Verifying services initialization...');
+      const serviceCheck = this.verifyServicesInitialization();
+      if (!serviceCheck.success) {
+        console.error('Service initialization errors detected:', serviceCheck.errors);
+        console.error('Some features may not work correctly');
+      } else {
+        console.log('All required services initialized successfully');
       }
 
       // 设置IPC处理器

@@ -8,6 +8,7 @@ import TagManagement from './TagManagement';
 import BackupSettings from './BackupSettings';
 import CustomTabManager from './CustomTabManager';
 import URLAuthorizationManager from './URLAuthorizationManager';
+import PromptTemplateManager from './PromptTemplateManager';
 
 const { Text } = Typography;
 
@@ -66,6 +67,8 @@ interface SettingsModalProps {
   existingTags?: string[];
   colorTheme?: ColorTheme;
   onColorThemeChange?: (theme: ColorTheme) => void;
+  promptTemplates?: any[];
+  onTemplatesChange?: () => Promise<void>;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -79,7 +82,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   onSaveCustomTabs,
   existingTags = [],
   colorTheme = 'purple',
-  onColorThemeChange
+  onColorThemeChange,
+  promptTemplates = [],
+  onTemplatesChange
 }) => {
   const [form] = Form.useForm();
   const [aiForm] = Form.useForm();
@@ -87,10 +92,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [dbPath, setDbPath] = useState<string>('加载中...');
   const [activeTab, setActiveTab] = useState('general');
   const [aiProviders, setAiProviders] = useState<Array<{value: string; label: string; endpoint: string}>>([]);
+  const [aiModels, setAiModels] = useState<Array<{id: string; name: string; description?: string}>>([]);
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [fetchModelsError, setFetchModelsError] = useState<string | null>(null);
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionTestResult, setConnectionTestResult] = useState<{success: boolean; message: string} | null>(null);
   const [generatingKeywords, setGeneratingKeywords] = useState(false);
   const [localColorTheme, setLocalColorTheme] = useState<ColorTheme>(colorTheme);
+  const [localPromptTemplates, setLocalPromptTemplates] = useState(promptTemplates);
 
   useEffect(() => {
     if (visible) {
@@ -100,7 +109,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         colorTheme: settings.colorTheme || 'purple',
       });
       setLocalColorTheme((settings.colorTheme as ColorTheme) || 'purple');
-      
+
       // 加载AI配置
       aiForm.setFieldsValue({
         ai_provider: settings.ai_provider || 'disabled',
@@ -108,7 +117,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         ai_api_endpoint: settings.ai_api_endpoint || '',
         ai_enabled: settings.ai_enabled === 'true',
       });
-      
+
       // 获取数据库路径
       window.electronAPI.settings.get('dbPath').then((path) => {
         if (path) {
@@ -119,15 +128,29 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       }).catch(() => {
         setDbPath('获取失败');
       });
-      
+
       // 获取支持的AI提供商
       window.electronAPI.ai.getSupportedProviders().then((providers) => {
         setAiProviders(providers);
       }).catch(() => {
         console.error('Failed to load AI providers');
       });
+
+      // 主动加载 Prompt 模板（作为后备）
+      window.electronAPI.promptTemplates.getAll().then((templates) => {
+        setLocalPromptTemplates(templates);
+      }).catch(() => {
+        console.error('Failed to load prompt templates in SettingsModal');
+      });
     }
   }, [visible, settings, form, aiForm]);
+
+  // 同步外部 promptTemplates 的变化到本地状态
+  useEffect(() => {
+    if (promptTemplates && promptTemplates.length > 0) {
+      setLocalPromptTemplates(promptTemplates);
+    }
+  }, [promptTemplates]);
 
   const handleSubmit = () => {
     const values = form.getFieldsValue();
@@ -160,48 +183,46 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleAIConfigSave = async () => {
     try {
       const values = await aiForm.validateFields();
+      console.log('[SettingsModal] 保存AI配置:', { ...values, ai_api_key: values.ai_api_key ? '***' : '(empty)' });
+
       const result = await window.electronAPI.ai.configure(
         values.ai_provider,
         values.ai_api_key || '',
-        values.ai_api_endpoint || ''
+        values.ai_api_endpoint || '',
+        values.ai_model || ''
       );
-      
+
       if (result.success) {
         message.success('AI配置已保存');
-        // 同时更新settings
-        await window.electronAPI.settings.update({
-          ai_provider: values.ai_provider,
-          ai_api_key: values.ai_api_key || '',
-          ai_api_endpoint: values.ai_api_endpoint || '',
-          ai_enabled: values.ai_provider !== 'disabled' && values.ai_api_key ? 'true' : 'false'
-        });
         setConnectionTestResult(null); // 清除测试结果
       } else {
         message.error('保存失败: ' + result.error);
       }
     } catch (error) {
-      console.error('Failed to save AI config:', error);
+      console.error('[SettingsModal] 保存AI配置失败:', error);
+      message.error('保存失败: ' + (error as Error).message);
     }
   };
 
   const handleTestConnection = async () => {
     setTestingConnection(true);
     setConnectionTestResult(null);
-    
+
     try {
       const values = await aiForm.validateFields();
-      
+
       // 先保存配置
       await window.electronAPI.ai.configure(
         values.ai_provider,
         values.ai_api_key || '',
-        values.ai_api_endpoint || ''
+        values.ai_api_endpoint || '',
+        values.ai_model || ''
       );
-      
+
       // 测试连接
       const result = await window.electronAPI.ai.testConnection();
       setConnectionTestResult(result);
-      
+
       if (result.success) {
         message.success('连接成功！');
       } else {
@@ -214,6 +235,91 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       });
     } finally {
       setTestingConnection(false);
+    }
+  };
+
+  const handleProviderChange = async (provider: string) => {
+    setConnectionTestResult(null);
+    setFetchModelsError(null);
+
+    if (provider === 'disabled') {
+      setAiModels([]);
+      aiForm.setFieldsValue({ ai_model: '' });
+      return;
+    }
+
+    try {
+      const models = await window.electronAPI.ai.getAvailableModels(provider);
+      setAiModels(models);
+
+      // 自动选择第一个模型作为默认值
+      if (models.length > 0) {
+        aiForm.setFieldsValue({ ai_model: models[0].id });
+      } else {
+        aiForm.setFieldsValue({ ai_model: '' });
+      }
+    } catch (error) {
+      console.error('Failed to load models for provider:', error);
+      setAiModels([]);
+      aiForm.setFieldsValue({ ai_model: '' });
+    }
+  };
+
+  const handleFetchModels = async () => {
+    const provider = aiForm.getFieldValue('ai_provider');
+    const apiKey = aiForm.getFieldValue('ai_api_key');
+    const endpoint = aiForm.getFieldValue('ai_api_endpoint');
+
+    if (!provider || provider === 'disabled') {
+      message.warning('请先选择AI服务提供商');
+      return;
+    }
+
+    if (!apiKey) {
+      message.warning('请先输入API Key');
+      return;
+    }
+
+    setFetchingModels(true);
+    setFetchModelsError(null);
+
+    try {
+      const result = await window.electronAPI.ai.fetchModels(provider, apiKey, endpoint);
+
+      if (result.success) {
+        // 转换为UI需要的格式（添加description字段）
+        const modelsWithDescription = result.models.map(m => ({
+          id: m.id,
+          name: m.name,
+          description: undefined // API返回的可能没有description
+        }));
+
+        setAiModels(modelsWithDescription);
+
+        // 自动选择第一个模型
+        if (modelsWithDescription.length > 0) {
+          aiForm.setFieldsValue({ ai_model: modelsWithDescription[0].id });
+          message.success(`成功获取 ${modelsWithDescription.length} 个可用模型`);
+        } else {
+          message.warning('未获取到任何模型，请检查API Key是否正确');
+        }
+
+        // 如果有警告信息（使用了fallback），显示出来
+        if (result.error) {
+          setFetchModelsError(result.error);
+        }
+      } else {
+        message.error('获取模型失败: ' + (result.error || '未知错误'));
+        if (result.error) {
+          setFetchModelsError(result.error);
+        }
+      }
+    } catch (error: any) {
+      console.error('Failed to fetch models:', error);
+      message.error('获取模型失败: ' + error.message);
+      setFetchModelsError(error.message);
+    } finally {
+      setFetchingModels(false);
     }
   };
 
@@ -463,7 +569,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   { label: '🚫 禁用', value: 'disabled' },
                   ...aiProviders.map(p => ({ label: p.label, value: p.value }))
                 ]}
-                onChange={() => setConnectionTestResult(null)}
+                onChange={(value) => {
+                  setConnectionTestResult(null);
+                  handleProviderChange(value);
+                }}
               />
             </Form.Item>
 
@@ -481,14 +590,44 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   <>
                     <Form.Item
                       name="ai_api_key"
-                      label="API Key"
+                      label={
+                        <Space>
+                          <span>API Key</span>
+                          <Text type="secondary" style={{ fontSize: 12, fontWeight: 'normal' }}>
+                            输入后点击"获取模型"按钮
+                          </Text>
+                        </Space>
+                      }
                       rules={[{ required: provider !== 'disabled', message: '请输入API Key' }]}
                     >
-                      <Input.Password
-                        placeholder="输入您的API Key"
-                        onChange={() => setConnectionTestResult(null)}
-                      />
+                      <Space.Compact style={{ width: '100%' }}>
+                        <Input.Password
+                          placeholder="输入您的API Key"
+                          onChange={() => {
+                            setConnectionTestResult(null);
+                            setFetchModelsError(null);
+                          }}
+                        />
+                        <Button
+                          onClick={handleFetchModels}
+                          loading={fetchingModels}
+                          disabled={!aiForm.getFieldValue('ai_api_key')}
+                        >
+                          获取模型
+                        </Button>
+                      </Space.Compact>
                     </Form.Item>
+
+                    {fetchModelsError && (
+                      <Alert
+                        message={fetchModelsError.includes('使用默认列表') ? '提示' : '警告'}
+                        description={fetchModelsError}
+                        type={fetchModelsError.includes('使用默认列表') ? 'info' : 'warning'}
+                        closable
+                        onClose={() => setFetchModelsError(null)}
+                        style={{ marginBottom: 16 }}
+                      />
+                    )}
 
                     <Form.Item
                       name="ai_api_endpoint"
@@ -498,6 +637,32 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       <Input
                         placeholder={aiProviders.find(p => p.value === provider)?.endpoint || '默认端点'}
                         onChange={() => setConnectionTestResult(null)}
+                      />
+                    </Form.Item>
+
+                    <Form.Item
+                      name="ai_model"
+                      label="AI 模型"
+                      tooltip={
+                        aiModels.length === 0
+                          ? '请先输入API Key并点击"获取模型"按钮'
+                          : '选择要使用的AI模型'
+                      }
+                      rules={[{ required: true, message: '请选择AI模型' }]}
+                    >
+                      <Select
+                        placeholder={aiModels.length === 0 ? '请先获取模型列表' : '选择AI模型'}
+                        options={aiModels.map(m => ({
+                          label: m.name,
+                          value: m.id,
+                          title: m.description
+                        }))}
+                        onChange={() => setConnectionTestResult(null)}
+                        notFoundContent={
+                          <span>
+                            {fetchingModels ? '正在获取模型...' : '请先输入API Key并点击"获取模型"按钮'}
+                          </span>
+                        }
                       />
                     </Form.Item>
 
@@ -556,6 +721,35 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             </Space>
           </Card>
         </div>
+      ),
+    },
+    {
+      key: 'promptTemplates',
+      label: (
+        <span>
+          <BulbOutlined />
+          Prompt 模板
+        </span>
+      ),
+      children: (
+        <PromptTemplateManager
+          visible={visible && activeTab === 'promptTemplates'}
+          onClose={() => {}}
+          templates={localPromptTemplates}
+          embedded={true}
+          onReload={async () => {
+            try {
+              const templates = await window.electronAPI.promptTemplates.getAll();
+              setLocalPromptTemplates(templates);
+              // 通知 App 重新加载模板列表
+              if (onTemplatesChange) {
+                await onTemplatesChange();
+              }
+            } catch (error) {
+              message.error('加载模板失败');
+            }
+          }}
+        />
       ),
     },
     {
