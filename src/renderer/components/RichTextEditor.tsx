@@ -31,6 +31,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
   // 添加输入状态和焦点状态追踪
   const isComposingRef = useRef(false);
   const isFocusedRef = useRef(false);
+  const scrollBlockRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -79,6 +80,15 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
             return;
           };
 
+          // 🔥 强化防护：内容同步后重新锁定
+          if (scrollBlockRef.current && typeof scrollBlockRef.current === 'function') {
+            try {
+              scrollBlockRef.current();
+            } catch (error) {
+              console.warn('[QuillScrollBlock] Reinforcement call failed:', error);
+            }
+          }
+
           if (selection) {
             try {
               editorInstance.setSelection(selection.index, selection.length);
@@ -100,12 +110,163 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       if (!editorInstance) {
         const editor = quillRef.current.getEditor();
         if (editor) {
-          // 🔥 核心修复：覆盖 scrollSelectionIntoView 方法，阻止输入时触发页面滚动
+          // 🔥 核心修复1：覆盖 scrollSelectionIntoView 方法
           const originalScrollIntoView = editor.scrollSelectionIntoView.bind(editor);
           editor.scrollSelectionIntoView = function() {
             // 不做任何操作，直接返回，阻止 window.scrollBy() 调用
             return;
           };
+
+          // 🔥 核心修复2：使用 Object.defineProperty 永久锁定，防止被重置
+          try {
+            Object.defineProperty(editor, 'scrollSelectionIntoView', {
+              value: function() {
+                console.log('[QuillScrollBlock] Blocked scrollSelectionIntoView call');
+                return;
+              },
+              writable: false,
+              configurable: false
+            });
+          } catch (error) {
+            console.warn('[QuillScrollBlock] Failed to lock scrollSelectionIntoView:', error);
+          }
+
+          // 🔥 核心修复3：拦截 window.scrollBy 调用（最后防线）
+          if (!(window.scrollBy as any)._quillIntercepted) {
+            const originalScrollBy = window.scrollBy.bind(window);
+            (window.scrollBy as any) = function(...args: [number, number] | [ScrollToOptions]) {
+              // 检查是否是编辑器触发的滚动
+              const activeElement = document.activeElement;
+              if (activeElement?.closest('.ql-editor')) {
+                console.log('[QuillScrollBlock] Blocked window.scrollBy from editor');
+                return; // 阻止编辑器触发的滚动
+              }
+              return originalScrollBy.apply(window, args as any);
+            };
+            (window.scrollBy as any)._quillIntercepted = true;
+          }
+
+          // 🔥🔥 最后防线：拦截 window.scrollTo 和 Element.scrollIntoView
+          if (!(window.scrollTo as any)._quillIntercepted) {
+            const originalScrollTo = window.scrollTo.bind(window);
+            (window.scrollTo as any) = function(...args: [number, number] | [ScrollToOptions]) {
+              const activeElement = document.activeElement;
+              if (activeElement?.closest('.ql-editor')) {
+                console.log('[QuillScrollBlock] Blocked window.scrollTo from editor');
+                return;
+              }
+              return originalScrollTo.apply(window, args as any);
+            };
+            (window.scrollTo as any)._quillIntercepted = true;
+          }
+
+          // 拦截 Element.scrollIntoView
+          if (!(Element.prototype.scrollIntoView as any)._quillIntercepted) {
+            const originalScrollIntoView = Element.prototype.scrollIntoView;
+            (Element.prototype.scrollIntoView as any) = function(this: Element, arg?: boolean | ScrollIntoViewOptions) {
+              // 如果是编辑器元素，阻止滚动
+              if (this instanceof HTMLElement && (this as HTMLElement).closest('.ql-editor')) {
+                console.log('[QuillScrollBlock] Blocked Element.scrollIntoView from editor');
+                return;
+              }
+              return originalScrollIntoView.apply(this, [arg]);
+            };
+            (Element.prototype.scrollIntoView as any)._quillIntercepted = true;
+          }
+
+          // 🔥 核心修复4：创建强化函数，在关键事件后调用
+          const reinforceScrollBlock = () => {
+            try {
+              Object.defineProperty(editor, 'scrollSelectionIntoView', {
+                value: function() { return; },
+                writable: false,
+                configurable: false
+              });
+            } catch (error) {
+              console.warn('[QuillScrollBlock] Reinforcement failed:', error);
+            }
+          };
+          scrollBlockRef.current = reinforceScrollBlock;
+
+          // 🔥🔥 防护层3：禁用 Quill Scroller 模块
+          try {
+            const editorAny = editor as any;
+            if (editorAny.scroller && editorAny.scroller.scroll) {
+              const originalScrollerScroll = editorAny.scroller.scroll.bind(editorAny.scroller);
+              editorAny.scroller.scroll = function() {
+                console.log('[QuillScrollBlock] Blocked scroller.scroll()');
+                return;
+              };
+            }
+          } catch (error) {
+            console.warn('[QuillScrollBlock] Failed to disable scroller:', error);
+          }
+
+          // 🔥🔥 防护层4：拦截 Selection API 导致的滚动
+          if (!(window.Selection.prototype.modify as any)._quillIntercepted) {
+            const originalModify = window.Selection.prototype.modify;
+            (window.Selection.prototype.modify as any) = function(
+              this: Selection,
+              alter?: string,
+              direction?: string,
+              granularity?: string
+            ) {
+              // 检查是否在编辑器中
+              const activeElement = document.activeElement;
+              if (activeElement?.closest('.ql-editor')) {
+                console.log('[QuillScrollBlock] Intercepted Selection.modify');
+                // 临时禁用 window.scrollBy
+                const originalScrollBy = window.scrollBy;
+                (window.scrollBy as any) = () => {};
+
+                try {
+                  const result = originalModify.call(this, alter, direction, granularity);
+                  // 恢复 scrollBy
+                  (window.scrollBy as any) = originalScrollBy;
+                  return result;
+                } catch (error) {
+                  (window.scrollBy as any) = originalScrollBy;
+                  throw error;
+                }
+              }
+              return originalModify.call(this, alter, direction, granularity);
+            };
+            (window.Selection.prototype.modify as any)._quillIntercepted = true;
+          }
+
+          // 🔥🔥 防护层5：拦截所有 DOM 滚动操作
+          const setupDOMScrollInterception = () => {
+            try {
+              // 拦截编辑器根元素的 scrollTop/scrollLeft 设置
+              const editorRoot = editor.root;
+              if (editorRoot) {
+                Object.defineProperty(editorRoot, 'scrollTop', {
+                  get: function() {
+                    return this._cachedScrollTop || 0;
+                  },
+                  set: function(value) {
+                    console.log('[QuillScrollBlock] Blocked scrollTop set:', value);
+                    this._cachedScrollTop = value;
+                    // 不实际设置，阻止滚动
+                  }
+                });
+
+                Object.defineProperty(editorRoot, 'scrollLeft', {
+                  get: function() {
+                    return this._cachedScrollLeft || 0;
+                  },
+                  set: function(value) {
+                    console.log('[QuillScrollBlock] Blocked scrollLeft set:', value);
+                    this._cachedScrollLeft = value;
+                    // 不实际设置，阻止滚动
+                  }
+                });
+              }
+            } catch (error) {
+              console.warn('[QuillScrollBlock] Failed to setup DOM interception:', error);
+            }
+          };
+          setupDOMScrollInterception();
 
           setEditorInstance(editor);
           return editor;
@@ -165,6 +326,14 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
 
     const handleFocus = () => {
       isFocusedRef.current = true;
+      // 🔥 强化防护：focus 后重新锁定滚动
+      if (scrollBlockRef.current && typeof scrollBlockRef.current === 'function') {
+        try {
+          scrollBlockRef.current();
+        } catch (error) {
+          console.warn('[QuillScrollBlock] Focus reinforcement failed:', error);
+        }
+      }
     };
 
     const handleBlur = () => {
@@ -180,14 +349,43 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
         // 只阻止传播，不阻止默认行为
         event.stopPropagation();
       }
-      // 对于其他按键（包括空格、删除、Enter等输入键），完全不干预
+
+      // 🔥 强化防护：输入键后重新锁定滚动（带安全守卫）
+      if (scrollBlockRef.current && typeof scrollBlockRef.current === 'function') {
+        setTimeout(() => {
+          try {
+            if (scrollBlockRef.current && typeof scrollBlockRef.current === 'function') {
+              scrollBlockRef.current();
+            }
+          } catch (error) {
+            console.warn('[QuillScrollBlock] Keydown reinforcement failed:', error);
+          }
+        }, 0);
+      }
     };
 
-    // 新增：阻止滚轮事件传播到滚动容器
-    const handleWheel = (event: WheelEvent) => {
-      // 阻止滚轮事件冒泡到父级滚动容器
+    // 🔥🔥 防护层2：阻止所有 DOM 滚动事件
+    const preventAnyScroll = (event: Event) => {
+      event.preventDefault();
       event.stopPropagation();
+      event.stopImmediatePropagation();
+      console.log('[QuillScrollBlock] Prevented scroll event:', event.type, event);
     };
+
+    const handleWheel = (event: WheelEvent) => {
+      // 只阻止垂直滚动，保留水平滚动（如果需要）
+      if (event.deltaY !== 0) {
+        preventAnyScroll(event);
+      } else {
+        // 水平滚动仍然阻止，防止意外滚动
+        event.stopPropagation();
+      }
+    };
+
+    // 监听所有可能的滚动事件
+    editorElement.addEventListener('scroll', preventAnyScroll, { passive: false, capture: true });
+    editorElement.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+    editorElement.addEventListener('touchmove', preventAnyScroll, { passive: false, capture: true });
 
     editorElement.addEventListener('compositionstart', handleCompositionStart);
     editorElement.addEventListener('compositionend', handleCompositionEnd);
@@ -195,7 +393,6 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
     editorElement.addEventListener('blur', handleBlur);
     // 优化：在冒泡阶段添加事件监听器，避免干扰Quill内部处理
     editorElement.addEventListener('keydown', handleKeyDown);
-    editorElement.addEventListener('wheel', handleWheel, { passive: false });
 
     return () => {
       editorElement.removeEventListener('compositionstart', handleCompositionStart);
@@ -204,7 +401,16 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       editorElement.removeEventListener('blur', handleBlur);
       // 清理事件监听器
       editorElement.removeEventListener('keydown', handleKeyDown);
+
+      // 🔥 清理所有滚动事件监听器
+      editorElement.removeEventListener('scroll', preventAnyScroll);
       editorElement.removeEventListener('wheel', handleWheel);
+      editorElement.removeEventListener('touchmove', preventAnyScroll);
+
+      // 🔥 清理强化函数引用（设置为安全的空函数，而不是 null）
+      scrollBlockRef.current = () => {
+        // 空函数，安全的 noop
+      };
     };
   }, [editorInstance, getEditorSafely, onChange]);
 
@@ -304,7 +510,20 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
   }
 
   return (
-    <div ref={containerRef} style={{ ...style, minHeight: '250px' }}>
+    <div
+      ref={containerRef}
+      style={{
+        ...style,
+        minHeight: '250px',
+        // 🔥🔥 防护层1：CSS 样式覆盖 - 禁用容器滚动
+        overflow: 'hidden',
+        overflowX: 'hidden',
+        overflowY: 'hidden',
+        overscrollBehavior: 'none',
+        overscrollBehaviorX: 'none',
+        overscrollBehaviorY: 'none',
+      }}
+    >
       <ReactQuill
         ref={quillRef}
         theme="snow"
@@ -313,6 +532,19 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
           try {
             if (isComposingRef.current) {
               return;
+            }
+
+            // 🔥 强化防护：内容变化时重新锁定滚动（带安全守卫）
+            if (scrollBlockRef.current && typeof scrollBlockRef.current === 'function') {
+              setTimeout(() => {
+                try {
+                  if (scrollBlockRef.current && typeof scrollBlockRef.current === 'function') {
+                    scrollBlockRef.current();
+                  }
+                } catch (error) {
+                  console.warn('[QuillScrollBlock] Change reinforcement failed:', error);
+                }
+              }, 0);
             }
 
             onChange(content);
