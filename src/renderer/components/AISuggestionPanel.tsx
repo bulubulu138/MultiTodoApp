@@ -3,6 +3,7 @@ import { Card, Button, Space, Spin, Empty, Divider, Select, Alert, Tooltip, Moda
 import { BulbOutlined, LoadingOutlined, CompressOutlined, ExpandOutlined } from '@ant-design/icons';
 import ReadOnlyMarkdown from './ReadOnlyMarkdown';
 import { Todo, PromptTemplate } from '../../shared/types';
+import { useThemeColors } from '../hooks/useThemeColors';
 
 interface AISuggestionPanelProps {
   todo: Todo | null;
@@ -29,6 +30,7 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
 }) => {
   const [generating, setGenerating] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | undefined>();
+  const themeColors = useThemeColors();
 
   // 拖拽调整宽度
   const [isResizing, setIsResizing] = useState(false);
@@ -117,17 +119,17 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
       <div
         style={{
           width: 40,
-          borderLeft: '1px solid #f0f0f0',
+          borderLeft: `1px solid ${themeColors.borderColor}`,
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: '#fafafa'
+          backgroundColor: themeColors.panelHeaderBg
         }}
         onClick={onToggleCollapse}
         title="展开AI建议面板"
       >
-        <ExpandOutlined style={{ fontSize: 16 }} />
+        <ExpandOutlined style={{ fontSize: 16, color: themeColors.textColor }} />
       </div>
     );
   }
@@ -136,11 +138,11 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
     <div
       style={{
         width: `${width}px`,
-        borderLeft: '1px solid #f0f0f0',
+        borderLeft: `1px solid ${themeColors.borderColor}`,
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        backgroundColor: '#fff',
+        backgroundColor: themeColors.contentBg,
         height: '100%'
       }}
     >
@@ -164,17 +166,17 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
       <div
         style={{
           padding: '12px 16px',
-          borderBottom: '1px solid #f0f0f0',
+          borderBottom: `1px solid ${themeColors.borderColor}`,
           display: 'flex',
           flexDirection: 'column',
           gap: '8px',
-          backgroundColor: '#fafafa'
+          backgroundColor: themeColors.panelHeaderBg
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Space>
             <BulbOutlined style={{ color: '#1890ff' }} />
-            <span style={{ fontWeight: 600 }}>AI 建议</span>
+            <span style={{ fontWeight: 600, color: themeColors.textPrimary }}>AI 建议</span>
           </Space>
           <Tooltip title="收起面板">
             <Button
@@ -191,7 +193,7 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
           <div
             style={{
               fontSize: '12px',
-              color: '#666',
+              color: themeColors.textColor,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap'
@@ -241,7 +243,7 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
             {generating && (
               <div style={{ textAlign: 'center', padding: '40px 0' }}>
                 <Spin indicator={<LoadingOutlined spin />} size="large" />
-                <div style={{ marginTop: 16, color: '#666' }}>AI正在思考中...</div>
+                <div style={{ marginTop: 16, color: themeColors.textColor }}>AI正在思考中...</div>
               </div>
             )}
 
@@ -259,7 +261,7 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
       {todo?.aiSuggestion && !generating && (
         <>
           <Divider style={{ margin: 0 }} />
-          <div style={{ padding: '12px 16px', borderTop: '1px solid #f0f0f0' }}>
+          <div style={{ padding: '12px 16px', borderTop: `1px solid ${themeColors.borderColor}` }}>
             <Space>
               <Button
                 size="small"

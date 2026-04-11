@@ -8,6 +8,7 @@ export interface ThemeColors {
   listItemOverdueHoverBg: string;
   listItemCurrentBg: string;
   contentBg: string;
+  panelHeaderBg: string; // 面板头部背景色
   borderColor: string;
   textColor: string;
   cardBg: string;
@@ -65,6 +66,8 @@ export const useThemeColors = (): ThemeColors => {
       listItemCurrentBg: isDark ? '#e6f7ff' : '#f0f9ff',
       // 内容区域背景 - 深色模式下使用浅色（可读性优先）
       contentBg: isDark ? '#f5f5f5' : '#f5f5f5',
+      // 面板头部背景 - 深色模式下使用深色，浅色模式使用浅色
+      panelHeaderBg: isDark ? '#1a1a1a' : '#fafafa',
       // 边框颜色
       borderColor: isDark ? '#404040' : '#f0f0f0',
       // 文本颜色 - 根据主题自动调整

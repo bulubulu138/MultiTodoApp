@@ -553,11 +553,14 @@ const ContentFocusItem = React.memo(
       <div
         className="content-focus-item"
         data-todo-id={todo.id}
+        data-group-start={isGroupStart}
+        data-group-end={isGroupEnd}
+        data-in-group={isInGroup}
         style={{
-          borderTop: isGroupStart ? '2px dashed #fa8c16' : undefined,
-          borderBottom: isGroupEnd ? '2px dashed #fa8c16' : undefined,
-          borderLeft: isInGroup ? '3px solid #fa8c16' : undefined,
-          borderRight: isInGroup ? '3px solid rgba(250, 140, 22, 0.3)' : undefined,
+          borderTop: isGroupStart ? '2px dashed var(--group-border-color, #fa8c16)' : undefined,
+          borderBottom: isGroupEnd ? '2px dashed var(--group-border-color, #fa8c16)' : undefined,
+          borderLeft: isInGroup ? '3px solid var(--group-border-color, #fa8c16)' : undefined,
+          borderRight: isInGroup ? '3px solid var(--group-border-bg, rgba(250, 140, 22, 0.3))' : undefined,
           paddingTop: isGroupStart ? 12 : 0,
           paddingBottom: isGroupEnd ? 12 : 0,
           paddingLeft: isInGroup ? 12 : 0,
