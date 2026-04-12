@@ -624,10 +624,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     }
   };
 
-  const handleSettingsUpdate = async (newSettings: Record<string, string>) => {
+  const handleSettingsUpdate = async (newSettings: Record<string, string>, shouldCloseModal: boolean = true) => {
     try {
       await window.electronAPI.settings.update(newSettings);
-      setSettings(newSettings);
+      setSettings(prev => ({ ...prev, ...newSettings }));
 
       // 更新主题
       if (newSettings.theme) {
@@ -639,11 +639,27 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         onColorThemeChange(newSettings.colorTheme as ColorTheme);
       }
 
-      setShowSettings(false);
-      message.success('设置保存成功');
+      if (shouldCloseModal) {
+        setShowSettings(false);
+      }
+      if (shouldCloseModal) {
+        message.success('设置保存成功');
+      }
     } catch (error) {
       message.error('保存设置失败');
       console.error('Error updating settings:', error);
+    }
+  };
+
+  // AI配置保存回调 - 用于AI配置保存后的状态同步，不关闭Modal
+  const handleAIConfigUpdate = async (newSettings: Record<string, string>) => {
+    try {
+      await window.electronAPI.settings.update(newSettings);
+      setSettings(prev => ({ ...prev, ...newSettings }));
+      message.success('AI配置已保存');
+    } catch (error) {
+      message.error('保存AI配置失败');
+      console.error('Error updating AI config:', error);
     }
   };
 
@@ -1237,6 +1253,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         onColorThemeChange={onColorThemeChange}
         promptTemplates={promptTemplates}
         onTemplatesChange={handleReloadPromptTemplates}
+        onAIConfigUpdate={handleAIConfigUpdate}
       />
 
       <TodoViewDrawer

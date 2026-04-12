@@ -69,6 +69,7 @@ interface SettingsModalProps {
   onColorThemeChange?: (theme: ColorTheme) => void;
   promptTemplates?: any[];
   onTemplatesChange?: () => Promise<void>;
+  onAIConfigUpdate?: (settings: Record<string, string>) => void;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -84,7 +85,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   colorTheme = 'purple',
   onColorThemeChange,
   promptTemplates = [],
-  onTemplatesChange
+  onTemplatesChange,
+  onAIConfigUpdate
 }) => {
   const [form] = Form.useForm();
   const [aiForm] = Form.useForm();
@@ -193,6 +195,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       );
 
       if (result.success) {
+        // 更新父组件的settings状态，保持UI同步
+        if (onAIConfigUpdate) {
+          const settingsToUpdate = {
+            ai_provider: values.ai_provider,
+            ai_api_key: values.ai_api_key || '',
+            ai_api_endpoint: values.ai_api_endpoint || '',
+            ai_model: values.ai_model || '',
+            ai_enabled: values.ai_provider !== 'disabled' && values.ai_api_key ? 'true' : 'false'
+          };
+          await onAIConfigUpdate(settingsToUpdate);
+        }
+
         message.success('AI配置已保存');
         setConnectionTestResult(null); // 清除测试结果
       } else {
