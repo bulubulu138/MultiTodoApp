@@ -758,7 +758,24 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   // AI 建议处理函数
   const handleGenerateSuggestion = async (todoId: number, templateId?: number) => {
     try {
+      console.log('[App] 开始生成AI建议, todoId:', todoId, 'templateId:', templateId);
+
+      // ✅ 添加AI配置预检查
+      const aiConfig = await window.electronAPI.ai.getConfig();
+      console.log('[App] AI配置状态:', {
+        ...aiConfig,
+        apiKey: aiConfig.enabled ? '***' : '(empty)'
+      });
+
+      if (!aiConfig.enabled) {
+        console.warn('[App] AI服务未启用，无法生成建议');
+        return { success: false, error: 'AI服务未配置，请先在设置中配置AI服务' };
+      }
+
       const result = await window.electronAPI.aiSuggestion.generate(todoId, templateId);
+
+      console.log('[App] AI建议生成结果:', result);
+
       if (result.success && result.suggestion) {
         // 重新加载待办以获取最新的AI建议
         await loadTodos();
@@ -767,6 +784,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         return { success: false, error: result.error };
       }
     } catch (error: any) {
+      console.error('[App] AI建议生成异常:', error);
       return { success: false, error: error.message || '生成失败' };
     }
   };

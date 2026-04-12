@@ -172,18 +172,41 @@ export class AIService {
     this.provider = provider;
     this.apiKey = apiKey;
     this.model = model || this.getDefaultModel(provider);
-    this.enabled = provider !== 'disabled' && apiKey.length > 0;
+
+    // 计算enabled状态
+    const shouldEnable = provider !== 'disabled' && apiKey.length > 0;
+    this.enabled = shouldEnable;
+
+    console.log(`[AIService.configure] 配置参数:`, {
+      provider,
+      apiKey: apiKey ? '***' : '(empty)',
+      apiKeyLength: apiKey.length,
+      model: this.model,
+      customEndpoint,
+      shouldEnable
+    });
 
     // 设置 API 端点
     const providerConfig = AI_PROVIDERS[provider];
     if (providerConfig) {
       this.apiEndpoint = customEndpoint || providerConfig.defaultEndpoint;
+      console.log(`[AIService.configure] API端点已设置:`, {
+        endpoint: this.apiEndpoint,
+        usingCustom: !!customEndpoint
+      });
     } else {
       this.apiEndpoint = '';
       this.enabled = false;
+      console.error(`[AIService.configure] ⚠️  警告：Provider配置不存在，已禁用AI服务:`, provider);
     }
 
-    console.log(`AI Service configured: provider=${provider}, model=${this.model}, enabled=${this.enabled}`);
+    console.log(`[AIService.configure] 配置完成:`, {
+      provider: this.provider,
+      model: this.model,
+      endpoint: this.apiEndpoint,
+      enabled: this.enabled,
+      finalApiKeyLength: this.apiKey.length
+    });
   }
 
   /**
@@ -571,7 +594,21 @@ export class AIService {
     content: string,
     promptTemplate?: string
   ): Promise<{ success: boolean; content?: string; error?: string }> {
+    console.log(`[AIService.generateSuggestion] 开始生成AI建议:`, {
+      enabled: this.enabled,
+      provider: this.provider,
+      model: this.model,
+      hasCustomPrompt: !!promptTemplate,
+      title: title.substring(0, 50) + (title.length > 50 ? '...' : ''),
+      contentLength: content.length
+    });
+
     if (!this.enabled) {
+      console.warn(`[AIService.generateSuggestion] AI服务未启用，无法生成建议:`, {
+        provider: this.provider,
+        apiKeyLength: this.apiKey.length,
+        endpoint: this.apiEndpoint
+      });
       return { success: false, error: 'AI未配置' };
     }
 
@@ -579,6 +616,13 @@ export class AIService {
       '你是一个专业的任务助手。请根据以下待办事项，提供详细的解决方案建议，包括具体步骤、注意事项和可能的解决方案。';
 
     const userMessage = `待办事项标题：${title}\n\n待办事项内容：${content}\n\n请为这个待办提供具体的解决方案建议。`;
+
+    console.log(`[AIService.generateSuggestion] 准备发送API请求:`, {
+      endpoint: this.apiEndpoint,
+      model: this.model,
+      systemPromptLength: systemPrompt.length,
+      userMessageLength: userMessage.length
+    });
 
     try {
       const response = await this.sendCompletionRequest({
@@ -589,8 +633,19 @@ export class AIService {
         max_tokens: 2000,
         temperature: 0.7
       });
+
+      console.log(`[AIService.generateSuggestion] API响应:`, {
+        success: response.success,
+        contentLength: response.content?.length || 0,
+        error: response.error
+      });
+
       return response;
     } catch (error: any) {
+      console.error(`[AIService.generateSuggestion] 生成建议失败:`, {
+        error: error.message,
+        stack: error.stack
+      });
       return { success: false, error: this.getErrorMessage(error) };
     }
   }

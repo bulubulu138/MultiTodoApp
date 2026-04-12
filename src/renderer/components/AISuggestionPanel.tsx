@@ -38,41 +38,73 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
   const resizeStartWidth = React.useRef(width);
 
   const handleGenerate = async () => {
-    if (!todo?.id) return;
-
-    // 检查是否已有AI建议
-    if (todo.aiSuggestion && !generating) {
-      // 使用 Modal.confirm 替代 window.confirm
-      Modal.confirm({
-        title: '确认重新生成',
-        content: '该待办已有AI建议，是否要重新生成？这将覆盖现有的建议内容。',
-        okText: '确定',
-        cancelText: '取消',
-        onOk: async () => {
-          setGenerating(true);
-          try {
-            const result = await onGenerate(todo.id!, selectedTemplateId);
-            if (result.success && result.suggestion) {
-              message.success('AI建议生成成功');
-            } else {
-              message.error('生成失败: ' + (result.error || '未知错误'));
-            }
-          } finally {
-            setGenerating(false);
-          }
-        }
-      });
+    if (!todo?.id) {
+      message.error('请先选择待办事项');
       return;
     }
 
     setGenerating(true);
     try {
+      console.log('[AISuggestionPanel] 开始生成AI建议, todoId:', todo.id, 'templateId:', selectedTemplateId);
+
+      // ✅ 添加配置检查
+      const aiConfig = await window.electronAPI.ai.getConfig();
+      console.log('[AISuggestionPanel] AI配置状态:', {
+        ...aiConfig,
+        apiKey: aiConfig.enabled ? '***' : '(empty)'
+      });
+
+      if (!aiConfig.enabled) {
+        message.error('AI服务未配置或已禁用，请先在设置中配置AI服务（选择提供商、输入API Key、选择模型）');
+        return;
+      }
+
+      // 检查是否已有AI建议
+      if (todo.aiSuggestion) {
+        // 使用 Modal.confirm 替代 window.confirm
+        await new Promise((resolve) => {
+          Modal.confirm({
+            title: '确认重新生成',
+            content: '该待办已有AI建议，是否要重新生成？这将覆盖现有的建议内容。',
+            okText: '确定',
+            cancelText: '取消',
+            onOk: () => resolve(true),
+            onCancel: () => resolve(false),
+          });
+        });
+        // 如果用户取消，返回
+        return;
+      }
+
       const result = await onGenerate(todo.id!, selectedTemplateId);
+
+      console.log('[AISuggestionPanel] AI建议生成结果:', result);
+
       if (result.success && result.suggestion) {
         message.success('AI建议生成成功');
       } else {
-        message.error('生成失败: ' + (result.error || '未知错误'));
+        // ✅ 改进：显示更友好的错误信息
+        const errorMsg = result.error || '未知错误';
+        console.error('[AISuggestionPanel] 生成失败:', errorMsg);
+
+        // 根据错误类型提供不同的提示
+        if (errorMsg.includes('AI未配置') || errorMsg.includes('AI服务未配置')) {
+          message.error('AI服务未配置，请先在设置中配置AI服务（选择提供商、输入API Key、选择模型）');
+        } else if (errorMsg.includes('API Key') || errorMsg.includes('api_key') || errorMsg.includes('401')) {
+          message.error('API Key无效或已过期，请检查设置中的配置');
+        } else if (errorMsg.includes('网络') || errorMsg.includes('timeout') || errorMsg.includes('超时') || errorMsg.includes('ENOTFOUND')) {
+          message.error('网络连接失败或请求超时，请检查网络连接后重试');
+        } else if (errorMsg.includes('模型') || errorMsg.includes('model')) {
+          message.error('AI模型配置有误，请在设置中重新选择模型');
+        } else if (errorMsg.includes('rate limit') || errorMsg.includes('429')) {
+          message.error('请求过于频繁，请稍后重试');
+        } else {
+          message.error('生成失败: ' + errorMsg);
+        }
       }
+    } catch (error: any) {
+      console.error('[AISuggestionPanel] 生成过程发生异常:', error);
+      message.error('生成失败: ' + (error.message || '未知错误'));
     } finally {
       setGenerating(false);
     }

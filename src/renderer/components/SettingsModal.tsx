@@ -113,12 +113,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       setLocalColorTheme((settings.colorTheme as ColorTheme) || 'purple');
 
       // 加载AI配置
-      aiForm.setFieldsValue({
+      const aiConfigToLoad = {
         ai_provider: settings.ai_provider || 'disabled',
         ai_api_key: settings.ai_api_key || '',
         ai_api_endpoint: settings.ai_api_endpoint || '',
+        ai_model: settings.ai_model || '', // ✅ 修复：添加ai_model字段加载
         ai_enabled: settings.ai_enabled === 'true',
+      };
+
+      console.log('[SettingsModal] 加载AI配置到表单:', {
+        ...aiConfigToLoad,
+        ai_api_key: aiConfigToLoad.ai_api_key ? '***' : '(empty)'
       });
+
+      aiForm.setFieldsValue(aiConfigToLoad);
 
       // 获取数据库路径
       window.electronAPI.settings.get('dbPath').then((path) => {
@@ -185,7 +193,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleAIConfigSave = async () => {
     try {
       const values = await aiForm.validateFields();
-      console.log('[SettingsModal] 保存AI配置:', { ...values, ai_api_key: values.ai_api_key ? '***' : '(empty)' });
+
+      console.log('[SettingsModal] 保存AI配置，验证后的表单值:', {
+        ...values,
+        ai_api_key: values.ai_api_key ? '***' : '(empty)',
+        ai_api_key_length: values.ai_api_key?.length || 0,
+        ai_model_length: values.ai_model?.length || 0
+      });
 
       const result = await window.electronAPI.ai.configure(
         values.ai_provider,
@@ -195,6 +209,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       );
 
       if (result.success) {
+        // ✅ 验证保存后的AI服务状态
+        const aiConfigAfterSave = await window.electronAPI.ai.getConfig();
+        console.log('[SettingsModal] 保存后的AI服务状态:', {
+          ...aiConfigAfterSave,
+          apiKey: aiConfigAfterSave.enabled ? '***' : '(empty)'
+        });
+
+        if (!aiConfigAfterSave.enabled) {
+          console.error('[SettingsModal] ⚠️  警告：配置保存后AI服务仍未启用！');
+          message.warning('AI配置已保存，但服务可能未正确启用，请检查配置');
+        }
+
         // 更新父组件的settings状态，保持UI同步
         if (onAIConfigUpdate) {
           const settingsToUpdate = {
@@ -204,6 +230,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             ai_model: values.ai_model || '',
             ai_enabled: values.ai_provider !== 'disabled' && values.ai_api_key ? 'true' : 'false'
           };
+          console.log('[SettingsModal] 更新父组件settings状态:', {
+            ...settingsToUpdate,
+            ai_api_key: settingsToUpdate.ai_api_key ? '***' : '(empty)'
+          });
           await onAIConfigUpdate(settingsToUpdate);
         }
 

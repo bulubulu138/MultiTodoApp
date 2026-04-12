@@ -756,8 +756,32 @@ class Application {
       try {
         console.log('[ai:configure] 接收到配置请求:', { provider, apiKey: apiKey ? '***' : '(empty)', endpoint, model });
 
+        // ✅ 添加参数验证
+        if (!provider || provider === 'disabled') {
+          console.log('[ai:configure] Provider is disabled');
+          aiService.configure('disabled', '');
+          return { success: true };
+        }
+
+        if (!apiKey || apiKey.length === 0) {
+          console.warn('[ai:configure] API Key is empty, AI service will be disabled');
+          aiService.configure(provider as any, '', endpoint, model);
+          return { success: true };
+        }
+
         // 配置AI服务（内存）
         aiService.configure(provider as any, apiKey, endpoint, model);
+
+        // ✅ 验证配置是否生效
+        const configAfter = aiService.getConfig();
+        console.log('[ai:configure] 配置后的状态:', {
+          ...configAfter,
+          apiKey: configAfter.enabled ? '***' : '(empty)'
+        });
+
+        if (!configAfter.enabled) {
+          console.error('[ai:configure] ⚠️  警告：配置后AI服务仍未启用！provider:', provider, 'apiKeyLength:', apiKey.length);
+        }
 
         // 保存到数据库（持久化）
         const settingsToSave = {
