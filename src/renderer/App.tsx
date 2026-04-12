@@ -775,12 +775,25 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       const result = await window.electronAPI.aiSuggestion.generate(todoId, templateId);
 
       console.log('[App] AI建议生成结果:', result);
+      console.log('[App] 检查结果字段:', {
+        hasSuccess: 'success' in result,
+        hasSuggestion: 'suggestion' in result,
+        success: result.success,
+        suggestionLength: result.suggestion?.length || 0,
+        error: result.error
+      });
 
       if (result.success && result.suggestion) {
         // 重新加载待办以获取最新的AI建议
         await loadTodos();
+        console.log('[App] AI建议生成成功，已重新加载待办列表');
         return { success: true, suggestion: result.suggestion };
       } else {
+        console.warn('[App] AI建议生成失败:', {
+          success: result.success,
+          hasSuggestion: !!result.suggestion,
+          error: result.error
+        });
         return { success: false, error: result.error };
       }
     } catch (error: any) {

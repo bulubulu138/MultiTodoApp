@@ -62,7 +62,7 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
       // 检查是否已有AI建议
       if (todo.aiSuggestion) {
         // 使用 Modal.confirm 替代 window.confirm
-        await new Promise((resolve) => {
+        const shouldContinue = await new Promise<boolean>((resolve) => {
           Modal.confirm({
             title: '确认重新生成',
             content: '该待办已有AI建议，是否要重新生成？这将覆盖现有的建议内容。',
@@ -72,8 +72,11 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
             onCancel: () => resolve(false),
           });
         });
-        // 如果用户取消，返回
-        return;
+        // 如果用户取消，清除生成状态并返回
+        if (!shouldContinue) {
+          setGenerating(false);
+          return;
+        }
       }
 
       const result = await onGenerate(todo.id!, selectedTemplateId);

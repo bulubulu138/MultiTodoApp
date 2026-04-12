@@ -854,7 +854,13 @@ class Application {
           console.error('AI suggestion generation failed:', result.error);
         }
 
-        return result;
+        // ✅ 修复：将content字段映射为suggestion字段，与AISuggestionResponse接口保持一致
+        // 这样可以确保返回的结构符合TypeScript类型定义
+        return {
+          success: result.success,
+          suggestion: result.success ? result.content : undefined,
+          error: result.error
+        };
       } catch (error: any) {
         console.error('Failed to generate AI suggestion:', error);
         console.error('Error stack:', error.stack);
