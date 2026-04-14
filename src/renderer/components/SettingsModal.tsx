@@ -288,22 +288,40 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
     if (provider === 'disabled') {
       setAiModels([]);
-      aiForm.setFieldsValue({ ai_model: '' });
+      aiForm.setFieldsValue({ ai_model: '', ai_api_key: '', ai_api_endpoint: '' });
       return;
     }
 
     try {
+      // 尝试获取该provider的已保存配置
+      const allProvidersResult = await window.electronAPI.ai.getAllProviders();
+      if (allProvidersResult.success) {
+        const savedConfig = allProvidersResult.providers.find(p => p.provider === provider);
+        if (savedConfig && savedConfig.enabled) {
+          // 自动填充已保存的配置
+          aiForm.setFieldsValue({
+            ai_api_key: '', // 出于安全考虑，不自动填充key
+            ai_api_endpoint: savedConfig.endpoint,
+            ai_model: savedConfig.model
+          });
+          message.info(`已加载 ${provider} 的配置（需要重新输入API Key）`);
+        }
+      }
+
       const models = await window.electronAPI.ai.getAvailableModels(provider);
       setAiModels(models);
 
-      // 自动选择第一个模型作为默认值
-      if (models.length > 0) {
-        aiForm.setFieldsValue({ ai_model: models[0].id });
-      } else {
-        aiForm.setFieldsValue({ ai_model: '' });
+      // 如果没有保存的模型或已保存的模型不在列表中，自动选择第一个
+      const currentModel = aiForm.getFieldValue('ai_model');
+      if (!currentModel || !models.find(m => m.id === currentModel)) {
+        if (models.length > 0) {
+          aiForm.setFieldsValue({ ai_model: models[0].id });
+        } else {
+          aiForm.setFieldsValue({ ai_model: '' });
+        }
       }
     } catch (error) {
-      console.error('Failed to load models for provider:', error);
+      console.error('Failed to load provider config:', error);
       setAiModels([]);
       aiForm.setFieldsValue({ ai_model: '' });
     }

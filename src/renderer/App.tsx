@@ -1316,7 +1316,16 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
 
       {/* 回到顶部按钮 */}
       <FloatButton.BackTop
-        target={() => document.querySelector('.content-area') as HTMLElement}
+        target={() => {
+          // 根据当前视图模式选择正确的滚动容器
+          if (currentTabSettings.viewMode === 'content-focus') {
+            // 专注模式：使用ContentFocusView内部的滚动容器
+            return document.querySelector('.content-focus-scroll-area') as HTMLElement;
+          } else {
+            // 普通模式：使用全局的.content-area容器
+            return document.querySelector('.content-area') as HTMLElement;
+          }
+        }}
         icon={<VerticalAlignTopOutlined />}
         tooltip="回到顶部"
         visibilityHeight={300}

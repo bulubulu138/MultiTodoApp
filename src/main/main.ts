@@ -14,6 +14,7 @@ import { URLAuthService } from './services/URLAuthService';
 import { URLAuthorizationService } from './services/URLAuthorizationService';
 import { AuthorizationRefreshScheduler } from './services/AuthorizationRefreshScheduler';
 import { TodoRecommendation } from '../shared/types';
+import { aiConfigManager } from './config/AIConfigManager';
 
 class Application {
   private mainWindow: BrowserWindow | null = null;
@@ -760,12 +761,14 @@ class Application {
         if (!provider || provider === 'disabled') {
           console.log('[ai:configure] Provider is disabled');
           aiService.configure('disabled', '');
+          aiConfigManager.updateProvider('disabled', '', '', '');
           return { success: true };
         }
 
         if (!apiKey || apiKey.length === 0) {
           console.warn('[ai:configure] API Key is empty, AI service will be disabled');
           aiService.configure(provider as any, '', endpoint, model);
+          aiConfigManager.updateProvider(provider as any, '', endpoint || '', model || '');
           return { success: true };
         }
 
@@ -783,7 +786,17 @@ class Application {
           console.error('[ai:configure] ⚠️  警告：配置后AI服务仍未启用！provider:', provider, 'apiKeyLength:', apiKey.length);
         }
 
-        // 保存到数据库（持久化）
+        // 保存到配置文件（持久化）
+        console.log('[ai:configure] 准备保存到配置文件');
+        aiConfigManager.updateProvider(
+          provider as any,
+          apiKey,
+          endpoint || '',
+          model || ''
+        );
+        console.log('[ai:configure] 配置文件保存成功');
+
+        // 同时保存到数据库（兼容旧版本）
         const settingsToSave = {
           ai_provider: provider,
           ai_api_key: apiKey,
@@ -791,10 +804,7 @@ class Application {
           ai_model: model || '',
           ai_enabled: provider !== 'disabled' && apiKey ? 'true' : 'false'
         };
-
-        console.log('[ai:configure] 准备保存到数据库:', { ...settingsToSave, ai_api_key: settingsToSave.ai_api_key ? '***' : '(empty)' });
         await this.dbManager.updateSettings(settingsToSave);
-        console.log('[ai:configure] 数据库保存成功');
 
         return { success: true };
       } catch (error) {
@@ -820,6 +830,79 @@ class Application {
     ipcMain.handle('ai:fetchModels', async (_, provider: string, apiKey: string, endpoint?: string) => {
       const { AIService } = await import('./services/AIService');
       return await AIService.fetchAvailableModels(provider as any, apiKey, endpoint);
+    });
+
+    // 获取所有已配置的providers
+    ipcMain.handle('ai:getAllProviders', async () => {
+      try {
+        const providers = aiConfigManager.getAllProviders();
+        return {
+          success: true,
+          providers: providers.map(({ provider, config }) => ({
+            provider,
+            apiKey: config.apiKey ? '***' : '', // 隐藏实际key
+            endpoint: config.endpoint,
+            model: config.model,
+            enabled: config.enabled,
+            updatedAt: config.updatedAt
+          }))
+        };
+      } catch (error) {
+        console.error('[ai:getAllProviders] 获取provider列表失败:', error);
+        return {
+          success: false,
+          providers: [],
+          error: (error as Error).message
+        };
+      }
+    });
+
+    // 切换当前provider
+    ipcMain.handle('ai:switchProvider', async (_, provider: string) => {
+      try {
+        aiConfigManager.switchProvider(provider as any);
+
+        // 重新配置AI服务
+        const config = aiConfigManager.getProviderConfig(provider as any);
+        if (config) {
+          aiService.configure(provider as any, config.apiKey, config.endpoint, config.model);
+        } else {
+          aiService.configure('disabled', '');
+        }
+
+        return { success: true };
+      } catch (error) {
+        console.error('[ai:switchProvider] 切换provider失败:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // 删除provider配置
+    ipcMain.handle('ai:deleteProvider', async (_, provider: string) => {
+      try {
+        aiConfigManager.deleteProvider(provider as any);
+
+        // 如果删除的是当前provider，重新配置
+        const { provider: currentProvider, config } = aiConfigManager.getCurrentProviderConfig();
+        if (currentProvider === 'disabled' || !config) {
+          aiService.configure('disabled', '');
+        } else {
+          aiService.configure(currentProvider, config.apiKey, config.endpoint, config.model);
+        }
+
+        return { success: true };
+      } catch (error) {
+        console.error('[ai:deleteProvider] 删除provider失败:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // 获取配置文件路径
+    ipcMain.handle('ai:getConfigPath', async () => {
+      return {
+        success: true,
+        path: aiConfigManager.getConfigPath()
+      };
     });
 
     // AI 建议相关
@@ -1494,40 +1577,35 @@ class Application {
       this.keywordProcessor = new KeywordProcessor(this.dbManager);
       console.log('Keyword processor initialized successfully');
 
-      // 初始化 AI 服务
-      console.log('Initializing AI service...');
-      const settings = await this.dbManager.getSettings();
+      // 初始化 AI 服务（从配置文件加载）
+      console.log('Initializing AI service from config file...');
+      try {
+        const { provider, config } = aiConfigManager.getCurrentProviderConfig();
 
-      // 输出读取到的配置（隐藏敏感信息）
-      console.log('[AI Init] 从数据库读取的配置:', {
-        ai_provider: settings.ai_provider,
-        ai_api_key: settings.ai_api_key ? '***' : '(empty)',
-        ai_enabled: settings.ai_enabled,
-        ai_api_endpoint: settings.ai_api_endpoint,
-        ai_model: settings.ai_model
-      });
+        console.log('[AI Init] 从配置文件读取的配置:', {
+          provider,
+          hasConfig: !!config,
+          apiKey: config?.apiKey ? '***' : '(empty)',
+          endpoint: config?.endpoint,
+          model: config?.model,
+          enabled: config?.enabled
+        });
 
-      // 宽松的加载条件：只要有provider和apiKey就加载，不依赖ai_enabled字段
-      if (settings.ai_provider && settings.ai_provider !== 'disabled' && settings.ai_api_key && settings.ai_api_key.length > 0) {
-        console.log('[AI Init] 配置有效，开始初始化AI服务');
-        try {
+        // 如果有有效配置，初始化AI服务
+        if (provider !== 'disabled' && config && config.enabled && config.apiKey) {
+          console.log('[AI Init] 配置有效，开始初始化AI服务');
           aiService.configure(
-            settings.ai_provider as any,
-            settings.ai_api_key,
-            settings.ai_api_endpoint || undefined,
-            settings.ai_model || undefined
+            provider,
+            config.apiKey,
+            config.endpoint,
+            config.model
           );
           console.log('[AI Init] AI服务配置成功');
-        } catch (error) {
-          console.error('[AI Init] AI服务配置失败:', error);
+        } else {
+          console.log('[AI Init] 配置无效或为空，AI服务保持禁用状态');
         }
-      } else {
-        console.log('[AI Init] 配置无效或为空，跳过AI服务初始化:', {
-          hasProvider: !!settings.ai_provider,
-          providerIsDisabled: settings.ai_provider === 'disabled',
-          hasApiKey: !!settings.ai_api_key,
-          apiKeyLength: settings.ai_api_key?.length || 0
-        });
+      } catch (error) {
+        console.error('[AI Init] AI服务配置失败:', error);
       }
       console.log('AI service initialization completed');
 

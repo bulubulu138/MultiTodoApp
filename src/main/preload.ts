@@ -62,6 +62,10 @@ export interface ElectronAPI {
     getSupportedProviders: () => Promise<Array<{value: string; label: string; endpoint: string}>>;
     getAvailableModels: (provider: string) => Promise<Array<{id: string; name: string; description?: string}>>;
     fetchModels: (provider: string, apiKey: string, endpoint?: string) => Promise<{success: boolean; models: Array<{id: string; name: string}>; error?: string}>;
+    getAllProviders: () => Promise<{success: boolean; providers: Array<{provider: string; apiKey: string; endpoint: string; model: string; enabled: boolean; updatedAt: string}>; error?: string}>;
+    switchProvider: (provider: string) => Promise<{success: boolean; error?: string}>;
+    deleteProvider: (provider: string) => Promise<{success: boolean; error?: string}>;
+    getConfigPath: () => Promise<{success: boolean; path: string}>;
   };
 
   // AI 建议API
@@ -265,6 +269,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getAvailableModels: (provider: string) => ipcRenderer.invoke('ai:getAvailableModels', provider),
     fetchModels: (provider: string, apiKey: string, endpoint?: string) =>
       ipcRenderer.invoke('ai:fetchModels', provider, apiKey, endpoint),
+    getAllProviders: () => ipcRenderer.invoke('ai:getAllProviders'),
+    switchProvider: (provider: string) => ipcRenderer.invoke('ai:switchProvider', provider),
+    deleteProvider: (provider: string) => ipcRenderer.invoke('ai:deleteProvider', provider),
+    getConfigPath: () => ipcRenderer.invoke('ai:getConfigPath'),
   },
   aiSuggestion: {
     generate: (todoId: number, templateId?: number) =>
