@@ -36,8 +36,8 @@ const CustomTabManager: React.FC<CustomTabManagerProps> = ({
     }
   }, [visible, customTabs]);
 
-  const handleAdd = () => {
-    form.validateFields().then(values => {
+  const handleAdd = async () => {
+    form.validateFields().then(async (values) => {
       // 处理tag：mode="tags"返回数组，需要转为字符串
       const tagValue = Array.isArray(values.tag) ? values.tag[0] : values.tag;
 
@@ -55,18 +55,44 @@ const CustomTabManager: React.FC<CustomTabManagerProps> = ({
         order: tabs.length
       };
 
-      setTabs([...tabs, newTab]);
+      const updatedTabs = [...tabs, newTab];
+      setTabs(updatedTabs);
       form.resetFields();
+
+      // 在嵌入模式下，添加后立即保存
+      if (embedded) {
+        try {
+          await onSave(updatedTabs);
+        } catch (error) {
+          console.error('Failed to save after add:', error);
+          message.error('保存失败，请重试');
+          return;
+        }
+      }
+
       message.success('添加成功');
     });
   };
 
-  const handleDelete = (id: string) => {
-    setTabs(tabs.filter(t => t.id !== id));
+  const handleDelete = async (id: string) => {
+    const updatedTabs = tabs.filter(t => t.id !== id);
+    setTabs(updatedTabs);
+
+    // 在嵌入模式下，删除后立即保存，避免数据丢失
+    if (embedded) {
+      try {
+        onSave(updatedTabs);
+      } catch (error) {
+        console.error('Failed to save after deletion:', error);
+        message.error('保存失败，请重试');
+        return;
+      }
+    }
+
     message.success('删除成功');
   };
 
-  const handleMoveUp = (index: number) => {
+  const handleMoveUp = async (index: number) => {
     if (index === 0) return;
     const newTabs = [...tabs];
     [newTabs[index - 1], newTabs[index]] = [newTabs[index], newTabs[index - 1]];
@@ -75,9 +101,19 @@ const CustomTabManager: React.FC<CustomTabManagerProps> = ({
       tab.order = idx;
     });
     setTabs(newTabs);
+
+    // 在嵌入模式下，移动后立即保存
+    if (embedded) {
+      try {
+        onSave(newTabs);
+      } catch (error) {
+        console.error('Failed to save after move up:', error);
+        message.error('保存失败，请重试');
+      }
+    }
   };
 
-  const handleMoveDown = (index: number) => {
+  const handleMoveDown = async (index: number) => {
     if (index === tabs.length - 1) return;
     const newTabs = [...tabs];
     [newTabs[index], newTabs[index + 1]] = [newTabs[index + 1], newTabs[index]];
@@ -86,6 +122,16 @@ const CustomTabManager: React.FC<CustomTabManagerProps> = ({
       tab.order = idx;
     });
     setTabs(newTabs);
+
+    // 在嵌入模式下，移动后立即保存
+    if (embedded) {
+      try {
+        onSave(newTabs);
+      } catch (error) {
+        console.error('Failed to save after move down:', error);
+        message.error('保存失败，请重试');
+      }
+    }
   };
 
   const handleSave = () => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert, Tooltip } from 'antd';
+import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert, Tooltip, Collapse } from 'antd';
 import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, ExportOutlined, LinkOutlined, BgColorsOutlined } from '@ant-design/icons';
 import { App } from 'antd';
 import { Todo, CustomTab } from '../../shared/types';
@@ -472,7 +472,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             placeholder="选择日历视图大小"
           />
         </Form.Item>
-        
+
         <Form.Item
           label={
             <span>
@@ -484,8 +484,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           <Space direction="vertical" style={{ width: '100%' }}>
             <Text
               copyable={{ text: dbPath, tooltips: ['复制路径', '已复制'] }}
-              style={{ 
-                fontSize: 12, 
+              style={{
+                fontSize: 12,
                 wordBreak: 'break-all',
                 display: 'block',
                 padding: '8px 12px',
@@ -515,10 +515,77 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             </Text>
           </Space>
         </Form.Item>
-        
-          <div style={{ 
-            marginTop: 16, 
-            padding: 12, 
+
+        <Divider />
+
+        <Collapse
+          defaultActiveKey={[]}
+          items={[
+            {
+              key: 'shortcuts',
+              label: (
+                <span>
+                  <ThunderboltOutlined style={{ marginRight: 8 }} />
+                  快捷键与托盘
+                </span>
+              ),
+              children: (
+                <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                  <Card title="🚀 全局快捷键" variant="borderless" size="small">
+                    <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                      <div>
+                        <div style={{ marginBottom: 8 }}>
+                          <Text strong>快速创建待办：</Text>
+                        </div>
+                        <Tag color="blue" style={{ fontSize: '14px', padding: '6px 12px' }}>
+                          {navigator.platform.includes('Mac') ? 'Cmd + Shift + T' : 'Ctrl + Shift + T'}
+                        </Tag>
+                        <div style={{ marginTop: 8 }}>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            在任何应用中选中文字或复制图片后，按此快捷键即可快速创建待办
+                          </Text>
+                        </div>
+                      </div>
+
+                      <Divider style={{ margin: '12px 0' }} />
+
+                      <div>
+                        <Text strong style={{ display: 'block', marginBottom: 8 }}>使用方法：</Text>
+                        <ol style={{ margin: 0, paddingLeft: 20, color: 'rgba(0, 0, 0, 0.65)' }}>
+                          <li style={{ marginBottom: 4 }}>在任何应用中选中文字或复制图片到剪贴板</li>
+                          <li style={{ marginBottom: 4 }}>按下快捷键 {navigator.platform.includes('Mac') ? 'Cmd + Shift + T' : 'Ctrl + Shift + T'}</li>
+                          <li style={{ marginBottom: 4 }}>MultiTodo 会自动显示并打开创建表单</li>
+                          <li>剪贴板内容会自动填充到待办内容中</li>
+                        </ol>
+                      </div>
+                    </Space>
+                  </Card>
+
+                  <Card title="💡 系统托盘" variant="borderless" size="small">
+                    <Space direction="vertical" style={{ width: '100%' }} size="small">
+                      <Text>
+                        • <Text strong>关闭窗口</Text>：应用会最小化到系统托盘，不会退出
+                      </Text>
+                      <Text>
+                        • <Text strong>单击托盘图标</Text>：快速显示/隐藏窗口
+                      </Text>
+                      <Text>
+                        • <Text strong>右键托盘图标</Text>：查看菜单选项
+                      </Text>
+                      <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>
+                        💡 提示：应用会在后台保持运行，随时响应全局快捷键
+                      </Text>
+                    </Space>
+                  </Card>
+                </Space>
+              ),
+            }
+          ]}
+        />
+
+          <div style={{
+            marginTop: 16,
+            padding: 12,
             borderRadius: 4,
             fontSize: 12,
             opacity: 0.8
@@ -541,65 +608,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           todos={todos} 
           onReload={onReload || (async () => {})} 
         />
-      ),
-    },
-    {
-      key: 'shortcuts',
-      label: (
-        <span>
-          <ThunderboltOutlined />
-          快捷键
-        </span>
-      ),
-      children: (
-        <div>
-          <Card title="🚀 全局快捷键" variant="borderless" style={{ marginBottom: 16 }}>
-            <Space direction="vertical" style={{ width: '100%' }} size="middle">
-              <div>
-                <div style={{ marginBottom: 8 }}>
-                  <Text strong>快速创建待办：</Text>
-                </div>
-                <Tag color="blue" style={{ fontSize: '14px', padding: '6px 12px' }}>
-                  {navigator.platform.includes('Mac') ? 'Cmd + Shift + T' : 'Ctrl + Shift + T'}
-                </Tag>
-                <div style={{ marginTop: 8 }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    在任何应用中选中文字或复制图片后，按此快捷键即可快速创建待办
-                  </Text>
-                </div>
-              </div>
-              
-              <Divider style={{ margin: '12px 0' }} />
-              
-              <div>
-                <Text strong style={{ display: 'block', marginBottom: 8 }}>使用方法：</Text>
-                <ol style={{ margin: 0, paddingLeft: 20, color: 'rgba(0, 0, 0, 0.65)' }}>
-                  <li style={{ marginBottom: 4 }}>在任何应用中选中文字或复制图片到剪贴板</li>
-                  <li style={{ marginBottom: 4 }}>按下快捷键 {navigator.platform.includes('Mac') ? 'Cmd + Shift + T' : 'Ctrl + Shift + T'}</li>
-                  <li style={{ marginBottom: 4 }}>MultiTodo 会自动显示并打开创建表单</li>
-                  <li>剪贴板内容会自动填充到待办内容中</li>
-                </ol>
-              </div>
-            </Space>
-          </Card>
-          
-          <Card title="💡 系统托盘" variant="borderless">
-            <Space direction="vertical" style={{ width: '100%' }} size="small">
-              <Text>
-                • <Text strong>关闭窗口</Text>：应用会最小化到系统托盘，不会退出
-              </Text>
-              <Text>
-                • <Text strong>单击托盘图标</Text>：快速显示/隐藏窗口
-              </Text>
-              <Text>
-                • <Text strong>右键托盘图标</Text>：查看菜单选项
-              </Text>
-              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>
-                💡 提示：应用会在后台保持运行，随时响应全局快捷键
-              </Text>
-            </Space>
-          </Card>
-        </div>
       ),
     },
     {
