@@ -98,19 +98,25 @@ const ContentFocusItem = React.memo(
     // 同步外部更新的 todo.content（仅在保存完成后更新）
     useEffect(() => {
       // 只有当外部内容变化且不是由当前组件保存触发时，才更新本地状态
-      if (todo.content !== lastSavedContentRef.current && !isSaving) {
+      // 添加额外检查：如果当前正在编辑（editedContent与lastSaved不同），不覆盖
+      const isCurrentlyEditing = editedContent !== lastSavedContentRef.current;
+
+      if (todo.content !== lastSavedContentRef.current && !isSaving && !isCurrentlyEditing) {
         setEditedContent(todo.content);
         lastSavedContentRef.current = todo.content;
       }
-    }, [todo.content, isSaving]);
+    }, [todo.content, isSaving, editedContent]);
 
     // 同步外部更新的 todo.title（仅在保存完成后更新）
     useEffect(() => {
-      if (todo.title !== lastSavedTitleRef.current && !isSavingTitle) {
+      // 添加额外检查：如果当前正在编辑标题，不覆盖
+      const isCurrentlyEditing = editedTitle !== lastSavedTitleRef.current;
+
+      if (todo.title !== lastSavedTitleRef.current && !isSavingTitle && !isCurrentlyEditing) {
         setEditedTitle(todo.title);
         lastSavedTitleRef.current = todo.title;
       }
-    }, [todo.title, isSavingTitle]);
+    }, [todo.title, isSavingTitle, editedTitle]);
 
     const getLatestContent = useCallback(() => {
       return editorRef.current?.getLatestHtml() ?? editedContent;
@@ -866,7 +872,7 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
   return (
     <div style={{ display: 'flex', height: '100%', flexDirection: 'row', minHeight: 0 }}>
       {/* 主内容区 */}
-      <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+      <div className="content-focus-scroll-area" style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
         <div className="content-focus-view">
           {todos.map((todo, index) => (
             <ContentFocusItem

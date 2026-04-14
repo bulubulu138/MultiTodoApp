@@ -1462,6 +1462,8 @@ flowchart-preview.flowchart-embedded:hover {
 /* 富文本编辑器容器 */
 .content-focus-item-editor {
   margin-bottom: 0;
+  /* 防止内容变化时导致布局跳动 */
+  contain: layout style paint;
 }
 
 .content-focus-item-editor .quill {
@@ -1491,6 +1493,8 @@ flowchart-preview.flowchart-embedded:hover {
   word-break: break-all;
   overflow-wrap: break-word;
   word-wrap: break-word;
+  /* 防止内容变化时的布局抖动 */
+  will-change: contents;
 }
 
 /* 分割线 */
@@ -1632,14 +1636,13 @@ flowchart-preview.flowchart-embedded:hover {
 /* 专注模式编辑器容器滚动隔离 */
 .content-focus-item-editor {
   overscroll-behavior: contain;
-  scroll-behavior: auto;
-  isolation: isolate;  /* 增强：防止任何滚动链 */
+  /* 移除 isolation: isolate 以免干扰编辑器内部滚动 */
 }
 
 /* Quill 编辑器滚动隔离 */
 .content-focus-item-editor .ql-editor {
   overscroll-behavior: contain;
-  touch-action: none;  /* 增强：防止触摸滚动 */
+  touch-action: pan-y; /* 允许垂直滚动，但阻止传播 */
 }
 
 /* 防止滚动链 */
@@ -1737,6 +1740,15 @@ flowchart-preview.flowchart-embedded:hover {
 /* ============================================
    专注模式布局优化 - 独立滚动
    ============================================ */
+
+/* 专注模式的滚动容器 */
+.content-focus-scroll-area {
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  /* 防止内容变化时滚动位置跳动 */
+  scroll-behavior: auto;
+}
 
 /* 专注模式下,禁用 content-area 的滚动,由内部容器自行处理 */
 /* 注意: 这个样式通过 App.tsx 的内联样式已经处理,这里作为后备方案 */
