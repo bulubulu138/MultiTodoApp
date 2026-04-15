@@ -964,7 +964,12 @@ class Application {
 
             // ✅ 新增：获取AI配置信息
             const aiConfig = aiService.getConfig();
-            const templateName = prompt ? (this.promptTemplateService?.getTemplateById(templateId)?.name || '自定义模板') : '默认模板';
+            let templateName = '默认模板';
+
+            if (prompt && templateId) {
+              const template = await this.promptTemplateService?.getById(templateId);
+              templateName = template?.name || '自定义模板';
+            }
 
             console.log('[AI Suggestion] 保存元数据:', {
               template: templateName,
@@ -1017,7 +1022,7 @@ class Application {
     ipcMain.handle('ai-suggestion:delete', async (_, todoId: number) => {
       try {
         // 删除时也清除元数据
-        await this.dbManager.updateTodoAISuggestion(todoId, '', null, null, null);
+        await this.dbManager.updateTodoAISuggestion(todoId, '', undefined, undefined, undefined);
         return { success: true };
       } catch (error: any) {
         console.error('Failed to delete AI suggestion:', error);
