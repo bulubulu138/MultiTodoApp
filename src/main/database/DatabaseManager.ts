@@ -279,7 +279,10 @@ export class DatabaseManager {
       const hasCompletedAt = tableInfo.some((col: any) => col.name === 'completedAt');
       const hasAiSuggestion = tableInfo.some((col: any) => col.name === 'aiSuggestion');
       const hasAiSuggestionGeneratedAt = tableInfo.some((col: any) => col.name === 'aiSuggestionGeneratedAt');
-      
+      const hasAiSuggestionTemplate = tableInfo.some((col: any) => col.name === 'aiSuggestionTemplate');
+      const hasAiSuggestionProvider = tableInfo.some((col: any) => col.name === 'aiSuggestionProvider');
+      const hasAiSuggestionModel = tableInfo.some((col: any) => col.name === 'aiSuggestionModel');
+
       if (!hasStartTime) {
         console.log('Adding startTime column to todos table...');
         this.db!.prepare('ALTER TABLE todos ADD COLUMN startTime TEXT').run();
@@ -347,7 +350,28 @@ export class DatabaseManager {
         this.db!.prepare('ALTER TABLE todos ADD COLUMN aiSuggestionGeneratedAt TEXT').run();
         console.log('aiSuggestionGeneratedAt column added successfully');
       }
-      
+
+      // 添加 aiSuggestionTemplate 列用于记录AI建议使用的prompt模板
+      if (!hasAiSuggestionTemplate) {
+        console.log('Adding aiSuggestionTemplate column to todos table...');
+        this.db!.prepare('ALTER TABLE todos ADD COLUMN aiSuggestionTemplate TEXT').run();
+        console.log('aiSuggestionTemplate column added successfully');
+      }
+
+      // 添加 aiSuggestionProvider 列用于记录AI建议的提供商
+      if (!hasAiSuggestionProvider) {
+        console.log('Adding aiSuggestionProvider column to todos table...');
+        this.db!.prepare('ALTER TABLE todos ADD COLUMN aiSuggestionProvider TEXT').run();
+        console.log('aiSuggestionProvider column added successfully');
+      }
+
+      // 添加 aiSuggestionModel 列用于记录AI建议使用的模型
+      if (!hasAiSuggestionModel) {
+        console.log('Adding aiSuggestionModel column to todos table...');
+        this.db!.prepare('ALTER TABLE todos ADD COLUMN aiSuggestionModel TEXT').run();
+        console.log('aiSuggestionModel column added successfully');
+      }
+
       // 迁移 displayOrders
       await this.migrateDisplayOrdersToJSON();
       
@@ -1368,6 +1392,9 @@ export class DatabaseManager {
       keywords: row.keywords ? JSON.parse(row.keywords) : [],
       aiSuggestion: row.aiSuggestion || undefined,
       aiSuggestionGeneratedAt: row.aiSuggestionGeneratedAt || undefined,
+      aiSuggestionTemplate: row.aiSuggestionTemplate || undefined,
+      aiSuggestionProvider: row.aiSuggestionProvider || undefined,
+      aiSuggestionModel: row.aiSuggestionModel || undefined,
       completedAt: row.completedAt || undefined,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt
@@ -1427,12 +1454,26 @@ export class DatabaseManager {
   }
 
   // 更新待办AI建议
-  public updateTodoAISuggestion(id: number, suggestion: string): Promise<void> {
+  public updateTodoAISuggestion(
+    id: number,
+    suggestion: string,
+    template?: string,
+    provider?: string,
+    model?: string
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
         this.db!.prepare(
-          'UPDATE todos SET aiSuggestion = ?, aiSuggestionGeneratedAt = ?, updatedAt = ? WHERE id = ?'
-        ).run(suggestion, new Date().toISOString(), new Date().toISOString(), id);
+          'UPDATE todos SET aiSuggestion = ?, aiSuggestionGeneratedAt = ?, aiSuggestionTemplate = ?, aiSuggestionProvider = ?, aiSuggestionModel = ?, updatedAt = ? WHERE id = ?'
+        ).run(
+          suggestion,
+          new Date().toISOString(),
+          template || null,
+          provider || null,
+          model || null,
+          new Date().toISOString(),
+          id
+        );
         resolve();
       } catch (error) {
         reject(error);

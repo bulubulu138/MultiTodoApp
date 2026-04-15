@@ -18,6 +18,9 @@ export interface Todo {
   keywords?: string[]; // 关键词数组，用于智能推荐
   aiSuggestion?: string; // AI生成的建议内容
   aiSuggestionGeneratedAt?: string; // AI建议生成时间
+  aiSuggestionTemplate?: string; // AI建议使用的prompt模板名称
+  aiSuggestionProvider?: string; // AI建议使用的AI服务提供商
+  aiSuggestionModel?: string; // AI建议使用的AI模型
   completedAt?: string; // 完成时间，准确记录待办完成的时间点
   createdAt: string;
   updatedAt: string;

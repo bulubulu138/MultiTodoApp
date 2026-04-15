@@ -332,10 +332,39 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
             )}
 
             {!generating && todo?.aiSuggestion && (
-              <ReadOnlyMarkdown
-                content={todo.aiSuggestion}
-                showCopyButton={true}
-              />
+              <>
+                <ReadOnlyMarkdown
+                  content={todo.aiSuggestion}
+                  showCopyButton={true}
+                />
+                {/* ✅ 新增：显示AI建议生成来源信息 */}
+                {(todo.aiSuggestionTemplate || todo.aiSuggestionProvider || todo.aiSuggestionModel) && (
+                  <div
+                    style={{
+                      marginTop: '16px',
+                      paddingTop: '12px',
+                      borderTop: `1px dashed ${themeColors.borderColor}`,
+                      fontSize: '12px',
+                      color: '#999',
+                      lineHeight: '1.5'
+                    }}
+                  >
+                    {(() => {
+                      // 格式：基于【模板名称】由【厂商】的【模型】生成
+                      const template = todo.aiSuggestionTemplate || '默认模板';
+                      const provider = todo.aiSuggestionProvider || '未知';
+                      const model = todo.aiSuggestionModel || '未知';
+
+                      // 如果所有字段都缺失，显示"来源信息不可用"
+                      if (!todo.aiSuggestionTemplate && !todo.aiSuggestionProvider && !todo.aiSuggestionModel) {
+                        return '来源信息不可用（历史数据）';
+                      }
+
+                      return `基于【${template}】由【${provider}】的【${model}】生成`;
+                    })()}
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
