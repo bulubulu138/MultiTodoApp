@@ -71,6 +71,7 @@ export interface ElectronAPI {
   // AI 建议API
   aiSuggestion: {
     generate: (todoId: number, templateId?: number) => Promise<AISuggestionResponse>;
+    cancel: () => Promise<{success: boolean; error?: string}>;  // ✅ 新增
     save: (todoId: number, suggestion: string) => Promise<{success: boolean; error?: string}>;
     delete: (todoId: number) => Promise<{success: boolean; error?: string}>;
   };
@@ -277,6 +278,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   aiSuggestion: {
     generate: (todoId: number, templateId?: number) =>
       ipcRenderer.invoke('ai-suggestion:generate', todoId, templateId),
+    cancel: () =>  // ✅ 新增
+      ipcRenderer.invoke('ai-suggestion:cancel'),
     save: (todoId: number, suggestion: string) =>
       ipcRenderer.invoke('ai-suggestion:save', todoId, suggestion),
     delete: (todoId: number) =>

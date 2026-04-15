@@ -32,6 +32,23 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | undefined>();
   const themeColors = useThemeColors();
 
+  // ✅ 新增：取消功能
+  const handleCancel = async () => {
+    try {
+      console.log('[AISuggestionPanel] 取消AI生成');
+      const result = await window.electronAPI.aiSuggestion.cancel();
+      if (result.success) {
+        message.info('正在取消生成...');
+        setGenerating(false);  // 立即更新UI
+      } else {
+        message.warning(result.error || '取消失败');
+      }
+    } catch (error: any) {
+      console.error('[AISuggestionPanel] 取消失败:', error);
+      message.error('取消失败: ' + error.message);
+    }
+  };
+
   // 拖拽调整宽度
   const [isResizing, setIsResizing] = useState(false);
   const resizeStartX = React.useRef(0);
@@ -61,11 +78,28 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
 
       // 检查是否已有AI建议
       if (todo.aiSuggestion) {
-        // 使用 Modal.confirm 替代 window.confirm
+        // ✅ 增强重新生成功能：允许选择模板
         const shouldContinue = await new Promise<boolean>((resolve) => {
           Modal.confirm({
             title: '确认重新生成',
-            content: '该待办已有AI建议，是否要重新生成？这将覆盖现有的建议内容。',
+            content: (
+              <div>
+                <p>该待办已有AI建议，是否要重新生成？这将覆盖现有的建议内容。</p>
+                <Select
+                  style={{ width: '100%', marginTop: 12 }}
+                  placeholder="选择Prompt模板（可选）"
+                  value={selectedTemplateId}
+                  onChange={(value) => setSelectedTemplateId(value)}
+                  allowClear
+                >
+                  {templates.map(t => (
+                    <Select.Option key={t.id} value={t.id}>
+                      {t.name}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </div>
+            ),
             okText: '确定',
             cancelText: '取消',
             onOk: () => resolve(true),
@@ -89,6 +123,12 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
         // ✅ 改进：显示更友好的错误信息
         const errorMsg = result.error || '未知错误';
         console.error('[AISuggestionPanel] 生成失败:', errorMsg);
+
+        // ✅ 新增：区分用户取消和真实错误
+        if (errorMsg === '已取消生成' || errorMsg === 'USER_CANCELLED') {
+          message.info('已取消生成');
+          return;
+        }
 
         // 根据错误类型提供不同的提示
         if (errorMsg.includes('AI未配置') || errorMsg.includes('AI服务未配置')) {
@@ -279,6 +319,15 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
               <div style={{ textAlign: 'center', padding: '40px 0' }}>
                 <Spin indicator={<LoadingOutlined spin />} size="large" />
                 <div style={{ marginTop: 16, color: themeColors.textColor }}>AI正在思考中...</div>
+                {/* ✅ 新增：取消按钮 */}
+                <Button
+                  danger
+                  size="small"
+                  onClick={handleCancel}
+                  style={{ marginTop: 16 }}
+                >
+                  取消生成
+                </Button>
               </div>
             )}
 

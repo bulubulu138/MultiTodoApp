@@ -30,6 +30,13 @@ class Application {
   private authorizationRefreshScheduler: AuthorizationRefreshScheduler | null = null;
   private promptTemplateService: PromptTemplateService | null = null;
 
+  // ✅ 新增：全局并发锁 - 用于AI建议任务的并发控制
+  private activeAiRequest: null | {
+    controller: AbortController;
+    todoId: number;
+    timestamp: number;
+  } = null;
+
   constructor() {
     this.dbManager = new DatabaseManager();
     this.imageManager = new ImageManager();
@@ -912,6 +919,12 @@ class Application {
         console.log('todoId:', todoId, 'templateId:', templateId);
         console.log('promptTemplateService initialized:', !!this.promptTemplateService);
 
+        // ✅ 新增：并发检查
+        if (this.activeAiRequest) {
+          console.warn('[AI Suggestion] 已有AI任务正在运行，拒绝新请求');
+          return { success: false, error: '已有AI任务正在运行，请稍后' };
+        }
+
         const todo = await this.dbManager.getTodoById(todoId);
         if (!todo) {
           console.error('Todo not found:', todoId);
@@ -927,26 +940,49 @@ class Application {
           console.log('Using default prompt for AI suggestion');
         }
 
-        console.log('Calling aiService.generateSuggestionWithRetry');
-        const result = await aiService.generateSuggestionWithRetry(todo.title, todo.content, prompt);
-
-        if (result.success && result.content) {
-          console.log('AI suggestion generated successfully, saving to database');
-          await this.dbManager.updateTodoAISuggestion(todoId, result.content);
-        } else {
-          console.error('AI suggestion generation failed:', result.error);
-        }
-
-        // ✅ 修复：将content字段映射为suggestion字段，与AISuggestionResponse接口保持一致
-        // 这样可以确保返回的结构符合TypeScript类型定义
-        return {
-          success: result.success,
-          suggestion: result.success ? result.content : undefined,
-          error: result.error
+        // ✅ 新增：创建 AbortController 用于取消功能
+        const controller = new AbortController();
+        this.activeAiRequest = {
+          controller,
+          todoId,
+          timestamp: Date.now()
         };
+        console.log('[AI Suggestion] Active AI request created:', todoId);
+
+        try {
+          console.log('Calling aiService.generateSuggestionWithRetry');
+          const result = await aiService.generateSuggestionWithRetry(
+            todo.title,
+            todo.content,
+            prompt,
+            3,  // maxRetries
+            controller.signal  // ✅ 新增：传递取消信号
+          );
+
+          if (result.success && result.content) {
+            console.log('AI suggestion generated successfully, saving to database');
+            await this.dbManager.updateTodoAISuggestion(todoId, result.content);
+          } else {
+            console.error('AI suggestion generation failed:', result.error);
+          }
+
+          // ✅ 修复：将content字段映射为suggestion字段，与AISuggestionResponse接口保持一致
+          // 这样可以确保返回的结构符合TypeScript类型定义
+          return {
+            success: result.success,
+            suggestion: result.success ? result.content : undefined,
+            error: result.error
+          };
+        } finally {
+          // ✅ 新增：确保锁释放（try...finally保证）
+          console.log('[AI Suggestion] Releasing active AI request lock');
+          this.activeAiRequest = null;
+        }
       } catch (error: any) {
         console.error('Failed to generate AI suggestion:', error);
         console.error('Error stack:', error.stack);
+        // ✅ 新增：确保异常时也释放锁
+        this.activeAiRequest = null;
         return { success: false, error: error.message || '生成失败' };
       }
     });
@@ -967,6 +1003,27 @@ class Application {
         return { success: true };
       } catch (error: any) {
         console.error('Failed to delete AI suggestion:', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // ✅ 新增：取消AI建议生成
+    ipcMain.handle('ai-suggestion:cancel', async () => {
+      try {
+        console.log('[AI Suggestion] Cancel requested, activeAiRequest:', !!this.activeAiRequest);
+
+        if (!this.activeAiRequest) {
+          console.warn('[AI Suggestion] No active AI request to cancel');
+          return { success: false, error: '没有正在运行的任务' };
+        }
+
+        console.log('[AI Suggestion] Aborting active AI request');
+        this.activeAiRequest.controller.abort();  // 发送中止信号
+        this.activeAiRequest = null;  // 立即释放锁
+
+        return { success: true };
+      } catch (error: any) {
+        console.error('Failed to cancel AI suggestion:', error);
         return { success: false, error: error.message };
       }
     });

@@ -500,7 +500,7 @@ export class AIService {
   /**
    * 发送文本补全请求（OpenAI 兼容格式）
    */
-  private async sendCompletionRequest(request: AICompletionRequest): Promise<AICompletionResponse> {
+  private async sendCompletionRequest(request: AICompletionRequest, signal?: AbortSignal): Promise<AICompletionResponse> {
     if (!this.enabled || !this.apiEndpoint) {
       return { success: false, error: 'AI服务未配置' };
     }
@@ -563,9 +563,22 @@ export class AIService {
           });
         });
 
+        // 监听中止事件（核心逻辑 - 支持取消功能）
+        signal?.addEventListener('abort', () => {
+          console.log('[AIService] Request aborted by user');
+          clearTimeout(timeoutId);
+          req.destroy(); // 强制关闭socket连接
+          resolve({ success: false, error: 'USER_CANCELLED' });
+        });
+
         req.on('error', (error) => {
           clearTimeout(timeoutId);
-          resolve({ success: false, error: error.message });
+          // 检查是否是用户取消
+          if (signal?.aborted) {
+            resolve({ success: false, error: 'USER_CANCELLED' });
+          } else {
+            resolve({ success: false, error: error.message });
+          }
         });
 
         req.on('timeout', () => {
@@ -592,7 +605,8 @@ export class AIService {
   public async generateSuggestion(
     title: string,
     content: string,
-    promptTemplate?: string
+    promptTemplate?: string,
+    signal?: AbortSignal  // 新增：支持取消信号
   ): Promise<{ success: boolean; content?: string; error?: string }> {
     console.log(`[AIService.generateSuggestion] 开始生成AI建议:`, {
       enabled: this.enabled,
@@ -632,13 +646,18 @@ export class AIService {
         ],
         max_tokens: 2000,
         temperature: 0.7
-      });
+      }, signal);  // 传递signal参数
 
       console.log(`[AIService.generateSuggestion] API响应:`, {
         success: response.success,
         contentLength: response.content?.length || 0,
         error: response.error
       });
+
+      // 处理用户取消
+      if (response.error === 'USER_CANCELLED') {
+        return { success: false, error: '已取消生成' };
+      }
 
       return response;
     } catch (error: any) {
@@ -677,12 +696,18 @@ export class AIService {
     title: string,
     content: string,
     promptTemplate?: string,
-    maxRetries: number = 3
+    maxRetries: number = 3,
+    signal?: AbortSignal  // 新增：支持取消信号
   ): Promise<{ success: boolean; content?: string; error?: string }> {
     for (let i = 0; i < maxRetries; i++) {
       try {
-        const result = await this.generateSuggestion(title, content, promptTemplate);
+        const result = await this.generateSuggestion(title, content, promptTemplate, signal);  // 传递signal
         if (result.success) {
+          return result;
+        }
+
+        // 如果是用户取消，直接返回，不重试
+        if (result.error === 'USER_CANCELLED' || result.error === '已取消生成') {
           return result;
         }
 
