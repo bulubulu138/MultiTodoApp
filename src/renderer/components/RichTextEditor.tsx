@@ -33,6 +33,97 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
   const isFocusedRef = useRef(false);
   const scrollBlockRef = useRef<(() => void) | null>(null);
 
+  // 🔥 新增：外部滚动容器的滚动锁定
+  const scrollContainerRef = useRef<HTMLElement | null>(null);
+  const originalScrollTopRef = useRef(0);
+  const isScrollLockedRef = useRef(false);
+
+  // 🔥 新增：查找外部滚动容器的函数
+  const findScrollContainer = useCallback(() => {
+    if (!editorInstance) return null;
+
+    try {
+      // 从编辑器根元素开始，向上查找最近的滚动容器
+      const editorRoot = editorInstance.root;
+      if (!editorRoot) return null;
+
+      let currentElement: HTMLElement | null = editorRoot.parentElement;
+      while (currentElement) {
+        // 查找具有 overflow: auto 或 scroll 的元素
+        const computedStyle = window.getComputedStyle(currentElement);
+        const overflow = computedStyle.getPropertyValue('overflow');
+        const overflowY = computedStyle.getPropertyValue('overflow-y');
+
+        if ((overflow === 'auto' || overflow === 'scroll' ||
+             overflowY === 'auto' || overflowY === 'scroll') &&
+            currentElement.scrollHeight > currentElement.clientHeight) {
+          console.log('[QuillScrollBlock] Found scroll container:', currentElement.className);
+          return currentElement;
+        }
+
+        currentElement = currentElement.parentElement;
+      }
+
+      return null;
+    } catch (error) {
+      console.warn('[QuillScrollBlock] Failed to find scroll container:', error);
+      return null;
+    }
+  }, [editorInstance]);
+
+  // 🔥 新增：锁定外部滚动容器的滚动
+  const lockScrollContainer = useCallback(() => {
+    const container = findScrollContainer();
+    if (!container) return;
+
+    scrollContainerRef.current = container;
+    originalScrollTopRef.current = container.scrollTop;
+    isScrollLockedRef.current = true;
+
+    console.log('[QuillScrollBlock] Locked scroll container, scrollTop:', container.scrollTop);
+
+    // 添加滚动事件监听器，阻止滚动
+    const handleScrollLock = (e: Event) => {
+      if (isScrollLockedRef.current && scrollContainerRef.current === e.target) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        // 恢复到锁定时的滚动位置
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = originalScrollTopRef.current;
+        }
+
+        console.log('[QuillScrollBlock] Blocked scroll container scroll');
+        return false;
+      }
+    };
+
+    container.addEventListener('scroll', handleScrollLock, { passive: false, capture: true });
+
+    // 保存清理函数
+    (container as any)._scrollLockHandler = handleScrollLock;
+    (container as any)._scrollLockOriginalScrollTop = originalScrollTopRef.current;
+  }, [findScrollContainer]);
+
+  // 🔥 新增：解锁外部滚动容器的滚动
+  const unlockScrollContainer = useCallback(() => {
+    if (!scrollContainerRef.current) return;
+
+    const container = scrollContainerRef.current;
+    isScrollLockedRef.current = false;
+
+    console.log('[QuillScrollBlock] Unlocked scroll container');
+
+    // 移除滚动事件监听器
+    if ((container as any)._scrollLockHandler) {
+      container.removeEventListener('scroll', (container as any)._scrollLockHandler, { capture: true });
+      delete (container as any)._scrollLockHandler;
+    }
+
+    scrollContainerRef.current = null;
+  }, []);
+
   useEffect(() => {
     setIsMounted(true);
     setHasError(false);
@@ -45,8 +136,11 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       clearTimeout(timer);
       setIsMounted(false);
       setEditorInstance(null);
+
+      // 🔥 清理：确保解锁滚动容器
+      unlockScrollContainer();
     };
-  }, []);
+  }, [unlockScrollContainer]);
 
   useEffect(() => {
     if (isReady && editorInstance && value !== editorInstance.root.innerHTML) {
@@ -61,6 +155,9 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
         const shouldSyncHtml = currentText.trim() !== incomingText;
 
         if (shouldSyncHtml) {
+          // 🔥🔥 关键修复：在内容同步前锁定外部滚动容器的滚动
+          lockScrollContainer();
+
           const selection = editorInstance.getSelection();
 
           try {
@@ -96,12 +193,18 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
               // noop
             }
           }
+
+          // 🔥🔥 延迟解锁滚动容器（确保滚动不会在内容更新后立即发生）
+          setTimeout(() => {
+            unlockScrollContainer();
+          }, 100);
         }
       } catch (error) {
         console.warn('Content sync failed:', error);
+        unlockScrollContainer();
       }
     }
-  }, [value, isReady, editorInstance]);
+  }, [value, isReady, editorInstance, lockScrollContainer, unlockScrollContainer]);
 
   const getEditorSafely = useCallback(() => {
     if (!isMounted || !quillRef.current) return null;
@@ -411,8 +514,11 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       scrollBlockRef.current = () => {
         // 空函数，安全的 noop
       };
+
+      // 🔥🔥 清理：确保解锁滚动容器
+      unlockScrollContainer();
     };
-  }, [editorInstance, getEditorSafely, onChange]);
+  }, [editorInstance, getEditorSafely, onChange, unlockScrollContainer]);
 
   const imageHandler = async () => {
     const editor = getEditorSafely();
@@ -534,6 +640,9 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
               return;
             }
 
+            // 🔥🔥 关键修复：在内容变化时锁定外部滚动容器的滚动
+            lockScrollContainer();
+
             // 🔥 强化防护：内容变化时重新锁定滚动（带安全守卫）
             if (scrollBlockRef.current && typeof scrollBlockRef.current === 'function') {
               setTimeout(() => {
@@ -547,10 +656,16 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
               }, 0);
             }
 
+            // 🔥🔥 延迟解锁滚动容器（确保滚动不会在内容更新后立即发生）
+            setTimeout(() => {
+              unlockScrollContainer();
+            }, 100);
+
             onChange(content);
           } catch (error) {
             console.warn('Content change handling failed:', error);
             setHasError(true);
+            unlockScrollContainer();
           }
         }}
         modules={modules}
