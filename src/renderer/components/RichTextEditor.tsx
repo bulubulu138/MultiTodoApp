@@ -38,6 +38,11 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
   const originalScrollTopRef = useRef(0);
   const isScrollLockedRef = useRef(false);
 
+  // 🔥 新增：MutationObserver 引用和锁定定时器
+  const mutationObserverRef = useRef<MutationObserver | null>(null);
+  const scrollLockTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isTextChangingRef = useRef(false);
+
   // 🔥 新增：查找外部滚动容器的函数
   const findScrollContainer = useCallback(() => {
     if (!editorInstance) return null;
@@ -72,15 +77,20 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
   }, [editorInstance]);
 
   // 🔥 新增：锁定外部滚动容器的滚动
-  const lockScrollContainer = useCallback(() => {
+  const lockScrollContainer = useCallback((duration: number = 300) => {
     const container = findScrollContainer();
     if (!container) return;
+
+    // 清除之前的定时器
+    if (scrollLockTimeoutRef.current) {
+      clearTimeout(scrollLockTimeoutRef.current);
+    }
 
     scrollContainerRef.current = container;
     originalScrollTopRef.current = container.scrollTop;
     isScrollLockedRef.current = true;
 
-    console.log('[QuillScrollBlock] Locked scroll container, scrollTop:', container.scrollTop);
+    console.log('[QuillScrollBlock] Locked scroll container for', duration, 'ms, scrollTop:', container.scrollTop);
 
     // 添加滚动事件监听器，阻止滚动
     const handleScrollLock = (e: Event) => {
@@ -104,10 +114,40 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
     // 保存清理函数
     (container as any)._scrollLockHandler = handleScrollLock;
     (container as any)._scrollLockOriginalScrollTop = originalScrollTopRef.current;
+
+    // 设置自动解锁定时器（内联解锁逻辑，避免循环依赖）
+    scrollLockTimeoutRef.current = setTimeout(() => {
+      // 清除定时器引用
+      if (scrollLockTimeoutRef.current) {
+        clearTimeout(scrollLockTimeoutRef.current);
+        scrollLockTimeoutRef.current = null;
+      }
+
+      if (!scrollContainerRef.current) return;
+
+      const lockedContainer = scrollContainerRef.current;
+      isScrollLockedRef.current = false;
+
+      console.log('[QuillScrollBlock] Auto-unlocked scroll container');
+
+      // 移除滚动事件监听器
+      if ((lockedContainer as any)._scrollLockHandler) {
+        lockedContainer.removeEventListener('scroll', (lockedContainer as any)._scrollLockHandler, { capture: true });
+        delete (lockedContainer as any)._scrollLockHandler;
+      }
+
+      scrollContainerRef.current = null;
+    }, duration);
   }, [findScrollContainer]);
 
   // 🔥 新增：解锁外部滚动容器的滚动
   const unlockScrollContainer = useCallback(() => {
+    // 清除定时器
+    if (scrollLockTimeoutRef.current) {
+      clearTimeout(scrollLockTimeoutRef.current);
+      scrollLockTimeoutRef.current = null;
+    }
+
     if (!scrollContainerRef.current) return;
 
     const container = scrollContainerRef.current;
@@ -137,10 +177,31 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       setIsMounted(false);
       setEditorInstance(null);
 
-      // 🔥 清理：确保解锁滚动容器
+      // 🔥 清理：解锁滚动容器和清理定时器
       unlockScrollContainer();
+
+      // 🔥 清理：断开 MutationObserver
+      if (mutationObserverRef.current) {
+        try {
+          mutationObserverRef.current.disconnect();
+          mutationObserverRef.current = null;
+          console.log('[QuillScrollBlock] MutationObserver disconnected');
+        } catch (error) {
+          console.warn('[QuillScrollBlock] Failed to disconnect MutationObserver:', error);
+        }
+      }
+
+      // 🔥 清理：断开 text-change 事件监听器
+      if (editorInstance) {
+        try {
+          editorInstance.off('text-change');
+          console.log('[QuillScrollBlock] Text-change event listener removed');
+        } catch (error) {
+          console.warn('[QuillScrollBlock] Failed to remove text-change listener:', error);
+        }
+      }
     };
-  }, [unlockScrollContainer]);
+  }, [unlockScrollContainer, editorInstance]);
 
   useEffect(() => {
     if (isReady && editorInstance && value !== editorInstance.root.innerHTML) {
@@ -155,8 +216,8 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
         const shouldSyncHtml = currentText.trim() !== incomingText;
 
         if (shouldSyncHtml) {
-          // 🔥🔥 关键修复：在内容同步前锁定外部滚动容器的滚动
-          lockScrollContainer();
+          // 🔥🔥 关键修复：在内容同步前锁定外部滚动容器的滚动，延长到 300ms
+          lockScrollContainer(300);
 
           const selection = editorInstance.getSelection();
 
@@ -193,11 +254,6 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
               // noop
             }
           }
-
-          // 🔥🔥 延迟解锁滚动容器（确保滚动不会在内容更新后立即发生）
-          setTimeout(() => {
-            unlockScrollContainer();
-          }, 100);
         }
       } catch (error) {
         console.warn('Content sync failed:', error);
@@ -404,6 +460,55 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
     const editorElement = editor.root;
     if (!editorElement) return;
 
+    // 🔥🔥 核心优化：监听 Quill 的 text-change 事件，提前锁定滚动
+    const handleTextChange = () => {
+      if (!isComposingRef.current) {
+        console.log('[QuillScrollBlock] Text changed, locking scroll immediately');
+        isTextChangingRef.current = true;
+
+        // 立即锁定滚动容器，延长锁定时间到 300ms
+        lockScrollContainer(300);
+
+        // 重置文本变化标志（带延迟）
+        setTimeout(() => {
+          isTextChangingRef.current = false;
+        }, 350);
+      }
+    };
+
+    // 🔥🔥 核心优化：添加 MutationObserver 监控 DOM 变化
+    const setupMutationObserver = () => {
+      if (!editorElement) return;
+
+      try {
+        const observer = new MutationObserver((mutations) => {
+          // 只在编辑器激活时响应
+          if (document.activeElement?.closest('.ql-editor') && !isComposingRef.current) {
+            console.log('[QuillScrollBlock] DOM mutation detected, reinforcing scroll lock');
+
+            // 在检测到 DOM 变化时锁定滚动
+            lockScrollContainer(300);
+          }
+        });
+
+        observer.observe(editorElement, {
+          subtree: true,
+          childList: true,
+          characterData: true,
+          characterDataOldValue: true
+        });
+
+        mutationObserverRef.current = observer;
+        console.log('[QuillScrollBlock] MutationObserver initialized');
+      } catch (error) {
+        console.warn('[QuillScrollBlock] Failed to setup MutationObserver:', error);
+      }
+    };
+
+    // 注册事件监听器和 Observer
+    editor.on('text-change', handleTextChange);
+    setupMutationObserver();
+
     const handleCompositionStart = () => {
       isComposingRef.current = true;
       // 在编辑器根元素设置 composition 状态标记
@@ -445,8 +550,15 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
 
     // 优化：只阻止可能触发页面滚动的按键，完全不干预输入键
     const handleKeyDown = (event: KeyboardEvent) => {
-      // 只阻止可能触发父级滚动容器滚动的按键
+      // 🔥 强化防护：对所有可打印字符进行拦截
+      const isPrintableChar = event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey && !event.ctrlKey;
       const isScrollKey = ['PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key);
+      const isDeleteKey = ['Delete', 'Backspace'].includes(event.key);
+
+      if (isPrintableChar || isDeleteKey) {
+        // 锁定滚动，延长到 300ms
+        lockScrollContainer(300);
+      }
 
       if (isScrollKey && !event.ctrlKey && !event.metaKey) {
         // 只阻止传播，不阻止默认行为
@@ -498,6 +610,9 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
     editorElement.addEventListener('keydown', handleKeyDown);
 
     return () => {
+      // 清理事件监听器
+      editor.off('text-change', handleTextChange);
+
       editorElement.removeEventListener('compositionstart', handleCompositionStart);
       editorElement.removeEventListener('compositionend', handleCompositionEnd);
       editorElement.removeEventListener('focus', handleFocus);
@@ -518,7 +633,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       // 🔥🔥 清理：确保解锁滚动容器
       unlockScrollContainer();
     };
-  }, [editorInstance, getEditorSafely, onChange, unlockScrollContainer]);
+  }, [editorInstance, getEditorSafely, onChange, unlockScrollContainer, lockScrollContainer]);
 
   const imageHandler = async () => {
     const editor = getEditorSafely();
@@ -640,26 +755,11 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
               return;
             }
 
-            // 🔥🔥 关键修复：在内容变化时锁定外部滚动容器的滚动
-            lockScrollContainer();
-
-            // 🔥 强化防护：内容变化时重新锁定滚动（带安全守卫）
-            if (scrollBlockRef.current && typeof scrollBlockRef.current === 'function') {
-              setTimeout(() => {
-                try {
-                  if (scrollBlockRef.current && typeof scrollBlockRef.current === 'function') {
-                    scrollBlockRef.current();
-                  }
-                } catch (error) {
-                  console.warn('[QuillScrollBlock] Change reinforcement failed:', error);
-                }
-              }, 0);
+            // 🔥🔥 优化：由于 text-change 事件已经提前锁定，这里只做轻量级强化
+            // 如果 text-change 没有触发（罕见情况），这里作为备份
+            if (!isTextChangingRef.current) {
+              lockScrollContainer(200); // 较短的锁定时间
             }
-
-            // 🔥🔥 延迟解锁滚动容器（确保滚动不会在内容更新后立即发生）
-            setTimeout(() => {
-              unlockScrollContainer();
-            }, 100);
 
             onChange(content);
           } catch (error) {
