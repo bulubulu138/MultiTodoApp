@@ -6,6 +6,8 @@ import 'quill/dist/quill.snow.css';
 export interface RichTextEditorRef {
   getLatestHtml: () => string;
   hasPendingComposition: () => boolean;
+  focus?: () => void;
+  blur?: () => void;
 }
 
 interface RichTextEditorProps {
@@ -449,6 +451,18 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
   useImperativeHandle(ref, () => ({
     getLatestHtml,
     hasPendingComposition: () => isComposingRef.current,
+    focus: () => {
+      const editor = getEditorSafely();
+      if (editor) {
+        editor.focus();
+      }
+    },
+    blur: () => {
+      const editor = getEditorSafely();
+      if (editor) {
+        editor.blur();
+      }
+    }
   }), [getLatestHtml]);
 
   useEffect(() => {

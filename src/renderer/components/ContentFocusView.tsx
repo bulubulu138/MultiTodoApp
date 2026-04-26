@@ -29,6 +29,13 @@ export interface ContentFocusViewRef {
   saveAll: () => Promise<void>;
 }
 
+// 🔥 新增：编辑器清理接口
+export interface EditorLifecycleManager {
+  cleanup: () => void;
+  activate: () => void;
+  deactivate: () => void;
+}
+
 // 单个待办项组件接口
 interface ContentFocusItemProps {
   todo: Todo;
@@ -48,6 +55,8 @@ interface ContentFocusItemProps {
 // 暴露给父组件的方法
 export interface ContentFocusItemRef {
   saveNow: () => Promise<void>;
+  activate: () => void;
+  deactivate: () => void;
 }
 
 // 单个待办项组件（使用 forwardRef 暴露保存方法）
@@ -77,6 +86,7 @@ const ContentFocusItem = React.memo(
     const titleSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const isComposingRef = useRef(false); // 追踪输入法状态
     const editorRef = useRef<RichTextEditorRef>(null);
+    const editorFocusedRef = useRef(false); // 🔥 新增：追踪编辑器焦点状态
 
     const lastSavedContentRef = useRef(todo.content);
     const lastSavedTitleRef = useRef(todo.title);
@@ -95,13 +105,20 @@ const ContentFocusItem = React.memo(
       latestTodoIdRef.current = todo.id;
     }, [todo.id]);
 
-    // 同步外部更新的 todo.content（仅在保存完成后更新）
+    // 🔥 关键修复：同步外部更新的 todo.content（仅在编辑器失焦时才同步）
     useEffect(() => {
-      // 只有当外部内容变化且不是由当前组件保存触发时，才更新本地状态
-      // 添加额外检查：如果当前正在编辑（editedContent与lastSaved不同），不覆盖
+      // 只在以下情况下才同步外部value到编辑器：
+      // 1. 外部内容确实发生了变化（todo.content !== lastSavedContentRef.current）
+      // 2. 当前不在保存中（!isSaving）
+      // 3. **编辑器不在焦点状态**（!editorFocusedRef.current）← 这是关键！
+      // 4. 用户不在编辑中（!isCurrentlyEditing）
+      //
+      // 这样可以防止编辑期间的外部value同步破坏Quill的history栈，
+      // 特别是在撤销操作期间，外部value同步会覆盖撤销结果
       const isCurrentlyEditing = editedContent !== lastSavedContentRef.current;
 
-      if (todo.content !== lastSavedContentRef.current && !isSaving && !isCurrentlyEditing) {
+      if (todo.content !== lastSavedContentRef.current && !isSaving && !isCurrentlyEditing && !editorFocusedRef.current) {
+        console.log('[ContentFocusItem] 🔒 Syncing external content (editor not focused)');
         setEditedContent(todo.content);
         lastSavedContentRef.current = todo.content;
       }
@@ -230,6 +247,42 @@ const ContentFocusItem = React.memo(
       }, 2500); // 增加到2.5秒，减少保存频率
     }, [handleSave]);
 
+    // 🔥 新增：激活当前编辑器（定义在 useImperativeHandle 之前）
+    const activateEditor = useCallback(() => {
+      console.log('[EditorLifecycle] Activating editor for todo:', todo.id);
+
+      // 🔥 移除currentProcessingTodoRef的设置，避免状态竞争
+
+      // 聚焦到编辑器
+      if (editorRef.current && typeof editorRef.current.focus === 'function') {
+        try {
+          editorRef.current.focus();
+          console.log('[EditorLifecycle] Focused editor:', todo.id);
+        } catch (error) {
+          console.warn('[EditorLifecycle] Failed to focus editor:', error);
+        }
+      }
+    }, [todo.id]);
+
+    // 🔥 新增：停用当前编辑器
+    const deactivateEditor = useCallback(() => {
+      console.log('[EditorLifecycle] Deactivating editor for todo:', todo.id);
+
+      // 🔥 关键修复：清除编辑器焦点状态
+      editorFocusedRef.current = false;
+
+      // 直接调用blur，确保编辑器真正失去焦点
+      if (editorRef.current && typeof editorRef.current.blur === 'function') {
+        try {
+          editorRef.current.blur();
+          console.log('[EditorLifecycle] Blurred editor:', todo.id);
+        } catch (error) {
+          console.warn('[EditorLifecycle] Failed to blur editor:', error);
+        }
+      }
+      currentProcessingTodoRef.current = null;
+    }, [todo.id]);
+
     // 暴露给父组件的保存方法
     useImperativeHandle(ref, () => ({
       saveNow: async () => {
@@ -240,13 +293,18 @@ const ContentFocusItem = React.memo(
         }
         // 立即保存（即使在输入法状态也保存，因为是用户主动触发）
         await handleSave();
-      }
-    }), [handleSave]);
+      },
+      activate: activateEditor,
+      deactivate: deactivateEditor
+    }), [handleSave, activateEditor, deactivateEditor]);
 
     // 组件卸载时保存未保存的更改
     useEffect(() => {
       return () => {
         console.log('[ContentFocusItem] 组件卸载，清理资源，todoId:', todo.id);
+
+        // 🔥 关键修复：清除编辑器焦点状态
+        editorFocusedRef.current = false;
 
         // 清除定时器
         if (saveTimeoutRef.current) {
@@ -453,6 +511,9 @@ const ContentFocusItem = React.memo(
     const handleBlur = useCallback(() => {
       console.log('[EditorBlur] 编辑器失焦，todoId:', todo.id);
 
+      // 🔥 关键修复：清除编辑器焦点状态
+      editorFocusedRef.current = false;
+
       // 失去焦点时，如果不在输入法状态，立即保存最新内容
       if (!isComposingRef.current) {
         // 清除防抖定时器
@@ -467,47 +528,46 @@ const ContentFocusItem = React.memo(
 
     // 🔥 统一的编辑器激活处理函数（合并 handleFocus 和 handleClick）
     const handleEditorActivate = useCallback(() => {
-      // 防止同一个todo的重复调用
-      if (currentProcessingTodoRef.current === todo.id) {
-        console.log('[EditorActivate] 防止同一个todo的重复调用:', todo.id);
-        return;
-      }
-
       if (!todo.id || !onSelectedTodoChange) {
         return;
       }
 
       console.log('[EditorActivate] 激活编辑器，todoId:', todo.id);
 
-      // 设置当前正在处理的todoId
-      currentProcessingTodoRef.current = todo.id;
-
-      // 先更新待办选择状态（这会触发 AI 建议面板的更新）
+      // 更新待办选择状态（这会触发 AI 建议面板的更新）
       onSelectedTodoChange(todo.id);
-
-      // 延迟清除标志位，确保状态更新完成
-      setTimeout(() => {
-        currentProcessingTodoRef.current = null;
-        console.log('[EditorActivate] 状态更新完成，todoId:', todo.id);
-      }, 100);
     }, [todo.id, onSelectedTodoChange]);
 
     // 保留原有函数名以兼容可能的引用（内部实现改为调用新函数）
     const handleFocus = useCallback(() => {
+      // 🔥 关键修复：设置编辑器焦点状态
+      editorFocusedRef.current = true;
+      console.log('[EditorFocus] Editor focused, todoId:', todo.id);
+
       handleEditorActivate();
-    }, [handleEditorActivate]);
+    }, [handleEditorActivate, todo.id]);
 
     const handleClick = useCallback(() => {
+      // 立即focus，确保点击立即响应
+      if (editorRef.current && typeof editorRef.current.focus === 'function') {
+        try {
+          editorRef.current.focus();
+          console.log('[EditorClick] Immediate focus on click, todoId:', todo.id);
+        } catch (error) {
+          console.warn('[EditorClick] Failed to focus on click:', error);
+        }
+      }
+
+      // 更新编辑器激活状态
       handleEditorActivate();
-    }, [handleEditorActivate]);
+    }, [editorRef, handleEditorActivate]);
 
     // 键盘事件处理 - Ctrl+S / Cmd+S 手动保存
     const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
       // 在输入法期间阻止空格键的默认滚动行为
       if (isComposingRef.current && event.key === ' ') {
         event.preventDefault();
-        event.stopPropagation();
-        return;
+        // 🔥 关键修复：移除 stopPropagation 和 return，让 Ctrl+Z 等其他键盘事件能够传播到编辑器
       }
 
       // 检测 Ctrl+S (Windows/Linux) 或 Cmd+S (Mac)
@@ -766,6 +826,9 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
   // 为每个待办项创建 ref
   const itemRefsMap = useRef<Map<number, ContentFocusItemRef>>(new Map());
 
+  // 🔥 新增：追踪当前激活的编辑器 todoId
+  const activeEditorTodoIdRef = useRef<number | null>(null);
+
   // AI 建议相关状态
   const [selectedTodoId, setSelectedTodoId] = useState<number | null>(null);
   const [suggestionPanelWidth, setSuggestionPanelWidth] = useState(300);
@@ -794,6 +857,72 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
   };
 
   const selectedTodo = todos.find(t => t.id === selectedTodoId) || null;
+
+  // 🔥 新增：编辑器切换时的完整生命周期管理
+  const handleEditorSwitch = useCallback((newTodoId: number | null) => {
+    const previousTodoId = activeEditorTodoIdRef.current;
+
+    console.log('[EditorSwitch] Switching from', previousTodoId, 'to', newTodoId);
+
+    // 🔥 阻止自切换，避免无限循环
+    if (previousTodoId === newTodoId) {
+      console.log('[EditorSwitch] Same editor, skipping activate/deactivate cycle');
+      return;
+    }
+
+    // 停用之前的编辑器
+    if (previousTodoId) {
+      const previousRef = itemRefsMap.current.get(previousTodoId);
+      if (previousRef && typeof previousRef.deactivate === 'function') {
+        try {
+          console.log('[EditorSwitch] Deactivating previous editor:', previousTodoId);
+          previousRef.deactivate();
+        } catch (error) {
+          console.warn('[EditorSwitch] Failed to deactivate previous editor:', error);
+        }
+      }
+    }
+
+    // 激活新的编辑器（如果指定了todoId）
+    if (newTodoId !== null) {
+      const newRef = itemRefsMap.current.get(newTodoId);
+      if (newRef && typeof newRef.activate === 'function') {
+        try {
+          console.log('[EditorSwitch] Activating new editor:', newTodoId);
+          newRef.activate();
+        } catch (error) {
+          console.warn('[EditorSwitch] Failed to activate new editor:', error);
+        }
+      }
+    }
+
+    // 更新当前激活的编辑器ID
+    activeEditorTodoIdRef.current = newTodoId;
+  }, []);
+
+  // 处理容器点击，支持点击空白区域取消焦点
+  const handleContainerClick = useCallback((event: React.MouseEvent) => {
+    // 检查点击是否落在todo项内
+    const clickedTodoItem = (event.target as HTMLElement).closest('.content-focus-item');
+
+    if (!clickedTodoItem) {
+      // 点击空白区域，取消当前编辑器焦点
+      const currentTodoId = activeEditorTodoIdRef.current;
+      if (currentTodoId) {
+        console.log('[ContainerClick] Clicked blank area, deactivating editor:', currentTodoId);
+        const currentRef = itemRefsMap.current.get(currentTodoId);
+        if (currentRef && typeof currentRef.deactivate === 'function') {
+          try {
+            currentRef.deactivate();
+          } catch (error) {
+            console.warn('[ContainerClick] Failed to deactivate editor:', error);
+          }
+        }
+        activeEditorTodoIdRef.current = null;
+      }
+    }
+    // 点击todo项时，让事件继续冒泡，让todo项的onClick处理
+  }, []);
 
   // 使用 DFS 构建并列关系分组 Map（复用自TodoList）
   const parallelGroups = useMemo(() => {
@@ -873,7 +1002,7 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
     <div style={{ display: 'flex', height: '100%', flexDirection: 'row', minHeight: 0 }}>
       {/* 主内容区 */}
       <div className="content-focus-scroll-area" style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
-        <div className="content-focus-view">
+        <div className="content-focus-view" onClick={handleContainerClick}>
           {todos.map((todo, index) => (
             <ContentFocusItem
               key={todo.id}
@@ -887,6 +1016,10 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
               onView={(todo) => {
                 setSelectedTodoId(todo.id!);
                 onView(todo);
+                // 🔥 触发编辑器切换
+                if (todo.id) {
+                  handleEditorSwitch(todo.id);
+                }
               }}
               isLast={index === todos.length - 1}
               activeTab={activeTab}
@@ -896,7 +1029,13 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
               prevTodo={index > 0 ? todos[index - 1] : null}
               nextTodo={index < todos.length - 1 ? todos[index + 1] : null}
               onUpdateDisplayOrder={onUpdateDisplayOrder}
-              onSelectedTodoChange={setSelectedTodoId}
+              onSelectedTodoChange={(todoId) => {
+                setSelectedTodoId(todoId);
+                // 🔥 当选中待办变更时，也触发编辑器切换
+                if (todoId) {
+                  handleEditorSwitch(todoId);
+                }
+              }}
             />
           ))}
         </div>

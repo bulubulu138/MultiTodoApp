@@ -1635,14 +1635,17 @@ flowchart-preview.flowchart-embedded:hover {
 
 /* 专注模式编辑器容器滚动隔离 */
 .content-focus-item-editor {
-  overscroll-behavior: contain;
+  /* 🔥 移除overscroll-behavior，改善点击体验 */
+  /* overscroll-behavior: contain; */
   /* 移除 isolation: isolate 以免干扰编辑器内部滚动 */
 }
 
 /* Quill 编辑器滚动隔离 */
 .content-focus-item-editor .ql-editor {
   overscroll-behavior: contain;
-  touch-action: pan-y; /* 允许垂直滚动，但阻止传播 */
+  /* 🔥 修改：只限制垂直触摸滚动，不阻止其他交互 */
+  /* touch-action: pan-y; */
+  touch-action: manipulation;
 }
 
 /* 防止滚动链 */
