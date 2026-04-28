@@ -593,6 +593,29 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       }
     };
 
+    // 🔥 新增：处理编辑器内的链接点击
+    const handleLinkClick = (event: Event) => {
+      const target = event.target as HTMLElement;
+
+      // 只处理 <a> 标签的点击
+      if (target.tagName === 'A' && target instanceof HTMLAnchorElement) {
+        const href = target.getAttribute('href');
+
+        if (href) {
+          // 阻止默认行为和事件冒泡
+          event.preventDefault();
+          event.stopPropagation();
+
+          // 通过 Electron API 打开外部链接
+          try {
+            window.electronAPI.openExternal(href);
+          } catch (error) {
+            console.error('[RichTextEditor] Failed to open external link:', error);
+          }
+        }
+      }
+    };
+
     // 🔥🔥 防护层2：阻止所有 DOM 滚动事件
     const preventAnyScroll = (event: Event) => {
       event.preventDefault();
@@ -622,6 +645,8 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
     editorElement.addEventListener('blur', handleBlur);
     // 优化：在冒泡阶段添加事件监听器，避免干扰Quill内部处理
     editorElement.addEventListener('keydown', handleKeyDown);
+    // 🔥 新增：在捕获阶段处理链接点击，优先于其他事件处理器
+    editorElement.addEventListener('click', handleLinkClick, { capture: true });
 
     return () => {
       // 清理事件监听器
@@ -633,6 +658,8 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       editorElement.removeEventListener('blur', handleBlur);
       // 清理事件监听器
       editorElement.removeEventListener('keydown', handleKeyDown);
+      // 🔥 清理链接点击监听器
+      editorElement.removeEventListener('click', handleLinkClick, { capture: true });
 
       // 🔥 清理所有滚动事件监听器
       editorElement.removeEventListener('scroll', preventAnyScroll);
