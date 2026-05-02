@@ -319,30 +319,29 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
 
   const loadTodos = async () => {
     PerformanceMonitor.start('todo-list-load');
-    
+    let duration = 0;
+
     try {
       setLoading(true);
       const todoList = await window.electronAPI.todo.getAll();
       // 过滤空值，确保数据完整性
       setTodos(todoList.filter(todo => todo && todo.id));
-      
+
       // 重置分页状态
       setDisplayCount(50);
       setHasMoreData(todoList.length > 50);
-      
+
       console.log(`[分页] 加载了 ${todoList.length} 条待办，初始显示 50 条`);
-      
-      const duration = PerformanceMonitor.end('todo-list-load');
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[Performance] Todo list loaded in ${duration.toFixed(2)}ms`);
-      }
     } catch (error) {
-      PerformanceMonitor.end('todo-list-load');
       message.error('加载待办事项失败');
       console.error('Error loading todos:', error);
     } finally {
+      duration = PerformanceMonitor.end('todo-list-load');
       setLoading(false);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Performance] Todo list loaded in ${duration.toFixed(2)}ms`);
+      }
     }
   };
 
@@ -522,19 +521,23 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
 
   const handleUpdateTodo = async (id: number, updates: Partial<Todo>) => {
     PerformanceMonitor.start('save');
-    
+    let duration = 0;
+
     try {
       await window.electronAPI.todo.update(id, updates);
       // 重新加载所有待办，确保数据一致性
       await loadTodos();
       setEditingTodo(null);
       message.success('待办事项更新成功');
-      
-      PerformanceMonitor.end('save');
     } catch (error) {
-      PerformanceMonitor.end('save');
       message.error('更新待办事项失败');
       console.error('Error updating todo:', error);
+    } finally {
+      duration = PerformanceMonitor.end('save');
+
+      if (process.env.NODE_ENV === 'development' && duration > 100) {
+        console.warn(`[Performance] Save operation took ${duration.toFixed(2)}ms (threshold: 100ms)`);
+      }
     }
   };
 

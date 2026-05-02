@@ -63,9 +63,20 @@ export class PerformanceMonitor {
   static end(label: string): number {
     const startMark = `${label}-start`;
     const endMark = `${label}-end`;
-    
+
+    // 防御性检查：start mark 是否存在
+    if (performance.getEntriesByName(startMark).length === 0) {
+      if (this.isDevelopment) {
+        console.warn(
+          `[PerformanceMonitor] Cannot end measurement "${label}": ` +
+          `start mark not found. Either not started or already ended.`
+        );
+      }
+      return 0;
+    }
+
     performance.mark(endMark);
-    
+
     try {
       performance.measure(label, startMark, endMark);
       const measure = performance.getEntriesByName(label)[0];
