@@ -465,6 +465,60 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
     }
   }), [getLatestHtml]);
 
+  // 🔥 useEffect 1：链接点击处理（独立，减少依赖）
+  useEffect(() => {
+    const editor = getEditorSafely();
+    if (!editor?.root) {
+      console.log('[RichTextEditor] Editor not ready for link click handler');
+      return;
+    }
+
+    const editorElement = editor.root;
+    if (!editorElement) return;
+
+    console.log('[RichTextEditor] Setting up link click handler');
+
+    const handleLinkClick = async (event: Event) => {
+      const target = event.target as HTMLElement;
+
+      // 只处理 <a> 标签的点击
+      if (target.tagName === 'A' && target instanceof HTMLAnchorElement) {
+        const href = target.getAttribute('href');
+
+        if (href) {
+          console.log('[RichTextEditor] Link clicked:', href);
+
+          // 阻止默认行为和事件冒泡
+          event.preventDefault();
+          event.stopPropagation();
+
+          // 通过 Electron API 打开外部链接
+          try {
+            if (window.electronAPI && window.electronAPI.openExternal) {
+              const result = await window.electronAPI.openExternal(href);
+              if (!result.success) {
+                console.error('[RichTextEditor] Failed to open link:', result.error);
+              }
+            } else {
+              console.error('[RichTextEditor] electronAPI.openExternal not available');
+            }
+          } catch (error) {
+            console.error('[RichTextEditor] Exception opening link:', error);
+          }
+        }
+      }
+    };
+
+    // 在捕获阶段处理链接点击，优先于其他事件处理器
+    editorElement.addEventListener('click', handleLinkClick, { capture: true });
+
+    return () => {
+      console.log('[RichTextEditor] Cleaning up link click handler');
+      editorElement.removeEventListener('click', handleLinkClick, { capture: true });
+    };
+  }, [editorInstance, getEditorSafely]);
+
+  // 🔥 useEffect 2：滚动事件拦截
   useEffect(() => {
     const editor = getEditorSafely();
     if (!editor?.root) {
@@ -473,6 +527,37 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
 
     const editorElement = editor.root;
     if (!editorElement) return;
+
+    // 🔥🔥 防护层2：阻止所有 DOM 滚动事件（但排除链接点击）
+    const preventAnyScroll = (event: Event) => {
+      // 🔥 关键修复：检查事件目标是否是链接，如果是则不阻止
+      const target = event.target as HTMLElement;
+      if (target.tagName === 'A' || target.closest('a')) {
+        console.log('[QuillScrollBlock] Allowing click on link element');
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      console.log('[QuillScrollBlock] Prevented scroll event:', event.type, event);
+    };
+
+    const handleWheel = (event: WheelEvent) => {
+      // 🔥 关键修复：检查事件目标是否是链接
+      const target = event.target as HTMLElement;
+      if (target.tagName === 'A' || target.closest('a')) {
+        return;
+      }
+
+      // 只阻止垂直滚动，保留水平滚动（如果需要）
+      if (event.deltaY !== 0) {
+        preventAnyScroll(event);
+      } else {
+        // 水平滚动仍然阻止，防止意外滚动
+        event.stopPropagation();
+      }
+    };
 
     // 🔥🔥 核心优化：监听 Quill 的 text-change 事件，提前锁定滚动
     const handleTextChange = () => {
@@ -519,9 +604,48 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       }
     };
 
-    // 注册事件监听器和 Observer
+    // 监听所有可能的滚动事件
+    editorElement.addEventListener('scroll', preventAnyScroll, { passive: false, capture: true });
+    editorElement.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+    editorElement.addEventListener('touchmove', preventAnyScroll, { passive: false, capture: true });
+
+    // 注册 text-change 和 Observer
     editor.on('text-change', handleTextChange);
     setupMutationObserver();
+
+    return () => {
+      // 清理滚动事件监听器
+      editorElement.removeEventListener('scroll', preventAnyScroll);
+      editorElement.removeEventListener('wheel', handleWheel);
+      editorElement.removeEventListener('touchmove', preventAnyScroll);
+
+      // 清理 text-change 和 Observer
+      editor.off('text-change', handleTextChange);
+
+      if (mutationObserverRef.current) {
+        mutationObserverRef.current.disconnect();
+        mutationObserverRef.current = null;
+      }
+
+      // 🔥 清理强化函数引用
+      scrollBlockRef.current = () => {
+        // 空函数，安全的 noop
+      };
+
+      // 🔥🔥 清理：确保解锁滚动容器
+      unlockScrollContainer();
+    };
+  }, [editorInstance, getEditorSafely, lockScrollContainer, unlockScrollContainer]);
+
+  // 🔥 useEffect 3：焦点和输入法事件
+  useEffect(() => {
+    const editor = getEditorSafely();
+    if (!editor?.root) {
+      return;
+    }
+
+    const editorElement = editor.root;
+    if (!editorElement) return;
 
     const handleCompositionStart = () => {
       isComposingRef.current = true;
@@ -562,7 +686,6 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       isFocusedRef.current = false;
     };
 
-    // 优化：只阻止可能触发页面滚动的按键，完全不干预输入键
     const handleKeyDown = (event: KeyboardEvent) => {
       // 🔥 强化防护：对所有可打印字符进行拦截
       const isPrintableChar = event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey && !event.ctrlKey;
@@ -593,88 +716,23 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       }
     };
 
-    // 🔥 新增：处理编辑器内的链接点击
-    const handleLinkClick = (event: Event) => {
-      const target = event.target as HTMLElement;
-
-      // 只处理 <a> 标签的点击
-      if (target.tagName === 'A' && target instanceof HTMLAnchorElement) {
-        const href = target.getAttribute('href');
-
-        if (href) {
-          // 阻止默认行为和事件冒泡
-          event.preventDefault();
-          event.stopPropagation();
-
-          // 通过 Electron API 打开外部链接
-          try {
-            window.electronAPI.openExternal(href);
-          } catch (error) {
-            console.error('[RichTextEditor] Failed to open external link:', error);
-          }
-        }
-      }
-    };
-
-    // 🔥🔥 防护层2：阻止所有 DOM 滚动事件
-    const preventAnyScroll = (event: Event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      console.log('[QuillScrollBlock] Prevented scroll event:', event.type, event);
-    };
-
-    const handleWheel = (event: WheelEvent) => {
-      // 只阻止垂直滚动，保留水平滚动（如果需要）
-      if (event.deltaY !== 0) {
-        preventAnyScroll(event);
-      } else {
-        // 水平滚动仍然阻止，防止意外滚动
-        event.stopPropagation();
-      }
-    };
-
-    // 监听所有可能的滚动事件
-    editorElement.addEventListener('scroll', preventAnyScroll, { passive: false, capture: true });
-    editorElement.addEventListener('wheel', handleWheel, { passive: false, capture: true });
-    editorElement.addEventListener('touchmove', preventAnyScroll, { passive: false, capture: true });
-
+    // 注册事件监听器
     editorElement.addEventListener('compositionstart', handleCompositionStart);
     editorElement.addEventListener('compositionend', handleCompositionEnd);
     editorElement.addEventListener('focus', handleFocus);
     editorElement.addEventListener('blur', handleBlur);
     // 优化：在冒泡阶段添加事件监听器，避免干扰Quill内部处理
     editorElement.addEventListener('keydown', handleKeyDown);
-    // 🔥 新增：在捕获阶段处理链接点击，优先于其他事件处理器
-    editorElement.addEventListener('click', handleLinkClick, { capture: true });
 
     return () => {
       // 清理事件监听器
-      editor.off('text-change', handleTextChange);
-
       editorElement.removeEventListener('compositionstart', handleCompositionStart);
       editorElement.removeEventListener('compositionend', handleCompositionEnd);
       editorElement.removeEventListener('focus', handleFocus);
       editorElement.removeEventListener('blur', handleBlur);
-      // 清理事件监听器
       editorElement.removeEventListener('keydown', handleKeyDown);
-      // 🔥 清理链接点击监听器
-      editorElement.removeEventListener('click', handleLinkClick, { capture: true });
-
-      // 🔥 清理所有滚动事件监听器
-      editorElement.removeEventListener('scroll', preventAnyScroll);
-      editorElement.removeEventListener('wheel', handleWheel);
-      editorElement.removeEventListener('touchmove', preventAnyScroll);
-
-      // 🔥 清理强化函数引用（设置为安全的空函数，而不是 null）
-      scrollBlockRef.current = () => {
-        // 空函数，安全的 noop
-      };
-
-      // 🔥🔥 清理：确保解锁滚动容器
-      unlockScrollContainer();
     };
-  }, [editorInstance, getEditorSafely, onChange, unlockScrollContainer, lockScrollContainer]);
+  }, [editorInstance, getEditorSafely, onChange, lockScrollContainer]);
 
   const imageHandler = async () => {
     const editor = getEditorSafely();
@@ -703,6 +761,25 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
     }
   };
 
+  // 🔥 新增：链接插入处理器
+  const linkHandler = () => {
+    const editor = getEditorSafely();
+    if (!editor) return;
+
+    try {
+      const href = prompt('请输入链接地址：');
+      if (!href) return;  // 用户取消或输入为空
+
+      const range = editor.getSelection(true);
+      if (range) {
+        editor.format('link', href);
+        console.log('[RichTextEditor] Link inserted:', href);
+      }
+    } catch (error) {
+      console.error('[RichTextEditor] Link insertion error:', error);
+    }
+  };
+
   const toolbarConfig = [
     [{ header: [1, 2, 3, false] }],
     ['bold', 'italic', 'underline', 'strike'],
@@ -718,6 +795,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       container: toolbarConfig,
       handlers: {
         image: imageHandler,
+        link: linkHandler,
       },
     },
     clipboard: {
