@@ -288,7 +288,7 @@ const StorageManagement: React.FC = () => {
                 icon={<FolderOpenOutlined />}
                 onClick={() => {
                   if (storagePath) {
-                    window.electronAPI.shell.openExternal(storagePath);
+                    window.electronAPI.openExternal(String(storagePath));
                   }
                 }}
               >

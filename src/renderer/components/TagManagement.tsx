@@ -6,7 +6,7 @@ import { Todo } from '../../shared/types';
 interface TagInfo {
   name: string;
   count: number;
-  todoIds: number[];
+  todoIds: (number | string)[]; // 支持数字和UUID字符串
 }
 
 interface TagManagementProps {
@@ -18,6 +18,14 @@ const TagManagement: React.FC<TagManagementProps> = ({ todos, onReload }) => {
   const { message } = App.useApp();
   const [searchText, setSearchText] = useState('');
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
+
+  // 辅助函数：安全地获取数字ID
+  const getNumericId = (id: number | string | undefined): number => {
+    if (id === undefined || id === null) {
+      throw new Error('ID cannot be undefined');
+    }
+    return typeof id === 'number' ? id : parseInt(String(id), 10);
+  };
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [currentTag, setCurrentTag] = useState<TagInfo | null>(null);
@@ -37,7 +45,7 @@ const TagManagement: React.FC<TagManagementProps> = ({ todos, onReload }) => {
             if (!tagMap[trimmed]) {
               tagMap[trimmed] = [];
             }
-            tagMap[trimmed].push(todo.id!);
+            tagMap[trimmed].push(getNumericId(todo.id));
           }
         });
       }
@@ -92,15 +100,16 @@ const TagManagement: React.FC<TagManagementProps> = ({ todos, onReload }) => {
       setLoading(true);
       
       // 更新所有相关待办
-      const affectedTodos = todos.filter(todo => 
-        currentTag?.todoIds.includes(todo.id!)
-      );
+      const affectedTodos = todos.filter(todo => {
+        const numId = getNumericId(todo.id);
+        return currentTag?.todoIds.includes(numId);
+      });
       
       for (const todo of affectedTodos) {
         const tags = todo.tags.split(',').map(t => t.trim());
         const updatedTags = tags.map(t => t === currentTag?.name ? newName : t);
         
-        await window.electronAPI.todo.update(todo.id!, {
+        await window.electronAPI.todo.update(getNumericId(todo.id), {
           tags: updatedTags.join(',')
         });
       }
@@ -125,13 +134,16 @@ const TagManagement: React.FC<TagManagementProps> = ({ todos, onReload }) => {
       const tagInfo = tagStats.find(t => t.name === tagName);
       if (!tagInfo) return;
       
-      const affectedTodos = todos.filter(todo => tagInfo.todoIds.includes(todo.id!));
-      
+      const affectedTodos = todos.filter(todo => {
+        const numId = getNumericId(todo.id);
+        return tagInfo.todoIds.includes(numId);
+      });
+
       for (const todo of affectedTodos) {
         const tags = todo.tags.split(',').map(t => t.trim());
         const updatedTags = tags.filter(t => t !== tagName);
-        
-        await window.electronAPI.todo.update(todo.id!, {
+
+        await window.electronAPI.todo.update(getNumericId(todo.id), {
           tags: updatedTags.join(',')
         });
       }
@@ -164,14 +176,17 @@ const TagManagement: React.FC<TagManagementProps> = ({ todos, onReload }) => {
           for (const tagName of selectedRowKeys) {
             const tagInfo = tagStats.find(t => t.name === tagName);
             if (!tagInfo) continue;
-            
-            const affectedTodos = todos.filter(todo => tagInfo.todoIds.includes(todo.id!));
-            
+
+            const affectedTodos = todos.filter(todo => {
+              const numId = getNumericId(todo.id);
+              return tagInfo.todoIds.includes(numId);
+            });
+
             for (const todo of affectedTodos) {
               const tags = todo.tags.split(',').map(t => t.trim());
               const updatedTags = tags.filter(t => t !== tagName);
-              
-              await window.electronAPI.todo.update(todo.id!, {
+
+              await window.electronAPI.todo.update(getNumericId(todo.id), {
                 tags: updatedTags.join(',')
               });
             }
@@ -218,11 +233,17 @@ const TagManagement: React.FC<TagManagementProps> = ({ todos, onReload }) => {
       selectedRowKeys.forEach(tagName => {
         const tagInfo = tagStats.find(t => t.name === tagName);
         if (tagInfo) {
-          tagInfo.todoIds.forEach(id => affectedTodoIds.add(id));
+          tagInfo.todoIds.forEach(id => {
+            const numId = typeof id === 'number' ? id : parseInt(String(id), 10);
+            affectedTodoIds.add(numId);
+          });
         }
       });
-      
-      const affectedTodos = todos.filter(todo => affectedTodoIds.has(todo.id!));
+
+      const affectedTodos = todos.filter(todo => {
+        const numId = getNumericId(todo.id);
+        return affectedTodoIds.has(numId);
+      });
       
       for (const todo of affectedTodos) {
         const tags = todo.tags.split(',').map(t => t.trim());
@@ -232,7 +253,7 @@ const TagManagement: React.FC<TagManagementProps> = ({ todos, onReload }) => {
         // 去重
         const uniqueTags = Array.from(new Set(updatedTags));
         
-        await window.electronAPI.todo.update(todo.id!, {
+        await window.electronAPI.todo.update(getNumericId(todo.id), {
           tags: uniqueTags.join(',')
         });
       }

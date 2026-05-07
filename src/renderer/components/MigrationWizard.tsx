@@ -31,26 +31,39 @@ const MigrationWizard: React.FC<MigrationWizardProps> = ({
   const [migrationProgress, setMigrationProgress] = useState<MigrationProgress | null>(null);
   const [migrationResult, setMigrationResult] = useState<any>(null);
 
+  interface StepContentProps {
+    targetPath: string;
+    setTargetPath: (path: string) => void;
+    migrationProgress: MigrationProgress | null;
+    setMigrationProgress: (progress: MigrationProgress | null) => void;
+    migrationResult: any;
+    setMigrationResult: (result: any) => void;
+    isMigrating: boolean;
+    handleStartMigration: () => Promise<void>;
+    handlePrev: () => void;
+    handleNext: () => void;
+  }
+
   const steps = [
     {
       title: '欢迎使用',
       description: '了解 Markdown 文件存储',
-      content: renderWelcomeStep
+      content: (props: StepContentProps) => renderWelcomeStep(props)
     },
     {
       title: '选择位置',
       description: '选择数据存储位置',
-      content: renderLocationStep
+      content: (props: StepContentProps) => renderLocationStep(props)
     },
     {
       title: '迁移中',
       description: '正在迁移数据',
-      content: renderMigrationStep
+      content: (props: StepContentProps) => renderMigrationStep(props)
     },
     {
       title: '完成',
       description: '迁移完成',
-      content: renderCompletionStep
+      content: (props: StepContentProps) => renderCompletionStep(props)
     }
   ];
 

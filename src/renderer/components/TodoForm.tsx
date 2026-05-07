@@ -163,7 +163,8 @@ const TodoForm: React.FC<TodoFormProps> = ({
       const contentHash = await window.electronAPI.todo.generateHash(title, submitContent);
 
       // 检测重复（编辑时排除自己）
-      const duplicate = await window.electronAPI.todo.findDuplicate(contentHash, todo?.id);
+      const editId = todo?.id !== undefined ? (typeof todo.id === 'number' ? todo.id : parseInt(String(todo.id), 10)) : undefined;
+      const duplicate = await window.electronAPI.todo.findDuplicate(contentHash, editId);
 
       const todoData: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'> = {
         title: title,

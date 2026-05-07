@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal, List, Card, Button, Space, Tag, Select, App, Typography, Segmented, Timeline } from 'antd';
 import { LinkOutlined, DeleteOutlined, PlusOutlined, ClockCircleOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { Todo, TodoRelation } from '../../shared/types';
+import { toNumberId } from '../../shared/utils/typeUtils';
 
 const { Option } = Select;
 const { Text } = Typography;
@@ -37,7 +38,7 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
     if (!todo?.id) return;
     
     try {
-      const todoRelations = await window.electronAPI.relations.getByTodoId(todo.id);
+      const todoRelations = await window.electronAPI.relations.getByTodoId(toNumberId(todo.id));
       setRelations(todoRelations);
     } catch (error) {
       console.error('Error loading relations:', error);
@@ -58,8 +59,8 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
     }
 
     try {
-      let sourceId: number = todo.id;
-      let targetId: number = targetTodo.id;
+      let sourceId: number = toNumberId(todo.id);
+      let targetId: number = toNumberId(targetTodo.id);
       let relationType = newRelationType;
 
       // 处理关系方向和类型
@@ -67,20 +68,20 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
         // 当前todo extends targetTodo（子待办关系）
         // 含义：当前todo是targetTodo的子待办
         // 存储：source=当前todo, target=targetTodo, type='extends'
-        sourceId = todo.id!;
-        targetId = targetTodo.id!;
+        sourceId = toNumberId(todo.id!);
+        targetId = toNumberId(targetTodo.id!);
         relationType = 'extends';
       } else if (newRelationType === 'background') {
         // targetTodo background 当前todo（父待办关系）
         // 含义：targetTodo是当前todo的父待办
         // 存储：source=targetTodo, target=当前todo, type='background'
-        sourceId = targetTodo.id!;
-        targetId = todo.id!;
+        sourceId = toNumberId(targetTodo.id!);
+        targetId = toNumberId(todo.id!);
         relationType = 'background';
       } else if (newRelationType === 'parallel') {
         // 并列关系，保持原样（无方向性，双向查询时会自动匹配）
-        sourceId = todo.id!;
-        targetId = targetTodo.id!;
+        sourceId = toNumberId(todo.id!);
+        targetId = toNumberId(targetTodo.id!);
         relationType = 'parallel';
       }
 
@@ -262,9 +263,9 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
 
     relations.forEach(relation => {
       const { relatedTodo, displayType } = getDisplayRelation(relation);
-      if (relatedTodo && !visited.has(relatedTodo.id!)) {
+      if (relatedTodo && !visited.has(toNumberId(relatedTodo.id!))) {
         result.push({ todo: relatedTodo, relation, displayType });
-        visited.add(relatedTodo.id!);
+        visited.add(toNumberId(relatedTodo.id!));
       }
     });
 

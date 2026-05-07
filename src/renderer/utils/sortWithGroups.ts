@@ -4,6 +4,7 @@
  */
 
 import { Todo, TodoRelation } from '../../shared/types';
+import { toNumberId } from '../../shared/utils/typeUtils';
 import { SortOption } from '../components/Toolbar';
 
 /**
@@ -34,7 +35,7 @@ export function buildParallelGroups(
 
   // 使用迭代BFS替代递归DFS
   todos.forEach(todo => {
-    const todoId = todo.id!;
+    const todoId = toNumberId(todo.id!);
     if (visited.has(todoId)) return;
 
     // 检查是否有并列关系
@@ -86,7 +87,7 @@ export function selectGroupRepresentatives(
     processedGroups.add(group);
 
     // 使用比较器选择代表（选择排序后会在最前面的）
-    const groupTodos = todos.filter(t => group.has(t.id!));
+    const groupTodos = todos.filter(t => group.has(toNumberId(t.id!)));
     if (groupTodos.length > 0) {
       const representative = groupTodos.reduce((best, todo) =>
         compareFn(todo, best) < 0 ? todo : best
@@ -116,14 +117,15 @@ export function sortWithGroups(
   const allRepresentatives = new Map(representatives); // 复制现有代表
 
   for (const todo of todos) {
-    let group = groups.get(todo.id!);
+    const todoId = toNumberId(todo.id!);
+    let group = groups.get(todoId);
     if (!group) {
       // 无并列关系：创建只包含自己的 Set
-      group = new Set([todo.id!]);
+      group = new Set([todoId]);
       // 为这个单独的待办设置代表（就是它自己）
       allRepresentatives.set(group, todo);
     }
-    if (!grouped.has(group)) {
+    if (group && !grouped.has(group)) {
       grouped.set(group, []);
     }
     grouped.get(group)!.push(todo);

@@ -1,4 +1,5 @@
 import { Todo, TodoRelation } from '../../shared/types';
+import { toNumberId } from '../../shared/utils/typeUtils';
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message, Image, Card, Empty, Spin, Tooltip, Progress, Alert } from 'antd';
 import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined, NodeIndexOutlined, FileTextOutlined, LinkOutlined, LoginOutlined, ReloadOutlined, SafetyOutlined, BulbOutlined } from '@ant-design/icons';
@@ -301,7 +302,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
           });
 
           // Update the todo with the new content
-          await window.electronAPI.todo.update(todo.id, { content: updatedContent });
+          await window.electronAPI.todo.update(toNumberId(todo.id), { content: updatedContent });
 
           // 创建更新后的todo对象
           const syncedTodo = { ...todo, content: updatedContent };

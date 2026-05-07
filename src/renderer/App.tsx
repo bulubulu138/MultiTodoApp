@@ -905,7 +905,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         const updates = groupTodos
           .filter(t => t.displayOrder !== syncOrder)
           .map(t => ({
-            id: t.id!,
+            id: typeof t.id === 'number' ? t.id : parseInt(String(t.id!), 10),
             displayOrder: syncOrder
           }));
 
@@ -1041,7 +1041,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         if (orderA != null && orderB != null) {
           if (orderA !== orderB) return orderA - orderB;
         }
-        return (a.id || 0) - (b.id || 0);
+        // 安全的 ID 比较：先转换为数字再比较
+        const numA = typeof a.id === 'number' ? a.id : parseInt(String(a.id || 0), 10);
+        const numB = typeof b.id === 'number' ? b.id : parseInt(String(b.id || 0), 10);
+        return numA - numB;
       };
 
       const groupRepresentatives = selectGroupRepresentatives(parallelGroups, searchedTodos, manualComparator);
@@ -1050,7 +1053,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         const orderA = a.displayOrders![activeTab]!;
         const orderB = b.displayOrders![activeTab]!;
         if (orderA !== orderB) return orderA - orderB;
-        return (a.id || 0) - (b.id || 0);
+        const numA = typeof a.id === 'number' ? a.id : parseInt(String(a.id || 0), 10);
+        const numB = typeof b.id === 'number' ? b.id : parseInt(String(b.id || 0), 10);
+        return numA - numB;
       });
 
       const sortedWithoutOrder = sortWithGroups(withoutOrder, parallelGroups, groupRepresentatives, (a, b) => {
@@ -1255,7 +1260,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
           todo={editingTodo}
           quickCreateContent={quickCreateContent}
           onSubmit={editingTodo ?
-            (data) => handleUpdateTodo(editingTodo.id!, data) :
+            (data) => handleUpdateTodo(
+              typeof editingTodo.id === 'number' ? editingTodo.id : parseInt(String(editingTodo.id!), 10),
+              data
+            ) :
             handleCreateTodo
           }
           onCancel={handleCloseForm}

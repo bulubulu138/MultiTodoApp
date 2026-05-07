@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Card, Space, Typography, Collapse, Tag, Popover } from 'antd';
 import { Todo, TodoRelation } from '../../shared/types';
+import { toNumberId } from '../../shared/utils/typeUtils';
 import { useThemeColors } from '../hooks/useThemeColors';
 
 const { Text } = Typography;
@@ -172,15 +173,15 @@ const RelationContext: React.FC<RelationContextProps> = ({
 
       bgRelations.forEach(rel => {
         const bgTodo = allTodos.find(t => t && t.id === rel.source_id);
-        if (bgTodo && !visited.has(bgTodo.id!)) {
+        if (bgTodo && !visited.has(toNumberId(bgTodo.id!))) {
           result.push(bgTodo);
-          recurse(bgTodo.id!, depth + 1);
+          recurse(toNumberId(bgTodo.id!), depth + 1);
         }
       });
     }
 
     if (currentTodo.id) {
-      recurse(currentTodo.id, 0);
+      recurse(toNumberId(currentTodo.id), 0);
     }
 
     return result.sort((a, b) =>
@@ -202,9 +203,11 @@ const RelationContext: React.FC<RelationContextProps> = ({
 
       extendsRels.forEach(rel => {
         const extTodo = allTodos.find(t => t && t.id === rel.target_id);
-        if (extTodo && !visited.has(extTodo.id!) && extTodo.id !== currentTodo.id) {
+        const extTodoId = extTodo ? toNumberId(extTodo.id!) : 0;
+        const currentTodoId = currentTodo.id ? toNumberId(currentTodo.id) : 0;
+        if (extTodo && !visited.has(extTodoId) && extTodoId !== currentTodoId) {
           result.push(extTodo);
-          visited.add(extTodo.id!);
+          visited.add(extTodoId);
         }
       });
     });

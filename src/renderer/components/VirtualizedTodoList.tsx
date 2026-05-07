@@ -1,4 +1,5 @@
 import { Todo, TodoRelation } from '../../shared/types';
+import { toNumberId } from '../../shared/utils/typeUtils';
 import React, { useState, useMemo, useCallback, memo } from 'react';
 import { Card, Tag, Button, Space, Popconfirm, Select, Typography, Tooltip, InputNumber, App } from 'antd';
 import { DeleteOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
@@ -180,7 +181,7 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
   const handleOrderSave = useCallback(async () => {
     if (onUpdateDisplayOrder && editingOrder !== null) {
       try {
-        await onUpdateDisplayOrder(todo.id!, activeTab, editingOrder);
+        await onUpdateDisplayOrder(toNumberId(todo.id!), activeTab, editingOrder);
         setEditingOrder(null);
       } catch (error) {
         message.error('更新排序失败');
@@ -246,7 +247,7 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
               </Text>
               {todo.id && (
                 <RelationIndicators
-                  todoId={todo.id}
+                  todoId={toNumberId(todo.id)}
                   relations={relations}
                   allTodos={allTodos || []}
                   size="small"
@@ -273,7 +274,7 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
             </Tooltip>
             <Popconfirm
               title="确定要删除吗？"
-              onConfirm={() => onDelete(todo.id!)}
+              onConfirm={() => onDelete(toNumberId(todo.id!))}
               okText="确定"
               cancelText="取消"
             >
@@ -327,7 +328,7 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
             </Tag>
             <Select
               value={todo.status}
-              onChange={(value) => handleStatusChange(todo.id!, value)}
+              onChange={(value) => handleStatusChange(toNumberId(todo.id!), value)}
               size="small"
               style={{ minWidth: 90 }}
             >
@@ -454,7 +455,7 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
         onView={onView}
         onRelationsChange={onRelationsChange}
         onUpdateDisplayOrder={onUpdateDisplayOrder}
-        urlTitles={getUrlTitlesForTodo ? getUrlTitlesForTodo(todo.id) : undefined}
+        urlTitles={getUrlTitlesForTodo ? getUrlTitlesForTodo(toNumberId(todo.id!)) : undefined}
         colorTheme={colorTheme}
       />
     );

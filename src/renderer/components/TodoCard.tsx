@@ -1,4 +1,5 @@
 import { Todo, TodoRelation } from '../../shared/types';
+import { toNumberId } from '../../shared/utils/typeUtils';
 import React, { useState, useCallback, memo } from 'react';
 import { Card, Tag, Button, Space, Popconfirm, Select, Typography, Tooltip, InputNumber, App } from 'antd';
 import { EditOutlined, DeleteOutlined, LinkOutlined, EyeOutlined, EyeInvisibleOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
@@ -348,7 +349,7 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
               </Tooltip>
               <Popconfirm
                 title="确定要删除吗？"
-                onConfirm={() => onDelete(todo.id!)}
+                onConfirm={() => onDelete(toNumberId(todo.id!))}
                 okText="确定"
                 cancelText="取消"
               >

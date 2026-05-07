@@ -1,4 +1,5 @@
 import { Todo, TodoRelation } from '../../shared/types';
+import { toNumberId } from '../../shared/utils/typeUtils';
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { List, Card, Tag, Button, Space, Popconfirm, Select, Typography, Image, Tooltip, App, InputNumber } from 'antd';
 import { DeleteOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
@@ -292,7 +293,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
         
         // 记录这个待办需要被移动
         adjustments.push({
-          id: conflictTodo.id!,
+          id: typeof conflictTodo.id === 'number' ? conflictTodo.id : parseInt(String(conflictTodo.id!), 10),
           oldOrder: targetOrder,
           newOrder: nextOrder
         });
@@ -413,12 +414,13 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
     };
     
     todos.forEach(todo => {
-      if (!visited.has(todo.id!)) {
-        const parallelRels = parallelRelationsByTodo.get(todo.id!) || [];
-        
+      const todoId = toNumberId(todo.id!);
+      if (!visited.has(todoId)) {
+        const parallelRels = parallelRelationsByTodo.get(todoId) || [];
+
         if (parallelRels.length > 0) {
           const groupSet = new Set<number>();
-          dfs(todo.id!, groupSet);
+          dfs(todoId, groupSet);
           groupSet.forEach(id => groups.set(id, groupSet));
         }
       }
@@ -479,32 +481,33 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
         if (!todo || !todo.id) return null;
         
         // 获取当前显示的序号值（编辑中的值或原始值，使用当前tab的序号）
-        const currentDisplayOrder = editingOrder[todo.id!] !== undefined 
-          ? editingOrder[todo.id!] 
+        const todoId = toNumberId(todo.id!);
+        const currentDisplayOrder = editingOrder[todoId] !== undefined
+          ? editingOrder[todoId]
           : (todo.displayOrders && todo.displayOrders[activeTab]);
-        
+
         // 性能优化：使用预计算的并列关系索引，避免重复过滤
-        const parallelRelations = parallelRelationsByTodo.get(todo.id!) || [];
+        const parallelRelations = parallelRelationsByTodo.get(todoId) || [];
         const hasParallel = parallelRelations.length > 0;
         
         // 检测分组边界（仅在手动排序模式下）
         const prevTodo = index > 0 ? todos[index - 1] : null;
         const nextTodo = index < todos.length - 1 ? todos[index + 1] : null;
-        
+
         // 检查是否在并列分组中
-        const parallelGroup = parallelGroups.get(todo.id!);
+        const parallelGroup = parallelGroups.get(todoId);
         const isInParallelGroup = parallelGroup && parallelGroup.size > 1;
-        
+
         // 统一分组判断：所有排序模式下，只要有并列关系且相邻即显示分组
         // sortWithGroups 确保并列待办在所有模式下都相邻
         const isInGroup = isInParallelGroup &&
           (
-            (prevTodo && parallelGroup?.has(prevTodo.id!)) ||
-            (nextTodo && parallelGroup?.has(nextTodo.id!))
+            (prevTodo && parallelGroup?.has(toNumberId(prevTodo.id!))) ||
+            (nextTodo && parallelGroup?.has(toNumberId(nextTodo.id!)))
           );
-        
-        const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(prevTodo.id!));
-        const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(nextTodo.id!));
+
+        const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(toNumberId(prevTodo.id!)));
+        const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(toNumberId(nextTodo.id!)));
         
         // 调试日志
         if (isInGroup) {
@@ -569,12 +572,12 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                     size="small"
                     min={0}
                     value={currentDisplayOrder}
-                    onChange={(value) => handleOrderChange(todo.id!, value)}
-                    onBlur={() => handleOrderSave(todo.id!, todo.displayOrders?.[activeTab])}
+                    onChange={(value) => handleOrderChange(toNumberId(todo.id!), value)}
+                    onBlur={() => handleOrderSave(toNumberId(todo.id!), todo.displayOrders?.[activeTab])}
                     onPressEnter={(e) => {
                       e.currentTarget.blur();
                     }}
-                    disabled={savingOrder.has(todo.id!) || !!(isInGroup && !isGroupStart)}
+                    disabled={savingOrder.has(toNumberId(todo.id!)) || !!(isInGroup && !isGroupStart)}
                     placeholder="序号"
                     style={{ 
                       width: 70,
@@ -646,7 +649,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                     {/* 关联指示器 */}
                     {todo.id && (
                       <RelationIndicators
-                        todoId={todo.id}
+                        todoId={toNumberId(todo.id!)}
                         relations={relations}
                         allTodos={allTodos || []}
                         size="small"
@@ -679,7 +682,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                   </Tooltip>
                   <Popconfirm
                     title="确定要删除吗？"
-                    onConfirm={() => onDelete(todo.id!)}
+                    onConfirm={() => onDelete(toNumberId(todo.id!))}
                     okText="确定"
                     cancelText="取消"
                   >
@@ -700,7 +703,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
               {todo.content && (
                 <TodoLinksPreview
                   content={todo.content}
-                  urlTitles={getUrlTitlesForTodo(todo.id!)}
+                  urlTitles={getUrlTitlesForTodo(toNumberId(todo.id!))}
                 />
               )}
 
@@ -718,7 +721,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                   </Tag>
                   <Select
                     value={todo.status}
-                    onChange={(value) => handleStatusChange(todo.id!, value)}
+                    onChange={(value) => handleStatusChange(toNumberId(todo.id!), value)}
                     size="small"
                     style={{ minWidth: 90 }}
                   >

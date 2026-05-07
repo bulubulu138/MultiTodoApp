@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Todo } from '../../shared/types';
+import { toNumberId } from '../../shared/utils/typeUtils';
 import { extractUrlTitlesFromContent } from '../utils/urlTitleStorage';
 
 // URL提取正则
@@ -143,7 +144,7 @@ export function useBatchURLTitles(todos: Todo[]): {
 
         // 提取嵌入的标题
         const embeddedTitles = extractUrlTitlesFromContent(todo.content);
-        embeddedTitlesByTodo.set(todo.id!, embeddedTitles);
+        embeddedTitlesByTodo.set(toNumberId(todo.id!), embeddedTitles);
 
         // 提取所有URL
         const urls = extractURLs(todo.content);
@@ -151,7 +152,7 @@ export function useBatchURLTitles(todos: Todo[]): {
           if (!urlToTodoIds.has(url)) {
             urlToTodoIds.set(url, []);
           }
-          urlToTodoIds.get(url)!.push(todo.id!);
+          urlToTodoIds.get(url)!.push(toNumberId(todo.id!));
         });
       });
 
@@ -203,7 +204,7 @@ export function useBatchURLTitles(todos: Todo[]): {
 
         const todoTitles = new Map<string, string>();
         const urls = extractURLs(todo.content);
-        const embeddedTitles = embeddedTitlesByTodo.get(todo.id!) || new Map();
+        const embeddedTitles = embeddedTitlesByTodo.get(toNumberId(todo.id!)) || new Map();
 
         urls.forEach(url => {
           // 优先级：嵌入标题 > 授权数据库 > 缓存标题 > 新获取的标题
@@ -217,7 +218,7 @@ export function useBatchURLTitles(todos: Todo[]): {
           }
         });
 
-        newTitlesByTodo.set(todo.id!, todoTitles);
+        newTitlesByTodo.set(toNumberId(todo.id!), todoTitles);
       });
 
       setTitlesByTodo(newTitlesByTodo);

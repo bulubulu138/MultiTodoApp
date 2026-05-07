@@ -113,7 +113,8 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
         }
       }
 
-      const result = await onGenerate(todo.id!, selectedTemplateId);
+      const todoId = typeof todo.id === 'number' ? todo.id : parseInt(String(todo.id!), 10);
+      const result = await onGenerate(todoId, selectedTemplateId);
 
       console.log('[AISuggestionPanel] AI建议生成结果:', result);
 
@@ -157,7 +158,8 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
     if (!todo?.id) return;
 
     try {
-      const result = await onDelete(todo.id);
+      const todoId = typeof todo.id === 'number' ? todo.id : parseInt(String(todo.id), 10);
+      const result = await onDelete(todoId);
       if (result.success) {
         message.success('已删除建议');
       } else {
