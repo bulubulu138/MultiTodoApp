@@ -451,7 +451,7 @@ export class FileIndexer {
         byTags: new Map(data.indexes.byTags.map(([k, v]: [string, string[]]) => [k, new Set(v)])),
         byDateRange: new Map(data.indexes.byDateRange.map(([k, v]: [string, string[]]) => [k, new Set(v)]))
       },
-      fullText: MiniSearch.loadJSON(data.fullText as any)
+      fullText: this.createEmptyIndex().fullText // 重新创建 MiniSearch 实例
     };
 
     return index;

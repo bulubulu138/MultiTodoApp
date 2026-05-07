@@ -1504,16 +1504,16 @@ export class DatabaseManager {
       });
 
       // 4. 找到根节点（没有父节点的待办）
-      const rootTodos = todos.filter(t => !childToParent.has(t.id!));
+      const rootTodos = todos.filter(t => !childToParent.has(Number(t.id!)));
 
       // 5. 递归构建子树
       const buildSubTree = (parentId: number): any[] => {
-        const children = todos.filter(t => childToParent.get(t.id!) === parentId);
+        const children = todos.filter(t => childToParent.get(Number(t.id!)) === parentId);
         return children.map(todo => ({
           key: String(todo.id),
           title: todo.title,
           todo,
-          children: buildSubTree(todo.id!)
+          children: buildSubTree(Number(todo.id!))
         }));
       };
 
@@ -1521,7 +1521,7 @@ export class DatabaseManager {
         key: String(todo.id),
         title: todo.title,
         todo,
-        children: buildSubTree(todo.id!)
+        children: buildSubTree(Number(todo.id!))
       }));
 
       return { roots, relations };

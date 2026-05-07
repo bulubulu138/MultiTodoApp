@@ -26,7 +26,7 @@ export class KeywordProcessor {
     if (!todo.id) return;
 
     const task: KeywordTask = {
-      todoId: todo.id,
+      todoId: Number(todo.id),
       title: todo.title,
       content: todo.content || ''
     };
@@ -93,10 +93,10 @@ export class KeywordProcessor {
     try {
       // 提取关键词
       const keywords = keywordExtractor.extractKeywords(todo.title, todo.content || '');
-      
+
       // 更新数据库
-      await this.dbManager.updateTodoKeywords(todo.id, keywords);
-      
+      await this.dbManager.updateTodoKeywords(Number(todo.id), keywords);
+
       console.log(`Generated ${keywords.length} keywords for todo ${todo.id}: ${keywords.join(', ')}`);
     } catch (error) {
       console.error(`Error processing todo ${todo.id}:`, error);

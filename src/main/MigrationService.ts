@@ -142,7 +142,7 @@ export class MigrationService {
           try {
             // 生成 UUID
             const uuid = uuidv4();
-            idMapping.set(todo.id!, uuid);
+            idMapping.set(Number(todo.id!), uuid);
 
             // 创建待办（无 ID）
             const { id, ...todoWithoutId } = todo;
@@ -405,8 +405,8 @@ export class MigrationService {
 
     // 初始化
     for (const todo of todos) {
-      graph.set(todo.id!, new Set());
-      inDegree.set(todo.id!, 0);
+      graph.set(Number(todo.id!), new Set());
+      inDegree.set(Number(todo.id!), 0);
     }
 
     // 添加依赖边
