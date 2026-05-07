@@ -166,7 +166,7 @@ export class FileIndexer {
    */
   addTodo(todo: Todo): Promise<void> {
     const entry: TodoIndexEntry = {
-      uuid: todo.id!,
+      uuid: String(todo.id!), // 转换为字符串
       title: todo.title,
       contentPreview: this.generateContentPreview(todo.content),
       status: todo.status,
@@ -194,7 +194,7 @@ export class FileIndexer {
    */
   removeTodo(uuid: string): Promise<void> {
     const entry = this.index.todos.get(uuid);
-    if (!entry) return;
+    if (!entry) return Promise.resolve();
 
     // 从主索引中删除
     this.index.todos.delete(uuid);
@@ -451,7 +451,7 @@ export class FileIndexer {
         byTags: new Map(data.indexes.byTags.map(([k, v]: [string, string[]]) => [k, new Set(v)])),
         byDateRange: new Map(data.indexes.byDateRange.map(([k, v]: [string, string[]]) => [k, new Set(v)]))
       },
-      fullText: MiniSearch.loadJSON(data.fullText)
+      fullText: MiniSearch.loadJSON(data.fullText as any)
     };
 
     return index;

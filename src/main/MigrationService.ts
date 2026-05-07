@@ -474,7 +474,7 @@ export class MigrationService {
     let migratedCount = 0;
 
     try {
-      const assetsDir = path.join(this.fileStorage.getStoragePath(), `todo-${uuid}`, 'assets`);
+      const assetsDir = path.join(this.fileStorage.getStoragePath(), `todo-${uuid}`, 'assets');
 
       // 确保 assets 目录存在
       await fs.promises.mkdir(assetsDir, { recursive: true });

@@ -268,11 +268,9 @@ class Application {
   private async checkStorageMode(): Promise<void> {
     try {
       // 从设置中读取存储模式
-      const settings = await this.dbManager.prepare(
-        'SELECT value FROM settings WHERE key = ?'
-      ).get('storageMode');
+      const settings = await this.dbManager.getSettings();
 
-      if (settings && settings.value === 'file') {
+      if (settings.storageMode === 'file') {
         this.useFileStorage = true;
         console.log('File storage mode enabled');
       } else {
@@ -291,17 +289,15 @@ class Application {
   private async initializeFileStorage(): Promise<void> {
     try {
       // 从设置中获取存储路径
-      const settings = await this.dbManager.prepare(
-        'SELECT value FROM settings WHERE key = ?'
-      ).get('storagePath');
+      const settings = await this.dbManager.getSettings();
 
-      if (!settings || !settings.value) {
+      const storagePath = settings.storagePath;
+      if (!storagePath) {
         console.log('No storage path configured, using default');
         this.useFileStorage = false;
         return;
       }
 
-      const storagePath = settings.value;
       console.log(`Initializing file storage at: ${storagePath}`);
 
       // 初始化 FileStorageManager
@@ -812,17 +808,10 @@ class Application {
         }
 
         // 更新设置
-        await this.dbManager.prepare(
-          'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)'
-        ).run('storageMode', mode);
-
-        if (mode === 'file' && storagePath) {
-          await this.dbManager.prepare(
-            'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)'
-          ).run('storagePath', storagePath);
-        }
-
-        return { success: true };
+        await this.dbManager.updateSettings({
+          storageMode: mode,
+          ...(mode === 'file' && storagePath ? { storagePath } : {})
+        });
       } catch (error) {
         return { success: false, error: (error as Error).message };
       }

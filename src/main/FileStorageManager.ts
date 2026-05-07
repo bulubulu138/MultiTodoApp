@@ -2,10 +2,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
 import { v4 as uuidv4 } from 'uuid';
-import chokidar from 'chokidar';
+import * as chokidar from 'chokidar';
 import MiniSearch from 'minisearch';
 import { Todo, TodoRelation, Settings } from '../shared/types';
 import { MarkdownParser } from './MarkdownParser';
+import { FileIndexer, TodoIndexEntry } from './FileIndexer';
 
 /**
  * 文件存储管理器
@@ -185,8 +186,8 @@ export class FileStorageManager {
    * 批量更新待办
    */
   async bulkUpdateTodos(updates: Array<{uuid: string; updates: Partial<Todo>}>): Promise<void> {
-    for (const { uuid, updates } of updates) {
-      await this.updateTodo(uuid, updates);
+    for (const { uuid, updates: todoUpdates } of updates) {
+      await this.updateTodo(uuid, todoUpdates);
     }
   }
 
@@ -454,7 +455,7 @@ export class FileStorageManager {
       }
     );
 
-    this.fileWatcher.on('change', async (filePath) => {
+    this.fileWatcher.on('change', async (filePath: string) => {
       const uuid = this.extractUuidFromPath(filePath);
       if (uuid) {
         try {
@@ -563,7 +564,9 @@ export class FileStorageManager {
     // 限制缓存大小
     if (this.cache.size >= this.MAX_CACHE_SIZE) {
       const oldestKey = this.cache.keys().next().value;
-      this.cache.delete(oldestKey);
+      if (oldestKey) {
+        this.cache.delete(oldestKey);
+      }
     }
 
     this.cache.set(uuid, {
