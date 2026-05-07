@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert, Tooltip, Collapse } from 'antd';
-import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, ExportOutlined, LinkOutlined, BgColorsOutlined } from '@ant-design/icons';
+import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert, Tooltip, Collapse, Descriptions, Progress, Result } from 'antd';
+import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, ExportOutlined, LinkOutlined, BgColorsOutlined, CloudUploadOutlined, LockOutlined, SyncOutlined } from '@ant-design/icons';
 import { App } from 'antd';
 import { Todo, CustomTab } from '../../shared/types';
 import { ColorTheme } from '../theme/themes';
@@ -71,6 +71,236 @@ interface SettingsModalProps {
   onTemplatesChange?: () => Promise<void>;
   onAIConfigUpdate?: (settings: Record<string, string>) => void;
 }
+
+// 存储管理组件
+const StorageManagement: React.FC = () => {
+  const [storageMode, setStorageMode] = useState<'database' | 'file'>('database');
+  const [storagePath, setStoragePath] = useState<string>('');
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationProgress, setMigrationProgress] = useState<any>(null);
+
+  useEffect(() => {
+    loadStorageInfo();
+  }, []);
+
+  const loadStorageInfo = async () => {
+    try {
+      const info = await window.electronAPI.storage.getMode();
+      setStorageMode(info.mode);
+      setStoragePath(info.path || '');
+    } catch (error) {
+      console.error('Error loading storage info:', error);
+    }
+  };
+
+  const handleSelectDirectory = async () => {
+    try {
+      const result = await window.electronAPI.file.selectDirectory();
+      if (result) {
+        setStoragePath(result);
+      }
+    } catch (error) {
+      console.error('Error selecting directory:', error);
+    }
+  };
+
+  const handleStartMigration = async () => {
+    if (!storagePath) {
+      return;
+    }
+
+    setIsMigrating(true);
+    try {
+      const result = await window.electronAPI.storage.migrate(storagePath, {
+        deleteDatabaseAfter: true,
+        createBackup: true,
+        batchWriteSize: 50,
+        verifyAfterMigration: true
+      });
+
+      if (result.success) {
+        setMigrationProgress({
+          stage: 'completed',
+          result
+        });
+
+        // 刷新存储信息
+        await loadStorageInfo();
+
+        // 提示用户重启应用
+        Modal.success({
+          title: '迁移成功',
+          content: '数据已成功迁移到 Markdown 文件格式。请重新启动应用以应用更改。',
+          onOk: () => {
+            window.location.reload();
+          }
+        });
+      } else {
+        setMigrationProgress({
+          stage: 'error',
+          error: result.errors?.[0] || '迁移失败'
+        });
+      }
+    } catch (error) {
+      setMigrationProgress({
+        stage: 'error',
+        error: String(error)
+      });
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
+  return (
+    <div>
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        {/* 当前存储模式 */}
+        <Card title={<><DatabaseOutlined /> 当前存储模式</>}>
+          <Descriptions column={1} size="small">
+            <Descriptions.Item label="存储类型">
+              <Tag color={storageMode === 'database' ? 'blue' : 'green'}>
+                {storageMode === 'database' ? 'SQLite 数据库' : 'Markdown 文件'}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="存储路径">
+              {storagePath || '默认位置'}
+            </Descriptions.Item>
+          </Descriptions>
+        </Card>
+
+        {/* 存储模式说明 */}
+        {storageMode === 'database' && (
+          <Alert
+            message="当前使用数据库存储"
+            description={
+              <div>
+                <p>您的待办数据当前存储在 SQLite 数据库中。</p>
+                <p>您可以迁移到 Markdown 文件存储，享受以下优势：</p>
+                <ul>
+                  <li>✓ 人类可读的数据格式</li>
+                  <li>✓ 支持任何文本编辑器</li>
+                  <li>✓ 版本控制友好（Git）</li>
+                  <li>✓ 完全去中心化，应用删除不影响数据</li>
+                  <li>✓ 支持云同步（Dropbox、Google Drive 等）</li>
+                </ul>
+              </div>
+            }
+            type="info"
+            showIcon
+          />
+        )}
+
+        {/* Markdown 文件存储说明 */}
+        {storageMode === 'file' && (
+          <Alert
+            message="当前使用 Markdown 文件存储"
+            description={
+              <div>
+                <p>您的待办数据以 Markdown 文件格式存储。</p>
+                <p>您可以：</p>
+                <ul>
+                  <li>在文件管理器中查看和编辑待办文件</li>
+                  <li>使用任何文本编辑器修改待办内容</li>
+                  <li>通过云服务同步数据到其他设备</li>
+                  <li>使用 Git 进行版本控制</li>
+                </ul>
+              </div>
+            }
+            type="success"
+            showIcon
+          />
+        )}
+
+        {/* 迁移选项 */}
+        {storageMode === 'database' && (
+          <Card title={<><CloudUploadOutlined /> 迁移到 Markdown 文件</>}>
+            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+              <div>
+                <Text strong>选择存储位置：</Text>
+                <Space.Compact style={{ width: '100%', marginTop: 8 }}>
+                  <Input
+                    value={storagePath}
+                    onChange={(e) => setStoragePath(e.target.value)}
+                    placeholder="选择存储待办文件的文件夹"
+                    readOnly
+                  />
+                  <Button icon={<FolderOpenOutlined />} onClick={handleSelectDirectory}>
+                    浏览
+                  </Button>
+                </Space.Compact>
+              </div>
+
+              <Alert
+                message="迁移说明"
+                description={
+                  <ul>
+                    <li>迁移过程会自动创建数据库备份</li>
+                    <li>每个待办将转换为独立的 Markdown 文件</li>
+                    <li>附件将从数据库提取到独立文件夹</li>
+                    <li>迁移完成后需要重新启动应用</li>
+                  </ul>
+                }
+                type="warning"
+                showIcon
+              />
+
+              {migrationProgress?.stage === 'error' && (
+                <Alert
+                  message="迁移失败"
+                  description={migrationProgress.error}
+                  type="error"
+                  showIcon
+                />
+              )}
+
+              <Button
+                type="primary"
+                size="large"
+                block
+                icon={<CloudUploadOutlined />}
+                onClick={handleStartMigration}
+                disabled={!storagePath || isMigrating}
+                loading={isMigrating}
+              >
+                开始迁移
+              </Button>
+            </Space>
+          </Card>
+        )}
+
+        {/* 文件存储管理 */}
+        {storageMode === 'file' && (
+          <Card title={<><SyncOutlined /> 文件存储管理</>}>
+            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+              <Descriptions column={1} size="small" bordered>
+                <Descriptions.Item label="存储位置">
+                  {storagePath}
+                </Descriptions.Item>
+                <Descriptions.Item label="文件格式">
+                  Markdown (.md)
+                </Descriptions.Item>
+                <Descriptions.Item label="关系管理">
+                  Markdown 链接
+                </Descriptions.Item>
+              </Descriptions>
+
+              <Button
+                icon={<FolderOpenOutlined />}
+                onClick={() => {
+                  if (storagePath) {
+                    window.electronAPI.shell.openExternal(storagePath);
+                  }
+                }}
+              >
+                打开存储文件夹
+              </Button>
+            </Space>
+          </Card>
+        )}
+      </Space>
+    </div>
+  );
+};
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
   visible,
@@ -862,6 +1092,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         </span>
       ),
       children: <URLAuthorizationManager />,
+    },
+    {
+      key: 'storage',
+      label: (
+        <span>
+          <DatabaseOutlined />
+          存储管理
+        </span>
+      ),
+      children: <StorageManagement />,
     },
   ];
 

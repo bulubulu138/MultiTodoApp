@@ -2,6 +2,8 @@ import { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, nativeImage, gl
 import * as path from 'path';
 import * as fs from 'fs';
 import { DatabaseManager } from './database/DatabaseManager';
+import { FileStorageManager } from './FileStorageManager';
+import { MigrationService } from './MigrationService';
 import { ImageManager } from './utils/ImageManager';
 import { BackupManager } from './utils/BackupManager';
 import { generateContentHash } from './utils/hashUtils';
@@ -19,6 +21,8 @@ import { aiConfigManager } from './config/AIConfigManager';
 class Application {
   private mainWindow: BrowserWindow | null = null;
   private dbManager: DatabaseManager;
+  private fileStorageManager: FileStorageManager | null = null;
+  private migrationService: MigrationService | null = null;
   private imageManager: ImageManager;
   private backupManager: BackupManager | null = null;
   private keywordProcessor: KeywordProcessor | null = null;
@@ -29,6 +33,7 @@ class Application {
   private urlAuthorizationService: URLAuthorizationService | null = null;
   private authorizationRefreshScheduler: AuthorizationRefreshScheduler | null = null;
   private promptTemplateService: PromptTemplateService | null = null;
+  private useFileStorage: boolean = false; // 是否使用文件存储
 
   // ✅ 新增：全局并发锁 - 用于AI建议任务的并发控制
   private activeAiRequest: null | {
@@ -255,6 +260,61 @@ class Application {
     });
 
     console.log(`CSP configured for ${isDev ? 'development' : 'production'} mode`);
+  }
+
+  /**
+   * 检查存储模式（数据库或文件存储）
+   */
+  private async checkStorageMode(): Promise<void> {
+    try {
+      // 从设置中读取存储模式
+      const settings = await this.dbManager.prepare(
+        'SELECT value FROM settings WHERE key = ?'
+      ).get('storageMode');
+
+      if (settings && settings.value === 'file') {
+        this.useFileStorage = true;
+        console.log('File storage mode enabled');
+      } else {
+        this.useFileStorage = false;
+        console.log('Database storage mode enabled');
+      }
+    } catch (error) {
+      console.error('Error checking storage mode:', error);
+      this.useFileStorage = false;
+    }
+  }
+
+  /**
+   * 初始化文件存储管理器
+   */
+  private async initializeFileStorage(): Promise<void> {
+    try {
+      // 从设置中获取存储路径
+      const settings = await this.dbManager.prepare(
+        'SELECT value FROM settings WHERE key = ?'
+      ).get('storagePath');
+
+      if (!settings || !settings.value) {
+        console.log('No storage path configured, using default');
+        this.useFileStorage = false;
+        return;
+      }
+
+      const storagePath = settings.value;
+      console.log(`Initializing file storage at: ${storagePath}`);
+
+      // 初始化 FileStorageManager
+      this.fileStorageManager = new FileStorageManager(storagePath);
+      this.migrationService = new MigrationService(this.dbManager, this.fileStorageManager);
+
+      console.log('File storage initialized successfully');
+    } catch (error) {
+      console.error('Error initializing file storage:', error);
+      this.useFileStorage = false;
+      this.fileStorageManager = null;
+      this.migrationService = null;
+    }
   }
 
   private createTray(): void {
@@ -622,6 +682,52 @@ class Application {
       }
     });
 
+    // 文件选择相关处理器
+    ipcMain.handle('file:openDirectory', async () => {
+      try {
+        const result = await dialog.showOpenDialog(this.mainWindow!, {
+          properties: ['openDirectory', 'createDirectory']
+        });
+
+        if (result.canceled || result.filePaths.length === 0) {
+          return null;
+        }
+
+        return result.filePaths[0];
+      } catch (error) {
+        console.error('Error opening directory:', error);
+        return null;
+      }
+    });
+
+    ipcMain.handle('file:selectDirectory', async () => {
+      try {
+        const result = await dialog.showOpenDialog(this.mainWindow!, {
+          title: '选择存储位置',
+          properties: ['openDirectory', 'createDirectory'],
+          message: '选择一个文件夹来存储待办数据'
+        });
+
+        if (result.canceled || result.filePaths.length === 0) {
+          return null;
+        }
+
+        const selectedPath = result.filePaths[0];
+
+        // 检查目录权限
+        try {
+          await fs.promises.access(selectedPath, fs.constants.W_OK);
+        } catch {
+          throw new Error('选择的目录没有写入权限');
+        }
+
+        return selectedPath;
+      } catch (error) {
+        console.error('Error selecting directory:', error);
+        throw error;
+      }
+    });
+
     // 关系相关的IPC处理器
     ipcMain.handle('relations:getAll', async () => {
       return await this.dbManager.getAllRelations();
@@ -688,6 +794,76 @@ class Application {
         return { success: true };
       } catch (error) {
         return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // 文件存储和迁移相关 IPC 处理器
+    ipcMain.handle('storage:getMode', async () => {
+      return {
+        mode: this.useFileStorage ? 'file' : 'database',
+        path: this.fileStorageManager?.getStoragePath() || null
+      };
+    });
+
+    ipcMain.handle('storage:setMode', async (_, mode: 'database' | 'file', storagePath?: string) => {
+      try {
+        if (mode === 'file' && !storagePath) {
+          throw new Error('Storage path is required for file storage mode');
+        }
+
+        // 更新设置
+        await this.dbManager.prepare(
+          'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)'
+        ).run('storageMode', mode);
+
+        if (mode === 'file' && storagePath) {
+          await this.dbManager.prepare(
+            'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)'
+          ).run('storagePath', storagePath);
+        }
+
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    ipcMain.handle('storage:migrate', async (_, targetPath: string, options: any) => {
+      if (!this.migrationService) {
+        return { success: false, error: 'Migration service not initialized' };
+      }
+
+      try {
+        const result = await this.migrationService.migrate(targetPath, options);
+        return result;
+      } catch (error) {
+        return {
+          success: false,
+          todosMigrated: 0,
+          relationsMigrated: 0,
+          assetsMigrated: 0,
+          errors: [String(error)],
+          duration: 0
+        };
+      }
+    });
+
+    ipcMain.handle('storage:validateMigration', async (_, targetPath: string) => {
+      if (!this.migrationService) {
+        return { success: false, errors: ['Migration service not initialized'] };
+      }
+
+      try {
+        return await this.migrationService.validateMigration(targetPath);
+      } catch (error) {
+        return {
+          success: false,
+          errors: [String(error)],
+          sourceCount: 0,
+          targetCount: 0,
+          missingTodos: [],
+          contentMismatches: []
+        };
       }
     });
 
@@ -1603,6 +1779,14 @@ class Application {
       try {
         await this.dbManager.initialize();
         console.log('Database initialized successfully');
+
+        // 检查是否使用文件存储
+        await this.checkStorageMode();
+
+        // 如果使用文件存储，初始化文件存储管理器
+        if (this.useFileStorage) {
+          await this.initializeFileStorage();
+        }
       } catch (dbError) {
         console.error('Database initialization failed:', dbError);
 

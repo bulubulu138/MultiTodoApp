@@ -2,7 +2,7 @@
 // 所有组件都从这里导入类型，避免重复定义
 
 export interface Todo {
-  id?: number;
+  id?: number | string; // 支持数字 ID（SQLite）或 UUID 字符串（文件存储）
   title: string;
   content: string;
   status: 'pending' | 'in_progress' | 'completed';

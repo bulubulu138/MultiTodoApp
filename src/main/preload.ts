@@ -91,6 +91,14 @@ export interface ElectronAPI {
     update: (settings: any) => Promise<any>;
     openDataFolder: () => Promise<{success: boolean; error?: string}>;
   };
+
+  // 存储管理API
+  storage: {
+    getMode: () => Promise<{mode: 'database' | 'file'; path: string | null}>;
+    setMode: (mode: 'database' | 'file', storagePath?: string) => Promise<{success: boolean; error?: string}>;
+    migrate: (targetPath: string, options: any) => Promise<any>;
+    validateMigration: (targetPath: string) => Promise<any>;
+  };
   
   // 图片API
   image: {
@@ -102,6 +110,8 @@ export interface ElectronAPI {
   // 文件API
   file: {
     exists: (filepath: string) => Promise<boolean>;
+    openDirectory: () => Promise<string | null>;
+    selectDirectory: () => Promise<string | null>;
   };
   
   // 关系API
@@ -291,6 +301,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     update: (settings: any) => ipcRenderer.invoke('settings:update', settings),
     openDataFolder: () => ipcRenderer.invoke('settings:openDataFolder'),
   },
+  storage: {
+    getMode: () => ipcRenderer.invoke('storage:getMode'),
+    setMode: (mode: 'database' | 'file', storagePath?: string) =>
+      ipcRenderer.invoke('storage:setMode', mode, storagePath),
+    migrate: (targetPath: string, options: any) =>
+      ipcRenderer.invoke('storage:migrate', targetPath, options),
+    validateMigration: (targetPath: string) =>
+      ipcRenderer.invoke('storage:validateMigration', targetPath),
+  },
   image: {
     upload: () => ipcRenderer.invoke('image:upload'),
     delete: (filepath: string) => ipcRenderer.invoke('image:delete', filepath),
@@ -298,6 +317,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   file: {
     exists: (filepath: string) => ipcRenderer.invoke('file:exists', filepath),
+    openDirectory: () => ipcRenderer.invoke('file:openDirectory'),
+    selectDirectory: () => ipcRenderer.invoke('file:selectDirectory'),
   },
   relations: {
     getAll: () => ipcRenderer.invoke('relations:getAll'),
