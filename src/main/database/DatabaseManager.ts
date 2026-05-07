@@ -2,7 +2,7 @@
 import Database from 'better-sqlite3';
 import * as path from 'path';
 import { app } from 'electron';
-import { Todo, Settings, TodoRelation, Note } from '../../shared/types';
+import { Todo, Settings, TodoRelation } from '../../shared/types';
 import { generateContentHash } from '../utils/hashUtils';
 
 export class DatabaseManager {
@@ -48,17 +48,6 @@ export class DatabaseManager {
       return Number.isNaN(value.getTime()) ? '' : value.toISOString();
     }
     return '';
-  }
-
-  private parseNote(row: any): Note {
-    return {
-      id: row?.id,
-      title: row?.title ?? '',
-      content: row?.content ?? '',
-      // notes 表使用 snake_case（created_at/updated_at），前端类型使用 camelCase（createdAt/updatedAt）。
-      createdAt: this.normalizeDateString(row?.createdAt ?? row?.created_at),
-      updatedAt: this.normalizeDateString(row?.updatedAt ?? row?.updated_at),
-    };
   }
 
   private parseDisplayOrdersSafely(displayOrders: unknown): Record<string, any> {
@@ -124,14 +113,6 @@ export class DatabaseManager {
       `CREATE INDEX IF NOT EXISTS idx_todos_status ON todos(status)`,
       `CREATE INDEX IF NOT EXISTS idx_todos_created_at ON todos(createdAt)`,
       `CREATE INDEX IF NOT EXISTS idx_todos_priority ON todos(priority)`,
-      
-      `CREATE TABLE IF NOT EXISTS notes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        content TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      )`,
 
       // Prompt 模板表
       `CREATE TABLE IF NOT EXISTS prompt_templates (
@@ -248,6 +229,7 @@ export class DatabaseManager {
     await this.migrateTodosTable();
     await this.migrateFlowchartEdgesTable();
     await this.dropFlowchartTodoAssociationsTable();
+    await this.dropNotesTable();
     await this.deletePausedTodos();
 
     // 创建流程图查询索引
@@ -438,6 +420,24 @@ export class DatabaseManager {
       }
     } catch (error) {
       console.error('Error dropping flowchart_todo_associations table:', error);
+      // 不抛出错误，允许应用继续运行
+    }
+  }
+
+  private async dropNotesTable(): Promise<void> {
+    try {
+      // 检查表是否存在
+      const tableExists = this.db!.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='notes'"
+      ).get() as any;
+
+      if (tableExists) {
+        console.log('Dropping notes table...');
+        this.db!.exec('DROP TABLE IF EXISTS notes');
+        console.log('notes table dropped successfully');
+      }
+    } catch (error) {
+      console.error('Error dropping notes table:', error);
       // 不抛出错误，允许应用继续运行
     }
   }
@@ -1295,79 +1295,6 @@ export class DatabaseManager {
         const row = this.db!.prepare('SELECT COUNT(*) as count FROM todo_relations WHERE source_id = ? AND target_id = ? AND relation_type = ?')
           .get(sourceId, targetId, relationType) as any;
         resolve(row.count > 0);
-      } catch (error) {
-        reject(error);
-      }
-    });
-  }
-
-  // 笔记操作
-  public createNote(note: Pick<Note, 'title' | 'content'>): Promise<Note> {
-    return new Promise((resolve, reject) => {
-      try {
-        const now = new Date().toISOString();
-        const result = this.db!.prepare(
-          'INSERT INTO notes (title, content, created_at, updated_at) VALUES (?, ?, ?, ?)'
-        ).run(note.title, note.content, now, now);
-
-        const newRow = this.db!.prepare('SELECT * FROM notes WHERE id = ?').get(result.lastInsertRowid) as any;
-        resolve(this.parseNote(newRow));
-      } catch (error) {
-        reject(error);
-      }
-    });
-  }
-
-  public getNoteById(id: number): Promise<Note | null> {
-    return new Promise((resolve, reject) => {
-      try {
-        const row = this.db!.prepare('SELECT * FROM notes WHERE id = ?').get(id) as any;
-        resolve(row ? this.parseNote(row) : null);
-      } catch (error) {
-        reject(error);
-      }
-    });
-  }
-
-  public getAllNotes(): Promise<Note[]> {
-    return new Promise((resolve, reject) => {
-      try {
-        const rows = this.db!.prepare('SELECT * FROM notes ORDER BY updated_at DESC').all() as any[];
-        resolve(rows.map(r => this.parseNote(r)));
-      } catch (error) {
-        reject(error);
-      }
-    });
-  }
-
-  public updateNote(id: number, updates: Partial<Pick<Note, 'title' | 'content'>>): Promise<void> {
-    return new Promise((resolve, reject) => {
-      try {
-        const now = new Date().toISOString();
-        const fields = [];
-        const values = [];
-
-        if (updates.title !== undefined) { fields.push('title = ?'); values.push(updates.title); }
-        if (updates.content !== undefined) { fields.push('content = ?'); values.push(updates.content); }
-
-        fields.push('updated_at = ?');
-        values.push(now);
-        values.push(id);
-
-        const sql = `UPDATE notes SET ${fields.join(', ')} WHERE id = ?`;
-        this.db!.prepare(sql).run(...values);
-        resolve();
-      } catch (error) {
-        reject(error);
-      }
-    });
-  }
-
-  public deleteNote(id: number): Promise<void> {
-    return new Promise((resolve, reject) => {
-      try {
-        this.db!.prepare('DELETE FROM notes WHERE id = ?').run(id);
-        resolve();
       } catch (error) {
         reject(error);
       }

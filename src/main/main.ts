@@ -659,23 +659,6 @@ class Application {
       return await this.dbManager.buildTree();
     });
 
-    // Notes CRUD
-    ipcMain.handle('notes:getAll', async () => {
-      return await this.dbManager.getAllNotes();
-    });
-
-    ipcMain.handle('notes:create', async (_, noteData) => {
-      return await this.dbManager.createNote(noteData);
-    });
-
-    ipcMain.handle('notes:update', async (_, id, updates) => {
-      return await this.dbManager.updateNote(id, updates);
-    });
-
-    ipcMain.handle('notes:delete', async (_, id) => {
-      return await this.dbManager.deleteNote(id);
-    });
-
     // Backup operations
     ipcMain.handle('backup:list', async () => {
       return await this.backupManager?.listBackups() || [];

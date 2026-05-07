@@ -11,7 +11,6 @@ import Toolbar, { SortOption, ViewMode } from './components/Toolbar';
 import SettingsModal from './components/SettingsModal';
 import ExportModal from './components/ExportModal';
 import TodoViewDrawer from './components/TodoViewDrawer';
-import NotesDrawer from './components/NotesDrawer';
 import CalendarDrawer from './components/CalendarDrawer';
 import ContentFocusView, { ContentFocusViewRef } from './components/ContentFocusView';
 import { getTheme, ThemeMode, ColorTheme } from './theme/themes';
@@ -50,7 +49,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const [showSettings, setShowSettings] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showViewDrawer, setShowViewDrawer] = useState(false);
-  const [showNotes, setShowNotes] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [viewingTodo, setViewingTodo] = useState<Todo | null>(null);
@@ -1167,7 +1165,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
           onAddTodo={() => setShowPositionSelector(true)}
         onShowSettings={() => setShowSettings(true)}
         onShowExport={() => setShowExport(true)}
-        onShowNotes={() => setShowNotes(true)}
         onShowCalendar={() => setShowCalendar(true)}
         sortOption={currentTabSettings.sortOption}
         onSortChange={handleSortChange}
@@ -1302,11 +1299,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         onEdit={handleEditFromView}
         onRelationsChange={loadRelations}
         onUpdateViewingTodo={handleUpdateViewingTodo}
-      />
-
-      <NotesDrawer
-        visible={showNotes}
-        onClose={() => setShowNotes(false)}
       />
 
       <CalendarDrawer

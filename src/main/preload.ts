@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { Note, PromptTemplate, AISuggestionResponse } from '../shared/types';
+import type { PromptTemplate, AISuggestionResponse } from '../shared/types';
 
 /**
  * 批量授权结果
@@ -116,15 +116,7 @@ export interface ElectronAPI {
     exists: (sourceId: number, targetId: number, relationType: string) => Promise<boolean>;
     buildTree: () => Promise<{roots: any[]; relations: any[]}>;
   };
-  
-  // 心得API
-  notes: {
-    getAll: () => Promise<Note[]>;
-    create: (noteData: Pick<Note, 'title' | 'content'>) => Promise<Note>;
-    update: (id: number, updates: Partial<Pick<Note, 'title' | 'content'>>) => Promise<void>;
-    delete: (id: number) => Promise<void>;
-  };
-  
+
   // 备份API
   backup: {
     list: () => Promise<any[]>;
@@ -319,12 +311,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     exists: (sourceId: number, targetId: number, relationType: string) =>
       ipcRenderer.invoke('relations:exists', sourceId, targetId, relationType),
     buildTree: () => ipcRenderer.invoke('relations:buildTree'),
-  },
-  notes: {
-    getAll: () => ipcRenderer.invoke('notes:getAll'),
-    create: (noteData: any) => ipcRenderer.invoke('notes:create', noteData),
-    update: (id: number, updates: any) => ipcRenderer.invoke('notes:update', id, updates),
-    delete: (id: number) => ipcRenderer.invoke('notes:delete', id),
   },
   backup: {
     list: () => ipcRenderer.invoke('backup:list'),

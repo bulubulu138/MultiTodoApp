@@ -96,14 +96,6 @@ export interface TreeRelationData {
   relations: TodoRelation[];
 }
 
-export interface Note {
-  id?: number;
-  title: string;
-  content: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 // 前端组件专用类型
 export interface TodoFormData {
   title: string;
