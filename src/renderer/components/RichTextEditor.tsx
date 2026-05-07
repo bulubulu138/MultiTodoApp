@@ -264,6 +264,31 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
     }
   }, [value, isReady, editorInstance, lockScrollContainer, unlockScrollContainer]);
 
+  // 🔥 新增：判断事件目标是否为工具栏相关元素（普通函数，避免作用域问题）
+  const isToolbarElement = (element: HTMLElement | null): boolean => {
+    if (!element) return false;
+
+    // 工具栏白名单选择器
+    const toolbarSelectors = [
+      '.ql-toolbar',           // 工具栏容器
+      '.ql-picker',            // 下拉选择器
+      '.ql-tooltip',           // 提示框
+      '.ql-action',            // 工具栏操作按钮
+      '.ql-picker-item',       // 选择器选项
+      '.ql-preview'            // 链接预览
+    ];
+
+    // 检查元素本身或其父元素是否匹配工具栏选择器
+    for (const selector of toolbarSelectors) {
+      if (element.matches(selector) || element.closest(selector)) {
+        console.log('[QuillScrollBlock] Allowing event on toolbar element:', selector);
+        return true;
+      }
+    }
+
+    return false;
+  };
+
   const getEditorSafely = useCallback(() => {
     if (!isMounted || !quillRef.current) return null;
 
@@ -299,6 +324,11 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
               // 检查是否是编辑器触发的滚动
               const activeElement = document.activeElement;
               if (activeElement?.closest('.ql-editor')) {
+                // 🔥 新增：排除工具栏元素的滚动
+                if (isToolbarElement(activeElement as HTMLElement)) {
+                  console.log('[QuillScrollBlock] Allowing window.scrollBy from toolbar');
+                  return originalScrollBy.apply(window, args as any);
+                }
                 console.log('[QuillScrollBlock] Blocked window.scrollBy from editor');
                 return; // 阻止编辑器触发的滚动
               }
@@ -313,6 +343,11 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
             (window.scrollTo as any) = function(...args: [number, number] | [ScrollToOptions]) {
               const activeElement = document.activeElement;
               if (activeElement?.closest('.ql-editor')) {
+                // 🔥 新增：排除工具栏元素的滚动
+                if (isToolbarElement(activeElement as HTMLElement)) {
+                  console.log('[QuillScrollBlock] Allowing window.scrollTo from toolbar');
+                  return originalScrollTo.apply(window, args as any);
+                }
                 console.log('[QuillScrollBlock] Blocked window.scrollTo from editor');
                 return;
               }
@@ -327,6 +362,11 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
             (Element.prototype.scrollIntoView as any) = function(this: Element, arg?: boolean | ScrollIntoViewOptions) {
               // 如果是编辑器元素，阻止滚动
               if (this instanceof HTMLElement && (this as HTMLElement).closest('.ql-editor')) {
+                // 🔥 新增：排除工具栏元素的滚动
+                if (isToolbarElement(this as HTMLElement)) {
+                  console.log('[QuillScrollBlock] Allowing Element.scrollIntoView from toolbar');
+                  return originalScrollIntoView.apply(this, [arg]);
+                }
                 console.log('[QuillScrollBlock] Blocked Element.scrollIntoView from editor');
                 return;
               }
@@ -528,12 +568,19 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
     const editorElement = editor.root;
     if (!editorElement) return;
 
-    // 🔥🔥 防护层2：阻止所有 DOM 滚动事件（但排除链接点击）
+    // 🔥🔥 防护层2：阻止所有 DOM 滚动事件（但排除工具栏和链接点击）
     const preventAnyScroll = (event: Event) => {
-      // 🔥 关键修复：检查事件目标是否是链接，如果是则不阻止
       const target = event.target as HTMLElement;
+
+      // 🔥 关键修复：检查事件目标是否是链接或工具栏元素
       if (target.tagName === 'A' || target.closest('a')) {
         console.log('[QuillScrollBlock] Allowing click on link element');
+        return;
+      }
+
+      // 🔥 新增：检查事件目标是否是工具栏元素
+      if (isToolbarElement(target)) {
+        console.log('[QuillScrollBlock] Allowing event on toolbar element');
         return;
       }
 
@@ -544,9 +591,16 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
     };
 
     const handleWheel = (event: WheelEvent) => {
-      // 🔥 关键修复：检查事件目标是否是链接
       const target = event.target as HTMLElement;
+
+      // 🔥 关键修复：检查事件目标是否是链接或工具栏元素
       if (target.tagName === 'A' || target.closest('a')) {
+        return;
+      }
+
+      // 🔥 新增：工具栏区域的滚轮事件不被拦截
+      if (isToolbarElement(target)) {
+        console.log('[QuillScrollBlock] Allowing wheel on toolbar element');
         return;
       }
 
