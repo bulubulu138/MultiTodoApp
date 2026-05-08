@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Input, Button, Alert, Space, Typography, Progress, Card, Steps, Result } from 'antd';
 import { FolderOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import { electronAPI } from '../preload';
+import { electronAPI } from '../../main/preload';
 
 const { Title, Text, Paragraph } = Typography;
 const { Step } = Steps;
@@ -206,7 +206,7 @@ const StorageLocationSelector: React.FC<StorageLocationSelectorProps> = ({
             extra={[
               <Button type="primary" key="reopen" onClick={() => window.location.reload()}>
                 重新启动应用
-              </Button            ]}
+              </Button>            ]}
           />
         )}
 
@@ -232,25 +232,25 @@ const StorageLocationSelector: React.FC<StorageLocationSelectorProps> = ({
           <Card>
             <Space direction="vertical" style={{ width: '100%' }} size="large">
               <div>
-                <Text strong>{migrationProgress.message}</Text>
+                <Text strong>{migrationProgress?.message}</Text>
                 <Progress
-                  percent={Math.floor(migrationProgress.progress)}
-                  status={migrationProgress.errors.length > 0 ? 'exception' : 'active'}
+                  percent={Math.floor(migrationProgress?.progress || 0)}
+                  status={migrationProgress?.errors?.length > 0 ? 'exception' : 'active'}
                 />
               </div>
 
-              {migrationProgress.total > 0 && (
+              {(migrationProgress?.total || 0) > 0 && (
                 <Text type="secondary">
-                  进度: {migrationProgress.current} / {migrationProgress.total}
+                  进度: {migrationProgress?.current || 0} / {migrationProgress?.total || 0}
                 </Text>
               )}
 
-              {migrationProgress.errors.length > 0 && (
+              {(migrationProgress?.errors?.length || 0) > 0 && (
                 <Alert
                   message="迁移过程中出现错误"
                   description={
                     <ul>
-                      {migrationProgress.errors.map((err, index) => (
+                      {migrationProgress?.errors?.map((err, index) => (
                         <li key={index}>{err}</li>
                       ))}
                     </ul>

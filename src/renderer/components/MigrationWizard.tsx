@@ -111,7 +111,7 @@ const MigrationWizard: React.FC<MigrationWizardProps> = ({
   };
 
   // 渲染欢迎步骤
-  function renderWelcomeStep() {
+  function renderWelcomeStep(props: StepContentProps) {
     return (
       <div style={{ padding: '20px 0' }}>
         <Title level={3}>欢迎使用 Markdown 文件存储迁移向导</Title>
@@ -164,7 +164,7 @@ const MigrationWizard: React.FC<MigrationWizardProps> = ({
   }
 
   // 渲染位置选择步骤
-  function renderLocationStep() {
+  function renderLocationStep(props: StepContentProps) {
     return (
       <div style={{ padding: '20px 0' }}>
         <Title level={3}>选择数据存储位置</Title>
@@ -233,7 +233,7 @@ const MigrationWizard: React.FC<MigrationWizardProps> = ({
   }
 
   // 渲染迁移步骤
-  function renderMigrationStep() {
+  function renderMigrationStep(props: StepContentProps) {
     const progress = migrationProgress;
     const isCompleted = progress?.stage === 'completed';
     const hasError = progress?.stage === 'error';
@@ -333,7 +333,7 @@ const MigrationWizard: React.FC<MigrationWizardProps> = ({
   }
 
   // 渲染完成步骤
-  function renderCompletionStep() {
+  function renderCompletionStep(props: StepContentProps) {
     const isSuccess = migrationProgress?.stage === 'completed';
     const hasError = migrationProgress?.stage === 'error';
 

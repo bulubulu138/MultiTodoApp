@@ -127,7 +127,7 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
 
   const handleStatusChange = useCallback((newStatus: string) => {
     const updates: Partial<Todo> = { status: newStatus as Todo['status'] };
-    onStatusChange(todo.id!, updates);
+    onStatusChange(toNumberId(todo.id!), updates);
   }, [onStatusChange, todo.id]);
 
   const handleCopy = useCallback(async () => {
@@ -148,7 +148,7 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
     
     setSavingOrder(true);
     try {
-      await onUpdateDisplayOrder(todo.id!, activeTab, editingOrder);
+      await onUpdateDisplayOrder(toNumberId(todo.id!), activeTab, editingOrder);
       setEditingOrder(null);
     } catch (error) {
       message.error('更新排序失败');
@@ -165,16 +165,16 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
   const currentDisplayOrder = editingOrder !== null ? editingOrder : (todo.displayOrders?.[activeTab]);
 
   // 计算并列关系
-  const parallelRelations = parallelRelationsByTodo.get(todo.id!) || [];
+  const parallelRelations = parallelRelationsByTodo.get(toNumberId(todo.id!)) || [];
   const hasParallel = parallelRelations.length > 0;
 
   // 计算分组信息
-  const parallelGroup = parallelGroups.get(todo.id!);
+  const parallelGroup = parallelGroups.get(toNumberId(todo.id!));
   const isInParallelGroup = parallelGroup && parallelGroup.size > 1;
   const isInGroup = isInParallelGroup &&
     (
-      (prevTodo && parallelGroup?.has(prevTodo.id!)) ||
-      (nextTodo && parallelGroup?.has(nextTodo.id!))
+      (prevTodo && parallelGroup?.has(toNumberId(prevTodo.id!))) ||
+      (nextTodo && parallelGroup?.has(toNumberId(nextTodo.id!)))
     );
   const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(prevTodo.id!));
   const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(nextTodo.id!));
@@ -289,7 +289,7 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
                   {todo.title}
                 </Text>
                 <RelationIndicators
-                  todoId={todo.id!}
+                  todoId={toNumberId(todo.id!)}
                   relations={relations}
                   allTodos={allTodos || []}
                   size="small"
@@ -298,8 +298,8 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
                 />
                 {onNavigateToFlowchart && (
                   <FlowchartIndicator
-                    todoId={todo.id!}
-                    associations={associationsByTodo.get(todo.id!) || []}
+                    todoId={toNumberId(todo.id!)}
+                    associations={associationsByTodo.get(toNumberId(todo.id!)) || []}
                     onNavigate={onNavigateToFlowchart}
                     size="small"
                     showLabel={false}
