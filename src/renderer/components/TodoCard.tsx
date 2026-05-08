@@ -176,8 +176,8 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
       (prevTodo && parallelGroup?.has(toNumberId(prevTodo.id!))) ||
       (nextTodo && parallelGroup?.has(toNumberId(nextTodo.id!)))
     );
-  const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(prevTodo.id!));
-  const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(nextTodo.id!));
+  const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(toNumberId(prevTodo.id!)));
+  const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(toNumberId(nextTodo.id!)));
 
   return (
     <div style={{

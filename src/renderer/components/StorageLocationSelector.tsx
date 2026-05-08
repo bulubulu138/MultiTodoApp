@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Input, Button, Alert, Space, Typography, Progress, Card, Steps, Result } from 'antd';
 import { FolderOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import { electronAPI } from '../../main/preload';
 
 const { Title, Text, Paragraph } = Typography;
 const { Step } = Steps;
@@ -235,7 +234,7 @@ const StorageLocationSelector: React.FC<StorageLocationSelectorProps> = ({
                 <Text strong>{migrationProgress?.message}</Text>
                 <Progress
                   percent={Math.floor(migrationProgress?.progress || 0)}
-                  status={migrationProgress?.errors?.length > 0 ? 'exception' : 'active'}
+                  status={(migrationProgress?.errors?.length || 0) > 0 ? 'exception' : 'active'}
                 />
               </div>
 
