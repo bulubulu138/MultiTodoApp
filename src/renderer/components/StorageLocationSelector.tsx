@@ -41,7 +41,7 @@ const StorageLocationSelector: React.FC<StorageLocationSelectorProps> = ({
 
   const handleSelectLocation = async () => {
     try {
-      const result = await electronAPI.file.openDirectory();
+      const result = await window.electronAPI.file.openDirectory();
       if (result) {
         setLocation(result);
         form.setFieldsValue({ location: result });
