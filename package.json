@@ -84,7 +84,7 @@
     "segment": "^0.1.3",
     "stream-browserify": "^3.0.0",
     "util": "^0.12.5",
-    "uuid": "^14.0.0"
+    "uuid": "9.0.1"
   },
   "build": {
     "appId": "com.multitodo.app",
