@@ -9,7 +9,6 @@ import TodoForm from './components/TodoForm';
 import TodoPositionSelector, { PositionSelection } from './components/TodoPositionSelector';
 import Toolbar, { SortOption, ViewMode } from './components/Toolbar';
 import SettingsModal from './components/SettingsModal';
-import ExportModal from './components/ExportModal';
 import TodoViewDrawer from './components/TodoViewDrawer';
 import CalendarDrawer from './components/CalendarDrawer';
 import ContentFocusView, { ContentFocusViewRef } from './components/ContentFocusView';
@@ -47,7 +46,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showExport, setShowExport] = useState(false);
   const [showViewDrawer, setShowViewDrawer] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
@@ -1169,7 +1167,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         <Toolbar
           onAddTodo={() => setShowPositionSelector(true)}
         onShowSettings={() => setShowSettings(true)}
-        onShowExport={() => setShowExport(true)}
         onShowCalendar={() => setShowCalendar(true)}
         sortOption={currentTabSettings.sortOption}
         onSortChange={handleSortChange}
@@ -1271,12 +1268,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
           relations={relations}
         />
       )}
-
-      <ExportModal
-        visible={showExport}
-        todos={todos}
-        onClose={() => setShowExport(false)}
-      />
 
       <SettingsModal
         visible={showSettings}
