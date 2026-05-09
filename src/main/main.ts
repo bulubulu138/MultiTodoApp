@@ -42,6 +42,9 @@ class Application {
     timestamp: number;
   } = null;
 
+  // ✅ 新增：迁移任务并发锁 - 防止多个迁移任务同时进行
+  private isMigrating: boolean = false;
+
   constructor() {
     this.dbManager = new DatabaseManager();
     this.imageManager = new ImageManager();
@@ -310,6 +313,41 @@ class Application {
       this.useFileStorage = false;
       this.fileStorageManager = null;
       this.migrationService = null;
+    }
+  }
+
+  /**
+   * 确保迁移服务已初始化（延迟初始化模式）
+   *
+   * 用于迁移场景：当用户从数据库模式迁移到文件模式时，
+   * migrationService 尚未初始化，需要按需创建。
+   *
+   * @param targetPath 目标存储路径
+   * @throws Error 如果初始化失败
+   */
+  private async ensureMigrationServiceInitialized(targetPath: string): Promise<void> {
+    // 如果服务已存在，无需重复初始化
+    if (this.migrationService && this.fileStorageManager) {
+      console.log('[ensureMigrationServiceInitialized] Service already initialized');
+      return;
+    }
+
+    console.log(`[ensureMigrationServiceInitialized] Initializing migration service for path: ${targetPath}`);
+
+    try {
+      // 初始化 FileStorageManager
+      this.fileStorageManager = new FileStorageManager(targetPath);
+
+      // 初始化 MigrationService
+      this.migrationService = new MigrationService(this.dbManager, this.fileStorageManager);
+
+      console.log('[ensureMigrationServiceInitialized] Migration service initialized successfully');
+    } catch (error) {
+      console.error('[ensureMigrationServiceInitialized] Failed to initialize migration service:', error);
+      // 清理可能部分初始化的资源
+      this.fileStorageManager = null;
+      this.migrationService = null;
+      throw new Error(`Failed to initialize migration service: ${(error as Error).message}`);
     }
   }
 
@@ -818,14 +856,30 @@ class Application {
     });
 
     ipcMain.handle('storage:migrate', async (_, targetPath: string, options: any) => {
-      if (!this.migrationService) {
-        return { success: false, error: 'Migration service not initialized' };
+      // 并发保护：检查是否已有迁移任务在进行
+      if (this.isMigrating) {
+        console.warn('[storage:migrate] Migration already in progress, rejecting request');
+        return { success: false, error: '已有迁移任务正在进行中，请稍后再试' };
       }
 
       try {
+        // 延迟初始化：确保 migrationService 已创建
+        await this.ensureMigrationServiceInitialized(targetPath);
+
+        if (!this.migrationService) {
+          return { success: false, error: '迁移服务初始化失败' };
+        }
+
+        // 设置迁移锁
+        this.isMigrating = true;
+        console.log('[storage:migrate] Starting migration to:', targetPath);
+
         const result = await this.migrationService.migrate(targetPath, options);
+
+        console.log('[storage:migrate] Migration completed:', result);
         return result;
       } catch (error) {
+        console.error('[storage:migrate] Migration failed:', error);
         return {
           success: false,
           todosMigrated: 0,
@@ -834,15 +888,22 @@ class Application {
           errors: [String(error)],
           duration: 0
         };
+      } finally {
+        // 确保释放迁移锁
+        this.isMigrating = false;
+        console.log('[storage:migrate] Migration lock released');
       }
     });
 
     ipcMain.handle('storage:validateMigration', async (_, targetPath: string) => {
-      if (!this.migrationService) {
-        return { success: false, errors: ['Migration service not initialized'] };
-      }
-
       try {
+        // 延迟初始化：确保 migrationService 已创建
+        await this.ensureMigrationServiceInitialized(targetPath);
+
+        if (!this.migrationService) {
+          return { success: false, errors: ['迁移服务初始化失败'] };
+        }
+
         return await this.migrationService.validateMigration(targetPath);
       } catch (error) {
         return {
