@@ -4,6 +4,7 @@ import * as path from 'path';
 import { app } from 'electron';
 import { Todo, Settings, TodoRelation } from '../../shared/types';
 import { generateContentHash } from '../utils/hashUtils';
+import { toNumberId } from '../../shared/utils/typeUtils';
 
 export class DatabaseManager {
   private db: Database.Database | null = null;
@@ -1499,7 +1500,7 @@ export class DatabaseManager {
       relations.forEach(rel => {
         if (rel.relation_type === 'extends' || rel.relation_type === 'background') {
           // target 是 source 的父节点
-          childToParent.set(rel.source_id, rel.target_id);
+          childToParent.set(toNumberId(rel.source_id), toNumberId(rel.target_id));
         }
       });
 

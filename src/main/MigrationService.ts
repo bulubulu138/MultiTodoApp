@@ -6,6 +6,7 @@ import { FileStorageManager } from './FileStorageManager';
 import { BackupManager } from './utils/BackupManager';
 import { Todo, TodoRelation } from '../shared/types';
 import { MarkdownParser } from './MarkdownParser';
+import { toNumberId } from '../shared/utils/typeUtils';
 
 /**
  * 迁移进度
@@ -216,8 +217,8 @@ export class MigrationService {
 
       for (const relation of sourceRelations) {
         try {
-          const sourceUuid = idMapping.get(relation.source_id);
-          const targetUuid = idMapping.get(relation.target_id);
+          const sourceUuid = idMapping.get(toNumberId(relation.source_id));
+          const targetUuid = idMapping.get(toNumberId(relation.target_id));
 
           if (!sourceUuid || !targetUuid) {
             console.warn(`跳过关系: 无法找到映射 ${relation.source_id} -> ${relation.target_id}`);
@@ -455,10 +456,12 @@ export class MigrationService {
     for (const rel of relations) {
       // extends 和 background 创建依赖
       if (rel.relation_type === 'extends' || rel.relation_type === 'background') {
-        const targetSet = graph.get(rel.source_id);
+        const sourceId = toNumberId(rel.source_id);
+        const targetId = toNumberId(rel.target_id);
+        const targetSet = graph.get(sourceId);
         if (targetSet) {
-          targetSet.add(rel.target_id);
-          inDegree.set(rel.source_id, (inDegree.get(rel.source_id) || 0) + 1);
+          targetSet.add(targetId);
+          inDegree.set(sourceId, (inDegree.get(sourceId) || 0) + 1);
         }
       }
     }

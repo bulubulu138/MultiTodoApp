@@ -14,6 +14,7 @@ import CalendarDrawer from './components/CalendarDrawer';
 import ContentFocusView, { ContentFocusViewRef } from './components/ContentFocusView';
 import { getTheme, ThemeMode, ColorTheme } from './theme/themes';
 import { buildParallelGroups, selectGroupRepresentatives, sortWithGroups, getSortComparator } from './utils/sortWithGroups';
+import { toNumberId } from '../shared/utils/typeUtils';
 import { optimizedMotionVariants, useConditionalAnimation, shouldReduceMotion, useMotionPerformanceMonitor } from './utils/optimizedMotionVariants';
 import { PerformanceMonitor } from './utils/performanceMonitor';
 import { useGlobalKeyboardHandler } from './hooks/useGlobalKeyboardHandler';
@@ -851,10 +852,12 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       // 按关系分组 - 使用图算法找出所有连通分量
       const graph = new Map<number, Set<number>>();
       parallelRelations.forEach(r => {
-        if (!graph.has(r.source_id)) graph.set(r.source_id, new Set());
-        if (!graph.has(r.target_id)) graph.set(r.target_id, new Set());
-        graph.get(r.source_id)!.add(r.target_id);
-        graph.get(r.target_id)!.add(r.source_id);
+        const sourceId = toNumberId(r.source_id);
+        const targetId = toNumberId(r.target_id);
+        if (!graph.has(sourceId)) graph.set(sourceId, new Set());
+        if (!graph.has(targetId)) graph.set(targetId, new Set());
+        graph.get(sourceId)!.add(targetId);
+        graph.get(targetId)!.add(sourceId);
       });
 
       // DFS找出所有连通分量

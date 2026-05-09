@@ -23,14 +23,16 @@ export function buildParallelGroups(
   const adjacencyMap = new Map<number, Set<number>>();
 
   parallelRelations.forEach(r => {
-    if (!adjacencyMap.has(r.source_id)) {
-      adjacencyMap.set(r.source_id, new Set());
+    const sourceId = toNumberId(r.source_id);
+    const targetId = toNumberId(r.target_id);
+    if (!adjacencyMap.has(sourceId)) {
+      adjacencyMap.set(sourceId, new Set());
     }
-    if (!adjacencyMap.has(r.target_id)) {
-      adjacencyMap.set(r.target_id, new Set());
+    if (!adjacencyMap.has(targetId)) {
+      adjacencyMap.set(targetId, new Set());
     }
-    adjacencyMap.get(r.source_id)!.add(r.target_id);
-    adjacencyMap.get(r.target_id)!.add(r.source_id);
+    adjacencyMap.get(sourceId)!.add(targetId);
+    adjacencyMap.get(targetId)!.add(sourceId);
   });
 
   // 使用迭代BFS替代递归DFS

@@ -939,8 +939,8 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
       const relatedIds = relations
         .filter(r => r.relation_type === 'parallel')
         .filter(r => r.source_id === todoId || r.target_id === todoId)
-        .map(r => r.source_id === todoId ? r.target_id : r.source_id);
-      
+        .map(r => toNumberId(r.source_id) === todoId ? toNumberId(r.target_id) : toNumberId(r.source_id));
+
       for (const relatedId of relatedIds) {
         dfs(relatedId, groupSet);
       }

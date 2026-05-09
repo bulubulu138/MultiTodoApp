@@ -368,13 +368,15 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   const relationsByTodo = useMemo(() => {
     const map = new Map<number, TodoRelation[]>();
     relations.forEach(r => {
+      const sourceId = toNumberId(r.source_id);
+      const targetId = toNumberId(r.target_id);
       // 为 source_id 添加关系
-      if (!map.has(r.source_id)) map.set(r.source_id, []);
-      map.get(r.source_id)!.push(r);
-      
+      if (!map.has(sourceId)) map.set(sourceId, []);
+      map.get(sourceId)!.push(r);
+
       // 为 target_id 添加关系
-      if (!map.has(r.target_id)) map.set(r.target_id, []);
-      map.get(r.target_id)!.push(r);
+      if (!map.has(targetId)) map.set(targetId, []);
+      map.get(targetId)!.push(r);
     });
     return map;
   }, [relations]);
@@ -384,11 +386,13 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
     const map = new Map<number, TodoRelation[]>();
     relations.forEach(r => {
       if (r.relation_type === 'parallel') {
-        if (!map.has(r.source_id)) map.set(r.source_id, []);
-        map.get(r.source_id)!.push(r);
-        
-        if (!map.has(r.target_id)) map.set(r.target_id, []);
-        map.get(r.target_id)!.push(r);
+        const sourceId = toNumberId(r.source_id);
+        const targetId = toNumberId(r.target_id);
+        if (!map.has(sourceId)) map.set(sourceId, []);
+        map.get(sourceId)!.push(r);
+
+        if (!map.has(targetId)) map.set(targetId, []);
+        map.get(targetId)!.push(r);
       }
     });
     return map;
@@ -406,10 +410,10 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
       
       // 优化：直接从预计算的并列关系索引获取
       const parallelRels = parallelRelationsByTodo.get(todoId) || [];
-      const relatedIds = parallelRels.map(r => 
-        r.source_id === todoId ? r.target_id : r.source_id
+      const relatedIds = parallelRels.map(r =>
+        toNumberId(r.source_id) === todoId ? toNumberId(r.target_id) : toNumberId(r.source_id)
       );
-      
+
       relatedIds.forEach(relatedId => dfs(relatedId, groupSet));
     };
     
