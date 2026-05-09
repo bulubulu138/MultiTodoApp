@@ -115,7 +115,8 @@ const StorageManagement: React.FC = () => {
         deleteDatabaseAfter: true,
         createBackup: true,
         batchWriteSize: 50,
-        verifyAfterMigration: true
+        verifyAfterMigration: true,
+        forceClean: true // 强制清理目标路径的旧数据
       });
 
       if (result.success) {

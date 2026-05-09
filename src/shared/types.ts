@@ -76,8 +76,8 @@ export interface CustomTab {
 
 export interface TodoRelation {
   id?: number;
-  source_id: number;
-  target_id: number;
+  source_id: number | string; // 支持 SQLite 数字 ID 或 UUID 字符串
+  target_id: number | string; // 支持 SQLite 数字 ID 或 UUID 字符串
   relation_type: 'extends' | 'background' | 'parallel';
   created_at: string;
 }

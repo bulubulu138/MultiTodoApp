@@ -27,6 +27,7 @@ export interface MigrationOptions {
   createBackup: boolean;
   batchWriteSize: number;
   verifyAfterMigration: boolean;
+  forceClean?: boolean; // 强制清理目标路径的旧数据
   onProgress?: (progress: MigrationProgress) => void;
 }
 
@@ -103,6 +104,35 @@ export class MigrationService {
           errors: [],
           progress: 5
         });
+      }
+
+      // 检查并清理目标路径的旧数据
+      const hasOldData = await this.checkTargetPathHasData(targetPath);
+      if (hasOldData) {
+        if (options.forceClean) {
+          console.log(`[Migration] 目标路径已有数据，执行清理: ${targetPath}`);
+          await this.cleanTargetPath(targetPath);
+          this.updateProgress({
+            stage: 'preparing',
+            current: 0,
+            total: 100,
+            message: '已清理目标路径的旧数据',
+            errors: [],
+            progress: 8
+          });
+        } else {
+          // 不强制清理，报错让用户确认
+          const error = '目标路径已存在数据，请先清理或设置 forceClean 选项';
+          console.error(`[Migration] ${error}`);
+          return {
+            success: false,
+            todosMigrated: 0,
+            relationsMigrated: 0,
+            assetsMigrated: 0,
+            errors: [error],
+            duration: 0
+          };
+        }
       }
 
       // 获取所有数据
@@ -194,10 +224,10 @@ export class MigrationService {
             continue;
           }
 
-          // 创建新关系
+          // 创建新关系 - 直接使用 UUID 字符串
           await this.fileStorage.createRelation({
-            source_id: parseInt(sourceUuid) || 0, // 临时使用，后续需要修复
-            target_id: parseInt(targetUuid) || 0,
+            source_id: sourceUuid, // UUID 字符串
+            target_id: targetUuid, // UUID 字符串
             relation_type: relation.relation_type,
             created_at: relation.created_at
           });
@@ -310,6 +340,18 @@ export class MigrationService {
       // 获取目标数据
       const targetTodos = await this.fileStorage.getAllTodos();
       const targetRelations = await this.fileStorage.getAllRelations();
+
+      // 检查关系数据质量（检测无效的 ID）
+      const invalidRelationCount = targetRelations.filter(
+        r => r.source_id === 0 || r.target_id === 0 ||
+             r.source_id === '0' || r.target_id === '0' ||
+             Number.isNaN(r.source_id) || Number.isNaN(r.target_id) ||
+             r.source_id === '' || r.target_id === ''
+      ).length;
+
+      if (invalidRelationCount > 0) {
+        errors.push(`发现无效的关系ID: ${invalidRelationCount}个关系使用了无效ID (0, NaN, 或空字符串)`);
+      }
 
       // 验证待办数量
       if (sourceTodos.length !== targetTodos.length) {
@@ -552,5 +594,70 @@ export class MigrationService {
    */
   setProgressCallback(callback: (progress: MigrationProgress) => void): void {
     this.progressCallback = callback;
+  }
+
+  /**
+   * 检查目标路径是否已有数据
+   */
+  private async checkTargetPathHasData(targetPath: string): Promise<boolean> {
+    try {
+      // 检查待办目录是否存在
+      if (!fs.existsSync(targetPath)) {
+        return false;
+      }
+
+      const entries = await fs.promises.readdir(targetPath, { withFileTypes: true });
+
+      // 检查是否有 todo-* 目录
+      const hasTodoDirs = entries.some(
+        entry => entry.isDirectory() && entry.name.startsWith('todo-')
+      );
+
+      // 检查是否有元数据文件
+      const metadataDir = path.join(targetPath, '.multitodo-metadata');
+      const hasMetadata = fs.existsSync(metadataDir) &&
+        fs.existsSync(path.join(metadataDir, 'index.json'));
+
+      return hasTodoDirs || hasMetadata;
+    } catch (error) {
+      console.error('[checkTargetPathHasData] Error checking target path:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 清理目标路径的旧数据
+   */
+  private async cleanTargetPath(targetPath: string): Promise<void> {
+    try {
+      console.log(`[cleanTargetPath] Cleaning target path: ${targetPath}`);
+
+      if (!fs.existsSync(targetPath)) {
+        return;
+      }
+
+      const entries = await fs.promises.readdir(targetPath, { withFileTypes: true });
+
+      // 删除所有 todo-* 目录
+      for (const entry of entries) {
+        if (entry.isDirectory() && entry.name.startsWith('todo-')) {
+          const todoPath = path.join(targetPath, entry.name);
+          await fs.promises.rm(todoPath, { recursive: true, force: true });
+          console.log(`[cleanTargetPath] Removed: ${entry.name}`);
+        }
+      }
+
+      // 清理元数据文件
+      const metadataDir = path.join(targetPath, '.multitodo-metadata');
+      if (fs.existsSync(metadataDir)) {
+        await fs.promises.rm(metadataDir, { recursive: true, force: true });
+        console.log(`[cleanTargetPath] Removed metadata directory`);
+      }
+
+      console.log(`[cleanTargetPath] Cleanup completed`);
+    } catch (error) {
+      console.error('[cleanTargetPath] Error cleaning target path:', error);
+      throw new Error(`清理目标路径失败: ${(error as Error).message}`);
+    }
   }
 }
