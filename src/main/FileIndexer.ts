@@ -125,29 +125,27 @@ export class FileIndexer {
   }
 
   /**
-   * 构建索引
+   * 构建索引（支持 Obsidian 风格）
    */
   async buildIndex(): Promise<void> {
-    console.log('Building index...');
+    console.log('[FileIndexer] Building index...');
 
     // 清空现有索引
     this.index = this.createEmptyIndex();
 
-    // 扫描所有待办目录
-    const todoDirs = await this.scanTodoDirectories();
+    // 扫描所有待办文件（支持新旧两种格式）
+    const todoFiles = await this.scanTodoFiles();
+    console.log(`[FileIndexer] Found ${todoFiles.length} todo files to index`);
 
-    for (const todoDir of todoDirs) {
-      const uuid = this.extractUuidFromPath(todoDir);
-      if (!uuid) continue;
-
-      const todoPath = path.join(todoDir, 'todo.md');
-      if (!fs.existsSync(todoPath)) continue;
-
+    for (const todoFile of todoFiles) {
       try {
-        const entry = await this.createIndexEntry(uuid, todoPath);
-        this.addToIndex(entry);
+        const entry = await this.createIndexEntryFromFile(todoFile);
+        if (entry) {
+          this.addToIndex(entry);
+          console.log(`[FileIndexer] Indexed todo: "${entry.title}" (${entry.uuid})`);
+        }
       } catch (error) {
-        console.error(`Error indexing ${uuid}:`, error);
+        console.error(`[FileIndexer] Error indexing ${todoFile}:`, error);
       }
     }
 
@@ -158,13 +156,15 @@ export class FileIndexer {
     // 保存索引
     await this.saveIndex();
 
-    console.log(`Index built: ${this.index.metadata.todoCount} todos`);
+    console.log(`[FileIndexer] Index built: ${this.index.metadata.todoCount} todos`);
   }
 
   /**
-   * 添加待办到索引
+   * 添加待办到索引（Obsidian 风格）
    */
   addTodo(todo: Todo): Promise<void> {
+    // 对于 Obsidian 风格，filePath 不重要，因为索引基于文件内容
+    // UUID 从 frontmatter 中读取，而不是从路径提取
     const entry: TodoIndexEntry = {
       uuid: String(todo.id!), // 转换为字符串
       title: todo.title,
@@ -175,7 +175,7 @@ export class FileIndexer {
       keywords: todo.keywords || [],
       createdAt: todo.createdAt,
       updatedAt: todo.updatedAt,
-      filePath: path.join(this.storagePath, `todo-${todo.id}`, 'todo.md')
+      filePath: '' // Obsidian 风格不需要特定路径，基于 UUID 映射
     };
 
     this.addToIndex(entry);
@@ -280,39 +280,59 @@ export class FileIndexer {
   // ==================== 辅助方法 ====================
 
   /**
-   * 扫描待办目录
+   * 扫描待办文件（支持 Obsidian 风格 + 向后兼容旧格式）
    */
-  private async scanTodoDirectories(): Promise<string[]> {
-    const todoDirs: string[] = [];
+  private async scanTodoFiles(): Promise<string[]> {
+    const todoFiles: string[] = [];
 
     try {
       const entries = await fs.promises.readdir(this.storagePath, { withFileTypes: true });
 
+      // 1. 扫描 Obsidian 风格的 .md 文件
       for (const entry of entries) {
-        if (entry.isDirectory() && entry.name.startsWith('todo-')) {
+        if (entry.isFile() && entry.name.endsWith('.md') && !entry.name.startsWith('.')) {
           const fullPath = path.join(this.storagePath, entry.name);
-          todoDirs.push(fullPath);
+          todoFiles.push(fullPath);
         }
       }
+
+      // 2. 向后兼容：扫描旧格式的 todo-{uuid}/todo.md 目录
+      for (const entry of entries) {
+        if (entry.isDirectory() && entry.name.startsWith('todo-')) {
+          const todoPath = path.join(this.storagePath, entry.name, 'todo.md');
+          if (fs.existsSync(todoPath)) {
+            todoFiles.push(todoPath);
+          }
+        }
+      }
+
+      console.log(`[FileIndexer] scanTodoFiles: Found ${todoFiles.length} todo files`);
     } catch (error) {
-      console.error('Error scanning todo directories:', error);
+      console.error('[FileIndexer] Error scanning todo files:', error);
     }
 
-    return todoDirs;
+    return todoFiles;
   }
 
   /**
-   * 创建索引条目
+   * 创建索引条目（从文件读取 UUID）
    */
-  private async createIndexEntry(uuid: string, todoPath: string): Promise<TodoIndexEntry> {
+  private async createIndexEntryFromFile(todoPath: string): Promise<TodoIndexEntry | null> {
     const content = await fs.promises.readFile(todoPath, 'utf-8');
 
-    // 简单解析 YAML frontmatter
+    // 解析 YAML frontmatter
     const frontmatterMatch = content.match(/^---\n([\s\S]+?)\n---/);
     const frontmatter = frontmatterMatch ? this.parseYaml(frontmatterMatch[1]) : {};
 
+    // 从 frontmatter 中提取 UUID
+    const uuid = frontmatter.id;
+    if (!uuid) {
+      console.warn(`[FileIndexer] No UUID found in ${todoPath}`);
+      return null;
+    }
+
     return {
-      uuid,
+      uuid: String(uuid),
       title: frontmatter.title || 'Untitled',
       contentPreview: this.generateContentPreview(content),
       status: frontmatter.status || 'pending',
@@ -529,14 +549,6 @@ export class FileIndexer {
     if (!isNaN(num)) return num;
 
     return value;
-  }
-
-  /**
-   * 从路径提取 UUID
-   */
-  private extractUuidFromPath(filePath: string): string | null {
-    const match = filePath.match(/todo-([a-f0-9-]+)$/);
-    return match ? match[1] : null;
   }
 
   /**

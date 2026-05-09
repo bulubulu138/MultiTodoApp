@@ -333,21 +333,27 @@ export class MigrationService {
   }
 
   /**
-   * 验证迁移结果
+   * 验证迁移结果（增强版）
    */
   async validateMigration(targetPath: string): Promise<ValidationResult> {
     const errors: string[] = [];
     const missingTodos: string[] = [];
     const contentMismatches: string[] = [];
 
+    console.log('[validateMigration] Starting migration validation...');
+
     try {
       // 获取源数据
       const sourceTodos = await this.dbManager.getAllTodos();
       const sourceRelations = await this.dbManager.getAllRelations();
 
+      console.log(`[validateMigration] Source data: ${sourceTodos.length} todos, ${sourceRelations.length} relations`);
+
       // 获取目标数据
       const targetTodos = await this.fileStorage.getAllTodos();
       const targetRelations = await this.fileStorage.getAllRelations();
+
+      console.log(`[validateMigration] Target data: ${targetTodos.length} todos, ${targetRelations.length} relations`);
 
       // 检查关系数据质量（检测无效的 ID）
       const invalidRelationCount = targetRelations.filter(
@@ -358,36 +364,53 @@ export class MigrationService {
       ).length;
 
       if (invalidRelationCount > 0) {
+        console.warn(`[validateMigration] Found ${invalidRelationCount} invalid relation IDs`);
         errors.push(`发现无效的关系ID: ${invalidRelationCount}个关系使用了无效ID (0, NaN, 或空字符串)`);
       }
 
       // 验证待办数量
       if (sourceTodos.length !== targetTodos.length) {
-        errors.push(`待办数量不匹配: 源=${sourceTodos.length}, 目标=${targetTodos.length}`);
+        const errorMsg = `待办数量不匹配: 源=${sourceTodos.length}, 目标=${targetTodos.length}`;
+        console.error(`[validateMigration] ${errorMsg}`);
+        errors.push(errorMsg);
+      } else {
+        console.log(`[validateMigration] Todo count matches: ${sourceTodos.length}`);
       }
 
-      // 验证每个待办
+      // 验证每个待办（基于 UUID 匹配）
       for (const sourceTodo of sourceTodos) {
-        // 简单验证：通过标题查找（临时方案）
-        const targetTodo = targetTodos.find(t => t.title === sourceTodo.title);
+        // 在新架构中，我们使用 UUID 映射来查找待办
+        const targetTodo = targetTodos.find(t => t.id === sourceTodo.id);
 
         if (!targetTodo) {
+          console.warn(`[validateMigration] Missing todo: ${sourceTodo.title} (${sourceTodo.id})`);
           missingTodos.push(sourceTodo.title);
           continue;
         }
 
         // 验证内容
         if (sourceTodo.content !== targetTodo.content) {
+          console.warn(`[validateMigration] Content mismatch: ${sourceTodo.title}`);
           contentMismatches.push(sourceTodo.title);
         }
       }
 
       // 验证关系数量
       if (sourceRelations.length !== targetRelations.length) {
-        errors.push(`关系数量不匹配: 源=${sourceRelations.length}, 目标=${targetRelations.length}`);
+        const errorMsg = `关系数量不匹配: 源=${sourceRelations.length}, 目标=${targetRelations.length}`;
+        console.warn(`[validateMigration] ${errorMsg}`);
+        errors.push(errorMsg);
+      } else {
+        console.log(`[validateMigration] Relation count matches: ${sourceRelations.length}`);
       }
 
+      // 综合判断
       if (errors.length > 0 || missingTodos.length > 0 || contentMismatches.length > 0) {
+        console.error(`[validateMigration] Validation failed:`);
+        console.error(`[validateMigration] - Errors: ${errors.join(', ')}`);
+        console.error(`[validateMigration] - Missing: ${missingTodos.join(', ')}`);
+        console.error(`[validateMigration] - Mismatches: ${contentMismatches.join(', ')}`);
+
         return {
           success: false,
           errors,
@@ -398,6 +421,7 @@ export class MigrationService {
         };
       }
 
+      console.log('[validateMigration] ===== VALIDATION SUCCESSFUL =====');
       return {
         success: true,
         errors: [],
@@ -408,9 +432,10 @@ export class MigrationService {
       };
 
     } catch (error) {
+      console.error('[validateMigration] Validation exception:', error);
       return {
         success: false,
-        errors: [String(error)],
+        errors: [`验证异常: ${String(error)}`],
         sourceCount: 0,
         targetCount: 0,
         missingTodos: [],
