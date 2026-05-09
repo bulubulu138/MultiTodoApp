@@ -179,9 +179,8 @@ export class MigrationService {
             const { id, ...todoWithoutId } = todo;
             const newTodo = await this.fileStorage.createTodo(todoWithoutId);
 
-            // 迁移附件
-            const assetsCount = await this.migrateAssets(todo, uuid);
-            assetsMigrated += assetsCount;
+            // 注意：附件现在由 FileStorageManager.createTodo 自动处理
+            // 所以这里不再需要调用 migrateAssets
 
             this.updateProgress({
               stage: 'migrating_todos',
@@ -513,21 +512,21 @@ export class MigrationService {
   }
 
   /**
-   * 迁移附件
+   * 迁移附件（Obsidian 风格：与 md 文件同级）
    */
-  private async migrateAssets(todo: Todo, uuid: string): Promise<number> {
+  private async migrateAssets(todo: Todo, todoFileName: string): Promise<number> {
     let migratedCount = 0;
+    const storagePath = this.fileStorage.getStoragePath();
+    const baseName = todoFileName.replace('.md', '');
+    let attachmentIndex = 1;
 
     try {
-      const assetsDir = path.join(this.fileStorage.getStoragePath(), `todo-${uuid}`, 'assets');
-
-      // 确保 assets 目录存在
-      await fs.promises.mkdir(assetsDir, { recursive: true });
-
       // 处理单张图片
       if (todo.imageUrl) {
-        await this.migrateSingleAsset(todo.imageUrl, assetsDir, `image-1.png`);
+        const fileName = `${baseName}_${attachmentIndex}.png`;
+        await this.migrateSingleAsset(todo.imageUrl, storagePath, fileName);
         migratedCount++;
+        attachmentIndex++;
       }
 
       // 处理多张图片
@@ -535,9 +534,11 @@ export class MigrationService {
         try {
           const images = JSON.parse(todo.images);
           if (Array.isArray(images)) {
-            for (let i = 0; i < images.length; i++) {
-              await this.migrateSingleAsset(images[i], assetsDir, `image-${i + 1}.png`);
+            for (const imageData of images) {
+              const fileName = `${baseName}_${attachmentIndex}.png`;
+              await this.migrateSingleAsset(imageData, storagePath, fileName);
               migratedCount++;
+              attachmentIndex++;
             }
           }
         } catch {
@@ -600,7 +601,7 @@ export class MigrationService {
   }
 
   /**
-   * 检查目标路径是否已有数据
+   * 检查目标路径是否已有数据（Obsidian 风格）
    */
   private async checkTargetPathHasData(targetPath: string): Promise<boolean> {
     try {
@@ -611,7 +612,12 @@ export class MigrationService {
 
       const entries = await fs.promises.readdir(targetPath, { withFileTypes: true });
 
-      // 检查是否有 todo-* 目录
+      // 检查是否有 .md 文件（新的 Obsidian 风格）
+      const hasMarkdownFiles = entries.some(
+        entry => entry.isFile() && entry.name.endsWith('.md')
+      );
+
+      // 检查是否有 todo-* 目录（旧格式，向后兼容）
       const hasTodoDirs = entries.some(
         entry => entry.isDirectory() && entry.name.startsWith('todo-')
       );
@@ -621,7 +627,7 @@ export class MigrationService {
       const hasMetadata = fs.existsSync(metadataDir) &&
         fs.existsSync(path.join(metadataDir, 'index.json'));
 
-      return hasTodoDirs || hasMetadata;
+      return hasMarkdownFiles || hasTodoDirs || hasMetadata;
     } catch (error) {
       console.error('[checkTargetPathHasData] Error checking target path:', error);
       return false;
@@ -629,7 +635,7 @@ export class MigrationService {
   }
 
   /**
-   * 清理目标路径的旧数据
+   * 清理目标路径的旧数据（Obsidian 风格）
    */
   private async cleanTargetPath(targetPath: string): Promise<void> {
     try {
@@ -641,12 +647,36 @@ export class MigrationService {
 
       const entries = await fs.promises.readdir(targetPath, { withFileTypes: true });
 
-      // 删除所有 todo-* 目录
+      // 删除所有 .md 文件（新的 Obsidian 风格）
+      for (const entry of entries) {
+        if (entry.isFile() && entry.name.endsWith('.md')) {
+          const filePath = path.join(targetPath, entry.name);
+          await fs.promises.unlink(filePath).catch(() => {
+            console.warn(`[cleanTargetPath] Failed to delete ${entry.name}`);
+          });
+          console.log(`[cleanTargetPath] Removed: ${entry.name}`);
+        }
+      }
+
+      // 删除所有附件文件（与 .md 文件同级的图片等）
+      const extensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.pdf', '.docx', '.xlsx'];
+      for (const entry of entries) {
+        const ext = path.extname(entry.name).toLowerCase();
+        if (extensions.includes(ext)) {
+          const filePath = path.join(targetPath, entry.name);
+          await fs.promises.unlink(filePath).catch(() => {
+            console.warn(`[cleanTargetPath] Failed to delete attachment ${entry.name}`);
+          });
+          console.log(`[cleanTargetPath] Removed attachment: ${entry.name}`);
+        }
+      }
+
+      // 删除旧格式的 todo-* 目录（向后兼容）
       for (const entry of entries) {
         if (entry.isDirectory() && entry.name.startsWith('todo-')) {
           const todoPath = path.join(targetPath, entry.name);
           await fs.promises.rm(todoPath, { recursive: true, force: true });
-          console.log(`[cleanTargetPath] Removed: ${entry.name}`);
+          console.log(`[cleanTargetPath] Removed old format: ${entry.name}`);
         }
       }
 
@@ -656,6 +686,10 @@ export class MigrationService {
         await fs.promises.rm(metadataDir, { recursive: true, force: true });
         console.log(`[cleanTargetPath] Removed metadata directory`);
       }
+
+      // 重新创建元数据目录结构
+      await fs.promises.mkdir(metadataDir, { recursive: true });
+      console.log(`[cleanTargetPath] Recreated metadata directory`);
 
       console.log(`[cleanTargetPath] Cleanup completed`);
     } catch (error) {

@@ -53,7 +53,7 @@ export class FileStorageManager {
   // ==================== Todo CRUD 操作 ====================
 
   /**
-   * 创建待办
+   * 创建待办（Obsidian 风格）
    */
   async createTodo(todo: Omit<Todo, 'id'>): Promise<Todo> {
     const uuid = uuidv4();
@@ -64,20 +64,19 @@ export class FileStorageManager {
       updatedAt: new Date().toISOString()
     };
 
-    const todoDir = path.join(this.storagePath, `todo-${uuid}`);
-    await fs.promises.mkdir(todoDir, { recursive: true });
+    // 生成 Obsidian 风格的文件名
+    const fileName = await this.generateFileName(newTodo.title, uuid);
+    const todoPath = path.join(this.storagePath, fileName);
 
-    // 创建 assets 目录
-    const assetsDir = path.join(todoDir, 'assets');
-    await fs.promises.mkdir(assetsDir, { recursive: true });
+    // 处理附件（与 md 文件同级放置）
+    const attachments = await this.processAttachments(newTodo, this.storagePath, fileName);
 
-    // 生成并保存 Markdown 文件
-    const markdown = this.markdownParser.generateTodo(newTodo);
-    const todoPath = path.join(todoDir, 'todo.md');
+    // 生成并保存 Markdown 文件（包含附件引用）
+    const markdown = this.markdownParser.generateTodo(newTodo, [], attachments);
     await this.atomicWrite(todoPath, markdown);
 
-    // 保存元数据
-    await this.saveMetadata(todoDir, newTodo);
+    // 更新 UUID 到文件名的映射
+    await this.updateUuidToFileMap(uuid, fileName);
 
     // 更新索引
     await this.fileIndexer.addTodo(newTodo);
@@ -89,7 +88,7 @@ export class FileStorageManager {
   }
 
   /**
-   * 根据 UUID 获取待办
+   * 根据 UUID 获取待办（Obsidian 风格）
    */
   async getTodoById(uuid: string): Promise<Todo | null> {
     // 检查缓存
@@ -98,8 +97,16 @@ export class FileStorageManager {
       return cached;
     }
 
-    const todoPath = path.join(this.storagePath, `todo-${uuid}`, 'todo.md');
+    // 根据 UUID 查找文件名
+    const fileName = await this.getFileNameByUuid(uuid);
+    if (!fileName) {
+      console.warn(`[getTodoById] UUID not found in map: ${uuid}`);
+      return null;
+    }
+
+    const todoPath = path.join(this.storagePath, fileName);
     if (!fs.existsSync(todoPath)) {
+      console.warn(`[getTodoById] File not found: ${todoPath}`);
       return null;
     }
 
@@ -112,7 +119,7 @@ export class FileStorageManager {
 
       return todo;
     } catch (error) {
-      console.error(`Error reading todo ${uuid}:`, error);
+      console.error(`[getTodoById] Error reading todo ${uuid}:`, error);
       return null;
     }
   }
@@ -135,7 +142,7 @@ export class FileStorageManager {
   }
 
   /**
-   * 更新待办
+   * 更新待办（Obsidian 风格）
    */
   async updateTodo(uuid: string, updates: Partial<Todo>): Promise<void> {
     const currentTodo = await this.getTodoById(uuid);
@@ -150,11 +157,16 @@ export class FileStorageManager {
       updatedAt: new Date().toISOString()
     };
 
-    const todoPath = path.join(this.storagePath, `todo-${uuid}`, 'todo.md');
+    // 根据 UUID 查找文件名
+    const fileName = await this.getFileNameByUuid(uuid);
+    if (!fileName) {
+      throw new Error(`UUID not found in map: ${uuid}`);
+    }
+
+    const todoPath = path.join(this.storagePath, fileName);
     const markdown = this.markdownParser.generateTodo(updatedTodo);
 
     await this.atomicWrite(todoPath, markdown);
-    await this.saveMetadata(path.dirname(todoPath), updatedTodo);
 
     // 更新索引
     await this.fileIndexer.updateTodo(updatedTodo);
@@ -164,14 +176,36 @@ export class FileStorageManager {
   }
 
   /**
-   * 删除待办
+   * 删除待办（Obsidian 风格）
    */
   async deleteTodo(uuid: string): Promise<void> {
-    const todoDir = path.join(this.storagePath, `todo-${uuid}`);
-
-    if (fs.existsSync(todoDir)) {
-      await fs.promises.rm(todoDir, { recursive: true, force: true });
+    // 根据 UUID 查找文件名
+    const fileName = await this.getFileNameByUuid(uuid);
+    if (!fileName) {
+      console.warn(`[deleteTodo] UUID not found in map: ${uuid}`);
+      return;
     }
+
+    const todoPath = path.join(this.storagePath, fileName);
+
+    if (fs.existsSync(todoPath)) {
+      await fs.promises.unlink(todoPath);
+    }
+
+    // 删除相关附件（与 md 文件同级的图片文件）
+    const baseName = fileName.replace('.md', '');
+    const files = await fs.promises.readdir(this.storagePath);
+    for (const file of files) {
+      if (file.startsWith(baseName) && file !== fileName) {
+        const filePath = path.join(this.storagePath, file);
+        await fs.promises.unlink(filePath).catch(() => {
+          console.warn(`[deleteTodo] Failed to delete attachment: ${filePath}`);
+        });
+      }
+    }
+
+    // 从 UUID 映射中删除
+    await this.removeFromUuidToFileMap(uuid);
 
     // 从索引中删除
     await this.fileIndexer.removeTodo(uuid);
@@ -440,15 +474,16 @@ export class FileStorageManager {
   // ==================== 辅助方法 ====================
 
   /**
-   * 启动文件监听
+   * 启动文件监听（Obsidian 风格）
    */
   private startFileWatcher(): void {
     if (this.fileWatcher) {
       return;
     }
 
+    // 监听所有 .md 文件
     this.fileWatcher = chokidar.watch(
-      path.join(this.storagePath, 'todo-*/todo.md'),
+      path.join(this.storagePath, '*.md'),
       {
         ignoreInitial: true,
         usePolling: process.platform === 'win32'
@@ -456,18 +491,23 @@ export class FileStorageManager {
     );
 
     this.fileWatcher.on('change', async (filePath: string) => {
-      const uuid = this.extractUuidFromPath(filePath);
-      if (uuid) {
-        try {
-          const markdown = await fs.promises.readFile(filePath, 'utf-8');
-          const todo = this.markdownParser.parseTodo(markdown);
+      try {
+        const markdown = await fs.promises.readFile(filePath, 'utf-8');
+        const todo = this.markdownParser.parseTodo(markdown);
 
-          // 更新缓存和索引
-          this.updateCache(uuid, todo);
-          await this.fileIndexer.updateTodo(todo);
-        } catch (error) {
-          console.error(`Error processing file change for ${uuid}:`, error);
+        // 确保 todo.id 存在且为字符串
+        if (!todo.id) {
+          console.warn(`[startFileWatcher] Todo missing ID in file: ${filePath}`);
+          return;
         }
+
+        const uuid = String(todo.id);
+
+        // 更新缓存和索引
+        this.updateCache(uuid, todo);
+        await this.fileIndexer.updateTodo(todo);
+      } catch (error) {
+        console.error(`[startFileWatcher] Error processing file change:`, error);
       }
     });
   }
@@ -522,9 +562,17 @@ export class FileStorageManager {
     if (!todo) return;
 
     const relations = await this.getRelationsByTodoId(uuid);
+
+    // 根据 UUID 查找文件名
+    const fileName = await this.getFileNameByUuid(uuid);
+    if (!fileName) {
+      console.error(`[updateTodoRelations] UUID not found in map: ${uuid}`);
+      return;
+    }
+
+    const todoPath = path.join(this.storagePath, fileName);
     const markdown = this.markdownParser.generateTodo(todo, relations);
 
-    const todoPath = path.join(this.storagePath, `todo-${uuid}`, 'todo.md');
     await this.atomicWrite(todoPath, markdown);
   }
 
@@ -544,14 +592,6 @@ export class FileStorageManager {
       }
       throw error;
     }
-  }
-
-  /**
-   * 从文件路径提取 UUID
-   */
-  private extractUuidFromPath(filePath: string): string | null {
-    const match = filePath.match(/todo-([a-f0-9-]+)\/todo\.md$/);
-    return match ? match[1] : null;
   }
 
   /**
@@ -602,5 +642,217 @@ export class FileStorageManager {
    */
   getStoragePath(): string {
     return this.storagePath;
+  }
+
+  // ==================== Obsidian 风格存储辅助方法 ====================
+
+  /**
+   * 生成安全的文件名（Obsidian 风格）
+   */
+  private async generateFileName(title: string, uuid: string): Promise<string> {
+    // 1. 移除或替换特殊字符
+    let safeTitle = title.replace(/[\/\\:*?"<>|]/g, '_');
+
+    // 2. 限制长度（避免文件系统限制）
+    if (safeTitle.length > 200) {
+      safeTitle = safeTitle.substring(0, 200);
+    }
+
+    // 3. 获取现有文件列表
+    const existingFiles = await this.getExistingMarkdownFiles();
+
+    // 4. 检查重名并添加序号
+    let fileName = `${safeTitle}.md`;
+    let counter = 1;
+
+    while (existingFiles.has(fileName)) {
+      fileName = `${safeTitle}_${counter}.md`;
+      counter++;
+    }
+
+    return fileName;
+  }
+
+  /**
+   * 获取现有的 Markdown 文件列表
+   */
+  private async getExistingMarkdownFiles(): Promise<Set<string>> {
+    const files = new Set<string>();
+
+    try {
+      const entries = await fs.promises.readdir(this.storagePath, { withFileTypes: true });
+
+      for (const entry of entries) {
+        if (entry.isFile() && entry.name.endsWith('.md')) {
+          files.add(entry.name);
+        }
+      }
+    } catch (error) {
+      console.error('[getExistingMarkdownFiles] Error reading directory:', error);
+    }
+
+    return files;
+  }
+
+  /**
+   * 处理附件（Obsidian 风格：与 md 文件同级）
+   */
+  private async processAttachments(
+    todo: Todo,
+    storagePath: string,
+    mdFileName: string
+  ): Promise<string[]> {
+    const attachments: string[] = [];
+    const baseName = mdFileName.replace('.md', '');
+    let attachmentIndex = 1;
+
+    try {
+      // 处理单张图片
+      if (todo.imageUrl) {
+        const attachmentFileName = await this.saveAttachment(
+          todo.imageUrl,
+          storagePath,
+          `${baseName}_${attachmentIndex}.png`
+        );
+        if (attachmentFileName) {
+          attachments.push(attachmentFileName);
+          attachmentIndex++;
+        }
+      }
+
+      // 处理多张图片
+      if (todo.images) {
+        try {
+          const images = JSON.parse(todo.images);
+          if (Array.isArray(images)) {
+            for (const imageData of images) {
+              const attachmentFileName = await this.saveAttachment(
+                imageData,
+                storagePath,
+                `${baseName}_${attachmentIndex}.png`
+              );
+              if (attachmentFileName) {
+                attachments.push(attachmentFileName);
+                attachmentIndex++;
+              }
+            }
+          }
+        } catch {
+          // 忽略解析错误
+        }
+      }
+    } catch (error) {
+      console.error('[processAttachments] Error processing attachments:', error);
+    }
+
+    return attachments;
+  }
+
+  /**
+   * 保存单个附件
+   */
+  private async saveAttachment(
+    imageData: string,
+    storagePath: string,
+    fileName: string
+  ): Promise<string | null> {
+    try {
+      const filePath = path.join(storagePath, fileName);
+
+      // 如果是 base64 数据
+      if (imageData.startsWith('data:')) {
+        const matches = imageData.match(/^data:image\/(\w+);base64,(.+)$/);
+        if (!matches) return null;
+
+        const ext = matches[1];
+        const base64Data = matches[2];
+        const buffer = Buffer.from(base64Data, 'base64');
+
+        // 调整文件扩展名
+        const adjustedFileName = fileName.replace('.png', `.${ext}`);
+        const adjustedFilePath = path.join(storagePath, adjustedFileName);
+
+        await fs.promises.writeFile(adjustedFilePath, buffer);
+        return `./${adjustedFileName}`;
+      }
+      // 如果是文件路径，复制文件
+      else if (fs.existsSync(imageData)) {
+        await fs.promises.copyFile(imageData, filePath);
+        return `./${fileName}`;
+      }
+    } catch (error) {
+      console.error(`[saveAttachment] Error saving attachment ${fileName}:`, error);
+    }
+
+    return null;
+  }
+
+  /**
+   * 更新 UUID 到文件名的映射
+   */
+  private async updateUuidToFileMap(uuid: string, fileName: string): Promise<void> {
+    const mapPath = path.join(this.storagePath, '.multitodo-metadata', 'uuid-to-file.json');
+
+    let uuidMap: Record<string, string> = {};
+
+    // 读取现有映射
+    if (fs.existsSync(mapPath)) {
+      try {
+        const content = await fs.promises.readFile(mapPath, 'utf-8');
+        uuidMap = JSON.parse(content);
+      } catch (error) {
+        console.error('[updateUuidToFileMap] Error reading UUID map:', error);
+      }
+    }
+
+    // 更新映射
+    uuidMap[uuid] = fileName;
+
+    // 保存映射
+    await this.atomicWrite(mapPath, JSON.stringify(uuidMap, null, 2));
+  }
+
+  /**
+   * 从 UUID 映射中删除
+   */
+  private async removeFromUuidToFileMap(uuid: string): Promise<void> {
+    const mapPath = path.join(this.storagePath, '.multitodo-metadata', 'uuid-to-file.json');
+
+    if (!fs.existsSync(mapPath)) {
+      return;
+    }
+
+    try {
+      const content = await fs.promises.readFile(mapPath, 'utf-8');
+      const uuidMap: Record<string, string> = JSON.parse(content);
+
+      // 删除映射
+      delete uuidMap[uuid];
+
+      // 保存映射
+      await this.atomicWrite(mapPath, JSON.stringify(uuidMap, null, 2));
+    } catch (error) {
+      console.error('[removeFromUuidToFileMap] Error removing UUID from map:', error);
+    }
+  }
+
+  /**
+   * 根据 UUID 查找文件名
+   */
+  private async getFileNameByUuid(uuid: string): Promise<string | null> {
+    const mapPath = path.join(this.storagePath, '.multitodo-metadata', 'uuid-to-file.json');
+
+    if (!fs.existsSync(mapPath)) {
+      return null;
+    }
+
+    try {
+      const content = await fs.promises.readFile(mapPath, 'utf-8');
+      const uuidMap: Record<string, string> = JSON.parse(content);
+      return uuidMap[uuid] || null;
+    } catch (error) {
+      console.error('[getFileNameByUuid] Error reading UUID map:', error);
+      return null;
+    }
   }
 }

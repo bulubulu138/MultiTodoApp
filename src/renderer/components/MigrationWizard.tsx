@@ -124,6 +124,10 @@ const MigrationWizard: React.FC<MigrationWizardProps> = ({
           <Space direction="vertical" size="middle">
             <div>
               <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
+              <Text strong>Obsidian 兼容：</Text>完美支持 Obsidian 笔记应用，可直接打开和编辑
+            </div>
+            <div>
+              <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
               <Text strong>人类可读：</Text>数据以纯文本格式存储，可用任何编辑器查看
             </div>
             <div>
@@ -132,7 +136,7 @@ const MigrationWizard: React.FC<MigrationWizardProps> = ({
             </div>
             <div>
               <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
-              <Text strong>便携性：</Text>轻松导出、备份和跨设备同步
+              <Text strong>附件同级存储：</Text>附件与 Markdown 文件同级放置，图片可直接预览
             </div>
             <div>
               <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
@@ -150,9 +154,9 @@ const MigrationWizard: React.FC<MigrationWizardProps> = ({
           description={
             <ul>
               <li>迁移过程会自动创建数据库备份</li>
-              <li>每个待办将转换为独立的 Markdown 文件</li>
-              <li>附件将从数据库提取到独立文件夹</li>
-              <li>待办关系将通过 Markdown 链接维护</li>
+              <li><strong>Obsidian 风格文件结构</strong>：每个待办将转换为独立的 Markdown 文件，文件名直接使用待办标题</li>
+              <li>附件将与 Markdown 文件同级放置，便于在 Obsidian 等应用中直接查看</li>
+              <li>待办关系将通过 Markdown 链接维护，支持跨文件引用</li>
               <li>迁移完成后可以选择是否删除原数据库</li>
             </ul>
           }

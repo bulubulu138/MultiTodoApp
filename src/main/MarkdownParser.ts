@@ -42,9 +42,9 @@ export class MarkdownParser {
   }
 
   /**
-   * 从 Todo 对象生成 Markdown 文件内容
+   * 从 Todo 对象生成 Markdown 文件内容（Obsidian 风格）
    */
-  generateTodo(todo: Todo, relations: TodoRelation[] = []): string {
+  generateTodo(todo: Todo, relations: TodoRelation[] = [], attachments: string[] = []): string {
     // 生成 YAML frontmatter
     const frontmatter: Record<string, any> = {
       title: todo.title,
@@ -70,6 +70,11 @@ export class MarkdownParser {
     if (todo.aiSuggestionProvider) frontmatter.ai_suggestion_provider = todo.aiSuggestionProvider;
     if (todo.aiSuggestionModel) frontmatter.ai_suggestion_model = todo.aiSuggestionModel;
 
+    // 添加附件列表（Obsidian 风格）
+    if (attachments.length > 0) {
+      frontmatter.attachments = attachments;
+    }
+
     // 生成 Markdown 内容
     let markdown = matter.stringify('', frontmatter);
 
@@ -80,12 +85,16 @@ export class MarkdownParser {
       markdown += '\n';
     }
 
-    // 添加附件部分
-    const attachments = this.extractAttachments(todo);
+    // 添加附件部分（使用标准 Markdown 图片语法）
     if (attachments.length > 0) {
       markdown += '\n## Attachments\n\n';
-      attachments.forEach(att => {
-        markdown += `- [${att.description}](./assets/${att.filename})\n`;
+      attachments.forEach((att, index) => {
+        const fileName = att.replace('./', '');
+        markdown += `
+
+
+![附件${index + 1}](${att})
+\n`;
       });
     }
 
