@@ -71,9 +71,32 @@ export class FileStorageManager {
     // 处理附件（与 md 文件同级放置）
     const attachments = await this.processAttachments(newTodo, this.storagePath, fileName);
 
+    // 添加附件处理日志
+    if (attachments.length > 0) {
+      console.log(`[createTodo] Created ${attachments.length} attachments for "${newTodo.title}":`, attachments);
+    } else {
+      console.log(`[createTodo] No attachments found for "${newTodo.title}"`);
+      console.log(`[createTodo] todo.imageUrl: ${newTodo.imageUrl ? 'present' : 'absent'}`);
+      console.log(`[createTodo] todo.images: ${newTodo.images ? 'present' : 'absent'}`);
+    }
+
     // 生成并保存 Markdown 文件（包含附件引用）
     const markdown = this.markdownParser.generateTodo(newTodo, [], attachments);
     await this.atomicWrite(todoPath, markdown);
+
+    // 添加文件系统验证日志
+    console.log(`[createTodo] Verifying files in storage path: ${this.storagePath}`);
+    try {
+      const files = await fs.promises.readdir(this.storagePath);
+      const mdFiles = files.filter(f => f.endsWith('.md'));
+      const imageFiles = files.filter(f => /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(f));
+      console.log(`[createTodo] Found ${mdFiles.length} .md files and ${imageFiles.length} image files`);
+      if (imageFiles.length > 0) {
+        console.log(`[createTodo] Image files: ${imageFiles.join(', ')}`);
+      }
+    } catch (error) {
+      console.error(`[createTodo] Error listing files:`, error);
+    }
 
     // 更新 UUID 到文件名的映射
     await this.updateUuidToFileMap(uuid, fileName);
@@ -706,45 +729,63 @@ export class FileStorageManager {
     const baseName = mdFileName.replace('.md', '');
     let attachmentIndex = 1;
 
+    console.log(`[processAttachments] Processing attachments for "${todo.title}"`);
+    console.log(`[processAttachments] Base name: ${baseName}, Storage path: ${storagePath}`);
+
     try {
       // 处理单张图片
       if (todo.imageUrl) {
+        console.log(`[processAttachments] Found single image (imageUrl): ${todo.imageUrl.substring(0, 50)}...`);
         const attachmentFileName = await this.saveAttachment(
           todo.imageUrl,
           storagePath,
           `${baseName}_${attachmentIndex}.png`
         );
         if (attachmentFileName) {
+          console.log(`[processAttachments] Successfully saved attachment: ${attachmentFileName}`);
           attachments.push(attachmentFileName);
           attachmentIndex++;
+        } else {
+          console.warn(`[processAttachments] Failed to save single image attachment`);
         }
+      } else {
+        console.log(`[processAttachments] No single image found (imageUrl is empty)`);
       }
 
       // 处理多张图片
       if (todo.images) {
+        console.log(`[processAttachments] Found multiple images (images): ${todo.images.substring(0, 50)}...`);
         try {
           const images = JSON.parse(todo.images);
+          console.log(`[processAttachments] Parsed ${images.length} images`);
           if (Array.isArray(images)) {
             for (const imageData of images) {
+              console.log(`[processAttachments] Processing image ${attachmentIndex}: ${imageData.substring(0, 50)}...`);
               const attachmentFileName = await this.saveAttachment(
                 imageData,
                 storagePath,
                 `${baseName}_${attachmentIndex}.png`
               );
               if (attachmentFileName) {
+                console.log(`[processAttachments] Successfully saved attachment: ${attachmentFileName}`);
                 attachments.push(attachmentFileName);
                 attachmentIndex++;
+              } else {
+                console.warn(`[processAttachments] Failed to save image attachment ${attachmentIndex}`);
               }
             }
           }
-        } catch {
-          // 忽略解析错误
+        } catch (error) {
+          console.error(`[processAttachments] Error parsing images array:`, error);
         }
+      } else {
+        console.log(`[processAttachments] No multiple images found (images is empty)`);
       }
     } catch (error) {
       console.error('[processAttachments] Error processing attachments:', error);
     }
 
+    console.log(`[processAttachments] Total attachments processed: ${attachments.length}`);
     return attachments;
   }
 
@@ -758,27 +799,57 @@ export class FileStorageManager {
   ): Promise<string | null> {
     try {
       const filePath = path.join(storagePath, fileName);
+      console.log(`[saveAttachment] Attempting to save attachment: ${fileName}`);
 
       // 如果是 base64 数据
       if (imageData.startsWith('data:')) {
+        console.log(`[saveAttachment] Detected base64 image data`);
         const matches = imageData.match(/^data:image\/(\w+);base64,(.+)$/);
-        if (!matches) return null;
+        if (!matches) {
+          console.warn(`[saveAttachment] Failed to match base64 pattern`);
+          return null;
+        }
 
         const ext = matches[1];
         const base64Data = matches[2];
         const buffer = Buffer.from(base64Data, 'base64');
+
+        console.log(`[saveAttachment] Base64 image detected: ${ext}, size: ${buffer.length} bytes`);
 
         // 调整文件扩展名
         const adjustedFileName = fileName.replace('.png', `.${ext}`);
         const adjustedFilePath = path.join(storagePath, adjustedFileName);
 
         await fs.promises.writeFile(adjustedFilePath, buffer);
+        console.log(`[saveAttachment] Successfully wrote base64 image to: ${adjustedFilePath}`);
+
+        // 验证文件确实存在
+        if (fs.existsSync(adjustedFilePath)) {
+          const stats = fs.statSync(adjustedFilePath);
+          console.log(`[saveAttachment] Verified file exists: ${adjustedFilePath}, size: ${stats.size} bytes`);
+        } else {
+          console.error(`[saveAttachment] File was not created: ${adjustedFilePath}`);
+        }
+
         return `./${adjustedFileName}`;
       }
       // 如果是文件路径，复制文件
       else if (fs.existsSync(imageData)) {
+        console.log(`[saveAttachment] Detected file path: ${imageData}`);
         await fs.promises.copyFile(imageData, filePath);
+        console.log(`[saveAttachment] Successfully copied file to: ${filePath}`);
+
+        // 验证文件确实存在
+        if (fs.existsSync(filePath)) {
+          const stats = fs.statSync(filePath);
+          console.log(`[saveAttachment] Verified file exists: ${filePath}, size: ${stats.size} bytes`);
+        } else {
+          console.error(`[saveAttachment] File was not copied: ${filePath}`);
+        }
+
         return `./${fileName}`;
+      } else {
+        console.warn(`[saveAttachment] Unknown image data format, doesn't start with 'data:' and file doesn't exist`);
       }
     } catch (error) {
       console.error(`[saveAttachment] Error saving attachment ${fileName}:`, error);

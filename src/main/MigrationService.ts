@@ -177,10 +177,18 @@ export class MigrationService {
 
             // 创建待办（无 ID）
             const { id, ...todoWithoutId } = todo;
+
+            // 添加迁移前的调试日志
+            console.log(`[Migration] Creating todo: "${todo.title}"`);
+            console.log(`[Migration] todo.imageUrl: ${todo.imageUrl ? 'present (' + todo.imageUrl.substring(0, 50) + '...)' : 'absent'}`);
+            console.log(`[Migration] todo.images: ${todo.images ? 'present (' + todo.images.substring(0, 50) + '...)' : 'absent'}`);
+
             const newTodo = await this.fileStorage.createTodo(todoWithoutId);
 
             // 注意：附件现在由 FileStorageManager.createTodo 自动处理
             // 所以这里不再需要调用 migrateAssets
+
+            console.log(`[Migration] Successfully created todo: "${todo.title}"`);
 
             this.updateProgress({
               stage: 'migrating_todos',
