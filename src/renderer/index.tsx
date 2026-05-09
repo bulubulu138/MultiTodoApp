@@ -39,7 +39,10 @@ if (typeof window !== 'undefined') {
       // Quill 内部错误
       message.includes('setRange') ||
       message.includes('setSelection') ||
-      message.includes('getSelection')
+      message.includes('getSelection') ||
+      // Quill 非被动事件监听器警告 (list.js:34 touchstart)
+      message.includes('non-passive event listener') ||
+      (message.includes('touchstart') && message.includes('passive'))
     ) {
       return;
     }
