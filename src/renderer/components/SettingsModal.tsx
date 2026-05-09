@@ -105,12 +105,18 @@ const StorageManagement: React.FC = () => {
   };
 
   const handleStartMigration = async () => {
+    console.log('[SettingsModal] ===== START MIGRATION CLICKED =====');
+    console.log('[SettingsModal] Storage path:', storagePath);
+
     if (!storagePath) {
+      console.warn('[SettingsModal] No storage path, aborting migration');
       return;
     }
 
     setIsMigrating(true);
     try {
+      console.log('[SettingsModal] Calling migration API with path:', storagePath);
+
       const result = await window.electronAPI.storage.migrate(storagePath, {
         deleteDatabaseAfter: true,
         createBackup: true,
@@ -118,6 +124,8 @@ const StorageManagement: React.FC = () => {
         verifyAfterMigration: true,
         forceClean: true // 强制清理目标路径的旧数据
       });
+
+      console.log('[SettingsModal] Migration result received:', result);
 
       if (result.success) {
         setMigrationProgress({
@@ -137,12 +145,14 @@ const StorageManagement: React.FC = () => {
           }
         });
       } else {
+        console.error('[SettingsModal] Migration failed:', result.errors);
         setMigrationProgress({
           stage: 'error',
           error: result.errors?.[0] || '迁移失败'
         });
       }
     } catch (error) {
+      console.error('[SettingsModal] Migration exception:', error);
       setMigrationProgress({
         stage: 'error',
         error: String(error)
