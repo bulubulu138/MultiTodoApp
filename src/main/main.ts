@@ -52,6 +52,9 @@ class Application {
   // ✅ 新增：混合存储管理器
   private hybridStorageManager: any = null;
 
+  // ✅ 新增：数据同步服务
+  private dataSyncService: any = null;
+
   constructor() {
     this.dbManager = new DatabaseManager();
     this.imageManager = new ImageManager();
@@ -1179,6 +1182,164 @@ class Application {
         }
       } catch (error) {
         console.error('Error invalidating cache:', error);
+      }
+    });
+
+    // ✅ 新增：数据同步服务IPC处理器
+    ipcMain.handle('dataSync:getConfig', async () => {
+      try {
+        if (!this.dataSyncService) {
+          return {
+            success: false,
+            error: 'Data sync service not initialized'
+          };
+        }
+
+        const config = this.dataSyncService.getConfig();
+        return {
+          success: true,
+          config
+        };
+      } catch (error) {
+        console.error('Error getting data sync config:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('dataSync:updateConfig', async (_, newConfig: any) => {
+      try {
+        if (!this.dataSyncService) {
+          return {
+            success: false,
+            error: 'Data sync service not initialized'
+          };
+        }
+
+        this.dataSyncService.updateConfig(newConfig);
+        return { success: true };
+      } catch (error) {
+        console.error('Error updating data sync config:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('dataSync:getStatus', async () => {
+      try {
+        if (!this.dataSyncService) {
+          return {
+            success: false,
+            error: 'Data sync service not initialized'
+          };
+        }
+
+        const status = this.dataSyncService.getSyncStatus();
+        const lastSyncTime = this.dataSyncService.getLastSyncTime();
+        return {
+          success: true,
+          status,
+          lastSyncTime
+        };
+      } catch (error) {
+        console.error('Error getting data sync status:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('dataSync:manualSync', async () => {
+      try {
+        if (!this.dataSyncService) {
+          return {
+            success: false,
+            error: 'Data sync service not initialized'
+          };
+        }
+
+        const result = await this.dataSyncService.manualSync();
+        return {
+          success: true,
+          result
+        };
+      } catch (error) {
+        console.error('Error performing manual sync:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('dataSync:getStats', async () => {
+      try {
+        if (!this.dataSyncService) {
+          return {
+            success: false,
+            error: 'Data sync service not initialized'
+          };
+        }
+
+        const stats = this.dataSyncService.getSyncStats();
+        return {
+          success: true,
+          stats
+        };
+      } catch (error) {
+        console.error('Error getting data sync stats:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('dataSync:getHistory', async () => {
+      try {
+        if (!this.dataSyncService) {
+          return {
+            success: false,
+            error: 'Data sync service not initialized'
+          };
+        }
+
+        const history = this.dataSyncService.getSyncHistory();
+        return {
+          success: true,
+          history
+        };
+      } catch (error) {
+        console.error('Error getting data sync history:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('dataSync:clearHistory', async () => {
+      try {
+        if (!this.dataSyncService) {
+          return {
+            success: false,
+            error: 'Data sync service not initialized'
+          };
+        }
+
+        this.dataSyncService.clearSyncHistory();
+        return { success: true };
+      } catch (error) {
+        console.error('Error clearing data sync history:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
       }
     });
 
@@ -2448,6 +2609,23 @@ class Application {
           conflictResolution: 'latest'
         });
         console.log('Hybrid storage manager initialized successfully');
+
+        // 初始化数据同步服务
+        console.log('Initializing data sync service...');
+        try {
+          const { DataSyncService } = await import('./services/DataSyncService');
+          this.dataSyncService = new DataSyncService(this.hybridStorageManager, {
+            enabled: true,
+            interval: 60000, // 每分钟同步一次
+            autoSyncOnSwitch: true,
+            conflictResolution: 'latest'
+          });
+          this.dataSyncService.startAutoSync();
+          console.log('Data sync service initialized successfully');
+        } catch (error) {
+          console.error('Failed to initialize data sync service:', error);
+          this.dataSyncService = null;
+        }
       } catch (error) {
         console.error('Failed to initialize hybrid storage manager:', error);
         this.hybridStorageManager = null;

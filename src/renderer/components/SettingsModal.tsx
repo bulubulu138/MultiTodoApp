@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert, Tooltip, Collapse, Descriptions, Progress, Result, message, Spin } from 'antd';
-import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, ExportOutlined, LinkOutlined, BgColorsOutlined, CloudUploadOutlined, LockOutlined, SyncOutlined, SwapOutlined } from '@ant-design/icons';
+import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, ExportOutlined, LinkOutlined, BgColorsOutlined, CloudUploadOutlined, LockOutlined, SyncOutlined, SwapOutlined, ReloadOutlined, FileTextOutlined } from '@ant-design/icons';
 import { App } from 'antd';
 import { Todo, CustomTab } from '../../shared/types';
 import { ColorTheme } from '../theme/themes';
@@ -9,6 +9,7 @@ import BackupSettings from './BackupSettings';
 import CustomTabManager from './CustomTabManager';
 import URLAuthorizationManager from './URLAuthorizationManager';
 import PromptTemplateManager from './PromptTemplateManager';
+import MarkdownFileBrowser from './MarkdownFileBrowser';
 
 const { Text } = Typography;
 
@@ -93,10 +94,23 @@ const StorageManagement: React.FC = () => {
   const [isSwitchingMode, setIsSwitchingMode] = useState(false);
   const [switchProgress, setSwitchProgress] = useState(0);
 
+  // ✅ 新增：Markdown文件浏览器状态
+  const [showMarkdownBrowser, setShowMarkdownBrowser] = useState(false);
+  const [mdFileCount, setMdFileCount] = useState(0);
+
+  // ✅ 新增：数据同步服务状态
+  const [dataSyncConfig, setDataSyncConfig] = useState<any>(null);
+  const [syncStatus, setSyncStatus] = useState<any>(null);
+  const [syncStats, setSyncStats] = useState<any>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<any>(null);
+
   useEffect(() => {
     loadStorageInfo();
     loadStorageLocationConfig();
     loadHybridStorageConfig(); // ✅ 新增：加载混合存储配置
+    loadDataSyncConfig(); // ✅ 新增：加载数据同步配置
+    loadDataSyncStatus(); // ✅ 新增：加载数据同步状态
   }, []);
 
   const loadStorageInfo = async () => {
@@ -200,6 +214,123 @@ const StorageManagement: React.FC = () => {
     } finally {
       setIsSwitchingMode(false);
       setSwitchProgress(0);
+    }
+  };
+
+  // ✅ 新增：处理Markdown文件导入
+  const handleImportMarkdownFile = async (filePath: string) => {
+    try {
+      const result = await window.electronAPI.hybridStorage.importMarkdownFile(filePath);
+      if (result.success) {
+        message.success(`成功导入文件: ${result.todo.title}`);
+        // 刷新存储统计信息
+        await loadStorageStats();
+      } else {
+        message.error(`导入失败: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error importing markdown file:', error);
+      message.error('导入文件时发生错误');
+    }
+  };
+
+  // ✅ 新增：刷新Markdown文件列表
+  const handleRefreshMarkdownFiles = async () => {
+    try {
+      await window.electronAPI.hybridStorage.invalidateCache();
+      await loadStorageStats();
+      await loadHybridStorageConfig();
+    } catch (error) {
+      console.error('Error refreshing markdown files:', error);
+    }
+  };
+
+  // ✅ 新增：加载数据同步配置
+  const loadDataSyncConfig = async () => {
+    try {
+      const result = await window.electronAPI.dataSync.getConfig();
+      if (result.success && result.config) {
+        setDataSyncConfig(result.config);
+      }
+    } catch (error) {
+      console.error('Error loading data sync config:', error);
+    }
+  };
+
+  // ✅ 新增：加载数据同步状态
+  const loadDataSyncStatus = async () => {
+    try {
+      const result = await window.electronAPI.dataSync.getStatus();
+      if (result.success) {
+        setSyncStatus(result);
+      }
+    } catch (error) {
+      console.error('Error loading data sync status:', error);
+    }
+  };
+
+  // ✅ 新增：加载数据同步统计
+  const loadDataSyncStats = async () => {
+    try {
+      const result = await window.electronAPI.dataSync.getStats();
+      if (result.success && result.stats) {
+        setSyncStats(result.stats);
+      }
+    } catch (error) {
+      console.error('Error loading data sync stats:', error);
+    }
+  };
+
+  // ✅ 新增：处理手动同步
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    setSyncProgress({ phase: 'starting', current: 0, total: 100, message: '正在启动同步...' });
+
+    try {
+      const result = await window.electronAPI.dataSync.manualSync();
+      if (result.success && result.result) {
+        const syncResult = result.result;
+        setSyncProgress({
+          phase: 'complete',
+          current: 100,
+          total: 100,
+          message: `同步完成: 成功 ${syncResult.itemsSuccess}, 失败 ${syncResult.itemsFailed}`
+        });
+
+        if (syncResult.success) {
+          message.success(`同步成功: ${syncResult.itemsSuccess} 个项目已同步`);
+        } else {
+          message.warning(`同步完成但有错误: ${syncResult.itemsSuccess} 成功, ${syncResult.itemsFailed} 失败`);
+        }
+
+        // 刷新状态
+        await loadDataSyncStatus();
+        await loadDataSyncStats();
+      } else {
+        message.error(`同步失败: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error performing manual sync:', error);
+      message.error('同步时发生错误');
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSyncProgress(null), 3000);
+    }
+  };
+
+  // ✅ 新增：更新数据同步配置
+  const handleUpdateSyncConfig = async (updates: any) => {
+    try {
+      const result = await window.electronAPI.dataSync.updateConfig(updates);
+      if (result.success) {
+        message.success('同步配置已更新');
+        await loadDataSyncConfig();
+      } else {
+        message.error(`更新配置失败: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error updating sync config:', error);
+      message.error('更新配置时发生错误');
     }
   };
 
@@ -451,6 +582,107 @@ const StorageManagement: React.FC = () => {
                 showIcon
               />
             )}
+          </Space>
+        </Card>
+
+        {/* ✅ 新增：数据同步服务 */}
+        <Card title={<><SyncOutlined spin={syncStatus?.status === 'syncing'} /> 数据同步服务</>}>
+          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+            {/* 同步状态 */}
+            <Descriptions column={2} size="small" bordered>
+              <Descriptions.Item label="同步状态">
+                <Tag color={syncStatus?.status === 'syncing' ? 'processing' :
+                         syncStatus?.status === 'error' ? 'error' : 'success'}>
+                  {syncStatus?.status === 'syncing' ? '同步中' :
+                   syncStatus?.status === 'error' ? '错误' : '空闲'}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="自动同步">
+                <Switch
+                  checked={dataSyncConfig?.enabled || false}
+                  onChange={(checked) => handleUpdateSyncConfig({ enabled: checked })}
+                  disabled={isSyncing}
+                />
+              </Descriptions.Item>
+              <Descriptions.Item label="同步间隔">
+                <Select
+                  value={dataSyncConfig?.interval || 60000}
+                  onChange={(value) => handleUpdateSyncConfig({ interval: value })}
+                  disabled={isSyncing || !dataSyncConfig?.enabled}
+                  style={{ width: 150 }}
+                >
+                  <Select.Option value={30000}>30秒</Select.Option>
+                  <Select.Option value={60000}>1分钟</Select.Option>
+                  <Select.Option value={300000}>5分钟</Select.Option>
+                  <Select.Option value={600000}>10分钟</Select.Option>
+                </Select>
+              </Descriptions.Item>
+              <Descriptions.Item label="切换时自动同步">
+                <Switch
+                  checked={dataSyncConfig?.autoSyncOnSwitch || false}
+                  onChange={(checked) => handleUpdateSyncConfig({ autoSyncOnSwitch: checked })}
+                  disabled={isSyncing}
+                />
+              </Descriptions.Item>
+              <Descriptions.Item label="最后同步时间">
+                {syncStats?.lastSyncTime ?
+                  new Date(syncStats.lastSyncTime).toLocaleString('zh-CN') :
+                  '从未同步'}
+              </Descriptions.Item>
+              <Descriptions.Item label="同步次数">
+                {syncStats?.totalSyncs || 0} 次
+                (成功: {syncStats?.successfulSyncs || 0}, 失败: {syncStats?.failedSyncs || 0})
+              </Descriptions.Item>
+            </Descriptions>
+
+            {/* 同步进度 */}
+            {syncProgress && (
+              <Alert
+                message={syncProgress.message}
+                type={syncProgress.phase === 'complete' ? 'success' : 'info'}
+                showIcon
+              />
+            )}
+
+            {/* 操作按钮 */}
+            <Space>
+              <Button
+                type="primary"
+                icon={<SyncOutlined spin={isSyncing} />}
+                onClick={handleManualSync}
+                disabled={isSyncing}
+                loading={isSyncing}
+              >
+                立即同步
+              </Button>
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={() => {
+                  loadDataSyncStatus();
+                  loadDataSyncStats();
+                }}
+                disabled={isSyncing}
+              >
+                刷新状态
+              </Button>
+            </Space>
+
+            <Alert
+              message="数据同步说明"
+              description={
+                <div>
+                  <p>数据同步服务会在数据库和Markdown文件之间自动同步待办数据：</p>
+                  <ul>
+                    <li><strong>自动同步</strong>：按照设定的时间间隔自动执行同步</li>
+                    <li><strong>切换时同步</strong>：切换存储模式时自动执行同步</li>
+                    <li><strong>冲突解决</strong>：自动选择最新修改的数据</li>
+                    <li><strong>手动同步</strong>：可以随时手动触发同步操作</li>
+                  </ul>
+                </div>
+              }
+              type="info"
+              showIcon
+            />
           </Space>
         </Card>
 
@@ -709,6 +941,9 @@ const StorageManagement: React.FC = () => {
                 <Descriptions.Item label="关系管理">
                   Markdown 链接
                 </Descriptions.Item>
+                <Descriptions.Item label="发现的MD文件">
+                  {storageStats && storageStats.fileCount}
+                </Descriptions.Item>
               </Descriptions>
 
               <Button
@@ -721,9 +956,26 @@ const StorageManagement: React.FC = () => {
               >
                 打开存储文件夹
               </Button>
+
+              <Button
+                icon={<FileTextOutlined />}
+                onClick={() => setShowMarkdownBrowser(true)}
+                style={{ marginTop: 8 }}
+              >
+                浏览和导入MD文件
+              </Button>
             </Space>
           </Card>
         )}
+
+        {/* ✅ 新增：Markdown文件浏览器 */}
+        <MarkdownFileBrowser
+          visible={showMarkdownBrowser}
+          storagePath={storagePath || ''}
+          onClose={() => setShowMarkdownBrowser(false)}
+          onImportFile={handleImportMarkdownFile}
+          onRefresh={handleRefreshMarkdownFiles}
+        />
       </Space>
     </div>
   );

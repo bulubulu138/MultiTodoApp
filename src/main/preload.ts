@@ -313,6 +313,65 @@ export interface ElectronAPI {
     exportTodoAsMarkdown: (todoId: number) => Promise<string>;
     invalidateCache: () => Promise<void>;
   };
+
+  // 数据同步API
+  dataSync: {
+    getConfig: () => Promise<{
+      success: boolean;
+      config?: {
+        enabled: boolean;
+        interval: number;
+        autoSyncOnSwitch: boolean;
+        conflictResolution: string;
+      };
+      error?: string;
+    }>;
+    updateConfig: (newConfig: any) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    getStatus: () => Promise<{
+      success: boolean;
+      status?: string;
+      lastSyncTime?: number;
+      error?: string;
+    }>;
+    manualSync: () => Promise<{
+      success: boolean;
+      result?: {
+        success: boolean;
+        startTime: number;
+        endTime: number;
+        duration: number;
+        itemsProcessed: number;
+        itemsSuccess: number;
+        itemsFailed: number;
+        errors: string[];
+      };
+      error?: string;
+    }>;
+    getStats: () => Promise<{
+      success: boolean;
+      stats?: {
+        lastSyncTime: number;
+        syncStatus: string;
+        totalSyncs: number;
+        successfulSyncs: number;
+        failedSyncs: number;
+        averageDuration: number;
+      };
+      error?: string;
+    }>;
+    getHistory: () => Promise<{
+      success: boolean;
+      history?: any[];
+      error?: string;
+    }>;
+    clearHistory: () => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+  };
 }
 
 // 暴露API到渲染进程
@@ -508,5 +567,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     importMarkdownFile: (filePath: string) => ipcRenderer.invoke('hybridStorage:importMarkdownFile', filePath),
     exportTodoAsMarkdown: (todoId: number) => ipcRenderer.invoke('hybridStorage:exportTodoAsMarkdown', todoId),
     invalidateCache: () => ipcRenderer.invoke('hybridStorage:invalidateCache'),
+  },
+
+  // 数据同步
+  dataSync: {
+    getConfig: () => ipcRenderer.invoke('dataSync:getConfig'),
+    updateConfig: (newConfig: any) => ipcRenderer.invoke('dataSync:updateConfig', newConfig),
+    getStatus: () => ipcRenderer.invoke('dataSync:getStatus'),
+    manualSync: () => ipcRenderer.invoke('dataSync:manualSync'),
+    getStats: () => ipcRenderer.invoke('dataSync:getStats'),
+    getHistory: () => ipcRenderer.invoke('dataSync:getHistory'),
+    clearHistory: () => ipcRenderer.invoke('dataSync:clearHistory'),
   },
 } as ElectronAPI);
