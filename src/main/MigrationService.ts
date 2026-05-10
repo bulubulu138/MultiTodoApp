@@ -315,9 +315,29 @@ export class MigrationService {
 
       // 删除数据库（如果用户选择）
       if (options.deleteDatabaseAfter) {
-        const dbPath = this.dbManager.getDbPath();
-        if (fs.existsSync(dbPath)) {
-          await fs.promises.unlink(dbPath);
+        try {
+          console.log('[Migration] 🗑️ Preparing to delete database file...');
+
+          // 🔧 关键修复：在删除数据库文件前，先关闭数据库连接以释放文件句柄
+          console.log('[Migration] 🔒 Closing database connection to release file handle...');
+          this.dbManager.close();
+          console.log('[Migration] ✅ Database connection closed, file handle released');
+
+          const dbPath = this.dbManager.getDbPath();
+          if (fs.existsSync(dbPath)) {
+            console.log(`[Migration] 🗑️ Deleting database file: ${dbPath}`);
+            await fs.promises.unlink(dbPath);
+            console.log('[Migration] ✅ Database file deleted successfully');
+          } else {
+            console.log('[Migration] ⚠️ Database file does not exist, skipping deletion');
+          }
+        } catch (error) {
+          console.error('[Migration] ❌ Error deleting database file:', error);
+          // 不抛出异常，允许迁移流程继续，但记录错误
+          failedTodos.push({
+            title: 'Database Cleanup',
+            error: `Failed to delete database file: ${error instanceof Error ? error.message : String(error)}`
+          });
         }
       }
 

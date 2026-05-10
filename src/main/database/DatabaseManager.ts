@@ -1534,8 +1534,18 @@ export class DatabaseManager {
 
   public close(): void {
     if (this.db) {
-      this.db.close();
-      this.db = null;
+      try {
+        console.log('[DatabaseManager] Closing database connection...');
+        this.db.close();
+        this.db = null;
+        console.log('[DatabaseManager] ✅ Database connection closed successfully');
+      } catch (error) {
+        console.error('[DatabaseManager] ❌ Error closing database connection:', error);
+        // 即使关闭失败，也设置为null以防止后续操作尝试使用已关闭的连接
+        this.db = null;
+      }
+    } else {
+      console.log('[DatabaseManager] Database connection already closed or not initialized');
     }
   }
 }
