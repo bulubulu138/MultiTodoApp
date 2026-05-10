@@ -326,21 +326,53 @@ export class FileIndexer {
 
     // 从 frontmatter 中提取 UUID
     const uuid = frontmatter.id;
-    if (!uuid) {
-      console.warn(`[FileIndexer] No UUID found in ${todoPath}`);
-      return null;
+    if (uuid) {
+      // 已有ID，正常处理
+      return {
+        uuid: String(uuid),
+        title: frontmatter.title || 'Untitled',
+        contentPreview: this.generateContentPreview(content),
+        status: frontmatter.status || 'pending',
+        priority: frontmatter.priority || 'medium',
+        tags: this.parseTags(frontmatter.tags),
+        keywords: frontmatter.keywords || [],
+        createdAt: frontmatter.created_at || new Date().toISOString(),
+        updatedAt: frontmatter.updated_at || new Date().toISOString(),
+        filePath: todoPath
+      };
     }
 
+    // ID缺失，调用规范化器
+    console.log(`[FileIndexer] No UUID found in ${todoPath}, normalizing...`);
+    const { TodoFileNormalizer } = await import('./TodoFileNormalizer');
+    const normalizer = new TodoFileNormalizer(this.storagePath);
+    const result = await normalizer.normalizeFile(todoPath, content);
+
+    if (result.success && result.todo) {
+      // 规范化成功，使用新UUID创建索引条目
+      console.log(`[FileIndexer] Successfully normalized ${todoPath}`);
+      return this.buildIndexEntryFromTodo(result.todo, todoPath);
+    }
+
+    // 规范化失败，记录警告并跳过
+    console.warn(`[FileIndexer] Failed to normalize ${todoPath}:`, result.error);
+    return null;
+  }
+
+  /**
+   * 从Todo对象构建索引条目
+   */
+  private buildIndexEntryFromTodo(todo: any, todoPath: string): TodoIndexEntry {
     return {
-      uuid: String(uuid),
-      title: frontmatter.title || 'Untitled',
-      contentPreview: this.generateContentPreview(content),
-      status: frontmatter.status || 'pending',
-      priority: frontmatter.priority || 'medium',
-      tags: this.parseTags(frontmatter.tags),
-      keywords: frontmatter.keywords || [],
-      createdAt: frontmatter.created_at || new Date().toISOString(),
-      updatedAt: frontmatter.updated_at || new Date().toISOString(),
+      uuid: String(todo.id),
+      title: todo.title || 'Untitled',
+      contentPreview: this.generateContentPreview(todo.content || ''),
+      status: todo.status || 'pending',
+      priority: todo.priority || 'medium',
+      tags: this.parseTags(todo.tags),
+      keywords: todo.keywords || [],
+      createdAt: todo.createdAt || new Date().toISOString(),
+      updatedAt: todo.updatedAt || new Date().toISOString(),
       filePath: todoPath
     };
   }

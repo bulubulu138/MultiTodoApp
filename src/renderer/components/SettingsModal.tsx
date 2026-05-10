@@ -128,6 +128,21 @@ const StorageManagement: React.FC = () => {
     loadFsWatcherStatus(); // ✅ 新增：加载文件系统监控器状态
   }, []);
 
+  // ✅ 新增：监听配置变更事件
+  useEffect(() => {
+    // 监听配置变更事件
+    if (window.electronAPI.hybridStorageEvents) {
+      const handleConfigChange = () => {
+        console.log('[SettingsModal] Config changed, reloading...');
+        loadHybridStorageConfig();
+        loadStorageStats();
+      };
+
+      const cleanup = window.electronAPI.hybridStorageEvents.onConfigChange(handleConfigChange);
+      return cleanup;
+    }
+  }, []);
+
   const loadStorageInfo = async () => {
     try {
       const info = await window.electronAPI.storage.getMode();
@@ -169,6 +184,11 @@ const StorageManagement: React.FC = () => {
       const result = await window.electronAPI.hybridStorage.getStats();
       if (result.success && result.stats) {
         setStorageStats(result.stats);
+
+        // 添加日志帮助调试
+        if (!result.stats.filePath) {
+          console.warn('[SettingsModal] Storage path not configured');
+        }
       }
     } catch (error) {
       console.error('Error loading storage stats:', error);

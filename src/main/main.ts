@@ -1093,6 +1093,9 @@ class Application {
           storageMode: newMode
         });
 
+        // 发送配置变更事件
+        this.mainWindow?.webContents.send('hybridStorage:configChanged');
+
         console.log(`[HybridStorage] Switched to ${newMode} mode`);
         return { success: true };
       } catch (error) {
@@ -1153,6 +1156,9 @@ class Application {
         await this.dbManager.updateSettings({
           markdownStoragePath: newPath
         });
+
+        // 发送配置变更事件
+        this.mainWindow?.webContents.send('hybridStorage:configChanged');
 
         console.log('[HybridStorage] Markdown path updated successfully');
         return { success: true };
@@ -2896,7 +2902,14 @@ class Application {
       console.log('Initializing hybrid storage manager...');
       try {
         const { HybridStorageManager } = await import('./services/HybridStorageManager');
-        const storagePath = this.fileStorageManager?.getStoragePath() || '';
+
+        // 从数据库加载markdownStoragePath，确保使用用户配置的路径
+        const settings = await this.dbManager.getSettings();
+        const storagePath = settings.markdownStoragePath ||
+                         this.fileStorageManager?.getStoragePath() ||
+                         '';
+
+        console.log('[Init] Loading markdown path from settings:', storagePath || '(empty)');
 
         this.hybridStorageManager = new HybridStorageManager(this.dbManager, {
           currentMode: this.useFileStorage ? 'file' : 'database',

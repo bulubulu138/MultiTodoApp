@@ -318,6 +318,11 @@ export interface ElectronAPI {
     invalidateCache: () => Promise<void>;
   };
 
+  // 混合存储事件API
+  hybridStorageEvents: {
+    onConfigChange: (callback: () => void) => () => void;
+  };
+
   // 数据同步API
   dataSync: {
     getConfig: () => Promise<{
@@ -638,6 +643,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     importMarkdownFile: (filePath: string) => ipcRenderer.invoke('hybridStorage:importMarkdownFile', filePath),
     exportTodoAsMarkdown: (todoId: number) => ipcRenderer.invoke('hybridStorage:exportTodoAsMarkdown', todoId),
     invalidateCache: () => ipcRenderer.invoke('hybridStorage:invalidateCache'),
+  },
+
+  // 混合存储事件
+  hybridStorageEvents: {
+    onConfigChange: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on('hybridStorage:configChanged', listener);
+      return () => ipcRenderer.removeListener('hybridStorage:configChanged', listener);
+    }
   },
 
   // 数据同步
