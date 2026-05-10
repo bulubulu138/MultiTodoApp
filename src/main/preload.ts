@@ -372,6 +372,72 @@ export interface ElectronAPI {
       error?: string;
     }>;
   };
+
+  // 文件系统监控器API
+  filesystemWatcher: {
+    getConfig: () => Promise<{
+      success: boolean;
+      config?: {
+        enabled: boolean;
+        debounceDelay: number;
+        ignorePatterns: RegExp[];
+        autoSync: boolean;
+        notifyChanges: boolean;
+      };
+      error?: string;
+    }>;
+    updateConfig: (newConfig: any) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    getStatus: () => Promise<{
+      success: boolean;
+      status?: string;
+      error?: string;
+    }>;
+    getStats: () => Promise<{
+      success: boolean;
+      stats?: {
+        status: string;
+        watchPath: string;
+        filesWatched: number;
+        changesDetected: number;
+        lastChangeTime: number;
+        uptime: number;
+        errors: number;
+      };
+      error?: string;
+    }>;
+    start: () => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    stop: () => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    pause: () => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    resume: () => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    refresh: () => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    getWatchedFiles: () => Promise<{
+      success: boolean;
+      files?: string[];
+      error?: string;
+    }>;
+    resetStats: () => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+  };
 }
 
 // 暴露API到渲染进程
@@ -578,5 +644,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getStats: () => ipcRenderer.invoke('dataSync:getStats'),
     getHistory: () => ipcRenderer.invoke('dataSync:getHistory'),
     clearHistory: () => ipcRenderer.invoke('dataSync:clearHistory'),
+  },
+
+  // 文件系统监控器
+  filesystemWatcher: {
+    getConfig: () => ipcRenderer.invoke('filesystemWatcher:getConfig'),
+    updateConfig: (newConfig: any) => ipcRenderer.invoke('filesystemWatcher:updateConfig', newConfig),
+    getStatus: () => ipcRenderer.invoke('filesystemWatcher:getStatus'),
+    getStats: () => ipcRenderer.invoke('filesystemWatcher:getStats'),
+    start: () => ipcRenderer.invoke('filesystemWatcher:start'),
+    stop: () => ipcRenderer.invoke('filesystemWatcher:stop'),
+    pause: () => ipcRenderer.invoke('filesystemWatcher:pause'),
+    resume: () => ipcRenderer.invoke('filesystemWatcher:resume'),
+    refresh: () => ipcRenderer.invoke('filesystemWatcher:refresh'),
+    getWatchedFiles: () => ipcRenderer.invoke('filesystemWatcher:getWatchedFiles'),
+    resetStats: () => ipcRenderer.invoke('filesystemWatcher:resetStats'),
   },
 } as ElectronAPI);

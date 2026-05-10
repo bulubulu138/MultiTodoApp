@@ -55,6 +55,9 @@ class Application {
   // ✅ 新增：数据同步服务
   private dataSyncService: any = null;
 
+  // ✅ 新增：文件系统监控器
+  private filesystemWatcher: any = null;
+
   constructor() {
     this.dbManager = new DatabaseManager();
     this.imageManager = new ImageManager();
@@ -1343,6 +1346,239 @@ class Application {
       }
     });
 
+    // ✅ 新增：文件系统监控器IPC处理器
+    ipcMain.handle('filesystemWatcher:getConfig', async () => {
+      try {
+        if (!this.filesystemWatcher) {
+          return {
+            success: false,
+            error: 'Filesystem watcher not initialized'
+          };
+        }
+
+        const config = this.filesystemWatcher.getConfig();
+        return {
+          success: true,
+          config
+        };
+      } catch (error) {
+        console.error('Error getting filesystem watcher config:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('filesystemWatcher:updateConfig', async (_, newConfig: any) => {
+      try {
+        if (!this.filesystemWatcher) {
+          return {
+            success: false,
+            error: 'Filesystem watcher not initialized'
+          };
+        }
+
+        this.filesystemWatcher.updateConfig(newConfig);
+        return { success: true };
+      } catch (error) {
+        console.error('Error updating filesystem watcher config:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('filesystemWatcher:getStatus', async () => {
+      try {
+        if (!this.filesystemWatcher) {
+          return {
+            success: false,
+            error: 'Filesystem watcher not initialized'
+          };
+        }
+
+        const status = this.filesystemWatcher.getStatus();
+        return {
+          success: true,
+          status
+        };
+      } catch (error) {
+        console.error('Error getting filesystem watcher status:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('filesystemWatcher:getStats', async () => {
+      try {
+        if (!this.filesystemWatcher) {
+          return {
+            success: false,
+            error: 'Filesystem watcher not initialized'
+          };
+        }
+
+        const stats = this.filesystemWatcher.getStats();
+        return {
+          success: true,
+          stats
+        };
+      } catch (error) {
+        console.error('Error getting filesystem watcher stats:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('filesystemWatcher:start', async () => {
+      try {
+        if (!this.filesystemWatcher) {
+          return {
+            success: false,
+            error: 'Filesystem watcher not initialized'
+          };
+        }
+
+        const result = await this.filesystemWatcher.start();
+        return { success: result };
+      } catch (error) {
+        console.error('Error starting filesystem watcher:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('filesystemWatcher:stop', async () => {
+      try {
+        if (!this.filesystemWatcher) {
+          return {
+            success: false,
+            error: 'Filesystem watcher not initialized'
+          };
+        }
+
+        this.filesystemWatcher.stop();
+        return { success: true };
+      } catch (error) {
+        console.error('Error stopping filesystem watcher:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('filesystemWatcher:pause', async () => {
+      try {
+        if (!this.filesystemWatcher) {
+          return {
+            success: false,
+            error: 'Filesystem watcher not initialized'
+          };
+        }
+
+        this.filesystemWatcher.pause();
+        return { success: true };
+      } catch (error) {
+        console.error('Error pausing filesystem watcher:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('filesystemWatcher:resume', async () => {
+      try {
+        if (!this.filesystemWatcher) {
+          return {
+            success: false,
+            error: 'Filesystem watcher not initialized'
+          };
+        }
+
+        this.filesystemWatcher.resume();
+        return { success: true };
+      } catch (error) {
+        console.error('Error resuming filesystem watcher:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('filesystemWatcher:refresh', async () => {
+      try {
+        if (!this.filesystemWatcher) {
+          return {
+            success: false,
+            error: 'Filesystem watcher not initialized'
+          };
+        }
+
+        await this.filesystemWatcher.refresh();
+        return { success: true };
+      } catch (error) {
+        console.error('Error refreshing filesystem watcher:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('filesystemWatcher:getWatchedFiles', async () => {
+      try {
+        if (!this.filesystemWatcher) {
+          return {
+            success: false,
+            error: 'Filesystem watcher not initialized'
+          };
+        }
+
+        const files = this.filesystemWatcher.getWatchedFiles();
+        return {
+          success: true,
+          files
+        };
+      } catch (error) {
+        console.error('Error getting watched files:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('filesystemWatcher:resetStats', async () => {
+      try {
+        if (!this.filesystemWatcher) {
+          return {
+            success: false,
+            error: 'Filesystem watcher not initialized'
+          };
+        }
+
+        this.filesystemWatcher.resetStats();
+        return { success: true };
+      } catch (error) {
+        console.error('Error resetting filesystem watcher stats:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
     ipcMain.handle('settings:openDataFolder', async () => {
       try {
         const dbPath = this.dbManager.getDbPath();
@@ -2622,6 +2858,47 @@ class Application {
           });
           this.dataSyncService.startAutoSync();
           console.log('Data sync service initialized successfully');
+
+          // 初始化文件系统监控器
+          console.log('Initializing filesystem watcher...');
+          try {
+            const { FilesystemWatcher } = await import('./services/FilesystemWatcher');
+            this.filesystemWatcher = new FilesystemWatcher(this.hybridStorageManager, {
+              enabled: true,
+              debounceDelay: 1000, // 1秒防抖延迟
+              ignorePatterns: [/^\./, /^~$/, /\.tmp$/i], // 忽略隐藏文件和临时文件
+              autoSync: true, // 检测到变化时自动同步
+              notifyChanges: true // 通知前端变化
+            });
+
+            // 启动监控器
+            await this.filesystemWatcher.start();
+
+            // 监听文件变化事件
+            this.filesystemWatcher.on('file-created', (event: any) => {
+              console.log(`[FilesystemWatcher] File created: ${event.filePath}`);
+              // 可以在这里添加自动导入新文件的逻辑
+            });
+
+            this.filesystemWatcher.on('file-modified', (event: any) => {
+              console.log(`[FilesystemWatcher] File modified: ${event.filePath}`);
+              // 可以在这里添加自动更新逻辑
+            });
+
+            this.filesystemWatcher.on('file-deleted', (event: any) => {
+              console.log(`[FilesystemWatcher] File deleted: ${event.filePath}`);
+              // 可以在这里添加自动清理逻辑
+            });
+
+            this.filesystemWatcher.on('error', (error: any) => {
+              console.error('[FilesystemWatcher] Error:', error);
+            });
+
+            console.log('Filesystem watcher initialized successfully');
+          } catch (error) {
+            console.error('Failed to initialize filesystem watcher:', error);
+            this.filesystemWatcher = null;
+          }
         } catch (error) {
           console.error('Failed to initialize data sync service:', error);
           this.dataSyncService = null;

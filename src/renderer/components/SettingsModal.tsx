@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert, Tooltip, Collapse, Descriptions, Progress, Result, message, Spin } from 'antd';
-import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, ExportOutlined, LinkOutlined, BgColorsOutlined, CloudUploadOutlined, LockOutlined, SyncOutlined, SwapOutlined, ReloadOutlined, FileTextOutlined } from '@ant-design/icons';
+import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, ExportOutlined, LinkOutlined, BgColorsOutlined, CloudUploadOutlined, LockOutlined, SyncOutlined, SwapOutlined, ReloadOutlined, FileTextOutlined, PlayCircleOutlined, PauseCircleOutlined, DeleteOutlined } from '@ant-design/icons';
 import { App } from 'antd';
 import { Todo, CustomTab } from '../../shared/types';
 import { ColorTheme } from '../theme/themes';
@@ -105,12 +105,20 @@ const StorageManagement: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<any>(null);
 
+  // ✅ 新增：文件系统监控器状态
+  const [fsWatcherConfig, setFsWatcherConfig] = useState<any>(null);
+  const [fsWatcherStatus, setFsWatcherStatus] = useState<any>(null);
+  const [fsWatcherStats, setFsWatcherStats] = useState<any>(null);
+  const [watchedFiles, setWatchedFiles] = useState<string[]>([]);
+
   useEffect(() => {
     loadStorageInfo();
     loadStorageLocationConfig();
     loadHybridStorageConfig(); // ✅ 新增：加载混合存储配置
     loadDataSyncConfig(); // ✅ 新增：加载数据同步配置
     loadDataSyncStatus(); // ✅ 新增：加载数据同步状态
+    loadFsWatcherConfig(); // ✅ 新增：加载文件系统监控器配置
+    loadFsWatcherStatus(); // ✅ 新增：加载文件系统监控器状态
   }, []);
 
   const loadStorageInfo = async () => {
@@ -330,6 +338,121 @@ const StorageManagement: React.FC = () => {
       }
     } catch (error) {
       console.error('Error updating sync config:', error);
+      message.error('更新配置时发生错误');
+    }
+  };
+
+  // ✅ 新增：加载文件系统监控器配置
+  const loadFsWatcherConfig = async () => {
+    try {
+      const result = await window.electronAPI.filesystemWatcher.getConfig();
+      if (result.success && result.config) {
+        setFsWatcherConfig(result.config);
+      }
+    } catch (error) {
+      console.error('Error loading filesystem watcher config:', error);
+    }
+  };
+
+  // ✅ 新增：加载文件系统监控器状态
+  const loadFsWatcherStatus = async () => {
+    try {
+      const [statusResult, statsResult] = await Promise.all([
+        window.electronAPI.filesystemWatcher.getStatus(),
+        window.electronAPI.filesystemWatcher.getStats()
+      ]);
+
+      if (statusResult.success) {
+        setFsWatcherStatus(statusResult);
+      }
+      if (statsResult.success && statsResult.stats) {
+        setFsWatcherStats(statsResult.stats);
+      }
+    } catch (error) {
+      console.error('Error loading filesystem watcher status:', error);
+    }
+  };
+
+  // ✅ 新增：加载监控文件列表
+  const loadWatchedFiles = async () => {
+    try {
+      const result = await window.electronAPI.filesystemWatcher.getWatchedFiles();
+      if (result.success && result.files) {
+        setWatchedFiles(result.files);
+      }
+    } catch (error) {
+      console.error('Error loading watched files:', error);
+    }
+  };
+
+  // ✅ 新增：处理监控器启动/停止
+  const handleToggleWatcher = async (enabled: boolean) => {
+    try {
+      const result = enabled
+        ? await window.electronAPI.filesystemWatcher.start()
+        : await window.electronAPI.filesystemWatcher.stop();
+
+      if (result.success) {
+        message.success(enabled ? '文件监控已启动' : '文件监控已停止');
+        await loadFsWatcherStatus();
+        await loadFsWatcherConfig();
+      } else {
+        message.error(`${enabled ? '启动' : '停止'}失败: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error toggling watcher:', error);
+      message.error('操作失败');
+    }
+  };
+
+  // ✅ 新增：处理监控器暂停/恢复
+  const handleToggleWatcherPause = async (paused: boolean) => {
+    try {
+      const result = paused
+        ? await window.electronAPI.filesystemWatcher.pause()
+        : await window.electronAPI.filesystemWatcher.resume();
+
+      if (result.success) {
+        message.success(paused ? '文件监控已暂停' : '文件监控已恢复');
+        await loadFsWatcherStatus();
+      } else {
+        message.error(`${paused ? '暂停' : '恢复'}失败: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error toggling watcher pause:', error);
+      message.error('操作失败');
+    }
+  };
+
+  // ✅ 新增：刷新监控文件列表
+  const handleRefreshWatcher = async () => {
+    try {
+      const result = await window.electronAPI.filesystemWatcher.refresh();
+      if (result.success) {
+        message.success('监控文件列表已刷新');
+        await loadFsWatcherStatus();
+        await loadWatchedFiles();
+      } else {
+        message.error(`刷新失败: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error refreshing watcher:', error);
+      message.error('刷新失败');
+    }
+  };
+
+  // ✅ 新增：更新监控器配置
+  const handleUpdateWatcherConfig = async (updates: any) => {
+    try {
+      const result = await window.electronAPI.filesystemWatcher.updateConfig(updates);
+      if (result.success) {
+        message.success('监控器配置已更新');
+        await loadFsWatcherConfig();
+      } else {
+        message.error(`更新配置失败: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error updating watcher config:', error);
       message.error('更新配置时发生错误');
     }
   };
@@ -677,6 +800,134 @@ const StorageManagement: React.FC = () => {
                     <li><strong>切换时同步</strong>：切换存储模式时自动执行同步</li>
                     <li><strong>冲突解决</strong>：自动选择最新修改的数据</li>
                     <li><strong>手动同步</strong>：可以随时手动触发同步操作</li>
+                  </ul>
+                </div>
+              }
+              type="info"
+              showIcon
+            />
+          </Space>
+        </Card>
+
+        {/* ✅ 新增：文件系统监控器 */}
+        <Card title={<><FileTextOutlined /> 文件系统监控器</>}>
+          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+            {/* 监控状态 */}
+            <Descriptions column={2} size="small" bordered>
+              <Descriptions.Item label="监控状态">
+                <Tag color={fsWatcherStatus?.status === 'watching' ? 'success' :
+                         fsWatcherStatus?.status === 'paused' ? 'warning' :
+                         fsWatcherStatus?.status === 'error' ? 'error' : 'default'}>
+                  {fsWatcherStatus?.status === 'watching' ? '监控中' :
+                   fsWatcherStatus?.status === 'paused' ? '已暂停' :
+                   fsWatcherStatus?.status === 'error' ? '错误' : '空闲'}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="监控开关">
+                <Switch
+                  checked={fsWatcherConfig?.enabled || false}
+                  onChange={handleToggleWatcher}
+                />
+              </Descriptions.Item>
+              <Descriptions.Item label="监控路径">
+                <Text ellipsis={{ tooltip: fsWatcherStats?.watchPath }} style={{ maxWidth: '200px' }}>
+                  {fsWatcherStats?.watchPath || '未配置'}
+                </Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="监控文件数">
+                {fsWatcherStats?.filesWatched || 0}
+              </Descriptions.Item>
+              <Descriptions.Item label="检测到变化">
+                {fsWatcherStats?.changesDetected || 0}
+              </Descriptions.Item>
+              <Descriptions.Item label="运行时长">
+                {fsWatcherStats?.uptime ? Math.floor(fsWatcherStats.uptime / 1000 / 60) + ' 分钟' : '0 分钟'}
+              </Descriptions.Item>
+              <Descriptions.Item label="自动同步">
+                <Switch
+                  checked={fsWatcherConfig?.autoSync || false}
+                  onChange={(checked) => handleUpdateWatcherConfig({ autoSync: checked })}
+                  disabled={!fsWatcherConfig?.enabled}
+                />
+              </Descriptions.Item>
+              <Descriptions.Item label="防抖延迟">
+                <Select
+                  value={fsWatcherConfig?.debounceDelay || 1000}
+                  onChange={(value) => handleUpdateWatcherConfig({ debounceDelay: value })}
+                  disabled={!fsWatcherConfig?.enabled}
+                  style={{ width: 120 }}
+                >
+                  <Select.Option value={500}>0.5秒</Select.Option>
+                  <Select.Option value={1000}>1秒</Select.Option>
+                  <Select.Option value={2000}>2秒</Select.Option>
+                  <Select.Option value={5000}>5秒</Select.Option>
+                </Select>
+              </Descriptions.Item>
+            </Descriptions>
+
+            {/* 操作按钮 */}
+            <Space>
+              <Button
+                icon={fsWatcherStatus?.status === 'paused' ? <PlayCircleOutlined /> : <PauseCircleOutlined />}
+                onClick={() => handleToggleWatcherPause(fsWatcherStatus?.status !== 'paused')}
+                disabled={!fsWatcherConfig?.enabled || fsWatcherStatus?.status === 'idle'}
+              >
+                {fsWatcherStatus?.status === 'paused' ? '恢复监控' : '暂停监控'}
+              </Button>
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={handleRefreshWatcher}
+                disabled={!fsWatcherConfig?.enabled || fsWatcherStatus?.status !== 'watching'}
+              >
+                刷新文件列表
+              </Button>
+              <Button
+                icon={<DeleteOutlined />}
+                onClick={async () => {
+                  const result = await window.electronAPI.filesystemWatcher.resetStats();
+                  if (result.success) {
+                    message.success('统计信息已重置');
+                    await loadFsWatcherStatus();
+                  }
+                }}
+                disabled={!fsWatcherConfig?.enabled}
+              >
+                重置统计
+              </Button>
+            </Space>
+
+            {/* 监控文件列表 */}
+            {watchedFiles.length > 0 && (
+              <div>
+                <Text strong>监控的文件：</Text>
+                <div style={{
+                  maxHeight: '200px',
+                  overflow: 'auto',
+                  marginTop: '8px',
+                  padding: '8px',
+                  background: '#f5f5f5',
+                  borderRadius: '4px'
+                }}>
+                  {watchedFiles.map((file, index) => (
+                    <div key={index} style={{ fontSize: '12px', padding: '4px 0' }}>
+                      <FileTextOutlined style={{ marginRight: '8px', color: '#52c41a' }} />
+                      <Text>{file.split(/[/\\]/).pop() || file}</Text>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Alert
+              message="文件监控说明"
+              description={
+                <div>
+                  <p>文件系统监控器会实时监控存储目录中的Markdown文件变化：</p>
+                  <ul>
+                    <li><strong>实时监控</strong>：检测文件的创建、修改、删除事件</li>
+                    <li><strong>自动同步</strong>：检测到变化时自动刷新数据</li>
+                    <li><strong>智能过滤</strong>：自动忽略隐藏文件和临时文件</li>
+                    <li><strong>防抖处理</strong>：避免频繁变化导致的性能问题</li>
                   </ul>
                 </div>
               }
