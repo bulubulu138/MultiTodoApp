@@ -681,4 +681,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getWatchedFiles: () => ipcRenderer.invoke('filesystemWatcher:getWatchedFiles'),
     resetStats: () => ipcRenderer.invoke('filesystemWatcher:resetStats'),
   },
+
+  // 调试工具
+  debug: {
+    checkDataIntegrity: () => ipcRenderer.invoke('debug:checkDataIntegrity'),
+    repairUuidMapping: () => ipcRenderer.invoke('debug:repairUuidMapping'),
+    rebuildIndex: () => ipcRenderer.invoke('debug:rebuildIndex'),
+    quickDiagnostic: () => ipcRenderer.invoke('debug:quickDiagnostic'),
+  },
 } as ElectronAPI);

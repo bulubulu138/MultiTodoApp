@@ -329,11 +329,22 @@ export class MarkdownParser {
    * 生成 UUID
    */
   private generateUUID(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    // 使用crypto API生成更安全的UUID（如果可用）
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      const uuid = crypto.randomUUID();
+      console.log(`[MarkdownParser] Generated UUID using crypto API: ${uuid}`);
+      return uuid;
+    }
+
+    // 降级到Math.random()方法
+    const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
       const r = Math.random() * 16 | 0;
       const v = c === 'x' ? r : (r & 0x3 | 0x8);
       return v.toString(16);
     });
+
+    console.log(`[MarkdownParser] Generated UUID using Math.random(): ${uuid}`);
+    return uuid;
   }
 }
 

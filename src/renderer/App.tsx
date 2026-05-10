@@ -334,16 +334,49 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       setDisplayCount(50);
       setHasMoreData(todoList.length > 50);
 
-      console.log(`[分页] 加载了 ${todoList.length} 条待办，初始显示 50 条`);
+      console.log(`[App] ✅ Successfully loaded ${todoList.length} todos`);
+      console.log(`[App] Initial display: 50 todos, has more: ${todoList.length > 50}`);
+
+      // 🔍 自动诊断：如果加载的待办数量异常，自动运行诊断
+      if (todoList.length < 20 && window.electronAPI.debug) {
+        console.warn('[App] ⚠️ Loaded fewer than 20 todos, running automatic diagnostic...');
+        try {
+          const diagnosticResult = await window.electronAPI.debug.quickDiagnostic();
+          console.log('[App] Diagnostic result:', diagnosticResult);
+
+          if (!diagnosticResult.healthy) {
+            console.error('[App] ❌ Found health issues:', diagnosticResult.issues);
+
+            // 如果发现问题，显示提示给用户
+            if (diagnosticResult.issues.length > 0) {
+              const issueMsg = diagnosticResult.issues.join('; ');
+              console.warn('[App] Issues found:', issueMsg);
+              // 可以考虑显示用户友好的提示
+              // message.warning(`检测到数据问题：${issueMsg}`);
+            }
+
+            if (diagnosticResult.recommendations.length > 0) {
+              console.log('[App] Recommendations:', diagnosticResult.recommendations);
+            }
+          }
+        } catch (diagError) {
+          console.error('[App] Failed to run diagnostic:', diagError);
+        }
+      }
     } catch (error) {
-      message.error('加载待办事项失败');
-      console.error('Error loading todos:', error);
+      const errorMsg = `加载待办事项失败: ${error instanceof Error ? error.message : '未知错误'}`;
+      message.error(errorMsg);
+      console.error('[App] ❌ Error loading todos:', error);
+      console.error('[App] Detailed error:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
     } finally {
       duration = PerformanceMonitor.end('todo-list-load');
       setLoading(false);
 
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[Performance] Todo list loaded in ${duration.toFixed(2)}ms`);
+        console.log(`[App] [Performance] Todo list loaded in ${duration.toFixed(2)}ms`);
       }
     }
   };

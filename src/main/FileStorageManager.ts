@@ -32,6 +32,8 @@ export class FileStorageManager {
    * 初始化存储目录结构
    */
   private async initializeStorage(): Promise<void> {
+    console.log('[FileStorageManager] 🚀 Initializing storage...');
+
     const dirs = [
       this.storagePath,
       path.join(this.storagePath, '.multitodo-metadata'),
@@ -41,13 +43,20 @@ export class FileStorageManager {
 
     for (const dir of dirs) {
       await fs.promises.mkdir(dir, { recursive: true });
+      console.log(`[FileStorageManager] ✅ Created directory: ${dir}`);
     }
 
-    // 初始化索引
+    // 初始化索引（阻塞操作，确保索引构建完成）
+    console.log('[FileStorageManager] 📊 Loading index...');
     await this.fileIndexer.loadIndex();
+    console.log('[FileStorageManager] ✅ Index loaded successfully');
 
-    // 启动文件监听
+    // 在索引构建完成后启动文件监听（避免竞态条件）
+    console.log('[FileStorageManager] 👀 Starting file watcher...');
     this.startFileWatcher();
+    console.log('[FileStorageManager] ✅ File watcher started');
+
+    console.log('[FileStorageManager] 🎉 Storage initialization completed');
   }
 
   // ==================== Todo CRUD 操作 ====================
@@ -139,35 +148,42 @@ export class FileStorageManager {
    * 根据 UUID 获取待办（Obsidian 风格）
    */
   async getTodoById(uuid: string): Promise<Todo | null> {
+    console.log(`[getTodoById] Looking up UUID: ${uuid}`);
+
     // 检查缓存
     const cached = this.getFromCache(uuid);
     if (cached) {
+      console.log(`[getTodoById] ✅ Found in cache: ${cached.title}`);
       return cached;
     }
 
     // 根据 UUID 查找文件名
     const fileName = await this.getFileNameByUuid(uuid);
     if (!fileName) {
-      console.warn(`[getTodoById] UUID not found in map: ${uuid}`);
+      console.error(`[getTodoById] ❌ UUID not found in map: ${uuid}`);
       return null;
     }
 
+    console.log(`[getTodoById] Found file: ${fileName}`);
     const todoPath = path.join(this.storagePath, fileName);
     if (!fs.existsSync(todoPath)) {
-      console.warn(`[getTodoById] File not found: ${todoPath}`);
+      console.error(`[getTodoById] ❌ File not found: ${todoPath}`);
       return null;
     }
 
     try {
+      console.log(`[getTodoById] Reading file: ${todoPath}`);
       const markdown = await fs.promises.readFile(todoPath, 'utf-8');
       const todo = this.markdownParser.parseTodo(markdown);
+
+      console.log(`[getTodoById] ✅ Successfully parsed todo: ${todo.title}`);
 
       // 更新缓存
       this.updateCache(uuid, todo);
 
       return todo;
     } catch (error) {
-      console.error(`[getTodoById] Error reading todo ${uuid}:`, error);
+      console.error(`[getTodoById] ❌ Error reading todo ${uuid}:`, error);
       return null;
     }
   }
@@ -179,13 +195,20 @@ export class FileStorageManager {
     const entries = await this.fileIndexer.getAllTodos();
     const todos: Todo[] = [];
 
+    console.log(`[FileStorageManager] getAllTodos: Starting, index entries: ${entries.length}`);
+
     for (const entry of entries) {
+      console.log(`[FileStorageManager] Attempting to load todo: ${entry.uuid}`);
       const todo = await this.getTodoById(entry.uuid);
       if (todo) {
         todos.push(todo);
+        console.log(`[FileStorageManager] ✅ Loaded todo: ${todo.title}`);
+      } else {
+        console.warn(`[FileStorageManager] ❌ Failed to load todo: ${entry.uuid}`);
       }
     }
 
+    console.log(`[FileStorageManager] getAllTodos: Completed, loaded ${todos.length}/${entries.length}`);
     return todos;
   }
 
@@ -959,17 +982,255 @@ export class FileStorageManager {
   private async getFileNameByUuid(uuid: string): Promise<string | null> {
     const mapPath = path.join(this.storagePath, '.multitodo-metadata', 'uuid-to-file.json');
 
+    console.log(`[getFileNameByUuid] Looking up UUID: ${uuid} in map: ${mapPath}`);
+
     if (!fs.existsSync(mapPath)) {
+      console.error(`[getFileNameByUuid] ❌ Map file not found: ${mapPath}`);
       return null;
     }
 
     try {
       const content = await fs.promises.readFile(mapPath, 'utf-8');
       const uuidMap: Record<string, string> = JSON.parse(content);
-      return uuidMap[uuid] || null;
+      const fileName = uuidMap[uuid] || null;
+
+      if (!fileName) {
+        console.warn(`[getFileNameByUuid] ⚠️ UUID ${uuid} not found in mapping file`);
+        console.warn(`[getFileNameByUuid] Available UUIDs in map:`, Object.keys(uuidMap));
+      } else {
+        console.log(`[getFileNameByUuid] ✅ Found mapping: ${uuid} -> ${fileName}`);
+      }
+
+      return fileName;
     } catch (error) {
-      console.error('[getFileNameByUuid] Error reading UUID map:', error);
+      console.error('[getFileNameByUuid] ❌ Error reading UUID map:', error);
+      console.error('[getFileNameByUuid] Map path:', mapPath);
+      console.error('[getFileNameByUuid] Error details:', error instanceof Error ? error.stack : String(error));
       return null;
     }
   }
+
+  /**
+   * 数据完整性验证
+   */
+  public async verifyDataIntegrity(): Promise<{
+    isValid: boolean;
+    issues: string[];
+    stats: {
+      indexCount: number;
+      mapCount: number;
+      fileCount: number;
+    };
+  }> {
+    const issues: string[] = [];
+
+    console.log('[FileStorageManager] 🔍 Starting data integrity verification...');
+
+    // 1. 检查索引数量
+    const indexEntries = await this.fileIndexer.getAllTodos();
+    const indexCount = indexEntries.length;
+    console.log(`[FileStorageManager] Index entries: ${indexCount}`);
+
+    // 2. 检查UUID映射数量
+    const mapPath = path.join(this.storagePath, '.multitodo-metadata', 'uuid-to-file.json');
+    let mapCount = 0;
+
+    if (fs.existsSync(mapPath)) {
+      try {
+        const content = await fs.promises.readFile(mapPath, 'utf-8');
+        const uuidMap = JSON.parse(content);
+        mapCount = Object.keys(uuidMap).length;
+        console.log(`[FileStorageManager] UUID mapping entries: ${mapCount}`);
+      } catch (error) {
+        issues.push(`UUID映射文件损坏: ${error}`);
+        console.error('[FileStorageManager] ❌ Failed to read UUID mapping file:', error);
+      }
+    } else {
+      issues.push('UUID映射文件不存在');
+      console.warn('[FileStorageManager] ⚠️ UUID mapping file does not exist');
+    }
+
+    // 3. 检查实际文件数量
+    const files = await fs.promises.readdir(this.storagePath);
+    const fileCount = files.filter(f => f.endsWith('.md') && !f.startsWith('.')).length;
+    console.log(`[FileStorageManager] Markdown files: ${fileCount}`);
+
+    // 4. 验证一致性
+    if (indexCount !== mapCount) {
+      const issue = `索引数量(${indexCount})与映射数量(${mapCount})不一致`;
+      issues.push(issue);
+      console.error(`[FileStorageManager] ❌ ${issue}`);
+    }
+
+    if (indexCount !== fileCount) {
+      const issue = `索引数量(${indexCount})与文件数量(${fileCount})不一致`;
+      issues.push(issue);
+      console.error(`[FileStorageManager] ❌ ${issue}`);
+    }
+
+    const isValid = issues.length === 0;
+
+    if (isValid) {
+      console.log('[FileStorageManager] ✅ Data integrity verified successfully');
+    } else {
+      console.error(`[FileStorageManager] ❌ Found ${issues.length} integrity issues:`, issues);
+    }
+
+    return {
+      isValid,
+      issues,
+      stats: { indexCount, mapCount, fileCount }
+    };
+  }
+
+  /**
+   * 修复UUID映射
+   */
+  public async repairUuidMapping(): Promise<{
+    success: boolean;
+    repaired: number;
+    errors: string[];
+  }> {
+    const errors: string[] = [];
+    let repaired = 0;
+
+    try {
+      // 🔧 防御性编程：备份现有映射文件
+      const mapPath = path.join(this.storagePath, '.multitodo-metadata', 'uuid-to-file.json');
+      const backupPath = path.join(this.storagePath, '.multitodo-metadata', 'uuid-to-file.json.backup');
+
+      if (fs.existsSync(mapPath)) {
+        try {
+          await fs.promises.copyFile(mapPath, backupPath);
+          console.log(`[FileStorageManager] 💾 Created backup: ${backupPath}`);
+        } catch (backupError) {
+          console.error('[FileStorageManager] ⚠️ Failed to create backup:', backupError);
+          // 不中断修复流程，备份失败不是致命错误
+        }
+      }
+
+      // 1. 获取所有markdown文件
+      const files = await fs.promises.readdir(this.storagePath);
+      const mdFiles = files.filter(f => f.endsWith('.md') && !f.startsWith('.'));
+
+      console.log(`[FileStorageManager] 🛠️️ Found ${mdFiles.length} markdown files to process`);
+
+      // 2. 为每个文件添加/验证UUID映射
+      for (const fileName of mdFiles) {
+        try {
+          const filePath = path.join(this.storagePath, fileName);
+
+          // 检查文件是否存在
+          if (!fs.existsSync(filePath)) {
+            console.warn(`[FileStorageManager] File does not exist: ${fileName}`);
+            continue;
+          }
+
+          // 解析markdown文件
+          const content = await fs.promises.readFile(filePath, 'utf-8');
+          const { data } = require('gray-matter')(content);
+
+          if (!data.id) {
+            errors.push(`文件 ${fileName} 缺少UUID`);
+            console.warn(`[FileStorageManager] ⚠️ File ${fileName} is missing UUID`);
+            continue;
+          }
+
+          const uuid = String(data.id);
+
+          // 检查映射是否存在
+          const existingMap = await this.getFileNameByUuid(uuid);
+          if (!existingMap || existingMap !== fileName) {
+            // 更新映射
+            await this.updateUuidToFileMap(uuid, fileName);
+            repaired++;
+            console.log(`[FileStorageManager] ✅ Repaired mapping: ${uuid} -> ${fileName}`);
+          } else {
+            console.log(`[FileStorageManager] ℹ️ Mapping already exists: ${uuid} -> ${fileName}`);
+          }
+        } catch (error) {
+          const errorMsg = `处理文件 ${fileName} 失败: ${error instanceof Error ? error.message : String(error)}`;
+          errors.push(errorMsg);
+          console.error(`[FileStorageManager] ❌ ${errorMsg}`);
+        }
+      }
+
+      const success = true;
+      console.log(`[FileStorageManager] 🛠️️ UUID mapping repair completed: ${repaired} repaired, ${errors.length} errors`);
+
+      return { success, repaired, errors };
+    } catch (error) {
+      const errorMsg = `修复过程失败: ${error instanceof Error ? error.message : String(error)}`;
+      errors.push(errorMsg);
+      console.error(`[FileStorageManager] ❌ ${errorMsg}`);
+      return { success: false, repaired, errors };
+    }
+  }
+
+  /**
+   * 快速诊断（启动时调用）
+   */
+  public async quickDiagnostic(): Promise<{
+    healthy: boolean;
+    issues: string[];
+    recommendations: string[];
+  }> {
+    const issues: string[] = [];
+    const recommendations: string[] = [];
+
+    console.log('[FileStorageManager] 🔍 Running quick diagnostic...');
+
+    try {
+      // 1. 检查存储路径是否存在
+      if (!fs.existsSync(this.storagePath)) {
+        issues.push('存储路径不存在');
+        recommendations.push('检查存储路径配置');
+        return { healthy: false, issues, recommendations };
+      }
+
+      // 2. 检查索引文件是否存在
+      const indexPath = path.join(this.storagePath, '.multitodo-metadata', 'index.json');
+      if (!fs.existsSync(indexPath)) {
+        issues.push('索引文件不存在');
+        recommendations.push('调用 rebuildIndex() 重建索引');
+      }
+
+      // 3. 检查UUID映射文件是否存在
+      const mapPath = path.join(this.storagePath, '.multitodo-metadata', 'uuid-to-file.json');
+      if (!fs.existsSync(mapPath)) {
+        issues.push('UUID映射文件不存在');
+        recommendations.push('调用 repairUuidMapping() 修复映射');
+      }
+
+      // 4. 快速统计文件数量
+      const files = await fs.promises.readdir(this.storagePath);
+      const mdFileCount = files.filter(f => f.endsWith('.md') && !f.startsWith('.')).length;
+
+      console.log(`[FileStorageManager] 📊 Found ${mdFileCount} markdown files`);
+
+      if (mdFileCount === 0) {
+        issues.push('没有找到任何markdown文件');
+        recommendations.push('检查待办数据是否已迁移');
+      }
+
+      // 5. 检查缓存状态
+      console.log(`[FileStorageManager] 🗄️ Cache size: ${this.cache.size}, TTL: ${this.CACHE_TTL}ms`);
+
+      const healthy = issues.length === 0;
+
+      if (healthy) {
+        console.log('[FileStorageManager] ✅ Quick diagnostic passed');
+      } else {
+        console.warn('[FileStorageManager] ⚠️ Quick diagnostic found issues:', issues);
+      }
+
+      return { healthy, issues, recommendations };
+    } catch (error) {
+      const errorMsg = `诊断失败: ${error instanceof Error ? error.message : String(error)}`;
+      issues.push(errorMsg);
+      console.error('[FileStorageManager] ❌', errorMsg);
+      return { healthy: false, issues, recommendations };
+    }
+  }
+}
 }

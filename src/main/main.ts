@@ -1816,6 +1816,75 @@ class Application {
       }
     });
 
+    // 调试工具相关
+    ipcMain.handle('debug:checkDataIntegrity', async () => {
+      console.log('[debug:checkDataIntegrity] Data integrity check requested');
+      if (!this.fileStorageManager) {
+        console.warn('[debug:checkDataIntegrity] File storage not initialized');
+        return { success: false, error: 'File storage not initialized' };
+      }
+
+      try {
+        const result = await this.fileStorageManager.verifyDataIntegrity();
+        console.log('[debug:checkDataIntegrity] Result:', result);
+        return { success: true, ...result };
+      } catch (error) {
+        console.error('[debug:checkDataIntegrity] Error:', error);
+        return { success: false, error: String(error) };
+      }
+    });
+
+    ipcMain.handle('debug:repairUuidMapping', async () => {
+      console.log('[debug:repairUuidMapping] UUID mapping repair requested');
+      if (!this.fileStorageManager) {
+        console.warn('[debug:repairUuidMapping] File storage not initialized');
+        return { success: false, error: 'File storage not initialized' };
+      }
+
+      try {
+        const result = await this.fileStorageManager.repairUuidMapping();
+        console.log('[debug:repairUuidMapping] Result:', result);
+        return { success: true, ...result };
+      } catch (error) {
+        console.error('[debug:repairUuidMapping] Error:', error);
+        return { success: false, error: String(error) };
+      }
+    });
+
+    ipcMain.handle('debug:rebuildIndex', async () => {
+      console.log('[debug:rebuildIndex] Index rebuild requested');
+      if (!this.fileStorageManager) {
+        console.warn('[debug:rebuildIndex] File storage not initialized');
+        return { success: false, error: 'File storage not initialized' };
+      }
+
+      try {
+        await this.fileStorageManager.rebuildIndex();
+        console.log('[debug:rebuildIndex] Index rebuild completed');
+        return { success: true };
+      } catch (error) {
+        console.error('[debug:rebuildIndex] Error:', error);
+        return { success: false, error: String(error) };
+      }
+    });
+
+    ipcMain.handle('debug:quickDiagnostic', async () => {
+      console.log('[debug:quickDiagnostic] Quick diagnostic requested');
+      if (!this.fileStorageManager) {
+        console.warn('[debug:quickDiagnostic] File storage not initialized');
+        return { success: false, error: 'File storage not initialized' };
+      }
+
+      try {
+        const result = await this.fileStorageManager.quickDiagnostic();
+        console.log('[debug:quickDiagnostic] Result:', result);
+        return { success: true, ...result };
+      } catch (error) {
+        console.error('[debug:quickDiagnostic] Error:', error);
+        return { success: false, error: String(error) };
+      }
+    });
+
     // 关键词和推荐相关
     ipcMain.handle('keywords:getRecommendations', async (_, title: string, content: string, excludeId?: number) => {
       try {

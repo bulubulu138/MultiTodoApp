@@ -162,6 +162,32 @@ export class FileIndexer {
       }
     }
 
+    // 对失败的文件进行二次尝试（Phase 3.2: 失败文件恢复机制）
+    if (failCount > 0) {
+      console.log(`[FileIndexer] 🔄 Attempting to recover ${failCount} failed files...`);
+
+      for (const todoFile of todoFiles) {
+        try {
+          const entry = await this.createIndexEntryFromFile(todoFile);
+          // 只处理之前失败但现在成功的文件
+          if (entry && !this.index.todos.has(entry.uuid)) {
+            this.addToIndex(entry);
+            successCount++;
+            failCount--;
+            console.log(`[FileIndexer] ✅ Recovered: "${entry.title}" (${entry.uuid})`);
+          }
+        } catch (error) {
+          console.error(`[FileIndexer] ❌ Recovery failed for ${todoFile}:`, error);
+        }
+      }
+
+      // 更新统计
+      this.index.metadata.lastUpdated = Date.now();
+      this.index.metadata.todoCount = this.index.todos.size;
+
+      console.log(`[FileIndexer] 🔄 Recovery completed: ${successCount} total, ${failCount} failed`);
+    }
+
     // 更新元数据
     this.index.metadata.lastUpdated = Date.now();
     this.index.metadata.todoCount = this.index.todos.size;
@@ -364,12 +390,19 @@ export class FileIndexer {
 
     if (result.success && result.todo) {
       // 规范化成功，使用新UUID创建索引条目
-      console.log(`[FileIndexer] Successfully normalized ${todoPath}`);
+      console.log(`[FileIndexer] ✅ Successfully normalized ${todoPath}, UUID: ${result.todo.id}`);
       return this.buildIndexEntryFromTodo(result.todo, todoPath);
     }
 
-    // 规范化失败，记录警告并跳过
-    console.warn(`[FileIndexer] Failed to normalize ${todoPath}:`, result.error);
+    // 规范化失败，记录详细错误并跳过
+    console.error(`[FileIndexer] ❌ Failed to normalize ${todoPath}:`, result.error);
+    console.error(`[FileIndexer] Normalization result details:`, {
+      filePath: todoPath,
+      success: result.success,
+      wasNormalized: result.wasNormalized,
+      error: result.error,
+      hasTodo: !!result.todo
+    });
     return null;
   }
 
