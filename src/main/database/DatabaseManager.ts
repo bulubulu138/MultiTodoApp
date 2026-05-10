@@ -1,6 +1,7 @@
 // Database manager - using better-sqlite3
 import Database from 'better-sqlite3';
 import * as path from 'path';
+import * as fs from 'fs';
 import { app } from 'electron';
 import { Todo, Settings, TodoRelation } from '../../shared/types';
 import { generateContentHash } from '../utils/hashUtils';
@@ -10,9 +11,17 @@ export class DatabaseManager {
   private db: Database.Database | null = null;
   private dbPath: string;
 
-  constructor() {
-    const userDataPath = app.getPath('userData');
-    this.dbPath = path.join(userDataPath, 'todo_app.db');
+  constructor(customPath?: string) {
+    if (customPath) {
+      // 使用自定义路径
+      this.dbPath = customPath;
+      console.log('[DatabaseManager] Using custom database path:', this.dbPath);
+    } else {
+      // 使用默认路径（保持向后兼容）
+      const userDataPath = app.getPath('userData');
+      this.dbPath = path.join(userDataPath, 'todo_app.db');
+      console.log('[DatabaseManager] Using default database path:', this.dbPath);
+    }
   }
 
   public getDbPath(): string {
@@ -1546,6 +1555,155 @@ export class DatabaseManager {
       }
     } else {
       console.log('[DatabaseManager] Database connection already closed or not initialized');
+    }
+  }
+
+  /**
+   * 移动数据库到新位置
+   * @param newPath 新的数据库文件路径
+   * @returns 是否成功移动
+   */
+  public async moveDatabase(newPath: string): Promise<boolean> {
+    try {
+      console.log('[DatabaseManager] Moving database from', this.dbPath, 'to', newPath);
+
+      // 1. 关闭当前数据库连接
+      if (this.db) {
+        this.close();
+      }
+
+      // 2. 确保目标目录存在
+      const targetDir = path.dirname(newPath);
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+        console.log('[DatabaseManager] Created target directory:', targetDir);
+      }
+
+      // 3. 检查源文件是否存在
+      if (!fs.existsSync(this.dbPath)) {
+        throw new Error(`Source database file does not exist: ${this.dbPath}`);
+      }
+
+      // 4. 如果目标文件已存在，先备份
+      if (fs.existsSync(newPath)) {
+        const backupPath = `${newPath}.backup`;
+        console.log('[DatabaseManager] Target file exists, creating backup:', backupPath);
+        fs.copyFileSync(newPath, backupPath);
+      }
+
+      // 5. 复制数据库文件到新位置
+      fs.copyFileSync(this.dbPath, newPath);
+      console.log('[DatabaseManager] Database file copied successfully');
+
+      // 6. 验证新数据库的完整性
+      const tempDb = new Database(newPath, { readonly: true });
+      try {
+        // 执行简单的完整性检查
+        tempDb.pragma('integrity_check');
+        console.log('[DatabaseManager] New database integrity check passed');
+      } finally {
+        tempDb.close();
+      }
+
+      // 7. 删除旧数据库文件（可选，根据需求决定）
+      // fs.unlinkSync(this.dbPath);
+      // console.log('[DatabaseManager] Old database file removed');
+
+      // 8. 更新当前路径
+      this.dbPath = newPath;
+
+      // 9. 重新连接数据库
+      await this.initialize();
+
+      console.log('[DatabaseManager] ✅ Database moved successfully');
+      return true;
+    } catch (error) {
+      console.error('[DatabaseManager] ❌ Failed to move database:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 验证数据库完整性
+   * @returns 数据库是否有效
+   */
+  public verifyDatabase(): boolean {
+    try {
+      console.log('[DatabaseManager] Verifying database integrity...');
+
+      // 检查文件是否存在
+      if (!fs.existsSync(this.dbPath)) {
+        console.error('[DatabaseManager] Database file does not exist:', this.dbPath);
+        return false;
+      }
+
+      // 如果数据库已打开，执行完整性检查
+      if (this.db) {
+        try {
+          const result = this.db.pragma('integrity_check') as any[];
+          if (result && result.length > 0 && result[0].integrity_check !== 'ok') {
+            console.error('[DatabaseManager] Database integrity check failed:', result);
+            return false;
+          }
+          console.log('[DatabaseManager] ✅ Database integrity verified');
+          return true;
+        } catch (error) {
+          console.error('[DatabaseManager] Database integrity check error:', error);
+          return false;
+        }
+      }
+
+      // 如果数据库未打开，尝试打开并验证
+      try {
+        const tempDb = new Database(this.dbPath, { readonly: true });
+        try {
+          const result = tempDb.pragma('integrity_check') as any[];
+          if (result && result.length > 0 && result[0].integrity_check !== 'ok') {
+            console.error('[DatabaseManager] Database integrity check failed:', result);
+            return false;
+          }
+          console.log('[DatabaseManager] ✅ Database integrity verified');
+          return true;
+        } finally {
+          tempDb.close();
+        }
+      } catch (error) {
+        console.error('[DatabaseManager] Failed to open database for verification:', error);
+        return false;
+      }
+    } catch (error) {
+      console.error('[DatabaseManager] Database verification error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 检查数据库文件是否存在
+   * @returns 数据库文件是否存在
+   */
+  public databaseExists(): boolean {
+    try {
+      return fs.existsSync(this.dbPath);
+    } catch (error) {
+      console.error('[DatabaseManager] Error checking database existence:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 获取数据库文件大小
+   * @returns 文件大小（字节），如果文件不存在则返回0
+   */
+  public getDatabaseSize(): number {
+    try {
+      if (fs.existsSync(this.dbPath)) {
+        const stats = fs.statSync(this.dbPath);
+        return stats.size;
+      }
+      return 0;
+    } catch (error) {
+      console.error('[DatabaseManager] Error getting database size:', error);
+      return 0;
     }
   }
 }

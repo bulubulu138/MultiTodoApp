@@ -45,6 +45,10 @@ class Application {
   // ✅ 新增：迁移任务并发锁 - 防止多个迁移任务同时进行
   private isMigrating: boolean = false;
 
+  // ✅ 新增：存储位置管理
+  private appConfig: any = null;
+  private storageLocationService: any = null;
+
   constructor() {
     this.dbManager = new DatabaseManager();
     this.imageManager = new ImageManager();
@@ -786,6 +790,127 @@ class Application {
       } catch (error) {
         console.error('Error selecting directory:', error);
         throw error;
+      }
+    });
+
+    // 存储位置相关 IPC 处理器
+    ipcMain.handle('storageLocation:getConfig', async () => {
+      try {
+        const { appConfigManager } = await import('./config/AppConfig');
+        return {
+          success: true,
+          config: {
+            firstRun: appConfigManager.isFirstRun(),
+            storageLocation: appConfigManager.getStorageLocation()
+          }
+        };
+      } catch (error) {
+        console.error('Error getting storage location config:', error);
+        return {
+          success: true,
+          config: {
+            firstRun: true,
+            storageLocation: {
+              type: 'default',
+              lastUpdated: new Date().toISOString()
+            }
+          }
+        };
+      }
+    });
+
+    ipcMain.handle('storageLocation:setStorageLocation', async (_, type: string, customPath?: string) => {
+      try {
+        const { appConfigManager } = await import('./config/AppConfig');
+        appConfigManager.setStorageLocation(type as any, customPath);
+        return { success: true };
+      } catch (error) {
+        console.error('Error setting storage location:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    ipcMain.handle('storageLocation:validatePath', async (_, targetPath: string) => {
+      try {
+        const { StorageLocationService } = await import('./services/StorageLocationService');
+        const service = new StorageLocationService(this.dbManager);
+        return service.validatePath(targetPath);
+      } catch (error) {
+        console.error('Error validating path:', error);
+        return {
+          valid: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('storageLocation:getRecommendedPaths', async () => {
+      try {
+        const { StorageLocationService } = await import('./services/StorageLocationService');
+        const service = new StorageLocationService();
+        return service.getRecommendedPaths();
+      } catch (error) {
+        console.error('Error getting recommended paths:', error);
+        return [];
+      }
+    });
+
+    ipcMain.handle('storageLocation:moveStorage', async (_, newPath: string) => {
+      try {
+        const { StorageLocationService } = await import('./services/StorageLocationService');
+        const service = new StorageLocationService(this.dbManager);
+        service.setBackupManager(this.backupManager!);
+
+        const currentPath = this.dbManager.getDbPath();
+        const result = await service.moveStorage(newPath, path.dirname(currentPath));
+        return result;
+      } catch (error) {
+        console.error('Error moving storage:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('storageLocation:selectFolder', async () => {
+      try {
+        const result = await dialog.showOpenDialog(this.mainWindow!, {
+          properties: ['openDirectory', 'createDirectory'],
+          title: '选择存储位置'
+        });
+
+        if (result.canceled || result.filePaths.length === 0) {
+          return null;
+        }
+
+        const selectedPath = result.filePaths[0];
+
+        // 检查目录权限
+        try {
+          await fs.promises.access(selectedPath, fs.constants.W_OK);
+        } catch {
+          throw new Error('选择的目录没有写入权限');
+        }
+
+        return selectedPath;
+      } catch (error) {
+        console.error('Error selecting folder:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('storageLocation:openInExplorer', async (_, targetPath: string) => {
+      try {
+        const dirPath = fs.existsSync(targetPath) && fs.statSync(targetPath).isFile()
+          ? path.dirname(targetPath)
+          : targetPath;
+
+        await shell.openPath(dirPath);
+        return { success: true };
+      } catch (error) {
+        console.error('Error opening in explorer:', error);
+        return { success: false, error: (error as Error).message };
       }
     });
 
@@ -1891,6 +2016,172 @@ class Application {
     });
   }
 
+  /**
+   * ✅ 新增：加载应用配置
+   */
+  private async loadAppConfig(): Promise<void> {
+    try {
+      const { appConfigManager } = await import('./config/AppConfig');
+      this.appConfig = appConfigManager;
+      console.log('[Startup] App config loaded:', {
+        firstRun: appConfigManager.isFirstRun(),
+        storageLocation: appConfigManager.getStorageLocation()
+      });
+    } catch (error) {
+      console.error('[Startup] Failed to load app config:', error);
+      // 如果配置加载失败，创建默认配置
+      const { appConfigManager } = await import('./config/AppConfig');
+      this.appConfig = appConfigManager;
+    }
+  }
+
+  /**
+   * ✅ 新增：显示首次运行对话框（通过创建窗口）
+   */
+  private async showFirstRunDialog(): Promise<any> {
+    return new Promise((resolve, reject) => {
+      try {
+        // 创建一个隐藏的配置窗口
+        const configWindow = new BrowserWindow({
+          width: 700,
+          height: 600,
+          show: false,
+          autoHideMenuBar: true,
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js')
+          }
+        });
+
+        // 加载一个简单的首次运行HTML页面
+        configWindow.loadFile('src/main/first-run.html');
+
+        configWindow.once('ready-to-show', () => {
+          configWindow.show();
+        });
+
+        // 监听窗口关闭事件
+        configWindow.on('closed', () => {
+          resolve(null);
+        });
+
+        // 监听来自渲染进程的完成消息
+        ipcMain.once('first-run:complete', (_event, config) => {
+          configWindow.close();
+          resolve(config);
+        });
+
+        // 监听取消消息
+        ipcMain.once('first-run:cancel', () => {
+          configWindow.close();
+          resolve(null);
+        });
+
+        this.mainWindow = configWindow;
+      } catch (error) {
+        console.error('[Startup] Failed to show first-run dialog:', error);
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * ✅ 新增：验证存储位置
+   */
+  private async validateStorageLocation(): Promise<boolean> {
+    try {
+      if (!this.appConfig) {
+        console.warn('[Startup] App config not loaded, skipping validation');
+        return true;
+      }
+
+      const storageLocation = this.appConfig.getStorageLocation();
+      const { StorageLocationService } = await import('./services/StorageLocationService');
+
+      if (!this.storageLocationService) {
+        this.storageLocationService = new StorageLocationService(this.dbManager);
+      }
+
+      const dbPath = this.storageLocationService.getDatabasePathFromConfig(storageLocation);
+
+      // 检查数据库文件是否存在
+      if (fs.existsSync(dbPath)) {
+        console.log('[Startup] Database file found at:', dbPath);
+        return true;
+      } else {
+        console.warn('[Startup] Database file not found at:', dbPath);
+        return false;
+      }
+    } catch (error) {
+      console.error('[Startup] Failed to validate storage location:', error);
+      return false;
+    }
+  }
+
+  /**
+   * ✅ 新增：处理存储位置问题
+   */
+  private async handleStorageLocationIssue(): Promise<void> {
+    try {
+      console.log('[Startup] Handling storage location issue...');
+
+      if (!this.appConfig || !this.storageLocationService) {
+        console.error('[Startup] Required services not available');
+        return;
+      }
+
+      const storageLocation = this.appConfig.getStorageLocation();
+      const recoveryOptions = await this.storageLocationService.handleMissingDatabase(storageLocation);
+
+      console.log('[Startup] Recovery options:', recoveryOptions);
+
+      // 显示恢复对话框（类似首次运行对话框）
+      const recoveryWindow = new BrowserWindow({
+        width: 800,
+        height: 700,
+        show: false,
+        autoHideMenuBar: true,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          preload: path.join(__dirname, 'preload.js')
+        }
+      });
+
+      // 这里应该加载一个恢复HTML页面
+      // 暂时使用简单的消息框
+      const result = await dialog.showMessageBox(recoveryWindow, {
+        type: 'warning',
+        title: '数据库文件未找到',
+        message: '应用程序无法找到数据库文件',
+        detail: '请选择恢复选项',
+        buttons: ['从备份恢复', '更改存储位置', '退出应用'],
+        defaultId: 0
+      });
+
+      switch (result.response) {
+        case 0: // 从备份恢复
+          if (this.backupManager && recoveryOptions.backupCount && recoveryOptions.backupCount > 0) {
+            // 执行恢复逻辑
+            console.log('[Startup] Restoring from backup...');
+          } else {
+            console.warn('[Startup] No backups available');
+          }
+          break;
+        case 1: // 更改存储位置
+          console.log('[Startup] Changing storage location...');
+          // 显示位置选择对话框
+          break;
+        case 2: // 退出
+          app.quit();
+          break;
+      }
+    } catch (error) {
+      console.error('[Startup] Failed to handle storage location issue:', error);
+    }
+  }
+
   public async initialize(): Promise<void> {
     try {
       // 添加全局错误处理
@@ -1923,6 +2214,45 @@ class Application {
       // === 原生模块兼容性检查 ===
       console.log('Running native module compatibility check...');
       await this.checkNativeModuleCompatibility();
+
+      // ✅ 新增：加载应用配置
+      console.log('Loading app configuration...');
+      await this.loadAppConfig();
+
+      // ✅ 新增：检查首次运行
+      if (this.appConfig && this.appConfig.isFirstRun()) {
+        console.log('[Startup] First run detected, showing first-run dialog...');
+        const selectedConfig = await this.showFirstRunDialog();
+
+        if (selectedConfig) {
+          // 用户选择了存储位置
+          this.appConfig.setStorageLocation(selectedConfig.type, selectedConfig.customPath);
+          this.appConfig.setFirstRunComplete();
+          console.log('[Startup] First-run setup completed:', selectedConfig);
+
+          // 使用新路径创建数据库管理器
+          const { StorageLocationService } = await import('./services/StorageLocationService');
+          const storageService = new StorageLocationService();
+          const newDbPath = storageService.getDatabasePathFromConfig(selectedConfig);
+
+          // 重新创建数据库管理器
+          this.dbManager = new DatabaseManager(newDbPath);
+          this.storageLocationService = new StorageLocationService(this.dbManager);
+        } else {
+          console.log('[Startup] First-run dialog was canceled');
+        }
+      }
+
+      // ✅ 新增：验证存储位置
+      if (this.appConfig && !this.appConfig.isFirstRun()) {
+        console.log('[Startup] Validating storage location...');
+        const isValid = await this.validateStorageLocation();
+
+        if (!isValid) {
+          console.warn('[Startup] Storage location validation failed, showing recovery options...');
+          await this.handleStorageLocationIssue();
+        }
+      }
 
       // 初始化数据库（增强错误处理）
       console.log('Initializing database...');

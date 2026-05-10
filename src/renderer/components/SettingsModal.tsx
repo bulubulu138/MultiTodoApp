@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert, Tooltip, Collapse, Descriptions, Progress, Result } from 'antd';
+import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert, Tooltip, Collapse, Descriptions, Progress, Result, message, Spin } from 'antd';
 import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, ExportOutlined, LinkOutlined, BgColorsOutlined, CloudUploadOutlined, LockOutlined, SyncOutlined } from '@ant-design/icons';
 import { App } from 'antd';
 import { Todo, CustomTab } from '../../shared/types';
@@ -79,8 +79,17 @@ const StorageManagement: React.FC = () => {
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationProgress, setMigrationProgress] = useState<any>(null);
 
+  // 新增：存储位置管理状态
+  const [storageLocationConfig, setStorageLocationConfig] = useState<any>(null);
+  const [newStoragePath, setNewStoragePath] = useState<string>('');
+  const [isMovingStorage, setIsMovingStorage] = useState(false);
+  const [moveProgress, setMoveProgress] = useState<any>(null);
+  const [pathValidation, setPathValidation] = useState<any>(null);
+  const [validatingPath, setValidatingPath] = useState(false);
+
   useEffect(() => {
     loadStorageInfo();
+    loadStorageLocationConfig();
   }, []);
 
   const loadStorageInfo = async () => {
@@ -93,6 +102,17 @@ const StorageManagement: React.FC = () => {
     }
   };
 
+  const loadStorageLocationConfig = async () => {
+    try {
+      const result = await window.electronAPI.storageLocation.getConfig();
+      if (result.success && result.config) {
+        setStorageLocationConfig(result.config);
+      }
+    } catch (error) {
+      console.error('Error loading storage location config:', error);
+    }
+  };
+
   const handleSelectDirectory = async () => {
     try {
       const result = await window.electronAPI.file.selectDirectory();
@@ -101,6 +121,103 @@ const StorageManagement: React.FC = () => {
       }
     } catch (error) {
       console.error('Error selecting directory:', error);
+    }
+  };
+
+  // 新增：验证新存储路径
+  const validateNewPath = async (path: string) => {
+    if (!path) {
+      setPathValidation(null);
+      return;
+    }
+
+    setValidatingPath(true);
+    try {
+      const result = await window.electronAPI.storageLocation.validatePath(path);
+      setPathValidation(result);
+    } catch (error) {
+      console.error('Error validating path:', error);
+      setPathValidation({
+        valid: false,
+        error: '路径验证失败'
+      });
+    } finally {
+      setValidatingPath(false);
+    }
+  };
+
+  // 新增：选择新的存储位置
+  const handleSelectNewStorageLocation = async () => {
+    try {
+      const result = await window.electronAPI.storageLocation.selectFolder();
+      if (result) {
+        setNewStoragePath(result);
+        validateNewPath(result);
+      }
+    } catch (error) {
+      console.error('Error selecting storage location:', error);
+    }
+  };
+
+  // 新增：移动存储到新位置
+  const handleMoveStorage = async () => {
+    if (!newStoragePath || !pathValidation?.valid) {
+      return;
+    }
+
+    setIsMovingStorage(true);
+    setMoveProgress({ stage: '准备中', percent: 0, message: '正在准备移动存储...' });
+
+    try {
+      const result = await window.electronAPI.storageLocation.moveStorage(newStoragePath);
+
+      if (result.success) {
+        setMoveProgress({
+          stage: '完成',
+          percent: 100,
+          message: '存储移动成功！'
+        });
+
+        // 刷新信息
+        await loadStorageInfo();
+        await loadStorageLocationConfig();
+
+        Modal.success({
+          title: '存储移动成功',
+          content: '数据已成功移动到新位置。建议重新启动应用以确保所有更改生效。',
+          onOk: () => {
+            window.location.reload();
+          }
+        });
+      } else {
+        setMoveProgress({
+          stage: '失败',
+          percent: 0,
+          message: result.error || '移动存储失败'
+        });
+      }
+    } catch (error) {
+      console.error('Error moving storage:', error);
+      setMoveProgress({
+        stage: '失败',
+        percent: 0,
+        message: '移动存储时发生错误'
+      });
+    } finally {
+      setIsMovingStorage(false);
+    }
+  };
+
+  // 新增：在文件管理器中打开
+  const handleOpenInExplorer = async () => {
+    try {
+      const result = await window.electronAPI.storageLocation.openInExplorer(storagePath);
+      if (!result.success) {
+        message.error(result.error || '打开失败');
+      }
+    } catch (error) {
+      console.error('Error opening in explorer:', error);
+      message.error('打开失败');
     }
   };
 
@@ -162,9 +279,145 @@ const StorageManagement: React.FC = () => {
     }
   };
 
+  // 格式化文件大小
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  };
+
   return (
     <div>
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        {/* 新增：存储位置管理 */}
+        {storageMode === 'database' && storageLocationConfig && (
+          <Card title={<><FolderOpenOutlined /> 存储位置管理</>}>
+            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+              {/* 当前存储位置 */}
+              <Descriptions column={1} size="small" bordered>
+                <Descriptions.Item label="存储类型">
+                  <Tag color="blue">
+                    {storageLocationConfig.storageLocation.type === 'default' ? '默认' :
+                     storageLocationConfig.storageLocation.type === 'documents' ? '文档目录' :
+                     storageLocationConfig.storageLocation.type === 'home' ? '主目录' : '自定义'}
+                  </Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="数据库路径">
+                  <Space>
+                    <Text ellipsis={{ tooltip: storagePath }} style={{ maxWidth: '300px' }}>
+                      {storagePath || '默认位置'}
+                    </Text>
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<FolderOpenOutlined />}
+                      onClick={handleOpenInExplorer}
+                    >
+                      打开
+                    </Button>
+                  </Space>
+                </Descriptions.Item>
+                <Descriptions.Item label="最后更新">
+                  {storageLocationConfig.storageLocation.lastUpdated ?
+                    new Date(storageLocationConfig.storageLocation.lastUpdated).toLocaleString('zh-CN') :
+                    '未知'}
+                </Descriptions.Item>
+              </Descriptions>
+
+              {/* 更改存储位置 */}
+              <div>
+                <Text strong>更改存储位置：</Text>
+                <Space.Compact style={{ width: '100%', marginTop: 8 }}>
+                  <Input
+                    value={newStoragePath}
+                    onChange={(e) => {
+                      setNewStoragePath(e.target.value);
+                      validateNewPath(e.target.value);
+                    }}
+                    placeholder="选择新的存储位置"
+                  />
+                  <Button
+                    icon={<FolderOpenOutlined />}
+                    onClick={handleSelectNewStorageLocation}
+                    disabled={isMovingStorage}
+                  >
+                    浏览
+                  </Button>
+                </Space.Compact>
+              </div>
+
+              {/* 路径验证结果 */}
+              {validatingPath && (
+                <div style={{ textAlign: 'center' }}>
+                  <Spin size="small" />
+                  <Text type="secondary" style={{ marginLeft: 8 }}>
+                    正在验证路径...
+                  </Text>
+                </div>
+              )}
+
+              {pathValidation && !validatingPath && (
+                <Alert
+                  message={pathValidation.valid ? '路径验证通过' : '路径验证失败'}
+                  description={pathValidation.error || (pathValidation.warnings?.join(', '))}
+                  type={pathValidation.valid ? 'success' : 'error'}
+                  showIcon
+                />
+              )}
+
+              {/* 移动进度 */}
+              {moveProgress && (
+                <Card size="small">
+                  <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                    <Space>
+                      {isMovingStorage ? <Spin size="small" /> : <CheckCircleOutlined />}
+                      <Text strong>{moveProgress.stage}</Text>
+                    </Space>
+                    <Progress
+                      percent={moveProgress.percent}
+                      status={isMovingStorage ? 'active' : 'success'}
+                    />
+                    <Text type="secondary" style={{ fontSize: '12px' }}>
+                      {moveProgress.message}
+                    </Text>
+                  </Space>
+                </Card>
+              )}
+
+              {/* 操作按钮 */}
+              <Space>
+                <Button
+                  type="primary"
+                  onClick={handleMoveStorage}
+                  disabled={!newStoragePath || !pathValidation?.valid || isMovingStorage}
+                  loading={isMovingStorage}
+                >
+                  移动存储
+                </Button>
+                <Button
+                  onClick={() => {
+                    setNewStoragePath('');
+                    setPathValidation(null);
+                    setMoveProgress(null);
+                  }}
+                  disabled={isMovingStorage}
+                >
+                  重置
+                </Button>
+              </Space>
+
+              <Alert
+                message="重要提示"
+                description="移动存储位置会自动创建备份，操作是安全的。移动完成后建议重启应用。"
+                type="info"
+                showIcon
+              />
+            </Space>
+          </Card>
+        )}
+
         {/* 当前存储模式 */}
         <Card title={<><DatabaseOutlined /> 当前存储模式</>}>
           <Descriptions column={1} size="small">
