@@ -936,8 +936,34 @@ class Application {
         console.log('[storage:migrate] ===== MIGRATION COMPLETED =====');
         console.log('[storage:migrate] Result:', JSON.stringify(result));
 
-        // 迁移完成后，如果失败则回滚设置
-        if (!result.success) {
+        // 迁移完成后，根据验证结果智能处理
+        if (result.validation) {
+          const { status, successRate, missingTodos } = result.validation;
+
+          if (status === 'failed') {
+            // 完全失败 (<50%成功率)：回滚设置
+            console.log(`[storage:migrate] ❌ Migration failed (${successRate}% < 50%), rolling back settings...`);
+            try {
+              await this.dbManager.updateSettings({
+                storageMode: 'database',
+                storagePath: ''
+              });
+              console.log('[storage:migrate] ✅ Settings rolled back to database mode');
+            } catch (rollbackError) {
+              console.error('[storage:migrate] ❌ Failed to rollback settings:', rollbackError);
+            }
+          } else if (status === 'partial') {
+            // 部分成功 (50%-99%成功率)：保留设置，提供警告
+            console.warn(`[storage:migrate] ⚠️ Migration partially successful (${successRate}% ≥ 50%)`);
+            console.warn(`[storage:migrate] ${missingTodos.length} todos failed to migrate:`,
+              missingTodos.slice(0, 5).join(', '));
+            console.log('[storage:migrate] ✅ Settings preserved (partial success accepted)');
+          } else {
+            // 完全成功 (100%成功率)
+            console.log(`[storage:migrate] ✅ Migration completely successful (${successRate}%)`);
+          }
+        } else if (!result.success) {
+          // 没有验证结果但迁移失败，回滚设置（向后兼容）
           console.log('[storage:migrate] ❌ Migration failed, rolling back storage mode settings...');
           try {
             await this.dbManager.updateSettings({

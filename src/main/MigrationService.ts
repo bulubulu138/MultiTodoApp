@@ -46,6 +46,7 @@ export interface MigrationResult {
   // 🔧 新增：部分成功统计
   partialSuccess?: boolean;
   failedTodosCount?: number;
+  validation?: ValidationResult; // 🔧 新增：验证结果详情
 }
 
 /**
@@ -58,6 +59,10 @@ export interface ValidationResult {
   targetCount: number;
   missingTodos: string[];
   contentMismatches: string[];
+  // 🔧 新增：部分成功支持字段
+  successRate: number;           // 成功率 (0-100)
+  successfulMigrations: number;  // 成功迁移数量
+  status: 'complete' | 'partial' | 'failed'; // 迁移状态
 }
 
 /**
@@ -272,6 +277,8 @@ export class MigrationService {
       });
 
       // 阶段 4: 验证
+      let validationResult: ValidationResult | undefined; // 🔧 移到外层作用域
+
       if (options.verifyAfterMigration) {
         this.updateProgress({
           stage: 'verifying',
@@ -284,21 +291,16 @@ export class MigrationService {
 
         const validation = await this.validateMigration(targetPath);
 
-        // 🔧 改进：支持部分成功的迁移场景
-        if (!validation.success) {
-          const successRate = ((validation.sourceCount - validation.missingTodos.length) / validation.sourceCount * 100).toFixed(1);
-          const errorMsg = `验证失败: ${validation.errors.join(', ')}。成功率: ${successRate}%`;
-
-          console.error(`[Migration] ❌ ${errorMsg}`);
-          console.error(`[Migration] Missing todos (${validation.missingTodos.length}): ${validation.missingTodos.slice(0, 5).join(', ')}${validation.missingTodos.length > 5 ? '...' : ''}`);
-
-          // 🔧 改进：如果成功率超过50%，仍然返回部分成功的结果
-          if (parseFloat(successRate) >= 50) {
-            console.warn(`[Migration] ⚠️ Migration partially successful (${successRate}%), but marked as failed for data consistency`);
-          }
-
-          throw new Error(errorMsg);
+        // 🔧 改进：记录验证结果，支持部分成功场景
+        console.log(`[Migration] 📊 Validation result: ${validation.status} (${validation.successRate}% success)`);
+        console.log(`[Migration] ✅ Successful migrations: ${validation.successfulMigrations}/${validation.sourceCount}`);
+        if (validation.missingTodos.length > 0) {
+          console.warn(`[Migration] ⚠️ Missing todos (${validation.missingTodos.length}):`,
+            validation.missingTodos.slice(0, 5).join(', '));
         }
+
+        // 将验证结果保存，用于最终的返回值
+        validationResult = validation;
       }
 
       // 阶段 5: 完成
@@ -325,22 +327,29 @@ export class MigrationService {
         stage: 'completed',
         current: 100,
         total: 100,
-        message: '迁移成功完成！',
+        message: '迁移完成！',
         errors: [],
         progress: 100
       });
 
+      // 🔧 改进：使用验证结果的实际success值
+      const isSuccess = validationResult ? validationResult.success : true;
+
       return {
-        success: true,
-        todosMigrated: successfulTodos, // 🔧 改进：使用实际成功的数量
+        success: isSuccess, // 🔧 关键：使用验证结果的success值
+        todosMigrated: successfulTodos, // 🔧 使用实际成功的数量
         relationsMigrated: sourceRelations.length,
         assetsMigrated,
-        errors: failedTodos.map(f => `${f.title}: ${f.error}`), // 🔧 改进：包含详细的错误信息
+        errors: [
+          ...failedTodos.map(f => `${f.title}: ${f.error}`),
+          ...(validationResult && validationResult.missingTodos.length > 0 ? [`部分失败: ${validationResult.missingTodos.length}个待办迁移失败 (${validationResult.successRate}%)`] : [])
+        ],
         duration,
         backupPath,
         // 🔧 改进：添加额外的迁移统计信息
-        partialSuccess: failedTodos.length > 0,
-        failedTodosCount: failedTodos.length
+        partialSuccess: validationResult ? validationResult.status === 'partial' : failedTodos.length > 0,
+        failedTodosCount: failedTodos.length,
+        validation: validationResult // 🔧 新增：包含完整的验证结果
       };
 
     } catch (error) {
@@ -455,32 +464,72 @@ export class MigrationService {
 
       console.log(`[validateMigration] 📈 Migration success rate: ${successfulMigrations}/${sourceTodos.length} (${Math.round(successfulMigrations/sourceTodos.length*100)}%)`);
 
-      // 🔧 改进：生成更详细的验证结果
-      const validationSuccess = successfulMigrations === sourceTodos.length;
+      // 🔧 改进：支持部分成功的验证逻辑
+      const successRate = (successfulMigrations / sourceTodos.length) * 100;
+      const successRateFormatted = Math.round(successRate * 10) / 10; // 保留一位小数
 
-      if (validationSuccess) {
-        console.log('[validateMigration] ===== ✅ VALIDATION SUCCESSFUL =====');
+      // 确定迁移状态
+      let status: 'complete' | 'partial' | 'failed';
+      let success: boolean;
+
+      if (successfulMigrations === sourceTodos.length) {
+        // 100% 成功
+        status = 'complete';
+        success = true;
+      } else if (successRate >= 50) {
+        // 50%-99% 成功 -> 部分成功
+        status = 'partial';
+        success = true; // ⚠️ 关键：部分成功也返回 success: true
+      } else {
+        // <50% 成功 -> 失败
+        status = 'failed';
+        success = false;
+      }
+
+      if (status === 'complete') {
+        console.log('[validateMigration] ===== ✅ VALIDATION COMPLETE SUCCESS =====');
         return {
           success: true,
           errors: [],
           sourceCount: sourceTodos.length,
           targetCount: actualMarkdownFiles.length,
           missingTodos: [],
-          contentMismatches: []
+          contentMismatches: [],
+          successRate: successRateFormatted,
+          successfulMigrations,
+          status
+        };
+      } else if (status === 'partial') {
+        const successPercent = `${successRateFormatted}%`;
+        console.warn(`[validateMigration] ===== ⚠️ VALIDATION PARTIAL SUCCESS (${successPercent}) =====`);
+        console.warn(`[validateMigration] Missing todos (${missingTodos.length}): ${missingTodos.slice(0, 5).join(', ')}${missingTodos.length > 5 ? '...' : ''}`);
+
+        return {
+          success: true, // 部分成功仍然返回 true
+          errors: [`部分成功: ${missingTodos.length}个待办迁移失败 (${successPercent})`],
+          sourceCount: sourceTodos.length,
+          targetCount: actualMarkdownFiles.length,
+          missingTodos,
+          contentMismatches: [],
+          successRate: successRateFormatted,
+          successfulMigrations,
+          status
         };
       } else {
-        const successRate = Math.round(successfulMigrations/sourceTodos.length*100);
-        const errorMsg = `迁移验证失败: 期望${sourceTodos.length}个待办，实际成功${successfulMigrations}个 (${successRate}%)`;
-        console.error(`[validateMigration] ❌ ${errorMsg}`);
+        const successPercent = `${successRateFormatted}%`;
+        console.error(`[validateMigration] ===== ❌ VALIDATION FAILED (${successPercent} < 50%) =====`);
         console.error(`[validateMigration] Missing todos (${missingTodos.length}): ${missingTodos.slice(0, 5).join(', ')}${missingTodos.length > 5 ? '...' : ''}`);
 
         return {
           success: false,
-          errors: [errorMsg, ...errors],
+          errors: [`迁移验证失败: 期望${sourceTodos.length}个待办，实际成功${successfulMigrations}个 (${successPercent}%)`],
           sourceCount: sourceTodos.length,
           targetCount: actualMarkdownFiles.length,
           missingTodos,
-          contentMismatches: []
+          contentMismatches: [],
+          successRate: successRateFormatted,
+          successfulMigrations,
+          status
         };
       }
 
@@ -492,7 +541,10 @@ export class MigrationService {
         sourceCount: 0,
         targetCount: 0,
         missingTodos: [],
-        contentMismatches: []
+        contentMismatches: [],
+        successRate: 0,
+        successfulMigrations: 0,
+        status: 'failed'
       };
     }
   }
