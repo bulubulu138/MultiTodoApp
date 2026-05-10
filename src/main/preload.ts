@@ -545,6 +545,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     restore: (backupPath: string) => ipcRenderer.invoke('backup:restore', backupPath),
   },
   flowchart: {
+    getAssociationsByTodoIds: (todoIds: number[]) =>
+      ipcRenderer.invoke('flowchart:getAssociationsByTodoIds', todoIds),
     save: (flowchartData: any) =>
       ipcRenderer.invoke('flowchart:save', flowchartData),
     load: (flowchartId: string) =>

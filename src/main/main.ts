@@ -2466,6 +2466,44 @@ class Application {
       }
     });
 
+    // 流程图待办关联查询
+    ipcMain.handle('flowchart:getAssociationsByTodoIds', async (_, todoIds: number[]) => {
+      try {
+        const { FlowchartTodoAssociationRepository } = await import('./database/FlowchartTodoAssociationRepository');
+        const db = this.dbManager.getDb();
+        if (!db) {
+          throw new Error('Database not initialized');
+        }
+
+        const repo = new FlowchartTodoAssociationRepository(db);
+        const associationsMap = await repo.queryByTodoIds(todoIds);
+
+        // 将Map转换为Record<number, Array<...>>格式，使用实际可用的字段
+        const result: Record<number, Array<{
+          flowchartId: string;
+          flowchartName: string;
+          nodeId: string;
+          nodeLabel: string;
+        }>> = {};
+
+        associationsMap.forEach((associations, todoId) => {
+          result[todoId] = associations.map(assoc => ({
+            flowchartId: assoc.flowchartId,
+            flowchartName: assoc.flowchartName || '',
+            nodeId: assoc.flowchartId, // 使用flowchartId作为nodeId
+            nodeLabel: assoc.flowchartName || '' // 使用flowchartName作为nodeLabel
+          }));
+        });
+
+        console.log(`[Flowchart] Retrieved associations for ${todoIds.length} todos`);
+
+        return result;
+      } catch (error) {
+        console.error('Error getting flowchart associations by todo ids:', error);
+        throw error;
+      }
+    });
+
     // URL标题获取
     ipcMain.handle('url-titles:fetch-batch', async (_, urls: string[]) => {
       try {
