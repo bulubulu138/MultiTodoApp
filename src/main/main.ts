@@ -2036,54 +2036,18 @@ class Application {
   }
 
   /**
-   * ✅ 新增：显示首次运行对话框（通过创建窗口）
+   * ✅ 新增：显示首次运行对话框（已禁用，将在React组件中实现）
+   * 注意：此功能暂时禁用，首次运行用户将使用默认配置
+   * 未来将在App.tsx中通过React组件实现首次运行对话框
    */
   private async showFirstRunDialog(): Promise<any> {
-    return new Promise((resolve, reject) => {
-      try {
-        // 创建一个隐藏的配置窗口
-        const configWindow = new BrowserWindow({
-          width: 700,
-          height: 600,
-          show: false,
-          autoHideMenuBar: true,
-          webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js')
-          }
-        });
-
-        // 加载一个简单的首次运行HTML页面
-        configWindow.loadFile('src/main/first-run.html');
-
-        configWindow.once('ready-to-show', () => {
-          configWindow.show();
-        });
-
-        // 监听窗口关闭事件
-        configWindow.on('closed', () => {
-          resolve(null);
-        });
-
-        // 监听来自渲染进程的完成消息
-        ipcMain.once('first-run:complete', (_event, config) => {
-          configWindow.close();
-          resolve(config);
-        });
-
-        // 监听取消消息
-        ipcMain.once('first-run:cancel', () => {
-          configWindow.close();
-          resolve(null);
-        });
-
-        this.mainWindow = configWindow;
-      } catch (error) {
-        console.error('[Startup] Failed to show first-run dialog:', error);
-        reject(error);
-      }
-    });
+    // 临时修复：直接返回默认配置，不显示对话框
+    // TODO: 在React组件中实现真正的首次运行对话框
+    console.log('[Startup] First run detected, using default configuration...');
+    return {
+      type: 'default',
+      customPath: undefined
+    };
   }
 
   /**
@@ -2120,7 +2084,9 @@ class Application {
   }
 
   /**
-   * ✅ 新增：处理存储位置问题
+   * ✅ 新增：处理存储位置问题（已简化）
+   * 注意：此功能已简化，数据库丢失时将创建新数据库
+   * 未来将在React组件中实现完整的恢复对话框
    */
   private async handleStorageLocationIssue(): Promise<void> {
     try {
@@ -2132,53 +2098,18 @@ class Application {
       }
 
       const storageLocation = this.appConfig.getStorageLocation();
-      const recoveryOptions = await this.storageLocationService.handleMissingDatabase(storageLocation);
+      console.log('[Startup] Current storage location:', storageLocation);
 
-      console.log('[Startup] Recovery options:', recoveryOptions);
+      // 简化处理：记录警告日志，让应用继续启动
+      // 数据库管理器会自动创建新的数据库文件
+      console.warn('[Startup] Database file not found, will create new database on initialization');
 
-      // 显示恢复对话框（类似首次运行对话框）
-      const recoveryWindow = new BrowserWindow({
-        width: 800,
-        height: 700,
-        show: false,
-        autoHideMenuBar: true,
-        webPreferences: {
-          nodeIntegration: false,
-          contextIsolation: true,
-          preload: path.join(__dirname, 'preload.js')
-        }
-      });
+      // TODO: 在React组件中实现完整的恢复对话框
+      // 包括：从备份恢复、重新定位数据库、更改存储位置等选项
 
-      // 这里应该加载一个恢复HTML页面
-      // 暂时使用简单的消息框
-      const result = await dialog.showMessageBox(recoveryWindow, {
-        type: 'warning',
-        title: '数据库文件未找到',
-        message: '应用程序无法找到数据库文件',
-        detail: '请选择恢复选项',
-        buttons: ['从备份恢复', '更改存储位置', '退出应用'],
-        defaultId: 0
-      });
-
-      switch (result.response) {
-        case 0: // 从备份恢复
-          if (this.backupManager && recoveryOptions.backupCount && recoveryOptions.backupCount > 0) {
-            // 执行恢复逻辑
-            console.log('[Startup] Restoring from backup...');
-          } else {
-            console.warn('[Startup] No backups available');
-          }
-          break;
-        case 1: // 更改存储位置
-          console.log('[Startup] Changing storage location...');
-          // 显示位置选择对话框
-          break;
-        case 2: // 退出
-          app.quit();
-          break;
-      }
     } catch (error) {
       console.error('[Startup] Failed to handle storage location issue:', error);
+      // 即使处理失败，也让应用继续启动
     }
   }
 
@@ -2219,37 +2150,31 @@ class Application {
       console.log('Loading app configuration...');
       await this.loadAppConfig();
 
-      // ✅ 新增：检查首次运行
+      // ✅ 新增：检查首次运行（已简化）
       if (this.appConfig && this.appConfig.isFirstRun()) {
-        console.log('[Startup] First run detected, showing first-run dialog...');
-        const selectedConfig = await this.showFirstRunDialog();
+        console.log('[Startup] First run detected, using default configuration...');
 
-        if (selectedConfig) {
-          // 用户选择了存储位置
-          this.appConfig.setStorageLocation(selectedConfig.type, selectedConfig.customPath);
-          this.appConfig.setFirstRunComplete();
-          console.log('[Startup] First-run setup completed:', selectedConfig);
+        // 使用默认配置
+        const defaultConfig = {
+          type: 'default',
+          customPath: undefined
+        };
 
-          // 使用新路径创建数据库管理器
-          const { StorageLocationService } = await import('./services/StorageLocationService');
-          const storageService = new StorageLocationService();
-          const newDbPath = storageService.getDatabasePathFromConfig(selectedConfig);
+        this.appConfig.setStorageLocation(defaultConfig.type, defaultConfig.customPath);
+        this.appConfig.setFirstRunComplete();
+        console.log('[Startup] First-run setup completed with default configuration');
 
-          // 重新创建数据库管理器
-          this.dbManager = new DatabaseManager(newDbPath);
-          this.storageLocationService = new StorageLocationService(this.dbManager);
-        } else {
-          console.log('[Startup] First-run dialog was canceled');
-        }
+        // TODO: 在React组件的App.tsx中实现真正的首次运行对话框
+        // 用户可以在应用运行时通过设置页面更改存储位置
       }
 
-      // ✅ 新增：验证存储位置
+      // ✅ 新增：验证存储位置（已简化）
       if (this.appConfig && !this.appConfig.isFirstRun()) {
         console.log('[Startup] Validating storage location...');
         const isValid = await this.validateStorageLocation();
 
         if (!isValid) {
-          console.warn('[Startup] Storage location validation failed, showing recovery options...');
+          console.warn('[Startup] Storage location validation failed, will create new database...');
           await this.handleStorageLocationIssue();
         }
       }

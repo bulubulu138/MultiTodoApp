@@ -12,6 +12,7 @@ import SettingsModal from './components/SettingsModal';
 import TodoViewDrawer from './components/TodoViewDrawer';
 import CalendarDrawer from './components/CalendarDrawer';
 import ContentFocusView, { ContentFocusViewRef } from './components/ContentFocusView';
+import FirstRunDialog from './components/FirstRunDialog';
 import { getTheme, ThemeMode, ColorTheme } from './theme/themes';
 import { buildParallelGroups, selectGroupRepresentatives, sortWithGroups, getSortComparator } from './utils/sortWithGroups';
 import { toNumberId } from '../shared/utils/typeUtils';
@@ -62,6 +63,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const [debouncedSearchText, setDebouncedSearchText] = useState<string>('');
   const [showPositionSelector, setShowPositionSelector] = useState(false);
   const [pendingPosition, setPendingPosition] = useState<PositionSelection | null>(null);
+
+  // ✅ 新增：首次运行状态
+  const [showFirstRunDialog, setShowFirstRunDialog] = useState(false);
+  const [storageLocationConfig, setStorageLocationConfig] = useState<any>(null);
 
   // AI 建议相关状态
   const [promptTemplates, setPromptTemplates] = useState<any[]>([]);
@@ -131,7 +136,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     loadTodos();
     loadSettings();
     loadRelations();
-    
+    checkFirstRun(); // ✅ 新增：检查首次运行
+
     // 记录初始加载完成时间
     if (process.env.NODE_ENV === 'development') {
       setTimeout(() => {
@@ -339,6 +345,53 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       if (process.env.NODE_ENV === 'development') {
         console.log(`[Performance] Todo list loaded in ${duration.toFixed(2)}ms`);
       }
+    }
+  };
+
+  // ✅ 新增：检查首次运行
+  const checkFirstRun = async () => {
+    try {
+      if (!window.electronAPI?.storageLocation) {
+        console.warn('[App] storageLocation API not available');
+        return;
+      }
+
+      const result = await window.electronAPI.storageLocation.getConfig();
+      if (result.success && result.config?.firstRun) {
+        console.log('[App] First run detected');
+        setStorageLocationConfig(result.config);
+        setShowFirstRunDialog(true);
+      }
+    } catch (error) {
+      console.error('[App] Error checking first run:', error);
+    }
+  };
+
+  // ✅ 新增：处理首次运行完成
+  const handleFirstRunComplete = async (location: any) => {
+    try {
+      console.log('[App] First run setup completed:', location);
+
+      // 更新存储位置配置
+      if (window.electronAPI?.storageLocation) {
+        await window.electronAPI.storageLocation.setStorageLocation(
+          location.type,
+          location.customPath
+        );
+      }
+
+      setShowFirstRunDialog(false);
+      setStorageLocationConfig(null);
+
+      message.success('存储位置设置成功！应用将重新启动以应用更改。');
+
+      // 延迟重启，让用户看到成功消息
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    } catch (error) {
+      console.error('[App] Error completing first run setup:', error);
+      message.error('设置失败，请重试');
     }
   };
 
@@ -1368,6 +1421,13 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
           </div>
         </Space>
       </Modal>
+
+      {/* ✅ 新增：首次运行对话框 */}
+      <FirstRunDialog
+        visible={showFirstRunDialog}
+        onComplete={handleFirstRunComplete}
+        onCancel={() => setShowFirstRunDialog(false)}
+      />
       </Layout>
   );
 };
