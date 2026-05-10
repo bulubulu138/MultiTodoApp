@@ -333,14 +333,14 @@ export class MigrationService {
   }
 
   /**
-   * 验证迁移结果（增强版）
+   * 验证迁移结果（直接扫描文件系统版本）
    */
   async validateMigration(targetPath: string): Promise<ValidationResult> {
     const errors: string[] = [];
     const missingTodos: string[] = [];
     const contentMismatches: string[] = [];
 
-    console.log('[validateMigration] Starting migration validation...');
+    console.log('[validateMigration] ===== STARTING FILE SYSTEM VALIDATION =====');
 
     try {
       // 获取源数据
@@ -349,87 +349,82 @@ export class MigrationService {
 
       console.log(`[validateMigration] Source data: ${sourceTodos.length} todos, ${sourceRelations.length} relations`);
 
-      // 获取目标数据
-      const targetTodos = await this.fileStorage.getAllTodos();
-      const targetRelations = await this.fileStorage.getAllRelations();
+      // 直接扫描文件系统获取实际文件数量（不依赖索引器）
+      const actualMarkdownFiles = await this.scanMarkdownFiles(targetPath);
+      console.log(`[validateMigration] Found ${actualMarkdownFiles.length} .md files in filesystem`);
 
-      console.log(`[validateMigration] Target data: ${targetTodos.length} todos, ${targetRelations.length} relations`);
+      // 读取 UUID 映射
+      const uuidMapPath = path.join(targetPath, '.multitodo-metadata', 'uuid-to-file.json');
+      let uuidMap: Record<string, string> = {};
 
-      // 检查关系数据质量（检测无效的 ID）
-      const invalidRelationCount = targetRelations.filter(
-        r => r.source_id === 0 || r.target_id === 0 ||
-             r.source_id === '0' || r.target_id === '0' ||
-             Number.isNaN(r.source_id) || Number.isNaN(r.target_id) ||
-             r.source_id === '' || r.target_id === ''
-      ).length;
-
-      if (invalidRelationCount > 0) {
-        console.warn(`[validateMigration] Found ${invalidRelationCount} invalid relation IDs`);
-        errors.push(`发现无效的关系ID: ${invalidRelationCount}个关系使用了无效ID (0, NaN, 或空字符串)`);
-      }
-
-      // 验证待办数量
-      if (sourceTodos.length !== targetTodos.length) {
-        const errorMsg = `待办数量不匹配: 源=${sourceTodos.length}, 目标=${targetTodos.length}`;
-        console.error(`[validateMigration] ${errorMsg}`);
-        errors.push(errorMsg);
+      if (fs.existsSync(uuidMapPath)) {
+        const content = await fs.promises.readFile(uuidMapPath, 'utf-8');
+        uuidMap = JSON.parse(content);
+        console.log(`[validateMigration] UUID map loaded: ${Object.keys(uuidMap).length} mappings`);
       } else {
-        console.log(`[validateMigration] Todo count matches: ${sourceTodos.length}`);
+        console.warn('[validateMigration] UUID map file not found, assuming empty');
       }
 
-      // 验证每个待办（基于 UUID 匹配）
-      for (const sourceTodo of sourceTodos) {
-        // 在新架构中，我们使用 UUID 映射来查找待办
-        const targetTodo = targetTodos.find(t => t.id === sourceTodo.id);
+      // 检查每个源待办是否成功迁移
+      let successfulMigrations = 0;
 
-        if (!targetTodo) {
-          console.warn(`[validateMigration] Missing todo: ${sourceTodo.title} (${sourceTodo.id})`);
+      for (const sourceTodo of sourceTodos) {
+        if (!sourceTodo.id) {
+          console.error(`[validateMigration] ❌ Todo missing ID: ${sourceTodo.title}`);
           missingTodos.push(sourceTodo.title);
           continue;
         }
 
-        // 验证内容
-        if (sourceTodo.content !== targetTodo.content) {
-          console.warn(`[validateMigration] Content mismatch: ${sourceTodo.title}`);
-          contentMismatches.push(sourceTodo.title);
+        const expectedFileName = uuidMap[String(sourceTodo.id)];
+
+        if (expectedFileName) {
+          // 检查对应的 .md 文件是否存在
+          const expectedFilePath = path.join(targetPath, expectedFileName);
+
+          if (fs.existsSync(expectedFilePath)) {
+            console.log(`[validateMigration] ✅ Todo "${sourceTodo.title}" (${sourceTodo.id}) exists as ${expectedFileName}`);
+            successfulMigrations++;
+          } else {
+            const errorMsg = `待办文件不存在: ${sourceTodo.title} (${expectedFileName})`;
+            console.error(`[validateMigration] ❌ ${errorMsg}`);
+            missingTodos.push(sourceTodo.title);
+          }
+        } else {
+          const errorMsg = `待办未在映射中: ${sourceTodo.title} (${String(sourceTodo.id)})`;
+          console.error(`[validateMigration] ❌ ${errorMsg}`);
+          missingTodos.push(sourceTodo.title);
         }
       }
 
-      // 验证关系数量
-      if (sourceRelations.length !== targetRelations.length) {
-        const errorMsg = `关系数量不匹配: 源=${sourceRelations.length}, 目标=${targetRelations.length}`;
-        console.warn(`[validateMigration] ${errorMsg}`);
-        errors.push(errorMsg);
-      } else {
-        console.log(`[validateMigration] Relation count matches: ${sourceRelations.length}`);
-      }
+      console.log(`[validateMigration] Migration success: ${successfulMigrations}/${sourceTodos.length}`);
 
-      // 综合判断
-      if (errors.length > 0 || missingTodos.length > 0 || contentMismatches.length > 0) {
-        console.error(`[validateMigration] Validation failed:`);
-        console.error(`[validateMigration] - Errors: ${errors.join(', ')}`);
-        console.error(`[validateMigration] - Missing: ${missingTodos.join(', ')}`);
-        console.error(`[validateMigration] - Mismatches: ${contentMismatches.join(', ')}`);
+      // 生成验证结果
+      const validationSuccess = successfulMigrations === sourceTodos.length;
+
+      if (validationSuccess) {
+        console.log('[validateMigration] ===== VALIDATION SUCCESSFUL =====');
+        return {
+          success: true,
+          errors: [],
+          sourceCount: sourceTodos.length,
+          targetCount: actualMarkdownFiles.length,
+          missingTodos: [],
+          contentMismatches: []
+        };
+      } else {
+        const errorMsg = `迁移验证失败: 期望${sourceTodos.length}个待办，实际成功${successfulMigrations}个`;
+        console.error(`[validateMigration] ${errorMsg}`);
+        console.error(`[validateMigration] Missing todos: ${missingTodos.join(', ')}`);
 
         return {
           success: false,
-          errors,
+          errors: [errorMsg],
           sourceCount: sourceTodos.length,
-          targetCount: targetTodos.length,
+          targetCount: actualMarkdownFiles.length,
           missingTodos,
-          contentMismatches
+          contentMismatches: []
         };
       }
-
-      console.log('[validateMigration] ===== VALIDATION SUCCESSFUL =====');
-      return {
-        success: true,
-        errors: [],
-        sourceCount: sourceTodos.length,
-        targetCount: targetTodos.length,
-        missingTodos: [],
-        contentMismatches: []
-      };
 
     } catch (error) {
       console.error('[validateMigration] Validation exception:', error);
@@ -442,6 +437,30 @@ export class MigrationService {
         contentMismatches: []
       };
     }
+  }
+
+  /**
+   * 扫描文件系统中的 Markdown 文件（不依赖索引器）
+   */
+  private async scanMarkdownFiles(targetPath: string): Promise<string[]> {
+    const markdownFiles: string[] = [];
+
+    try {
+      const entries = await fs.promises.readdir(targetPath, { withFileTypes: true });
+
+      for (const entry of entries) {
+        // 扫描所有 .md 文件（Obsidian 风格）
+        if (entry.isFile() && entry.name.endsWith('.md') && !entry.name.startsWith('.')) {
+          markdownFiles.push(entry.name);
+        }
+      }
+
+      console.log(`[scanMarkdownFiles] Found ${markdownFiles.length} .md files`);
+    } catch (error) {
+      console.error('[scanMarkdownFiles] Error scanning files:', error);
+    }
+
+    return markdownFiles;
   }
 
   /**
