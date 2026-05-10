@@ -291,17 +291,26 @@ class Application {
    */
   private async initializeFileStorage(): Promise<void> {
     try {
-      // 从设置中获取存储路径
+      // 从设置中获取存储模式
       const settings = await this.dbManager.getSettings();
-
+      const storageMode = settings.storageMode || 'database';
       const storagePath = settings.storagePath;
-      if (!storagePath) {
-        console.log('No storage path configured, using default');
+
+      // 只有在文件存储模式下才初始化文件存储
+      if (storageMode !== 'file') {
+        console.log(`Storage mode is '${storageMode}', using database storage`);
         this.useFileStorage = false;
         return;
       }
 
-      console.log(`Initializing file storage at: ${storagePath}`);
+      if (!storagePath) {
+        console.log('Storage mode is file but no storage path configured, using database');
+        this.useFileStorage = false;
+        return;
+      }
+
+      console.log(`Storage mode is 'file', initializing file storage at: ${storagePath}`);
+      this.useFileStorage = true;
 
       // 初始化 FileStorageManager
       this.fileStorageManager = new FileStorageManager(storagePath);
@@ -892,6 +901,17 @@ class Application {
 
         console.log('[storage:migrate] ===== MIGRATION COMPLETED =====');
         console.log('[storage:migrate] Result:', JSON.stringify(result));
+
+        // 迁移成功后更新存储模式设置
+        if (result.success) {
+          console.log('[storage:migrate] Updating storage mode settings...');
+          await this.dbManager.updateSettings({
+            storageMode: 'file',
+            storagePath: targetPath
+          });
+          console.log('[storage:migrate] Storage mode settings updated successfully');
+        }
+
         return result;
       } catch (error) {
         console.error('[storage:migrate] ===== MIGRATION FAILED =====');
