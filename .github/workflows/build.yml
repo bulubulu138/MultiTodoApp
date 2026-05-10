@@ -211,6 +211,62 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Verify Windows build output
+        if: matrix.platform == 'win'
+        run: |
+          echo "=== Verifying Windows build output ==="
+
+          # Check if release directory exists
+          if [ ! -d "release" ]; then
+            echo "❌ Release directory does not exist"
+            exit 1
+          fi
+
+          echo "✅ Release directory exists"
+
+          # List all files in release directory
+          echo "📁 Contents of release directory:"
+          ls -la release/
+
+          # Check for .exe files
+          echo ""
+          echo "🔍 Searching for .exe files..."
+          EXE_FILES=$(find release -name "*.exe" -type f)
+          if [ -z "$EXE_FILES" ]; then
+            echo "❌ No .exe files found in release directory"
+            echo "🔍 All files in release:"
+            find release -type f
+            exit 1
+          fi
+
+          echo "✅ Found .exe files:"
+          echo "$EXE_FILES"
+
+          # Check for .blockmap files
+          echo ""
+          echo "🔍 Searching for .blockmap files..."
+          BLOCKMAP_FILES=$(find release -name "*.blockmap" -type f)
+          if [ -z "$BLOCKMAP_FILES" ]; then
+            echo "⚠️ No .blockmap files found (this might be expected)"
+          else
+            echo "✅ Found .blockmap files:"
+            echo "$BLOCKMAP_FILES"
+          fi
+
+          # Verify file sizes
+          echo ""
+          echo "📊 File sizes:"
+          for file in $EXE_FILES; do
+            if [ -f "$file" ]; then
+              SIZE=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null || echo "unknown")
+              echo "  $(basename "$file"): $SIZE bytes"
+            fi
+          done
+
+          echo ""
+          echo "✅ Windows build verification completed"
+        shell: bash
+
       - name: Package application (macOS x64)
         if: matrix.platform == 'mac' && matrix.arch == 'x64'
         run: npm run dist:mac -- --x64
@@ -298,15 +354,72 @@ jobs:
           echo "✅ App bundle verification completed"
         shell: bash
 
+      - name: Verify macOS build artifacts
+        if: matrix.platform == 'mac'
+        run: |
+          echo "=== Verifying macOS build artifacts ==="
+
+          # Check if release directory exists
+          if [ ! -d "release" ]; then
+            echo "❌ Release directory does not exist"
+            exit 1
+          fi
+
+          echo "✅ Release directory exists"
+
+          # List all files in release directory
+          echo "📁 Contents of release directory:"
+          ls -la release/
+
+          # Check for .dmg files
+          echo ""
+          echo "🔍 Searching for .dmg files..."
+          DMG_FILES=$(find release -name "*.dmg" -type f)
+          if [ -z "$DMG_FILES" ]; then
+            echo "❌ No .dmg files found in release directory"
+            echo "🔍 All files in release:"
+            find release -type f
+            exit 1
+          fi
+
+          echo "✅ Found .dmg files:"
+          echo "$DMG_FILES"
+
+          # Check for .blockmap files
+          echo ""
+          echo "🔍 Searching for .blockmap files..."
+          BLOCKMAP_FILES=$(find release -name "*.blockmap" -type f)
+          if [ -z "$BLOCKMAP_FILES" ]; then
+            echo "⚠️ No .blockmap files found (this might be expected)"
+          else
+            echo "✅ Found .blockmap files:"
+            echo "$BLOCKMAP_FILES"
+          fi
+
+          # Verify file sizes
+          echo ""
+          echo "📊 File sizes:"
+          for file in $DMG_FILES; do
+            if [ -f "$file" ]; then
+              SIZE=$(stat -f%z "$file" 2>/dev/null || echo "unknown")
+              echo "  $(basename "$file"): $SIZE bytes"
+            fi
+          done
+
+          echo ""
+          echo "✅ macOS build artifacts verification completed"
+        shell: bash
+
       - name: Upload artifacts (Windows)
         if: matrix.platform == 'win'
         uses: actions/upload-artifact@v4
         with:
-          name: MultiTodo-Windows
+          name: MultiTodo-Windows-x64
           path: |
             release/*.exe
-            release/*.exe.blockmap
-          if-no-files-found: error
+            release/*.blockmap
+          if-no-files-found: warn
+          overwrite: false
 
       - name: Upload artifacts (macOS)
         if: matrix.platform == 'mac'
@@ -315,8 +428,9 @@ jobs:
           name: MultiTodo-${{ matrix.arch == 'x64' && 'macOS-Intel' || 'macOS-Apple-Silicon' }}
           path: |
             release/*.dmg
-            release/*.dmg.blockmap
-          if-no-files-found: error
+            release/*.blockmap
+          if-no-files-found: warn
+          overwrite: false
 
   release:
     name: Create Release
