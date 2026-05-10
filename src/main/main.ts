@@ -296,29 +296,41 @@ class Application {
       const storageMode = settings.storageMode || 'database';
       const storagePath = settings.storagePath;
 
+      console.log(`[initializeFileStorage] Current storage mode: '${storageMode}'`);
+      console.log(`[initializeFileStorage] Storage path: ${storagePath || 'not configured'}`);
+
       // 只有在文件存储模式下才初始化文件存储
       if (storageMode !== 'file') {
-        console.log(`Storage mode is '${storageMode}', using database storage`);
+        console.log('[initializeFileStorage] ✅ Using database storage mode');
         this.useFileStorage = false;
         return;
       }
 
       if (!storagePath) {
-        console.log('Storage mode is file but no storage path configured, using database');
+        console.warn('[initializeFileStorage] ⚠️ Storage mode is file but no storage path configured, falling back to database');
         this.useFileStorage = false;
         return;
       }
 
-      console.log(`Storage mode is 'file', initializing file storage at: ${storagePath}`);
+      // 验证存储路径是否存在
+      if (!fs.existsSync(storagePath)) {
+        console.error(`[initializeFileStorage] ❌ Storage path does not exist: ${storagePath}`);
+        console.warn('[initializeFileStorage] ⚠️ Falling back to database mode');
+        this.useFileStorage = false;
+        return;
+      }
+
+      console.log(`[initializeFileStorage] 🔄 Initializing file storage at: ${storagePath}`);
       this.useFileStorage = true;
 
       // 初始化 FileStorageManager
       this.fileStorageManager = new FileStorageManager(storagePath);
       this.migrationService = new MigrationService(this.dbManager, this.fileStorageManager);
 
-      console.log('File storage initialized successfully');
+      console.log('[initializeFileStorage] ✅ File storage initialized successfully');
     } catch (error) {
-      console.error('Error initializing file storage:', error);
+      console.error('[initializeFileStorage] ❌ Error initializing file storage:', error);
+      console.warn('[initializeFileStorage] ⚠️ Falling back to database mode');
       this.useFileStorage = false;
       this.fileStorageManager = null;
       this.migrationService = null;
@@ -893,6 +905,28 @@ class Application {
 
         console.log('[storage:migrate] Migration service ready, starting migration...');
 
+        // 🔧 修复：在迁移开始前就更新存储模式设置
+        // 这样即使迁移过程中出现异常，重启后也能正确切换到文件存储模式
+        console.log('[storage:migrate] Updating storage mode settings BEFORE migration...');
+        try {
+          await this.dbManager.updateSettings({
+            storageMode: 'file',
+            storagePath: targetPath
+          });
+          console.log('[storage:migrate] ✅ Storage mode settings updated successfully');
+        } catch (error) {
+          console.error('[storage:migrate] ❌ Failed to update storage mode settings:', error);
+          return {
+            success: false,
+            error: '设置存储模式失败，请重试',
+            todosMigrated: 0,
+            relationsMigrated: 0,
+            assetsMigrated: 0,
+            errors: ['Failed to update storage mode settings'],
+            duration: 0
+          };
+        }
+
         // 设置迁移锁
         this.isMigrating = true;
         console.log('[storage:migrate] Starting migration to:', targetPath);
@@ -902,14 +936,18 @@ class Application {
         console.log('[storage:migrate] ===== MIGRATION COMPLETED =====');
         console.log('[storage:migrate] Result:', JSON.stringify(result));
 
-        // 迁移成功后更新存储模式设置
-        if (result.success) {
-          console.log('[storage:migrate] Updating storage mode settings...');
-          await this.dbManager.updateSettings({
-            storageMode: 'file',
-            storagePath: targetPath
-          });
-          console.log('[storage:migrate] Storage mode settings updated successfully');
+        // 迁移完成后，如果失败则回滚设置
+        if (!result.success) {
+          console.log('[storage:migrate] ❌ Migration failed, rolling back storage mode settings...');
+          try {
+            await this.dbManager.updateSettings({
+              storageMode: 'database',
+              storagePath: ''
+            });
+            console.log('[storage:migrate] ✅ Settings rolled back to database mode');
+          } catch (rollbackError) {
+            console.error('[storage:migrate] ❌ Failed to rollback settings:', rollbackError);
+          }
         }
 
         return result;

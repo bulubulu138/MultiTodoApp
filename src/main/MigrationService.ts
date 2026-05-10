@@ -333,44 +333,58 @@ export class MigrationService {
   }
 
   /**
-   * 验证迁移结果（直接扫描文件系统版本）
+   * 验证迁移结果（改进版 - 容错性更强）
    */
   async validateMigration(targetPath: string): Promise<ValidationResult> {
     const errors: string[] = [];
     const missingTodos: string[] = [];
     const contentMismatches: string[] = [];
 
-    console.log('[validateMigration] ===== STARTING FILE SYSTEM VALIDATION =====');
+    console.log('[validateMigration] ===== STARTING IMPROVED FILE SYSTEM VALIDATION =====');
 
     try {
       // 获取源数据
       const sourceTodos = await this.dbManager.getAllTodos();
       const sourceRelations = await this.dbManager.getAllRelations();
 
-      console.log(`[validateMigration] Source data: ${sourceTodos.length} todos, ${sourceRelations.length} relations`);
+      console.log(`[validateMigration] 📊 Source data: ${sourceTodos.length} todos, ${sourceRelations.length} relations`);
 
-      // 直接扫描文件系统获取实际文件数量（不依赖索引器）
-      const actualMarkdownFiles = await this.scanMarkdownFiles(targetPath);
-      console.log(`[validateMigration] Found ${actualMarkdownFiles.length} .md files in filesystem`);
+      // 🔧 改进：直接扫描文件系统获取实际文件数量，容错性更强
+      let actualMarkdownFiles: string[] = [];
+      try {
+        actualMarkdownFiles = await this.scanMarkdownFiles(targetPath);
+        console.log(`[validateMigration] 📁 Found ${actualMarkdownFiles.length} .md files in filesystem`);
+      } catch (scanError) {
+        console.error(`[validateMigration] ❌ Error scanning files: ${scanError}`);
+        errors.push(`文件系统扫描失败: ${String(scanError)}`);
+      }
 
-      // 读取 UUID 映射
+      // 🔧 改进：读取 UUID 映射，增加容错处理
       const uuidMapPath = path.join(targetPath, '.multitodo-metadata', 'uuid-to-file.json');
       let uuidMap: Record<string, string> = {};
 
-      if (fs.existsSync(uuidMapPath)) {
-        const content = await fs.promises.readFile(uuidMapPath, 'utf-8');
-        uuidMap = JSON.parse(content);
-        console.log(`[validateMigration] UUID map loaded: ${Object.keys(uuidMap).length} mappings`);
-      } else {
-        console.warn('[validateMigration] UUID map file not found, assuming empty');
+      try {
+        if (fs.existsSync(uuidMapPath)) {
+          const content = await fs.promises.readFile(uuidMapPath, 'utf-8');
+          uuidMap = JSON.parse(content);
+          console.log(`[validateMigration] 🗺️ UUID map loaded: ${Object.keys(uuidMap).length} mappings`);
+        } else {
+          console.warn('[validateMigration] ⚠️ UUID map file not found, will perform direct file validation');
+        }
+      } catch (mapError) {
+        console.error(`[validateMigration] ❌ Error reading UUID map: ${mapError}`);
+        // 继续执行，使用直接文件验证作为备用方案
       }
 
-      // 检查每个源待办是否成功迁移
+      // 🔧 改进：检查每个源待办是否成功迁移，增加详细的调试信息
       let successfulMigrations = 0;
+      let processedCount = 0;
 
       for (const sourceTodo of sourceTodos) {
+        processedCount++;
+
         if (!sourceTodo.id) {
-          console.error(`[validateMigration] ❌ Todo missing ID: ${sourceTodo.title}`);
+          console.error(`[validateMigration] ❌ [${processedCount}/${sourceTodos.length}] Todo missing ID: "${sourceTodo.title}"`);
           missingTodos.push(sourceTodo.title);
           continue;
         }
@@ -382,27 +396,37 @@ export class MigrationService {
           const expectedFilePath = path.join(targetPath, expectedFileName);
 
           if (fs.existsSync(expectedFilePath)) {
-            console.log(`[validateMigration] ✅ Todo "${sourceTodo.title}" (${sourceTodo.id}) exists as ${expectedFileName}`);
+            console.log(`[validateMigration] ✅ [${processedCount}/${sourceTodos.length}] Todo "${sourceTodo.title}" (${sourceTodo.id}) exists as ${expectedFileName}`);
             successfulMigrations++;
           } else {
-            const errorMsg = `待办文件不存在: ${sourceTodo.title} (${expectedFileName})`;
+            const errorMsg = `待办文件不存在: "${sourceTodo.title}" (${expectedFileName})`;
             console.error(`[validateMigration] ❌ ${errorMsg}`);
             missingTodos.push(sourceTodo.title);
           }
         } else {
-          const errorMsg = `待办未在映射中: ${sourceTodo.title} (${String(sourceTodo.id)})`;
-          console.error(`[validateMigration] ❌ ${errorMsg}`);
-          missingTodos.push(sourceTodo.title);
+          // 🔧 改进：UUID 映射中没有，尝试直接在文件系统中查找
+          console.warn(`[validateMigration] ⚠️ [${processedCount}/${sourceTodos.length}] Todo "${sourceTodo.title}" (${String(sourceTodo.id)}) not in UUID map, checking filesystem...`);
+
+          // 尝试查找包含该 UUID 的文件
+          const foundFile = actualMarkdownFiles.find(file => file.includes(String(sourceTodo.id)));
+          if (foundFile) {
+            console.log(`[validateMigration] ✅ Found file by UUID: ${foundFile}`);
+            successfulMigrations++;
+          } else {
+            const errorMsg = `待办未在映射中且文件系统中未找到: "${sourceTodo.title}" (${String(sourceTodo.id)})`;
+            console.error(`[validateMigration] ❌ ${errorMsg}`);
+            missingTodos.push(sourceTodo.title);
+          }
         }
       }
 
-      console.log(`[validateMigration] Migration success: ${successfulMigrations}/${sourceTodos.length}`);
+      console.log(`[validateMigration] 📈 Migration success rate: ${successfulMigrations}/${sourceTodos.length} (${Math.round(successfulMigrations/sourceTodos.length*100)}%)`);
 
-      // 生成验证结果
+      // 🔧 改进：生成更详细的验证结果
       const validationSuccess = successfulMigrations === sourceTodos.length;
 
       if (validationSuccess) {
-        console.log('[validateMigration] ===== VALIDATION SUCCESSFUL =====');
+        console.log('[validateMigration] ===== ✅ VALIDATION SUCCESSFUL =====');
         return {
           success: true,
           errors: [],
@@ -412,13 +436,14 @@ export class MigrationService {
           contentMismatches: []
         };
       } else {
-        const errorMsg = `迁移验证失败: 期望${sourceTodos.length}个待办，实际成功${successfulMigrations}个`;
-        console.error(`[validateMigration] ${errorMsg}`);
-        console.error(`[validateMigration] Missing todos: ${missingTodos.join(', ')}`);
+        const successRate = Math.round(successfulMigrations/sourceTodos.length*100);
+        const errorMsg = `迁移验证失败: 期望${sourceTodos.length}个待办，实际成功${successfulMigrations}个 (${successRate}%)`;
+        console.error(`[validateMigration] ❌ ${errorMsg}`);
+        console.error(`[validateMigration] Missing todos (${missingTodos.length}): ${missingTodos.slice(0, 5).join(', ')}${missingTodos.length > 5 ? '...' : ''}`);
 
         return {
           success: false,
-          errors: [errorMsg],
+          errors: [errorMsg, ...errors],
           sourceCount: sourceTodos.length,
           targetCount: actualMarkdownFiles.length,
           missingTodos,
@@ -427,10 +452,10 @@ export class MigrationService {
       }
 
     } catch (error) {
-      console.error('[validateMigration] Validation exception:', error);
+      console.error('[validateMigration] ❌ Validation exception:', error);
       return {
         success: false,
-        errors: [`验证异常: ${String(error)}`],
+        errors: [`验证异常: ${String(error)}`, ...errors],
         sourceCount: 0,
         targetCount: 0,
         missingTodos: [],
