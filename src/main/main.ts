@@ -1844,7 +1844,7 @@ class Application {
       try {
         const result = await this.fileStorageManager.repairUuidMapping();
         console.log('[debug:repairUuidMapping] Result:', result);
-        return { success: true, ...result };
+        return result;
       } catch (error) {
         console.error('[debug:repairUuidMapping] Error:', error);
         return { success: false, error: String(error) };

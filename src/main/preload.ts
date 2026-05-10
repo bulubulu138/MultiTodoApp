@@ -447,6 +447,18 @@ export interface ElectronAPI {
       error?: string;
     }>;
   };
+
+  // 调试工具API
+  debug: {
+    checkDataIntegrity: () => Promise<any>;
+    repairUuidMapping: () => Promise<any>;
+    rebuildIndex: () => Promise<any>;
+    quickDiagnostic: () => Promise<{
+      healthy: boolean;
+      issues: string[];
+      recommendations: string[];
+    }>;
+  };
 }
 
 // 暴露API到渲染进程
