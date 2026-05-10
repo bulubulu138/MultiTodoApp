@@ -89,11 +89,43 @@ export class HybridStorageManager {
     if (newConfig.currentMode && newConfig.currentMode !== oldMode) {
       console.log(`[HybridStorage] Storage mode changed: ${oldMode} -> ${newConfig.currentMode}`);
       await this.initializeFileManager();
+
+      // 新增：当切换到file模式时，触发索引重建
+      if (newConfig.currentMode === 'file') {
+        await this.rebuildFileIndex();
+      }
     }
 
-    // 如果文件路径改变，重新初始化文件管理器
+    // 如果文件路径改变，重新初始化文件管理器并重建索引
     if (newConfig.filePath) {
       await this.initializeFileManager();
+      await this.rebuildFileIndex();
+    }
+  }
+
+  /**
+   * 重建文件索引
+   * 用于配置变更时确保现有MD文件被正确加载
+   */
+  private async rebuildFileIndex(): Promise<void> {
+    try {
+      if (!this.config.filePath) {
+        console.warn('[HybridStorage] File path not configured, skipping index rebuild');
+        return;
+      }
+
+      console.log('[HybridStorage] Rebuilding file index...');
+      console.log(`[HybridStorage] Indexing path: ${this.config.filePath}`);
+
+      // 使用FileIndexer重建索引
+      const { FileIndexer } = await import('../FileIndexer');
+      const tempIndexer = new FileIndexer(this.config.filePath);
+      await tempIndexer.buildIndex();
+
+      console.log('[HybridStorage] ✅ File index rebuilt successfully');
+    } catch (error) {
+      console.error('[HybridStorage] ❌ Failed to rebuild file index:', error);
+      // 不抛出错误，避免阻塞配置切换
     }
   }
 

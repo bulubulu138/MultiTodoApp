@@ -129,23 +129,36 @@ export class FileIndexer {
    */
   async buildIndex(): Promise<void> {
     console.log('[FileIndexer] Building index...');
+    console.log(`[FileIndexer] 📂 Storage path: ${this.storagePath}`);
 
     // 清空现有索引
     this.index = this.createEmptyIndex();
 
     // 扫描所有待办文件（支持新旧两种格式）
     const todoFiles = await this.scanTodoFiles();
-    console.log(`[FileIndexer] Found ${todoFiles.length} todo files to index`);
+    console.log(`[FileIndexer] 📁 Found ${todoFiles.length} todo files to index`);
+
+    if (todoFiles.length === 0) {
+      console.warn('[FileIndexer] ⚠️ No todo files found in directory');
+    }
+
+    let successCount = 0;
+    let failCount = 0;
 
     for (const todoFile of todoFiles) {
       try {
         const entry = await this.createIndexEntryFromFile(todoFile);
         if (entry) {
           this.addToIndex(entry);
-          console.log(`[FileIndexer] Indexed todo: "${entry.title}" (${entry.uuid})`);
+          console.log(`[FileIndexer] ✅ Indexed: "${entry.title}" (${entry.uuid})`);
+          successCount++;
+        } else {
+          failCount++;
+          console.warn(`[FileIndexer] ⚠️ Skipped (no entry returned): ${todoFile}`);
         }
       } catch (error) {
-        console.error(`[FileIndexer] Error indexing ${todoFile}:`, error);
+        failCount++;
+        console.error(`[FileIndexer] ❌ Error indexing ${todoFile}:`, error);
       }
     }
 
@@ -156,7 +169,8 @@ export class FileIndexer {
     // 保存索引
     await this.saveIndex();
 
-    console.log(`[FileIndexer] Index built: ${this.index.metadata.todoCount} todos`);
+    console.log(`[FileIndexer] 📊 Index build complete: ${successCount} success, ${failCount} failed, ${this.index.metadata.todoCount} total in index`);
+    console.log(`[FileIndexer] ✅ Index built successfully with ${this.index.metadata.todoCount} todos`);
   }
 
   /**
