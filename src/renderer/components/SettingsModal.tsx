@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert, Tooltip, Collapse, Descriptions, Progress, Result, message, Spin } from 'antd';
-import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, ExportOutlined, LinkOutlined, BgColorsOutlined, CloudUploadOutlined, LockOutlined, SyncOutlined, SwapOutlined, ReloadOutlined, FileTextOutlined, PlayCircleOutlined, PauseCircleOutlined, DeleteOutlined } from '@ant-design/icons';
+import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, ExportOutlined, LinkOutlined, BgColorsOutlined, CloudUploadOutlined, LockOutlined, SyncOutlined, SwapOutlined, ReloadOutlined, FileTextOutlined, PlayCircleOutlined, PauseCircleOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { App } from 'antd';
 import { Todo, CustomTab } from '../../shared/types';
 import { ColorTheme } from '../theme/themes';
@@ -110,6 +110,13 @@ const StorageManagement: React.FC = () => {
   const [fsWatcherStatus, setFsWatcherStatus] = useState<any>(null);
   const [fsWatcherStats, setFsWatcherStats] = useState<any>(null);
   const [watchedFiles, setWatchedFiles] = useState<string[]>([]);
+
+  // ✅ 新增：Markdown路径编辑状态
+  const [isEditingMarkdownPath, setIsEditingMarkdownPath] = useState(false);
+  const [newMarkdownPath, setNewMarkdownPath] = useState('');
+  const [markdownPathValidation, setMarkdownPathValidation] = useState<any>(null);
+  const [isValidatingMarkdownPath, setIsValidatingMarkdownPath] = useState(false);
+  const [isUpdatingMarkdownPath, setIsUpdatingMarkdownPath] = useState(false);
 
   useEffect(() => {
     loadStorageInfo();
@@ -563,6 +570,145 @@ const StorageManagement: React.FC = () => {
       console.error('Error opening in explorer:', error);
       message.error('打开失败');
     }
+  };
+
+  // 新增：在文件管理器中打开Markdown文件夹
+  const handleOpenMarkdownFolder = async () => {
+    try {
+      const markdownPath = storageStats?.filePath;
+      if (!markdownPath) {
+        message.warning('Markdown存储路径未配置');
+        return;
+      }
+
+      const result = await window.electronAPI.storageLocation.openInExplorer(markdownPath);
+      if (!result.success) {
+        message.error(result.error || '打开失败');
+      }
+    } catch (error) {
+      console.error('Error opening markdown folder:', error);
+      message.error('打开失败');
+    }
+  };
+
+  // 新增：选择新的Markdown存储路径
+  const handleSelectMarkdownPath = async () => {
+    try {
+      const result = await window.electronAPI.storageLocation.selectFolder();
+      if (result) {
+        setNewMarkdownPath(result);
+        await validateMarkdownPath(result);
+      }
+    } catch (error) {
+      console.error('Error selecting markdown path:', error);
+      message.error('选择路径失败');
+    }
+  };
+
+  // 新增：验证Markdown存储路径
+  const validateMarkdownPath = async (path: string) => {
+    if (!path) {
+      setMarkdownPathValidation(null);
+      return;
+    }
+
+    setIsValidatingMarkdownPath(true);
+    try {
+      const result = await window.electronAPI.storageLocation.validatePath(path);
+      setMarkdownPathValidation(result);
+    } catch (error) {
+      console.error('Error validating markdown path:', error);
+      setMarkdownPathValidation({
+        valid: false,
+        error: '路径验证失败'
+      });
+    } finally {
+      setIsValidatingMarkdownPath(false);
+    }
+  };
+
+  // 新增：开始编辑Markdown路径
+  const handleStartEditMarkdownPath = () => {
+    setNewMarkdownPath(storageStats?.filePath || '');
+    setIsEditingMarkdownPath(true);
+    setMarkdownPathValidation(null);
+  };
+
+  // 新增：取消编辑Markdown路径
+  const handleCancelEditMarkdownPath = () => {
+    setIsEditingMarkdownPath(false);
+    setNewMarkdownPath('');
+    setMarkdownPathValidation(null);
+  };
+
+  // 新增：更新Markdown存储路径
+  const handleUpdateMarkdownPath = async () => {
+    if (!newMarkdownPath || !markdownPathValidation?.valid) {
+      return;
+    }
+
+    // 显示确认对话框
+    Modal.confirm({
+      title: '确认更改存储位置',
+      icon: <ExclamationCircleOutlined />,
+      content: (
+        <div>
+          <p>您即将将Markdown存储位置更改为：</p>
+          <p><Text code>{newMarkdownPath}</Text></p>
+          <Alert
+            message="重要说明"
+            description={
+              <ul style={{ margin: 0, paddingLeft: 20 }}>
+                <li>此更改只影响新创建的待办文件</li>
+                <li>现有Markdown文件将保持在原位置</li>
+                <li>如需移动现有文件，请使用文件管理器手动操作</li>
+              </ul>
+            }
+            type="warning"
+            showIcon
+            style={{ marginTop: 16 }}
+          />
+        </div>
+      ),
+      okText: '确认更改',
+      cancelText: '取消',
+      onOk: async () => {
+        setIsUpdatingMarkdownPath(true);
+        try {
+          // 调用后端API更新路径
+          const result = await window.electronAPI.hybridStorage.updatePath(newMarkdownPath);
+
+          if (result.success) {
+            message.success('存储位置已成功更新');
+
+            // 刷新配置和统计信息
+            await loadHybridStorageConfig();
+            await loadStorageStats();
+
+            // 退出编辑模式
+            setIsEditingMarkdownPath(false);
+            setNewMarkdownPath('');
+            setMarkdownPathValidation(null);
+
+            // 提示用户重启应用
+            Modal.success({
+              title: '更改成功',
+              content: '存储位置已成功更改。建议重新启动应用以确保所有功能正常工作。',
+              onOk: () => {
+                window.location.reload();
+              }
+            });
+          } else {
+            message.error(`更改失败: ${result.error || '未知错误'}`);
+          }
+        } catch (error) {
+          console.error('Error updating markdown path:', error);
+          message.error('更改存储位置时发生错误');
+        } finally {
+          setIsUpdatingMarkdownPath(false);
+        }
+      }
+    });
   };
 
   const handleStartMigration = async () => {
@@ -1072,9 +1218,29 @@ const StorageManagement: React.FC = () => {
                 {storageMode === 'database' ? 'SQLite 数据库' : 'Markdown 文件'}
               </Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="存储路径">
-              {storagePath || '默认位置'}
-            </Descriptions.Item>
+            {storageMode === 'database' ? (
+              <Descriptions.Item label="存储路径">
+                {storagePath || '默认位置'}
+              </Descriptions.Item>
+            ) : (
+              <Descriptions.Item label="存储路径">
+                <Space>
+                  <Text ellipsis={{ tooltip: storageStats?.filePath }} style={{ maxWidth: '300px' }}>
+                    {storageStats?.filePath || '未配置'}
+                  </Text>
+                  {storageStats?.filePath && (
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<FolderOpenOutlined />}
+                      onClick={() => handleOpenMarkdownFolder()}
+                    >
+                      打开
+                    </Button>
+                  )}
+                </Space>
+              </Descriptions.Item>
+            )}
           </Descriptions>
         </Card>
 
@@ -1119,6 +1285,164 @@ const StorageManagement: React.FC = () => {
             type="success"
             showIcon
           />
+        )}
+
+        {/* Markdown 存储路径管理 */}
+        {storageMode === 'file' && !isEditingMarkdownPath && (
+          <Card
+            title={<><FolderOpenOutlined /> Markdown 存储位置</>}
+            extra={
+              <Button
+                type="primary"
+                size="small"
+                icon={<SwapOutlined />}
+                onClick={handleStartEditMarkdownPath}
+              >
+                更改位置
+              </Button>
+            }
+          >
+            <Space direction="vertical" size="small" style={{ width: '100%' }}>
+              <div>
+                <Text type="secondary">当前存储位置：</Text>
+                <div style={{ marginTop: 8 }}>
+                  <Text ellipsis={{ tooltip: storageStats?.filePath }} style={{ maxWidth: '100%' }}>
+                    {storageStats?.filePath || '未配置'}
+                  </Text>
+                </div>
+              </div>
+
+              <Alert
+                message="存储说明"
+                description={
+                  <ul style={{ margin: 0, paddingLeft: 20 }}>
+                    <li>新创建的待办将保存到此位置</li>
+                    <li>现有Markdown文件保持在原位置</li>
+                    <li>您可以随时更改存储位置</li>
+                  </ul>
+                }
+                type="info"
+                showIcon
+              />
+            </Space>
+          </Card>
+        )}
+
+        {/* Markdown 存储路径编辑 */}
+        {storageMode === 'file' && isEditingMarkdownPath && (
+          <Card
+            title={<><SwapOutlined /> 更改存储位置</>}
+            extra={
+              <Button
+                type="text"
+                size="small"
+                onClick={handleCancelEditMarkdownPath}
+              >
+                取消
+              </Button>
+            }
+          >
+            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+              <div>
+                <Text strong>选择新的存储位置：</Text>
+                <Space.Compact style={{ width: '100%', marginTop: 8 }}>
+                  <Input
+                    value={newMarkdownPath}
+                    onChange={(e) => {
+                      setNewMarkdownPath(e.target.value);
+                      if (e.target.value) {
+                        validateMarkdownPath(e.target.value);
+                      } else {
+                        setMarkdownPathValidation(null);
+                      }
+                    }}
+                    placeholder="选择存储待办文件的文件夹"
+                    readOnly
+                  />
+                  <Button
+                    icon={<FolderOpenOutlined />}
+                    onClick={handleSelectMarkdownPath}
+                  >
+                    浏览
+                  </Button>
+                </Space.Compact>
+              </div>
+
+              {/* 路径验证结果 */}
+              {isValidatingMarkdownPath && (
+                <div style={{ textAlign: 'center', padding: '10px 0' }}>
+                  <Spin size="small" />
+                  <Text type="secondary" style={{ marginLeft: 8 }}>正在验证路径...</Text>
+                </div>
+              )}
+
+              {markdownPathValidation && !isValidatingMarkdownPath && (
+                <Alert
+                  message={markdownPathValidation.valid ? '路径验证成功' : '路径验证失败'}
+                  description={
+                    <div>
+                      {markdownPathValidation.error && (
+                        <div style={{ marginBottom: 8 }}>
+                          <Text type="danger">{markdownPathValidation.error}</Text>
+                        </div>
+                      )}
+                      {markdownPathValidation.warnings && markdownPathValidation.warnings.length > 0 && (
+                        <div>
+                          <Text type="warning">警告：</Text>
+                          <ul style={{ margin: 0, paddingLeft: 20 }}>
+                            {markdownPathValidation.warnings.map((warning: string, index: number) => (
+                              <li key={index}>{warning}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {markdownPathValidation.valid && (
+                        <div>
+                          <Text type="success">
+                            ✓ 路径可用，可用空间: {
+                              markdownPathValidation.availableSpace
+                                ? `${(markdownPathValidation.availableSpace / 1024 / 1024 / 1024).toFixed(2)} GB`
+                                : '未知'
+                            }
+                          </Text>
+                        </div>
+                      )}
+                    </div>
+                  }
+                  type={markdownPathValidation.valid ? 'success' : 'error'}
+                  showIcon
+                />
+              )}
+
+              {/* 操作按钮 */}
+              <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+                <Button onClick={handleCancelEditMarkdownPath}>
+                  取消
+                </Button>
+                <Button
+                  type="primary"
+                  onClick={handleUpdateMarkdownPath}
+                  disabled={!newMarkdownPath || !markdownPathValidation?.valid || isUpdatingMarkdownPath}
+                  loading={isUpdatingMarkdownPath}
+                >
+                  确认更改
+                </Button>
+              </Space>
+
+              <Alert
+                message="重要说明"
+                description={
+                  <ul style={{ margin: 0, paddingLeft: 20 }}>
+                    <li>更改存储位置只影响新创建的待办文件</li>
+                    <li>现有Markdown文件将保持在原位置</li>
+                    <li>如需移动现有文件，请使用文件管理器手动操作</li>
+                  </ul>
+                }
+                type="warning"
+                showIcon
+              />
+            </Space>
+          </Card>
         )}
 
         {/* 迁移选项 */}

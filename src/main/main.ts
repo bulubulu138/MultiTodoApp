@@ -1104,6 +1104,67 @@ class Application {
       }
     });
 
+    ipcMain.handle('hybridStorage:updatePath', async (_, newPath: string) => {
+      try {
+        if (!this.hybridStorageManager) {
+          return {
+            success: false,
+            error: 'Hybrid storage manager not initialized'
+          };
+        }
+
+        if (!this.storageLocationService) {
+          return {
+            success: false,
+            error: 'Storage location service not initialized'
+          };
+        }
+
+        console.log(`[HybridStorage] Updating markdown path to: ${newPath}`);
+
+        // 1. 验证路径
+        const validation = this.storageLocationService.validatePath(newPath);
+        if (!validation.valid) {
+          console.warn(`[HybridStorage] Path validation failed: ${validation.error}`);
+          return {
+            success: false,
+            error: validation.error || '路径验证失败'
+          };
+        }
+
+        // 2. 更新混合存储配置
+        await this.hybridStorageManager.updateConfig({ filePath: newPath });
+
+        // 3. 更新文件系统监控器（如激活）
+        if (this.filesystemWatcher) {
+          try {
+            await this.filesystemWatcher.updateWatchPath(newPath);
+            console.log('[HybridStorage] Filesystem watcher updated');
+          } catch (error) {
+            console.warn('[HybridStorage] Failed to update filesystem watcher:', error);
+            // 不阻塞主流程，监控器更新失败不应影响路径更改
+          }
+        }
+
+        // 4. 清除缓存
+        this.hybridStorageManager.invalidateCache();
+
+        // 5. 保存到数据库设置
+        await this.dbManager.updateSettings({
+          markdownStoragePath: newPath
+        });
+
+        console.log('[HybridStorage] Markdown path updated successfully');
+        return { success: true };
+      } catch (error) {
+        console.error('Error updating markdown path:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
     ipcMain.handle('hybridStorage:getStats', async () => {
       try {
         if (!this.hybridStorageManager) {

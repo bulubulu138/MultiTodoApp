@@ -203,6 +203,37 @@ export class FilesystemWatcher extends EventEmitter {
   }
 
   /**
+   * 更新监控路径
+   */
+  public async updateWatchPath(newPath: string): Promise<void> {
+    console.log(`[FilesystemWatcher] Updating watch path to: ${newPath}`);
+
+    const wasWatching = this.status === 'watching';
+
+    // 停止当前监控
+    if (wasWatching) {
+      this.stop();
+    }
+
+    // 更新监控路径
+    this.watchPath = newPath;
+    this.stats.watchPath = newPath;
+
+    // 如果之前在监控，重新启动
+    if (wasWatching) {
+      try {
+        await this.start();
+        console.log('[FilesystemWatcher] Successfully updated watch path and restarted watching');
+      } catch (error) {
+        console.error('[FilesystemWatcher] Failed to restart watching after path update:', error);
+        // 不抛出错误，允许主流程继续
+      }
+    } else {
+      console.log('[FilesystemWatcher] Watch path updated (was not watching)');
+    }
+  }
+
+  /**
    * 暂停监控
    */
   public pause(): void {

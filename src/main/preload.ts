@@ -296,6 +296,10 @@ export interface ElectronAPI {
       success: boolean;
       error?: string;
     }>;
+    updatePath: (newPath: string) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
     getStats: () => Promise<{
       success: boolean;
       stats?: {
@@ -628,6 +632,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   hybridStorage: {
     getConfig: () => ipcRenderer.invoke('hybridStorage:getConfig'),
     switchMode: (newMode: string) => ipcRenderer.invoke('hybridStorage:switchMode', newMode),
+    updatePath: (newPath: string) => ipcRenderer.invoke('hybridStorage:updatePath', newPath),
     getStats: () => ipcRenderer.invoke('hybridStorage:getStats'),
     scanMarkdownFiles: () => ipcRenderer.invoke('hybridStorage:scanMarkdownFiles'),
     importMarkdownFile: (filePath: string) => ipcRenderer.invoke('hybridStorage:importMarkdownFile', filePath),
