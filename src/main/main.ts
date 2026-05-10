@@ -49,6 +49,9 @@ class Application {
   private appConfig: any = null;
   private storageLocationService: any = null;
 
+  // ✅ 新增：混合存储管理器
+  private hybridStorageManager: any = null;
+
   constructor() {
     this.dbManager = new DatabaseManager();
     this.imageManager = new ImageManager();
@@ -613,13 +616,34 @@ class Application {
   }
 
   private setupIpcHandlers(): void {
-    // 待办事项相关的IPC处理器
+    // 待办事项相关的IPC处理器（优先使用混合存储管理器）
     ipcMain.handle('todo:getAll', async () => {
+      // 优先使用混合存储管理器
+      if (this.hybridStorageManager) {
+        try {
+          return await this.hybridStorageManager.getAllTodos();
+        } catch (error) {
+          console.error('Error using hybrid storage manager, falling back to database:', error);
+          return await this.dbManager.getAllTodos();
+        }
+      }
       return await this.dbManager.getAllTodos();
     });
 
     ipcMain.handle('todo:create', async (_, todo) => {
-      const createdTodo = await this.dbManager.createTodo(todo);
+      let createdTodo: any;
+      // 优先使用混合存储管理器
+      if (this.hybridStorageManager) {
+        try {
+          createdTodo = await this.hybridStorageManager.createTodo(todo);
+        } catch (error) {
+          console.error('Error using hybrid storage manager, falling back to database:', error);
+          createdTodo = await this.dbManager.createTodo(todo);
+        }
+      } else {
+        createdTodo = await this.dbManager.createTodo(todo);
+      }
+
       // 异步生成关键词（不阻塞创建流程）
       if (this.keywordProcessor && createdTodo.id) {
         this.keywordProcessor.queueTodoForKeywordExtraction(createdTodo).catch(err => {
@@ -630,7 +654,20 @@ class Application {
     });
 
     ipcMain.handle('todo:createManualAtTop', async (_, todo, tabKey: string) => {
-      const createdTodo = await this.dbManager.createTodoManualAtTop(todo, tabKey);
+      let createdTodo: any;
+      // 优先使用混合存储管理器
+      if (this.hybridStorageManager) {
+        try {
+          // 暂时使用数据库管理器的createManualAtTop方法
+          createdTodo = await this.dbManager.createTodoManualAtTop(todo, tabKey);
+        } catch (error) {
+          console.error('Error using hybrid storage manager, falling back to database:', error);
+          createdTodo = await this.dbManager.createTodoManualAtTop(todo, tabKey);
+        }
+      } else {
+        createdTodo = await this.dbManager.createTodoManualAtTop(todo, tabKey);
+      }
+
       // 异步生成关键词（不阻塞创建流程）
       if (this.keywordProcessor && createdTodo.id) {
         this.keywordProcessor.queueTodoForKeywordExtraction(createdTodo).catch(err => {
@@ -641,10 +678,32 @@ class Application {
     });
 
     ipcMain.handle('todo:update', async (_, id, updates) => {
-      await this.dbManager.updateTodo(id, updates);
+      // 优先使用混合存储管理器
+      if (this.hybridStorageManager) {
+        try {
+          await this.hybridStorageManager.updateTodo(id, updates);
+        } catch (error) {
+          console.error('Error using hybrid storage manager, falling back to database:', error);
+          await this.dbManager.updateTodo(id, updates);
+        }
+      } else {
+        await this.dbManager.updateTodo(id, updates);
+      }
+
       // 如果标题或内容更新，重新生成关键词
       if ((updates.title !== undefined || updates.content !== undefined) && this.keywordProcessor) {
-        const todo = await this.dbManager.getTodoById(id);
+        let todo: any;
+        if (this.hybridStorageManager) {
+          try {
+            todo = await this.hybridStorageManager.getTodoById(id);
+          } catch (error) {
+            console.error('Error getting todo for keyword extraction:', error);
+            todo = await this.dbManager.getTodoById(id);
+          }
+        } else {
+          todo = await this.dbManager.getTodoById(id);
+        }
+
         if (todo) {
           this.keywordProcessor.queueTodoForKeywordExtraction(todo).catch(err => {
             console.error('Failed to queue todo for keyword extraction:', err);
@@ -654,6 +713,15 @@ class Application {
     });
 
     ipcMain.handle('todo:delete', async (_, id) => {
+      // 优先使用混合存储管理器
+      if (this.hybridStorageManager) {
+        try {
+          await this.hybridStorageManager.deleteTodo(id);
+          return;
+        } catch (error) {
+          console.error('Error using hybrid storage manager, falling back to database:', error);
+        }
+      }
       return await this.dbManager.deleteTodo(id);
     });
 
@@ -970,6 +1038,148 @@ class Application {
     // Settings - Data folder operations
     ipcMain.handle('settings:getDbPath', async () => {
       return this.dbManager.getDbPath();
+    });
+
+    // ✅ 新增：混合存储管理IPC处理器
+    ipcMain.handle('hybridStorage:getConfig', async () => {
+      try {
+        if (!this.hybridStorageManager) {
+          return {
+            success: false,
+            error: 'Hybrid storage manager not initialized'
+          };
+        }
+
+        const config = this.hybridStorageManager.getConfig();
+        return {
+          success: true,
+          config: {
+            currentMode: config.currentMode,
+            databasePath: config.databasePath,
+            filePath: config.filePath,
+            enableFileSync: config.enableFileSync,
+            conflictResolution: config.conflictResolution
+          }
+        };
+      } catch (error) {
+        console.error('Error getting hybrid storage config:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('hybridStorage:switchMode', async (_, newMode: string) => {
+      try {
+        if (!this.hybridStorageManager) {
+          return {
+            success: false,
+            error: 'Hybrid storage manager not initialized'
+          };
+        }
+
+        // 更新配置
+        await this.hybridStorageManager.updateConfig({ currentMode: newMode as any });
+
+        // 保存到数据库设置
+        await this.dbManager.updateSettings({
+          storageMode: newMode
+        });
+
+        console.log(`[HybridStorage] Switched to ${newMode} mode`);
+        return { success: true };
+      } catch (error) {
+        console.error('Error switching storage mode:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('hybridStorage:getStats', async () => {
+      try {
+        if (!this.hybridStorageManager) {
+          return {
+            success: false,
+            error: 'Hybrid storage manager not initialized'
+          };
+        }
+
+        const stats = await this.hybridStorageManager.getStorageStats();
+        return {
+          success: true,
+          stats
+        };
+      } catch (error) {
+        console.error('Error getting hybrid storage stats:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('hybridStorage:scanMarkdownFiles', async () => {
+      try {
+        if (!this.hybridStorageManager) {
+          return [];
+        }
+
+        const files = await this.hybridStorageManager.scanMarkdownFiles();
+        return files;
+      } catch (error) {
+        console.error('Error scanning markdown files:', error);
+        return [];
+      }
+    });
+
+    ipcMain.handle('hybridStorage:importMarkdownFile', async (_, filePath: string) => {
+      try {
+        if (!this.hybridStorageManager) {
+          return {
+            success: false,
+            error: 'Hybrid storage manager not initialized'
+          };
+        }
+
+        const todo = await this.hybridStorageManager.importMarkdownFile(filePath);
+        return {
+          success: true,
+          todo
+        };
+      } catch (error) {
+        console.error('Error importing markdown file:', error);
+        return {
+          success: false,
+          error: (error as Error).message
+        };
+      }
+    });
+
+    ipcMain.handle('hybridStorage:exportTodoAsMarkdown', async (_, todoId: number) => {
+      try {
+        if (!this.hybridStorageManager) {
+          throw new Error('Hybrid storage manager not initialized');
+        }
+
+        const filePath = await this.hybridStorageManager.exportTodoAsMarkdown(todoId);
+        return filePath;
+      } catch (error) {
+        console.error('Error exporting todo as markdown:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('hybridStorage:invalidateCache', async () => {
+      try {
+        if (this.hybridStorageManager) {
+          this.hybridStorageManager.invalidateCache();
+        }
+      } catch (error) {
+        console.error('Error invalidating cache:', error);
+      }
     });
 
     ipcMain.handle('settings:openDataFolder', async () => {
@@ -2223,6 +2433,25 @@ class Application {
       this.backupManager = new BackupManager(dbPath);
       this.backupManager.startAutoBackup();
       console.log('Backup manager initialized successfully');
+
+      // ✅ 新增：初始化混合存储管理器
+      console.log('Initializing hybrid storage manager...');
+      try {
+        const { HybridStorageManager } = await import('./services/HybridStorageManager');
+        const storagePath = this.fileStorageManager?.getStoragePath() || '';
+
+        this.hybridStorageManager = new HybridStorageManager(this.dbManager, {
+          currentMode: this.useFileStorage ? 'file' : 'database',
+          databasePath: dbPath,
+          filePath: storagePath,
+          enableFileSync: true,
+          conflictResolution: 'latest'
+        });
+        console.log('Hybrid storage manager initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize hybrid storage manager:', error);
+        this.hybridStorageManager = null;
+      }
 
       // 初始化关键词处理器
       console.log('Initializing keyword processor...');

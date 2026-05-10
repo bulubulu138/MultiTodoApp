@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert, Tooltip, Collapse, Descriptions, Progress, Result, message, Spin } from 'antd';
-import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, ExportOutlined, LinkOutlined, BgColorsOutlined, CloudUploadOutlined, LockOutlined, SyncOutlined } from '@ant-design/icons';
+import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, ExportOutlined, LinkOutlined, BgColorsOutlined, CloudUploadOutlined, LockOutlined, SyncOutlined, SwapOutlined } from '@ant-design/icons';
 import { App } from 'antd';
 import { Todo, CustomTab } from '../../shared/types';
 import { ColorTheme } from '../theme/themes';
@@ -87,9 +87,16 @@ const StorageManagement: React.FC = () => {
   const [pathValidation, setPathValidation] = useState<any>(null);
   const [validatingPath, setValidatingPath] = useState(false);
 
+  // ✅ 新增：存储类型切换状态
+  const [hybridStorageConfig, setHybridStorageConfig] = useState<any>(null);
+  const [storageStats, setStorageStats] = useState<any>(null);
+  const [isSwitchingMode, setIsSwitchingMode] = useState(false);
+  const [switchProgress, setSwitchProgress] = useState(0);
+
   useEffect(() => {
     loadStorageInfo();
     loadStorageLocationConfig();
+    loadHybridStorageConfig(); // ✅ 新增：加载混合存储配置
   }, []);
 
   const loadStorageInfo = async () => {
@@ -110,6 +117,89 @@ const StorageManagement: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading storage location config:', error);
+    }
+  };
+
+  // ✅ 新增：加载混合存储配置
+  const loadHybridStorageConfig = async () => {
+    try {
+      const result = await window.electronAPI.hybridStorage.getConfig();
+      if (result.success && result.config) {
+        setHybridStorageConfig(result.config);
+        // 同步更新storageMode状态
+        setStorageMode(result.config.currentMode === 'database' ? 'database' : 'file');
+      }
+    } catch (error) {
+      console.error('Error loading hybrid storage config:', error);
+    }
+  };
+
+  // ✅ 新增：加载存储统计信息
+  const loadStorageStats = async () => {
+    try {
+      const result = await window.electronAPI.hybridStorage.getStats();
+      if (result.success && result.stats) {
+        setStorageStats(result.stats);
+      }
+    } catch (error) {
+      console.error('Error loading storage stats:', error);
+    }
+  };
+
+  // ✅ 新增：处理存储类型切换
+  const handleStorageModeSwitch = async (checked: boolean) => {
+    const newMode = checked ? 'file' : 'database';
+
+    // 如果模式没有变化，直接返回
+    if (hybridStorageConfig?.currentMode === newMode) {
+      return;
+    }
+
+    setIsSwitchingMode(true);
+    setSwitchProgress(0);
+
+    try {
+      // 模拟进度
+      const progressInterval = setInterval(() => {
+        setSwitchProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return prev;
+          }
+          return prev + 10;
+        });
+      }, 100);
+
+      // 切换存储模式
+      const result = await window.electronAPI.hybridStorage.switchMode(newMode);
+
+      clearInterval(progressInterval);
+      setSwitchProgress(100);
+
+      if (result.success) {
+        message.success(`已切换到${newMode === 'database' ? '数据库' : 'Markdown'}存储模式`);
+
+        // 刷新配置
+        await loadHybridStorageConfig();
+        await loadStorageStats();
+
+        // 提示用户重启应用
+        Modal.success({
+          title: '切换成功',
+          content: '存储模式已成功切换。建议重新启动应用以确保所有功能正常工作。',
+          onOk: () => {
+            window.location.reload();
+          }
+        });
+      } else {
+        message.error(`切换失败: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error switching storage mode:', error);
+      message.error('切换存储模式失败');
+    } finally {
+      setIsSwitchingMode(false);
+      setSwitchProgress(0);
     }
   };
 
@@ -291,6 +381,79 @@ const StorageManagement: React.FC = () => {
   return (
     <div>
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        {/* ✅ 新增：存储类型切换 */}
+        <Card title={<><SwapOutlined /> 存储类型选择</>}>
+          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+            <div>
+              <Text strong>当前存储类型：</Text>
+              <div style={{ marginTop: 8 }}>
+                <Switch
+                  checked={storageMode === 'file'}
+                  onChange={handleStorageModeSwitch}
+                  checkedChildren="Markdown"
+                  unCheckedChildren="数据库"
+                  loading={isSwitchingMode}
+                  style={{ minWidth: 120 }}
+                />
+              </div>
+            </div>
+
+            {isSwitchingMode && (
+              <div>
+                <Text type="secondary">正在切换存储模式...</Text>
+                <Progress percent={switchProgress} status="active" style={{ marginTop: 8 }} />
+              </div>
+            )}
+
+            {storageStats && (
+              <Descriptions column={1} size="small" bordered>
+                <Descriptions.Item label="当前模式">
+                  <Tag color={storageStats.mode === 'database' ? 'blue' : 'green'}>
+                    {storageStats.mode === 'database' ? 'SQLite数据库' : 'Markdown文件'}
+                  </Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="数据库待办数">
+                  {storageStats.databaseCount}
+                </Descriptions.Item>
+                <Descriptions.Item label="文件待办数">
+                  {storageStats.fileCount}
+                </Descriptions.Item>
+                <Descriptions.Item label="总待办数">
+                  {storageStats.totalCount}
+                </Descriptions.Item>
+                <Descriptions.Item label="数据库路径">
+                  <Text ellipsis={{ tooltip: storageStats.databasePath }} style={{ maxWidth: '200px' }}>
+                    {storageStats.databasePath}
+                  </Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="文件存储路径">
+                  <Text ellipsis={{ tooltip: storageStats.filePath }} style={{ maxWidth: '200px' }}>
+                    {storageStats.filePath}
+                  </Text>
+                </Descriptions.Item>
+              </Descriptions>
+            )}
+
+            {storageMode === 'file' && (
+              <Alert
+                message="双存储模式说明"
+                description={
+                  <div>
+                    <p>当前启用双存储模式：</p>
+                    <ul>
+                      <li><strong>新建待办</strong>：保存为Markdown文件</li>
+                      <li><strong>数据读取</strong>：同时显示数据库和文件中的待办</li>
+                      <li><strong>冲突解决</strong>：自动选择最新修改的数据</li>
+                    </ul>
+                  </div>
+                }
+                type="info"
+                showIcon
+              />
+            )}
+          </Space>
+        </Card>
+
         {/* 新增：存储位置管理 */}
         {storageMode === 'database' && storageLocationConfig && (
           <Card title={<><FolderOpenOutlined /> 存储位置管理</>}>

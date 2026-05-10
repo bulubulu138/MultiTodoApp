@@ -278,6 +278,41 @@ export interface ElectronAPI {
       error?: string;
     }>;
   };
+
+  // 混合存储API
+  hybridStorage: {
+    getConfig: () => Promise<{
+      success: boolean;
+      config?: {
+        currentMode: string;
+        databasePath: string;
+        filePath: string;
+        enableFileSync: boolean;
+        conflictResolution: string;
+      };
+      error?: string;
+    }>;
+    switchMode: (newMode: string) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    getStats: () => Promise<{
+      success: boolean;
+      stats?: {
+        mode: string;
+        databaseCount: number;
+        fileCount: number;
+        totalCount: number;
+        databasePath: string;
+        filePath: string;
+      };
+      error?: string;
+    }>;
+    scanMarkdownFiles: () => Promise<string[]>;
+    importMarkdownFile: (filePath: string) => Promise<any>;
+    exportTodoAsMarkdown: (todoId: number) => Promise<string>;
+    invalidateCache: () => Promise<void>;
+  };
 }
 
 // 暴露API到渲染进程
@@ -462,5 +497,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     moveStorage: (newPath: string) => ipcRenderer.invoke('storageLocation:moveStorage', newPath),
     selectFolder: () => ipcRenderer.invoke('storageLocation:selectFolder'),
     openInExplorer: (path: string) => ipcRenderer.invoke('storageLocation:openInExplorer', path),
+  },
+
+  // 混合存储
+  hybridStorage: {
+    getConfig: () => ipcRenderer.invoke('hybridStorage:getConfig'),
+    switchMode: (newMode: string) => ipcRenderer.invoke('hybridStorage:switchMode', newMode),
+    getStats: () => ipcRenderer.invoke('hybridStorage:getStats'),
+    scanMarkdownFiles: () => ipcRenderer.invoke('hybridStorage:scanMarkdownFiles'),
+    importMarkdownFile: (filePath: string) => ipcRenderer.invoke('hybridStorage:importMarkdownFile', filePath),
+    exportTodoAsMarkdown: (todoId: number) => ipcRenderer.invoke('hybridStorage:exportTodoAsMarkdown', todoId),
+    invalidateCache: () => ipcRenderer.invoke('hybridStorage:invalidateCache'),
   },
 } as ElectronAPI);
