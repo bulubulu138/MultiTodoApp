@@ -64,49 +64,74 @@ export class FileStorageManager {
       updatedAt: new Date().toISOString()
     };
 
-    // 生成 Obsidian 风格的文件名
-    const fileName = await this.generateFileName(newTodo.title, uuid);
-    const todoPath = path.join(this.storagePath, fileName);
+    // 🔧 改进：添加详细的错误分类和处理
+    let fileName: string;
+    let todoPath: string;
+    let attachments: string[] = [];
 
-    // 处理附件（与 md 文件同级放置）
-    const attachments = await this.processAttachments(newTodo, this.storagePath, fileName);
-
-    // 添加附件处理日志
-    if (attachments.length > 0) {
-      console.log(`[createTodo] Created ${attachments.length} attachments for "${newTodo.title}":`, attachments);
-    } else {
-      console.log(`[createTodo] No attachments found for "${newTodo.title}"`);
-      console.log(`[createTodo] todo.imageUrl: ${newTodo.imageUrl ? 'present' : 'absent'}`);
-      console.log(`[createTodo] todo.images: ${newTodo.images ? 'present' : 'absent'}`);
-    }
-
-    // 生成并保存 Markdown 文件（包含附件引用）
-    const markdown = this.markdownParser.generateTodo(newTodo, [], attachments);
-    await this.atomicWrite(todoPath, markdown);
-
-    // 添加文件系统验证日志
-    console.log(`[createTodo] Verifying files in storage path: ${this.storagePath}`);
     try {
-      const files = await fs.promises.readdir(this.storagePath);
-      const mdFiles = files.filter(f => f.endsWith('.md'));
-      const imageFiles = files.filter(f => /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(f));
-      console.log(`[createTodo] Found ${mdFiles.length} .md files and ${imageFiles.length} image files`);
-      if (imageFiles.length > 0) {
-        console.log(`[createTodo] Image files: ${imageFiles.join(', ')}`);
+      // 步骤 1: 生成文件名
+      fileName = await this.generateFileName(newTodo.title, uuid);
+      todoPath = path.join(this.storagePath, fileName);
+      console.log(`[createTodo] 📝 Generated filename: ${fileName}`);
+
+      // 步骤 2: 处理附件
+      attachments = await this.processAttachments(newTodo, this.storagePath, fileName);
+
+      if (attachments.length > 0) {
+        console.log(`[createTodo] ✅ Created ${attachments.length} attachments for "${newTodo.title}":`, attachments);
+      } else {
+        console.log(`[createTodo] ℹ️ No attachments found for "${newTodo.title}"`);
+        console.log(`[createTodo] todo.imageUrl: ${newTodo.imageUrl ? 'present' : 'absent'}`);
+        console.log(`[createTodo] todo.images: ${newTodo.images ? 'present' : 'absent'}`);
       }
+
+      // 步骤 3: 生成并保存 Markdown 文件
+      const markdown = this.markdownParser.generateTodo(newTodo, [], attachments);
+      await this.atomicWrite(todoPath, markdown);
+      console.log(`[createTodo] ✅ Markdown file created: ${fileName}`);
+
+      // 验证文件是否成功创建
+      if (!fs.existsSync(todoPath)) {
+        throw new Error(`File creation verification failed: ${todoPath}`);
+      }
+
     } catch (error) {
-      console.error(`[createTodo] Error listing files:`, error);
+      console.error(`[createTodo] ❌ Failed to create todo "${newTodo.title}":`, error);
+      throw new Error(`Todo creation failed: ${error instanceof Error ? error.message : String(error)}`);
     }
 
-    // 更新 UUID 到文件名的映射
-    await this.updateUuidToFileMap(uuid, fileName);
+    // 🔧 改进：将 UUID 映射更新集成到原子操作中
+    try {
+      await this.updateUuidToFileMap(uuid, fileName);
+      console.log(`[createTodo] 🗺️ UUID mapping updated: ${uuid} -> ${fileName}`);
+    } catch (mappingError) {
+      console.error(`[createTodo] ❌ Failed to update UUID mapping for ${uuid}:`, mappingError);
+      // 🔧 改进：映射更新失败时，删除已创建的文件以保持一致性
+      try {
+        if (fs.existsSync(todoPath)) {
+          await fs.promises.unlink(todoPath);
+          console.log(`[createTodo] 🧹 Cleaned up file due to mapping update failure: ${fileName}`);
+        }
+      } catch (cleanupError) {
+        console.error(`[createTodo] ❌ Failed to cleanup file: ${cleanupError}`);
+      }
+      throw new Error(`UUID mapping update failed: ${mappingError instanceof Error ? mappingError.message : String(mappingError)}`);
+    }
 
     // 更新索引
-    await this.fileIndexer.addTodo(newTodo);
+    try {
+      await this.fileIndexer.addTodo(newTodo);
+      console.log(`[createTodo] 📊 Index updated for todo: ${newTodo.title}`);
+    } catch (indexError) {
+      console.warn(`[createTodo] ⚠️ Failed to update index (non-critical):`, indexError);
+      // 索引更新失败不影响主要功能，继续执行
+    }
 
     // 更新缓存
     this.updateCache(uuid, newTodo);
 
+    console.log(`[createTodo] 🎉 Successfully created todo: "${newTodo.title}" (${uuid})`);
     return newTodo;
   }
 
@@ -863,24 +888,45 @@ export class FileStorageManager {
    */
   private async updateUuidToFileMap(uuid: string, fileName: string): Promise<void> {
     const mapPath = path.join(this.storagePath, '.multitodo-metadata', 'uuid-to-file.json');
+    const maxRetries = 3;
+    let attempt = 0;
 
-    let uuidMap: Record<string, string> = {};
-
-    // 读取现有映射
-    if (fs.existsSync(mapPath)) {
+    while (attempt < maxRetries) {
       try {
-        const content = await fs.promises.readFile(mapPath, 'utf-8');
-        uuidMap = JSON.parse(content);
+        let uuidMap: Record<string, string> = {};
+
+        // 读取现有映射
+        if (fs.existsSync(mapPath)) {
+          try {
+            const content = await fs.promises.readFile(mapPath, 'utf-8');
+            uuidMap = JSON.parse(content);
+          } catch (readError) {
+            console.error(`[updateUuidToFileMap] ⚠️ Error reading UUID map (attempt ${attempt + 1}):`, readError);
+            // 如果文件损坏，重新开始
+            uuidMap = {};
+          }
+        }
+
+        // 更新映射
+        uuidMap[uuid] = fileName;
+
+        // 保存映射
+        await this.atomicWrite(mapPath, JSON.stringify(uuidMap, null, 2));
+        console.log(`[updateUuidToFileMap] ✅ Successfully updated mapping: ${uuid} -> ${fileName}`);
+        return; // 成功则返回
+
       } catch (error) {
-        console.error('[updateUuidToFileMap] Error reading UUID map:', error);
+        attempt++;
+        console.error(`[updateUuidToFileMap] ❌ Failed to update mapping (attempt ${attempt}/${maxRetries}):`, error);
+
+        if (attempt >= maxRetries) {
+          throw new Error(`UUID mapping update failed after ${maxRetries} attempts: ${error instanceof Error ? error.message : String(error)}`);
+        }
+
+        // 等待后重试
+        await new Promise(resolve => setTimeout(resolve, 100 * attempt));
       }
     }
-
-    // 更新映射
-    uuidMap[uuid] = fileName;
-
-    // 保存映射
-    await this.atomicWrite(mapPath, JSON.stringify(uuidMap, null, 2));
   }
 
   /**

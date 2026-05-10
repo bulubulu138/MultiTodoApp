@@ -43,6 +43,9 @@ export interface MigrationResult {
   errors: string[];
   duration: number;
   backupPath?: string;
+  // 🔧 新增：部分成功统计
+  partialSuccess?: boolean;
+  failedTodosCount?: number;
 }
 
 /**
@@ -164,8 +167,10 @@ export class MigrationService {
 
       const idMapping = new Map<number, string>(); // SQLite ID -> UUID 映射
       let assetsMigrated = 0;
+      let successfulTodos = 0;
+      let failedTodos: Array<{title: string, error: string}> = [];
 
-      // 批量迁移待办
+      // 🔧 改进：批量迁移待办，跟踪成功和失败的待办
       for (let i = 0; i < sortedTodos.length; i += options.batchWriteSize) {
         const batch = sortedTodos.slice(i, i + options.batchWriteSize);
 
@@ -179,7 +184,7 @@ export class MigrationService {
             const { id, ...todoWithoutId } = todo;
 
             // 添加迁移前的调试日志
-            console.log(`[Migration] Creating todo: "${todo.title}"`);
+            console.log(`[Migration] 📝 Creating todo: "${todo.title}"`);
             console.log(`[Migration] todo.imageUrl: ${todo.imageUrl ? 'present (' + todo.imageUrl.substring(0, 50) + '...)' : 'absent'}`);
             console.log(`[Migration] todo.images: ${todo.images ? 'present (' + todo.images.substring(0, 50) + '...)' : 'absent'}`);
 
@@ -188,7 +193,8 @@ export class MigrationService {
             // 注意：附件现在由 FileStorageManager.createTodo 自动处理
             // 所以这里不再需要调用 migrateAssets
 
-            console.log(`[Migration] Successfully created todo: "${todo.title}"`);
+            console.log(`[Migration] ✅ Successfully created todo: "${todo.title}" (${uuid})`);
+            successfulTodos++;
 
             this.updateProgress({
               stage: 'migrating_todos',
@@ -200,6 +206,12 @@ export class MigrationService {
             });
           } catch (error) {
             const errorMsg = `迁移待办 "${todo.title}" 失败: ${error}`;
+            console.error(`[Migration] ❌ ${errorMsg}`);
+            failedTodos.push({
+              title: todo.title || 'Unknown',
+              error: error instanceof Error ? error.message : String(error)
+            });
+
             this.updateProgress({
               stage: 'migrating_todos',
               current: i + batch.indexOf(todo) + 1,
@@ -210,6 +222,12 @@ export class MigrationService {
             });
           }
         }
+      }
+
+      // 🔧 改进：记录迁移统计信息
+      console.log(`[Migration] 📊 Migration statistics: ${successfulTodos}/${sortedTodos.length} successful, ${failedTodos.length} failed`);
+      if (failedTodos.length > 0) {
+        console.error(`[Migration] ❌ Failed todos:`, failedTodos.map(f => `"${f.title}": ${f.error}`).join(', '));
       }
 
       // 阶段 3: 迁移关系
@@ -266,8 +284,20 @@ export class MigrationService {
 
         const validation = await this.validateMigration(targetPath);
 
+        // 🔧 改进：支持部分成功的迁移场景
         if (!validation.success) {
-          throw new Error(`验证失败: ${validation.errors.join(', ')}`);
+          const successRate = ((validation.sourceCount - validation.missingTodos.length) / validation.sourceCount * 100).toFixed(1);
+          const errorMsg = `验证失败: ${validation.errors.join(', ')}。成功率: ${successRate}%`;
+
+          console.error(`[Migration] ❌ ${errorMsg}`);
+          console.error(`[Migration] Missing todos (${validation.missingTodos.length}): ${validation.missingTodos.slice(0, 5).join(', ')}${validation.missingTodos.length > 5 ? '...' : ''}`);
+
+          // 🔧 改进：如果成功率超过50%，仍然返回部分成功的结果
+          if (parseFloat(successRate) >= 50) {
+            console.warn(`[Migration] ⚠️ Migration partially successful (${successRate}%), but marked as failed for data consistency`);
+          }
+
+          throw new Error(errorMsg);
         }
       }
 
@@ -302,12 +332,15 @@ export class MigrationService {
 
       return {
         success: true,
-        todosMigrated: sourceTodos.length,
+        todosMigrated: successfulTodos, // 🔧 改进：使用实际成功的数量
         relationsMigrated: sourceRelations.length,
         assetsMigrated,
-        errors: [],
+        errors: failedTodos.map(f => `${f.title}: ${f.error}`), // 🔧 改进：包含详细的错误信息
         duration,
-        backupPath
+        backupPath,
+        // 🔧 改进：添加额外的迁移统计信息
+        partialSuccess: failedTodos.length > 0,
+        failedTodosCount: failedTodos.length
       };
 
     } catch (error) {
