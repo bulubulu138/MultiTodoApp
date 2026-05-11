@@ -161,7 +161,7 @@ const StorageDiagnosticModal: React.FC<StorageDiagnosticModalProps> = ({ visible
         </Button>
       ]}
       width={1000}
-      bodyStyle={{ maxHeight: '70vh', overflowY: 'auto' }}
+      styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
     >
       {loading && (
         <div style={{ textAlign: 'center', padding: '40px 0' }}>

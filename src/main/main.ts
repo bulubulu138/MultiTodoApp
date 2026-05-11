@@ -1900,36 +1900,59 @@ class Application {
     // 存储完整性检查
     ipcMain.handle('debug:checkStorageIntegrity', async () => {
       console.log('[debug:checkStorageIntegrity] Storage integrity check requested');
+      console.log(`[debug:checkStorageIntegrity] Current storage mode: ${this.useFileStorage ? 'file' : 'database'}`);
 
       try {
-        if (!this.fileStorageManager) {
-          console.warn('[debug:checkStorageIntegrity] File storage manager not initialized');
+        if (this.useFileStorage) {
+          // 文件存储模式：使用现有的 StorageIntegrityChecker
+          console.log('[debug:checkStorageIntegrity] Using file storage integrity checker');
+
+          if (!this.fileStorageManager) {
+            console.warn('[debug:checkStorageIntegrity] File storage manager not initialized');
+            return {
+              success: false,
+              healthy: false,
+              issues: ['File storage manager not initialized'],
+              recommendations: ['Initialize file storage manager'],
+              error: 'File storage manager not initialized'
+            };
+          }
+
+          // 动态导入StorageIntegrityChecker
+          const { StorageIntegrityChecker } = await import('./services/StorageIntegrityChecker');
+          const checker = new StorageIntegrityChecker(
+            this.dbManager,
+            this.fileStorageManager,
+            this.fileStorageManager.getStoragePath()
+          );
+
+          const result = await checker.performFullCheck();
+
+          // 打印详细报告到控制台
+          checker.printDiagnosticReport(result);
+
           return {
-            success: false,
-            healthy: false,
-            issues: ['File storage manager not initialized'],
-            recommendations: ['Initialize file storage manager'],
-            error: 'File storage manager not initialized'
+            success: true,
+            ...result
+          };
+        } else {
+          // 数据库模式：使用新的 DatabaseIntegrityChecker
+          console.log('[debug:checkStorageIntegrity] Using database integrity checker');
+
+          // 动态导入 DatabaseIntegrityChecker
+          const { DatabaseIntegrityChecker } = await import('./services/DatabaseIntegrityChecker');
+          const checker = new DatabaseIntegrityChecker(this.dbManager);
+
+          const result = await checker.performFullCheck();
+
+          // 打印详细报告到控制台
+          checker.printDiagnosticReport(result);
+
+          return {
+            success: true,
+            ...result
           };
         }
-
-        // 动态导入StorageIntegrityChecker
-        const { StorageIntegrityChecker } = await import('./services/StorageIntegrityChecker');
-        const checker = new StorageIntegrityChecker(
-          this.dbManager,
-          this.fileStorageManager,
-          this.fileStorageManager.getStoragePath()
-        );
-
-        const result = await checker.performFullCheck();
-
-        // 打印详细报告到控制台
-        checker.printDiagnosticReport(result);
-
-        return {
-          success: true,
-          ...result
-        };
       } catch (error) {
         console.error('[debug:checkStorageIntegrity] Error:', error);
         return {
