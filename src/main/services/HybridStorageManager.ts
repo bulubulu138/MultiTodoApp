@@ -217,27 +217,41 @@ export class HybridStorageManager {
   public async getAllTodos(): Promise<Todo[]> {
     // 检查缓存（5秒有效期）
     if (this.cache.size > 0 && Date.now() - this.cacheTimestamp < 5000) {
-      console.log('[HybridStorage] Returning cached todos');
+      console.log('[HybridStorage] 📦 Returning cached todos (count: ' + this.cache.size + ')');
       return Array.from(this.cache.values());
     }
 
-    console.log('[HybridStorage] Fetching todos from both storages');
+    console.log('[HybridStorage] 🔍 Fetching todos from both storages...');
 
     try {
       // 从数据库获取
+      console.log('[HybridStorage] 📊 Step 1: Fetching from database...');
       const dbTodos = await this.dbManager.getAllTodos();
       const dbTodoMap = new Map(dbTodos.map(todo => [Number(todo.id), todo]));
+      console.log(`[HybridStorage] ✅ Database: ${dbTodoMap.size} todos loaded`);
+      console.log(`[HybridStorage] 📋 DB sample titles: ${dbTodos.slice(0, 3).map(t => t.title || 'Untitled').join(', ')}...`);
 
       // 从文件存储获取（如果可用）
       let fileTodos: Todo[] = [];
       if (this.fileManager) {
+        console.log('[HybridStorage] 📂 Step 2: Fetching from file storage...');
         try {
           fileTodos = await this.fileManager.getAllTodos();
+          console.log(`[HybridStorage] ✅ File storage: ${fileTodos.length} todos loaded`);
+          console.log(`[HybridStorage] 📋 File sample titles: ${fileTodos.slice(0, 3).map(t => t.title || 'Untitled').join(', ')}...`);
         } catch (error) {
-          console.warn('[HybridStorage] Failed to get todos from file storage:', error);
+          console.warn('[HybridStorage] ❌ Failed to get todos from file storage:', error);
+          console.error('[HybridStorage] Error details:', {
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined
+          });
         }
+      } else {
+        console.log('[HybridStorage] ⚠️ File storage manager is not initialized');
       }
       const fileTodoMap = new Map(fileTodos.map(todo => [Number(todo.id), todo]));
+
+      console.log('[HybridStorage] 🔄 Step 3: Merging data from both sources...');
 
       // 合并数据
       const mergedTodos = this.mergeTodos(dbTodoMap, fileTodoMap);
@@ -246,11 +260,17 @@ export class HybridStorageManager {
       this.cache = new Map(mergedTodos.map(todo => [Number(todo.id), todo]));
       this.cacheTimestamp = Date.now();
 
-      console.log(`[HybridStorage] Merged ${dbTodoMap.size} DB todos + ${fileTodoMap.size} file todos = ${mergedTodos.length} total`);
+      console.log(`[HybridStorage] 📊 Final Result: ${dbTodoMap.size} DB todos + ${fileTodoMap.size} file todos = ${mergedTodos.length} total todos`);
+      console.log(`[HybridStorage] 💾 Cache updated with ${this.cache.size} entries, valid for 5 seconds`);
 
       return mergedTodos;
     } catch (error) {
-      console.error('[HybridStorage] Error getting all todos:', error);
+      console.error('[HybridStorage] ❌ Error getting all todos:', error);
+      console.error('[HybridStorage] Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      console.log('[HybridStorage] 🔄 Falling back to database only...');
       // 降级：只返回数据库数据
       return await this.dbManager.getAllTodos();
     }

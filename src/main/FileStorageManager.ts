@@ -194,21 +194,62 @@ export class FileStorageManager {
   async getAllTodos(): Promise<Todo[]> {
     const entries = await this.fileIndexer.getAllTodos();
     const todos: Todo[] = [];
+    const failures: Array<{ uuid: string; reason: string }> = [];
 
-    console.log(`[FileStorageManager] getAllTodos: Starting, index entries: ${entries.length}`);
+    console.log(`[FileStorageManager] 🚀 getAllTodos: Starting`);
+    console.log(`[FileStorageManager] 📊 Index contains ${entries.length} entries`);
+    console.log(`[FileStorageManager] 📂 Storage path: ${this.storagePath}`);
+
+    console.log(`[FileStorageManager] 📋 Sample index entries (first 5):`);
+    entries.slice(0, 5).forEach(entry => {
+      console.log(`   - ${entry.uuid}: ${entry.title || 'Untitled'} (${entry.filePath})`);
+    });
+
+    console.log('[FileStorageManager] 🔄 Loading each todo from file system...');
 
     for (const entry of entries) {
-      console.log(`[FileStorageManager] Attempting to load todo: ${entry.uuid}`);
-      const todo = await this.getTodoById(entry.uuid);
-      if (todo) {
-        todos.push(todo);
-        console.log(`[FileStorageManager] ✅ Loaded todo: ${todo.title}`);
-      } else {
-        console.warn(`[FileStorageManager] ❌ Failed to load todo: ${entry.uuid}`);
+      console.log(`[FileStorageManager] 📖 Attempting to load: ${entry.uuid} (${entry.filePath})`);
+      try {
+        const todo = await this.getTodoById(entry.uuid);
+        if (todo) {
+          todos.push(todo);
+          console.log(`[FileStorageManager] ✅ Successfully loaded: ${todo.title || 'Untitled'}`);
+        } else {
+          const reason = 'getTodoById returned null';
+          console.warn(`[FileStorageManager] ❌ Failed to load: ${entry.uuid} - ${reason}`);
+          failures.push({ uuid: entry.uuid, reason });
+        }
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        console.error(`[FileStorageManager] ❌ Error loading: ${entry.uuid} - ${reason}`);
+        console.error(`[FileStorageManager] Error details:`, {
+          uuid: entry.uuid,
+          filePath: entry.filePath,
+          error: error
+        });
+        failures.push({ uuid: entry.uuid, reason });
       }
     }
 
-    console.log(`[FileStorageManager] getAllTodos: Completed, loaded ${todos.length}/${entries.length}`);
+    console.log(`[FileStorageManager] 📊 getAllTodos: Completed`);
+    console.log(`[FileStorageManager] ✅ Successfully loaded: ${todos.length} todos`);
+    console.log(`[FileStorageManager] ❌ Failed to load: ${failures.length} entries`);
+
+    if (failures.length > 0) {
+      console.log('[FileStorageManager] 📋 Failure summary:');
+      failures.slice(0, 10).forEach(f => {
+        console.log(`   - ${f.uuid}: ${f.reason}`);
+      });
+      if (failures.length > 10) {
+        console.log(`   ... and ${failures.length - 10} more failures`);
+      }
+    }
+
+    console.log(`[FileStorageManager] 📋 Successfully loaded todos (first 3):`);
+    todos.slice(0, 3).forEach(todo => {
+      console.log(`   - ${todo.id}: ${todo.title || 'Untitled'}`);
+    });
+
     return todos;
   }
 

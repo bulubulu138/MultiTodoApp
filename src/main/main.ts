@@ -1897,6 +1897,51 @@ class Application {
       }
     });
 
+    // 存储完整性检查
+    ipcMain.handle('debug:checkStorageIntegrity', async () => {
+      console.log('[debug:checkStorageIntegrity] Storage integrity check requested');
+
+      try {
+        if (!this.fileStorageManager) {
+          console.warn('[debug:checkStorageIntegrity] File storage manager not initialized');
+          return {
+            success: false,
+            healthy: false,
+            issues: ['File storage manager not initialized'],
+            recommendations: ['Initialize file storage manager'],
+            error: 'File storage manager not initialized'
+          };
+        }
+
+        // 动态导入StorageIntegrityChecker
+        const { StorageIntegrityChecker } = await import('./services/StorageIntegrityChecker');
+        const checker = new StorageIntegrityChecker(
+          this.dbManager,
+          this.fileStorageManager,
+          this.fileStorageManager.getStoragePath()
+        );
+
+        const result = await checker.performFullCheck();
+
+        // 打印详细报告到控制台
+        checker.printDiagnosticReport(result);
+
+        return {
+          success: true,
+          ...result
+        };
+      } catch (error) {
+        console.error('[debug:checkStorageIntegrity] Error:', error);
+        return {
+          success: false,
+          healthy: false,
+          issues: [`Integrity check failed: ${String(error)}`],
+          recommendations: ['Check application logs for details'],
+          error: String(error)
+        };
+      }
+    });
+
     // 关键词和推荐相关
     ipcMain.handle('keywords:getRecommendations', async (_, title: string, content: string, excludeId?: number) => {
       try {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert, Tooltip, Collapse, Descriptions, Progress, Result, message, Spin } from 'antd';
-import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, ExportOutlined, LinkOutlined, BgColorsOutlined, CloudUploadOutlined, LockOutlined, SyncOutlined, SwapOutlined, ReloadOutlined, FileTextOutlined, PlayCircleOutlined, PauseCircleOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, ExportOutlined, LinkOutlined, BgColorsOutlined, CloudUploadOutlined, LockOutlined, SyncOutlined, SwapOutlined, ReloadOutlined, FileTextOutlined, PlayCircleOutlined, PauseCircleOutlined, DeleteOutlined, ExclamationCircleOutlined, ToolOutlined } from '@ant-design/icons';
 import { App } from 'antd';
 import { Todo, CustomTab } from '../../shared/types';
 import { ColorTheme } from '../theme/themes';
@@ -10,6 +10,7 @@ import CustomTabManager from './CustomTabManager';
 import URLAuthorizationManager from './URLAuthorizationManager';
 import PromptTemplateManager from './PromptTemplateManager';
 import MarkdownFileBrowser from './MarkdownFileBrowser';
+import StorageDiagnosticModal from './StorageDiagnosticModal';
 
 const { Text } = Typography;
 
@@ -117,6 +118,9 @@ const StorageManagement: React.FC = () => {
   const [markdownPathValidation, setMarkdownPathValidation] = useState<any>(null);
   const [isValidatingMarkdownPath, setIsValidatingMarkdownPath] = useState(false);
   const [isUpdatingMarkdownPath, setIsUpdatingMarkdownPath] = useState(false);
+
+  // 存储诊断相关状态
+  const [showDiagnosticModal, setShowDiagnosticModal] = useState(false);
 
   useEffect(() => {
     loadStorageInfo();
@@ -1524,7 +1528,37 @@ const StorageManagement: React.FC = () => {
 
         {/* 文件存储管理 */}
         {storageMode === 'file' && (
-          <Card title={<><SyncOutlined /> 文件存储管理</>}>
+          <>
+            <Card title={<><SyncOutlined /> 文件存储管理</>}>
+              <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                <Alert
+                  message="存储完整性诊断"
+                  description="运行完整的存储系统检查，诊断文件-数据库映射不一致问题"
+                  type="info"
+                  showIcon
+                  action={
+                    <Button
+                      type="primary"
+                      icon={<ToolOutlined />}
+                      onClick={() => setShowDiagnosticModal(true)}
+                    >
+                      运行诊断
+                    </Button>
+                  }
+                />
+
+                <Descriptions bordered column={2}>
+                  <Descriptions.Item label="存储路径">
+                    {storageStats?.filePath || '未知'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Markdown文件数">
+                    <Tag color="green">{storageStats?.fileCount || 0}</Tag>
+                  </Descriptions.Item>
+                </Descriptions>
+              </Space>
+            </Card>
+
+            <Card title={<><SyncOutlined /> 文件存储管理</>}>
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
               <Descriptions column={1} size="small" bordered>
                 <Descriptions.Item label="存储位置">
@@ -2396,6 +2430,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         items={tabItems}
       />
     </Modal>
+
+    {/* 存储诊断模态框 */}
+    <StorageDiagnosticModal
+      visible={showDiagnosticModal}
+      onClose={() => setShowDiagnosticModal(false)}
+    />
+  </>
   );
 };
 
