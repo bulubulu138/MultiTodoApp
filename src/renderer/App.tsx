@@ -345,18 +345,21 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
           console.log('[App] Diagnostic result:', diagnosticResult);
 
           if (!diagnosticResult.healthy) {
-            console.error('[App] ❌ Found health issues:', diagnosticResult.issues);
+            const issues = diagnosticResult.issues || [];
+            const recommendations = diagnosticResult.recommendations || [];
+
+            console.error('[App] ❌ Found health issues:', issues);
 
             // 如果发现问题，显示提示给用户
-            if (diagnosticResult.issues.length > 0) {
-              const issueMsg = diagnosticResult.issues.join('; ');
+            if (issues.length > 0) {
+              const issueMsg = issues.join('; ');
               console.warn('[App] Issues found:', issueMsg);
               // 可以考虑显示用户友好的提示
               // message.warning(`检测到数据问题：${issueMsg}`);
             }
 
-            if (diagnosticResult.recommendations.length > 0) {
-              console.log('[App] Recommendations:', diagnosticResult.recommendations);
+            if (recommendations.length > 0) {
+              console.log('[App] Recommendations:', recommendations);
             }
           }
         } catch (diagError) {

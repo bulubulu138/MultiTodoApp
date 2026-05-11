@@ -1872,7 +1872,13 @@ class Application {
       console.log('[debug:quickDiagnostic] Quick diagnostic requested');
       if (!this.fileStorageManager) {
         console.warn('[debug:quickDiagnostic] File storage not initialized');
-        return { success: false, error: 'File storage not initialized' };
+        return {
+          success: false,
+          healthy: false,
+          issues: ['File storage not initialized'],
+          recommendations: ['Initialize file storage manager'],
+          error: 'File storage not initialized'
+        };
       }
 
       try {
@@ -1881,7 +1887,13 @@ class Application {
         return { success: true, ...result };
       } catch (error) {
         console.error('[debug:quickDiagnostic] Error:', error);
-        return { success: false, error: String(error) };
+        return {
+          success: false,
+          healthy: false,
+          issues: [`Diagnostic error: ${String(error)}`],
+          recommendations: ['Check file system permissions and storage configuration'],
+          error: String(error)
+        };
       }
     });
 
