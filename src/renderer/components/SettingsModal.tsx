@@ -1595,6 +1595,7 @@ const StorageManagement: React.FC = () => {
               </Button>
             </Space>
           </Card>
+          </>
         )}
 
         {/* ✅ 新增：Markdown文件浏览器 */}
@@ -1606,6 +1607,12 @@ const StorageManagement: React.FC = () => {
           onRefresh={handleRefreshMarkdownFiles}
         />
       </Space>
+
+      {/* 存储诊断模态框 */}
+      <StorageDiagnosticModal
+        visible={showDiagnosticModal}
+        onClose={() => setShowDiagnosticModal(false)}
+      />
     </div>
   );
 };
@@ -2430,13 +2437,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         items={tabItems}
       />
     </Modal>
-
-    {/* 存储诊断模态框 */}
-    <StorageDiagnosticModal
-      visible={showDiagnosticModal}
-      onClose={() => setShowDiagnosticModal(false)}
-    />
-  </>
   );
 };
 
