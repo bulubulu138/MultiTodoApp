@@ -90,13 +90,13 @@ const StorageDiagnosticModal: React.FC<StorageDiagnosticModalProps> = ({ visible
         }
       } else {
         setError(diagnosticResult.error || '诊断失败');
-        message.error('存储完整性检查失败');
+        antdMessage.error('存储完整性检查失败');
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       setError(errorMsg);
       console.error('[StorageDiagnosticModal] Error running diagnostic:', err);
-      message.error('存储完整性检查失败');
+      antdMessage.error('存储完整性检查失败');
     } finally {
       setLoading(false);
     }
