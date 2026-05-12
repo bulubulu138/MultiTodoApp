@@ -109,6 +109,20 @@ export class FileIndexer {
   }
 
   /**
+   * 确保索引已加载，避免重复加载
+   */
+  async ensureIndexLoaded(): Promise<void> {
+    // 通过检查 todo 数量判断索引是否已加载
+    if (this.index.metadata.todoCount > 0 || this.index.todos.size > 0) {
+      console.log('[FileIndexer] Index already loaded, skipping');
+      return;
+    }
+
+    console.log('[FileIndexer] Index not loaded, loading now...');
+    await this.loadIndex();
+  }
+
+  /**
    * 保存索引
    */
   async saveIndex(): Promise<void> {

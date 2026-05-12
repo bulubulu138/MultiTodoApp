@@ -75,6 +75,14 @@ export class StorageIntegrityChecker {
   async performFullCheck(): Promise<IntegrityCheckResult> {
     console.log('[StorageIntegrityChecker] 🚀 Starting full integrity check...');
 
+    // 关键修复：确保索引已加载后再执行所有检查
+    try {
+      await this.fileIndexer.ensureIndexLoaded();
+      console.log('[StorageIntegrityChecker] ✅ Index loaded successfully');
+    } catch (error) {
+      console.error('[StorageIntegrityChecker] ❌ Failed to load index:', error);
+    }
+
     const result: IntegrityCheckResult = {
       healthy: true,
       checks: {
@@ -146,7 +154,13 @@ export class StorageIntegrityChecker {
 
       const sampleFiles = mdFiles.slice(0, 5);
 
-      console.log(`[StorageIntegrityChecker] File system: ${mdFiles.length} .md files found`);
+      // 增强日志记录
+      console.log(`[StorageIntegrityChecker] 📂 Scanned directory: ${this.storagePath}`);
+      console.log(`[StorageIntegrityChecker] 📄 Total files: ${files.length}`);
+      console.log(`[StorageIntegrityChecker] 📝 Markdown files: ${mdFiles.length}`);
+      if (mdFiles.length > 0) {
+        console.log(`[StorageIntegrityChecker] 📋 Sample files: ${sampleFiles.join(', ')}`);
+      }
 
       return {
         healthy: true,
@@ -180,9 +194,8 @@ export class StorageIntegrityChecker {
         };
       }
 
-      // 重新加载索引以获取最新状态
-      await this.fileIndexer.loadIndex();
-
+      // 索引加载已在 performFullCheck() 中统一处理
+      // const entries = await this.fileIndexer.getAllTodos();
       const entries = await this.fileIndexer.getAllTodos();
       const sampleEntries = entries.slice(0, 5).map(e => ({
         uuid: e.uuid,
@@ -215,6 +228,19 @@ export class StorageIntegrityChecker {
   private async checkMapping(): Promise<MappingCheckResult> {
     console.log('[StorageIntegrityChecker] 🔍 Checking mappings...');
     try {
+      // 防御性检查：验证索引是否有数据
+      const quickIndexCheck = await this.fileIndexer.getAllTodos();
+      if (quickIndexCheck.length === 0) {
+        console.warn('[StorageIntegrityChecker] ⚠️ Index is empty, skipping detailed mapping check');
+        return {
+          healthy: false,
+          orphanFiles: [],
+          orphanRecords: [],
+          databaseMismatch: 0,
+          error: 'Index is empty - unable to perform mapping check'
+        };
+      }
+
       const orphanFiles: string[] = [];
       const orphanRecords: string[] = [];
       let databaseMismatch = 0;
@@ -230,6 +256,9 @@ export class StorageIntegrityChecker {
 
       // 2. 获取索引中的所有条目
       const indexEntries = await this.fileIndexer.getAllTodos();
+      console.log(`[StorageIntegrityChecker] 🔗 Index entries for mapping: ${indexEntries.length}`);
+      console.log(`[StorageIntegrityChecker] 📁 Markdown files from filesystem: ${mdFiles.size}`);
+
       const indexedUuids = new Set(indexEntries.map(e => {
         // 文件名格式: uuid-title.md
         const fileName = path.basename(e.filePath);
