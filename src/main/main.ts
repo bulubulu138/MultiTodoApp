@@ -1948,10 +1948,16 @@ class Application {
 
           // 动态导入StorageIntegrityChecker
           const { StorageIntegrityChecker } = await import('./services/StorageIntegrityChecker');
+
+          // 关键诊断：记录传递给诊断器的存储路径
+          const storagePath = this.fileStorageManager.getStoragePath();
+          console.log('[debug:checkStorageIntegrity] 📂 StoragePath from fileStorageManager:', storagePath);
+          console.log('[debug:checkStorageIntegrity] 📁 Path exists:', fs.existsSync(storagePath));
+
           const checker = new StorageIntegrityChecker(
             this.dbManager,
             this.fileStorageManager,
-            this.fileStorageManager.getStoragePath()
+            storagePath
           );
 
           const result = await checker.performFullCheck();

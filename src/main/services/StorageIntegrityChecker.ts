@@ -66,7 +66,28 @@ export class StorageIntegrityChecker {
     this.dbManager = dbManager;
     this.fileManager = fileManager;
     this.storagePath = storagePath;
+
+    // 关键诊断：记录接收到的路径并验证其存在性
+    console.log('[StorageIntegrityChecker] 🔧 Constructor received storagePath:', storagePath);
+    console.log('[StorageIntegrityChecker] 📂 Path exists:', fs.existsSync(storagePath));
+    console.log('[StorageIntegrityChecker] 📁 Path is absolute:', path.isAbsolute(storagePath));
+
+    // 如果路径存在，记录目录内容
+    if (fs.existsSync(storagePath)) {
+      try {
+        const entries = fs.readdirSync(storagePath);
+        console.log(`[StorageIntegrityChecker] 📋 Directory contains ${entries.length} items`);
+        console.log('[StorageIntegrityChecker] 📝 Contents:', entries.slice(0, 10).join(', '));
+      } catch (error) {
+        console.error('[StorageIntegrityChecker] ❌ Error reading directory:', error);
+      }
+    } else {
+      console.error('[StorageIntegrityChecker] ❌ Storage path does not exist:', storagePath);
+      console.error('[StorageIntegrityChecker] 💡 Suggestion: Check if storage path is correctly configured in app settings');
+    }
+
     this.fileIndexer = new FileIndexer(storagePath);
+    console.log('[StorageIntegrityChecker] ✅ Created FileIndexer with path:', storagePath);
   }
 
   /**
@@ -136,17 +157,40 @@ export class StorageIntegrityChecker {
    */
   private async checkFileSystem(): Promise<FileSystemCheckResult> {
     console.log('[StorageIntegrityChecker] 🔍 Checking file system...');
+    console.log('[StorageIntegrityChecker] 📂 Using storagePath:', this.storagePath);
+
     try {
+      // 检查路径是否存在
       if (!fs.existsSync(this.storagePath)) {
+        const error = `Storage path does not exist: ${this.storagePath}`;
+        console.error('[StorageIntegrityChecker] ❌', error);
+        console.error('[StorageIntegrityChecker] 💡 Please check app settings for storage path configuration');
         return {
           healthy: false,
           mdFileCount: 0,
           sampleFiles: [],
-          error: 'Storage path does not exist'
+          error
         };
       }
 
+      // 检查路径是否是目录
+      const stats = await fs.promises.stat(this.storagePath);
+      if (!stats.isDirectory()) {
+        const error = `Storage path is not a directory: ${this.storagePath}`;
+        console.error('[StorageIntegrityChecker] ❌', error);
+        return {
+          healthy: false,
+          mdFileCount: 0,
+          sampleFiles: [],
+          error
+        };
+      }
+
+      console.log('[StorageIntegrityChecker] ✅ Path exists and is a directory');
+
       const files = await fs.promises.readdir(this.storagePath);
+      console.log(`[StorageIntegrityChecker] 📄 Total files in directory: ${files.length}`);
+
       const mdFiles = files.filter(f =>
         f.endsWith('.md') &&
         !f.startsWith('.multitodo-metadata')
@@ -154,16 +198,20 @@ export class StorageIntegrityChecker {
 
       const sampleFiles = mdFiles.slice(0, 5);
 
-      // 增强日志记录
       console.log(`[StorageIntegrityChecker] 📂 Scanned directory: ${this.storagePath}`);
       console.log(`[StorageIntegrityChecker] 📄 Total files: ${files.length}`);
       console.log(`[StorageIntegrityChecker] 📝 Markdown files: ${mdFiles.length}`);
       if (mdFiles.length > 0) {
         console.log(`[StorageIntegrityChecker] 📋 Sample files: ${sampleFiles.join(', ')}`);
+      } else {
+        console.warn('[StorageIntegrityChecker] ⚠️ No markdown files found');
+        if (files.length > 0) {
+          console.log('[StorageIntegrityChecker] 📋 Non-markdown files:', files.slice(0, 10).join(', '));
+        }
       }
 
       return {
-        healthy: true,
+        healthy: mdFiles.length > 0,
         mdFileCount: mdFiles.length,
         sampleFiles
       };
