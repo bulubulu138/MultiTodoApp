@@ -1912,8 +1912,36 @@ class Application {
             return {
               success: false,
               healthy: false,
-              issues: ['File storage manager not initialized'],
-              recommendations: ['Initialize file storage manager'],
+              checks: {
+                database: {
+                  healthy: false,
+                  todoCount: 0,
+                  sampleTitles: [],
+                  error: 'File storage manager not initialized'
+                },
+                fileSystem: {
+                  healthy: false,
+                  mdFileCount: 0,
+                  sampleFiles: [],
+                  error: 'File storage manager not initialized'
+                },
+                index: {
+                  healthy: false,
+                  indexEntryCount: 0,
+                  indexLoaded: false,
+                  sampleEntries: [],
+                  error: 'File storage manager not initialized'
+                },
+                mapping: {
+                  healthy: false,
+                  orphanFiles: [],
+                  orphanRecords: [],
+                  databaseMismatch: 0,
+                  error: 'File storage manager not initialized'
+                }
+              },
+              summary: 'File storage manager is not properly initialized',
+              recommendations: ['Initialize file storage manager', 'Check application settings', 'Restart the application'],
               error: 'File storage manager not initialized'
             };
           }
@@ -1958,8 +1986,36 @@ class Application {
         return {
           success: false,
           healthy: false,
-          issues: [`Integrity check failed: ${String(error)}`],
-          recommendations: ['Check application logs for details'],
+          checks: {
+            database: {
+              healthy: false,
+              todoCount: 0,
+              sampleTitles: [],
+              error: `Integrity check failed: ${String(error)}`
+            },
+            fileSystem: {
+              healthy: false,
+              mdFileCount: 0,
+              sampleFiles: [],
+              error: `Integrity check failed: ${String(error)}`
+            },
+            index: {
+              healthy: false,
+              indexEntryCount: 0,
+              indexLoaded: false,
+              sampleEntries: [],
+              error: `Integrity check failed: ${String(error)}`
+            },
+            mapping: {
+              healthy: false,
+              orphanFiles: [],
+              orphanRecords: [],
+              databaseMismatch: 0,
+              error: `Integrity check failed: ${String(error)}`
+            }
+          },
+          summary: `Storage integrity check failed: ${String(error)}`,
+          recommendations: ['Check application logs for details', 'Ensure file system permissions are correct', 'Verify storage configuration'],
           error: String(error)
         };
       }
