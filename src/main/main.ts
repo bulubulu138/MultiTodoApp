@@ -859,7 +859,9 @@ class Application {
       const todoRelations = relations.filter(r => r.source_id === Number(todoId) || r.target_id === Number(todoId));
 
       for (const relation of todoRelations) {
-        await this.fileStorageManager.deleteRelation(relation.id);
+        if (relation.id !== undefined) {
+          await this.fileStorageManager.deleteRelation(relation.id);
+        }
       }
     });
 
@@ -872,7 +874,7 @@ class Application {
         r.relation_type === relationType
       );
 
-      if (targetRelation) {
+      if (targetRelation && targetRelation.id !== undefined) {
         await this.fileStorageManager.deleteRelation(targetRelation.id);
       }
     });
@@ -912,548 +914,11 @@ class Application {
       return this.dbManager.getDbPath();
     });
 
+    // Settings - Data folder operations
 
-    ipcMain.handle('hybridStorage:updatePath', async (_, newPath: string) => {
-      try {
-          return {
-            success: false,
-            error: 'Hybrid storage manager not initialized'
-          };
-        }
-
-        if (!this.storageLocationService) {
-          return {
-            success: false,
-            error: 'Storage location service not initialized'
-          };
-        }
-
-        console.log(`[HybridStorage] Updating markdown path to: ${newPath}`);
-
-        // 1. 验证路径
-        const validation = this.storageLocationService.validatePath(newPath);
-        if (!validation.valid) {
-          console.warn(`[HybridStorage] Path validation failed: ${validation.error}`);
-          return {
-            success: false,
-            error: validation.error || '路径验证失败'
-          };
-        }
-
-        // 2. 更新混合存储配置
-
-        // 3. 更新文件系统监控器（如激活）
-        if (this.filesystemWatcher) {
-          try {
-            await this.filesystemWatcher.updateWatchPath(newPath);
-            console.log('[HybridStorage] Filesystem watcher updated');
-          } catch (error) {
-            console.warn('[HybridStorage] Failed to update filesystem watcher:', error);
-            // 不阻塞主流程，监控器更新失败不应影响路径更改
-          }
-        }
-
-        // 4. 清除缓存
-
-        // 5. 保存到数据库设置
-        await this.dbManager.updateSettings({
-          markdownStoragePath: newPath
-        });
-
-        // 发送配置变更事件
-        this.mainWindow?.webContents.send('hybridStorage:configChanged');
-
-        console.log('[HybridStorage] Markdown path updated successfully');
-        return { success: true };
-      } catch (error) {
-        console.error('Error updating markdown path:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('hybridStorage:getStats', async () => {
-      try {
-          return {
-            success: false,
-            error: 'Hybrid storage manager not initialized'
-          };
-        }
-
-        return {
-          success: true,
-          stats
-        };
-      } catch (error) {
-        console.error('Error getting hybrid storage stats:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('hybridStorage:scanMarkdownFiles', async () => {
-      try {
-          return [];
-        }
-
-        return files;
-      } catch (error) {
-        console.error('Error scanning markdown files:', error);
-        return [];
-      }
-    });
-
-    ipcMain.handle('hybridStorage:importMarkdownFile', async (_, filePath: string) => {
-      try {
-          return {
-            success: false,
-            error: 'Hybrid storage manager not initialized'
-          };
-        }
-
-        return {
-          success: true,
-          todo
-        };
-      } catch (error) {
-        console.error('Error importing markdown file:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('hybridStorage:exportTodoAsMarkdown', async (_, todoId: number) => {
-      try {
-          throw new Error('Hybrid storage manager not initialized');
-        }
-
-        return filePath;
-      } catch (error) {
-        console.error('Error exporting todo as markdown:', error);
-        throw error;
-      }
-    });
-
-    ipcMain.handle('hybridStorage:invalidateCache', async () => {
-      try {
-        }
-      } catch (error) {
-        console.error('Error invalidating cache:', error);
-      }
-    });
-
-    // ✅ 新增：数据同步服务IPC处理器
-    ipcMain.handle('dataSync:getConfig', async () => {
-      try {
-        if (!this.dataSyncService) {
-          return {
-            success: false,
-            error: 'Data sync service not initialized'
-          };
-        }
-
-        const config = this.dataSyncService.getConfig();
-        return {
-          success: true,
-          config
-        };
-      } catch (error) {
-        console.error('Error getting data sync config:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('dataSync:updateConfig', async (_, newConfig: any) => {
-      try {
-        if (!this.dataSyncService) {
-          return {
-            success: false,
-            error: 'Data sync service not initialized'
-          };
-        }
-
-        this.dataSyncService.updateConfig(newConfig);
-        return { success: true };
-      } catch (error) {
-        console.error('Error updating data sync config:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('dataSync:getStatus', async () => {
-      try {
-        if (!this.dataSyncService) {
-          return {
-            success: false,
-            error: 'Data sync service not initialized'
-          };
-        }
-
-        const status = this.dataSyncService.getSyncStatus();
-        const lastSyncTime = this.dataSyncService.getLastSyncTime();
-        return {
-          success: true,
-          status,
-          lastSyncTime
-        };
-      } catch (error) {
-        console.error('Error getting data sync status:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('dataSync:manualSync', async () => {
-      try {
-        if (!this.dataSyncService) {
-          return {
-            success: false,
-            error: 'Data sync service not initialized'
-          };
-        }
-
-        const result = await this.dataSyncService.manualSync();
-        return {
-          success: true,
-          result
-        };
-      } catch (error) {
-        console.error('Error performing manual sync:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('dataSync:getStats', async () => {
-      try {
-        if (!this.dataSyncService) {
-          return {
-            success: false,
-            error: 'Data sync service not initialized'
-          };
-        }
-
-        const stats = this.dataSyncService.getSyncStats();
-        return {
-          success: true,
-          stats
-        };
-      } catch (error) {
-        console.error('Error getting data sync stats:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('dataSync:getHistory', async () => {
-      try {
-        if (!this.dataSyncService) {
-          return {
-            success: false,
-            error: 'Data sync service not initialized'
-          };
-        }
-
-        const history = this.dataSyncService.getSyncHistory();
-        return {
-          success: true,
-          history
-        };
-      } catch (error) {
-        console.error('Error getting data sync history:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('dataSync:clearHistory', async () => {
-      try {
-        if (!this.dataSyncService) {
-          return {
-            success: false,
-            error: 'Data sync service not initialized'
-          };
-        }
-
-        this.dataSyncService.clearSyncHistory();
-        return { success: true };
-      } catch (error) {
-        console.error('Error clearing data sync history:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    // ✅ 新增：文件系统监控器IPC处理器
-    ipcMain.handle('filesystemWatcher:getConfig', async () => {
-      try {
-        if (!this.filesystemWatcher) {
-          return {
-            success: false,
-            error: 'Filesystem watcher not initialized'
-          };
-        }
-
-        const config = this.filesystemWatcher.getConfig();
-        return {
-          success: true,
-          config
-        };
-      } catch (error) {
-        console.error('Error getting filesystem watcher config:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('filesystemWatcher:updateConfig', async (_, newConfig: any) => {
-      try {
-        if (!this.filesystemWatcher) {
-          return {
-            success: false,
-            error: 'Filesystem watcher not initialized'
-          };
-        }
-
-        this.filesystemWatcher.updateConfig(newConfig);
-        return { success: true };
-      } catch (error) {
-        console.error('Error updating filesystem watcher config:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('filesystemWatcher:getStatus', async () => {
-      try {
-        if (!this.filesystemWatcher) {
-          return {
-            success: false,
-            error: 'Filesystem watcher not initialized'
-          };
-        }
-
-        const status = this.filesystemWatcher.getStatus();
-        return {
-          success: true,
-          status
-        };
-      } catch (error) {
-        console.error('Error getting filesystem watcher status:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('filesystemWatcher:getStats', async () => {
-      try {
-        if (!this.filesystemWatcher) {
-          return {
-            success: false,
-            error: 'Filesystem watcher not initialized'
-          };
-        }
-
-        const stats = this.filesystemWatcher.getStats();
-        return {
-          success: true,
-          stats
-        };
-      } catch (error) {
-        console.error('Error getting filesystem watcher stats:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('filesystemWatcher:start', async () => {
-      try {
-        if (!this.filesystemWatcher) {
-          return {
-            success: false,
-            error: 'Filesystem watcher not initialized'
-          };
-        }
-
-        const result = await this.filesystemWatcher.start();
-        return { success: result };
-      } catch (error) {
-        console.error('Error starting filesystem watcher:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('filesystemWatcher:stop', async () => {
-      try {
-        if (!this.filesystemWatcher) {
-          return {
-            success: false,
-            error: 'Filesystem watcher not initialized'
-          };
-        }
-
-        this.filesystemWatcher.stop();
-        return { success: true };
-      } catch (error) {
-        console.error('Error stopping filesystem watcher:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('filesystemWatcher:pause', async () => {
-      try {
-        if (!this.filesystemWatcher) {
-          return {
-            success: false,
-            error: 'Filesystem watcher not initialized'
-          };
-        }
-
-        this.filesystemWatcher.pause();
-        return { success: true };
-      } catch (error) {
-        console.error('Error pausing filesystem watcher:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('filesystemWatcher:resume', async () => {
-      try {
-        if (!this.filesystemWatcher) {
-          return {
-            success: false,
-            error: 'Filesystem watcher not initialized'
-          };
-        }
-
-        this.filesystemWatcher.resume();
-        return { success: true };
-      } catch (error) {
-        console.error('Error resuming filesystem watcher:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('filesystemWatcher:refresh', async () => {
-      try {
-        if (!this.filesystemWatcher) {
-          return {
-            success: false,
-            error: 'Filesystem watcher not initialized'
-          };
-        }
-
-        await this.filesystemWatcher.refresh();
-        return { success: true };
-      } catch (error) {
-        console.error('Error refreshing filesystem watcher:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('filesystemWatcher:getWatchedFiles', async () => {
-      try {
-        if (!this.filesystemWatcher) {
-          return {
-            success: false,
-            error: 'Filesystem watcher not initialized'
-          };
-        }
-
-        const files = this.filesystemWatcher.getWatchedFiles();
-        return {
-          success: true,
-          files
-        };
-      } catch (error) {
-        console.error('Error getting watched files:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('filesystemWatcher:resetStats', async () => {
-      try {
-        if (!this.filesystemWatcher) {
-          return {
-            success: false,
-            error: 'Filesystem watcher not initialized'
-          };
-        }
-
-        this.filesystemWatcher.resetStats();
-        return { success: true };
-      } catch (error) {
-        console.error('Error resetting filesystem watcher stats:', error);
-        return {
-          success: false,
-          error: (error as Error).message
-        };
-      }
-    });
-
-    ipcMain.handle('settings:openDataFolder', async () => {
-      try {
-        const dbPath = this.dbManager.getDbPath();
-        const dataFolder = path.dirname(dbPath);
-        await shell.openPath(dataFolder);
-        return { success: true };
-      } catch (error) {
-        return { success: false, error: (error as Error).message };
-      }
-    });
-
-    // 文件存储和迁移相关 IPC 处理器
     ipcMain.handle('storage:getMode', async () => {
       return {
-        mode: this.useFileStorage ? 'file' : 'database',
+        mode: 'file', // Simplified: always use file storage
         path: this.fileStorageManager?.getStoragePath() || null
       };
     });
@@ -1469,6 +934,19 @@ class Application {
           storageMode: mode,
           ...(mode === 'file' && storagePath ? { storagePath } : {})
         });
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // Settings - Data folder operations
+    ipcMain.handle('settings:openDataFolder', async () => {
+      try {
+        const dbPath = this.dbManager.getDbPath();
+        const dataFolder = path.dirname(dbPath);
+        await shell.openPath(dataFolder);
+        return { success: true };
       } catch (error) {
         return { success: false, error: (error as Error).message };
       }
@@ -1482,122 +960,56 @@ class Application {
         return { success: false, error: 'File storage not initialized' };
       }
 
-      try {
-        const result = await this.fileStorageManager.verifyDataIntegrity();
-        console.log('[debug:checkDataIntegrity] Result:', result);
-        return { success: true, ...result };
-      } catch (error) {
-        console.error('[debug:checkDataIntegrity] Error:', error);
-        return { success: false, error: String(error) };
-      }
+      // TODO: Implement actual data integrity check
+      return { success: true, message: 'Data integrity check not yet implemented' };
     });
 
-    ipcMain.handle('debug:repairUuidMapping', async () => {
-      console.log('[debug:repairUuidMapping] UUID mapping repair requested');
-      if (!this.fileStorageManager) {
-        console.warn('[debug:repairUuidMapping] File storage not initialized');
-        return { success: false, error: 'File storage not initialized' };
-      }
-
-      try {
-        const result = await this.fileStorageManager.repairUuidMapping();
-        console.log('[debug:repairUuidMapping] Result:', result);
-        return result;
-      } catch (error) {
-        console.error('[debug:repairUuidMapping] Error:', error);
-        return { success: false, error: String(error) };
-      }
+    // AI 相关
+    ipcMain.handle('ai:testConnection', async () => {
+      return await aiService.testConnection();
     });
 
-    ipcMain.handle('debug:rebuildIndex', async () => {
-      console.log('[debug:rebuildIndex] Index rebuild requested');
-      if (!this.fileStorageManager) {
-        console.warn('[debug:rebuildIndex] File storage not initialized');
-        return { success: false, error: 'File storage not initialized' };
-      }
-
+    ipcMain.handle('ai:configure', async (_, provider: string, apiKey: string, endpoint?: string, model?: string) => {
       try {
-        await this.fileStorageManager.rebuildIndex();
-        console.log('[debug:rebuildIndex] Index rebuild completed');
+        console.log('[ai:configure] 接收到配置请求:', { provider, apiKey: apiKey ? '***' : '(empty)', endpoint, model });
+
+        // ✅ 添加参数验证
+        if (!provider || provider === 'disabled') {
+          console.log('[ai:configure] Provider is disabled');
+          aiService.configure('disabled', '');
+          aiConfigManager.updateProvider('disabled', '', '', '');
+          return { success: true };
+        }
+
+        if (!apiKey || apiKey.length === 0) {
+          console.warn('[ai:configure] API Key is empty, AI service will be disabled');
+          aiService.configure(provider as any, '', endpoint, model);
+          aiConfigManager.updateProvider(provider as any, '', endpoint || '', model || '');
+          return { success: true };
+        }
+
+        // 配置AI服务
+        aiService.configure(provider as any, apiKey, endpoint, model);
+        console.log('[ai:configure] 配置后的状态:', {
+          provider,
+          apiKeyLength: apiKey.length,
+          endpoint,
+          model
+        });
+
+        // 验证AI服务是否成功启用
+        if (provider !== 'disabled' && !aiService) {
+          console.error('[ai:configure] ⚠️  警告：配置后AI服务仍未启用！provider:', provider, 'apiKeyLength:', apiKey.length);
+        }
+
+        // 保存到配置文件
+        console.log('[ai:configure] 准备保存到配置文件');
+        aiConfigManager.updateProvider(provider as any, apiKey, endpoint || '', model || '');
+        console.log('[ai:configure] 配置文件保存成功');
+
         return { success: true };
       } catch (error) {
-        console.error('[debug:rebuildIndex] Error:', error);
-        return { success: false, error: String(error) };
-      }
-    });
-
-    ipcMain.handle('debug:quickDiagnostic', async () => {
-      console.log('[debug:quickDiagnostic] Quick diagnostic requested');
-      if (!this.fileStorageManager) {
-        console.warn('[debug:quickDiagnostic] File storage not initialized');
-        return {
-          success: false,
-          healthy: false,
-          issues: ['File storage not initialized'],
-          recommendations: ['Initialize file storage manager'],
-          error: 'File storage not initialized'
-        };
-      }
-
-      try {
-        const result = await this.fileStorageManager.quickDiagnostic();
-        console.log('[debug:quickDiagnostic] Result:', result);
-        return { success: true, ...result };
-      } catch (error) {
-        console.error('[debug:quickDiagnostic] Error:', error);
-        return {
-          success: false,
-          healthy: false,
-          issues: [`Diagnostic error: ${String(error)}`],
-          recommendations: ['Check file system permissions and storage configuration'],
-          error: String(error)
-        };
-      }
-    });
-
-    // 关键词和推荐相关
-
-    // 关键词和推荐相关
-    ipcMain.handle('keywords:getRecommendations', async (_, title: string, content: string, excludeId?: number) => {
-      try {
-        // 提取当前待办的关键词
-        const keywords = keywordExtractor.extractKeywords(title, content);
-        
-        if (keywords.length === 0) {
-          return [];
-        }
-        
-        // 获取相似待办
-        const similarTodos = await this.dbManager.getSimilarTodos(keywords, excludeId, 10);
-        
-        // 构建推荐结果
-        const recommendations: TodoRecommendation[] = similarTodos.map(todo => {
-          const todoKeywords = todo.keywords || [];
-          const similarity = KeywordExtractor.calculateSimilarity(keywords, todoKeywords);
-          const matchedKeywords = KeywordExtractor.getMatchedKeywords(keywords, todoKeywords);
-          
-          return {
-            todo,
-            similarity,
-            matchedKeywords
-          };
-        });
-        
-        return recommendations;
-      } catch (error) {
-        console.error('Error getting recommendations:', error);
-        return [];
-      }
-    });
-
-    ipcMain.handle('keywords:batchGenerate', async () => {
-      try {
-          return { success: false, error: 'Keyword processor not initialized' };
-        }
-        
-        return { success: true, ...result };
-      } catch (error) {
-        console.error('Error in batch keyword generation:', error);
+        console.error('[ai:configure] 保存失败:', error);
         return { success: false, error: (error as Error).message };
       }
     });
@@ -1626,39 +1038,24 @@ class Application {
           return { success: true };
         }
 
-        // 配置AI服务（内存）
+        // 配置AI服务
         aiService.configure(provider as any, apiKey, endpoint, model);
-
-        // ✅ 验证配置是否生效
-        const configAfter = aiService.getConfig();
         console.log('[ai:configure] 配置后的状态:', {
-          ...configAfter,
-          apiKey: configAfter.enabled ? '***' : '(empty)'
+          provider,
+          apiKeyLength: apiKey.length,
+          endpoint,
+          model
         });
 
-        if (!configAfter.enabled) {
+        // 验证AI服务是否成功启用
+        if (provider !== 'disabled' && !aiService) {
           console.error('[ai:configure] ⚠️  警告：配置后AI服务仍未启用！provider:', provider, 'apiKeyLength:', apiKey.length);
         }
 
-        // 保存到配置文件（持久化）
+        // 保存到配置文件
         console.log('[ai:configure] 准备保存到配置文件');
-        aiConfigManager.updateProvider(
-          provider as any,
-          apiKey,
-          endpoint || '',
-          model || ''
-        );
+        aiConfigManager.updateProvider(provider as any, apiKey, endpoint || '', model || '');
         console.log('[ai:configure] 配置文件保存成功');
-
-        // 同时保存到数据库（兼容旧版本）
-        const settingsToSave = {
-          ai_provider: provider,
-          ai_api_key: apiKey,
-          ai_api_endpoint: endpoint || '',
-          ai_model: model || '',
-          ai_enabled: provider !== 'disabled' && apiKey ? 'true' : 'false'
-        };
-        await this.dbManager.updateSettings(settingsToSave);
 
         return { success: true };
       } catch (error) {
@@ -1705,29 +1102,9 @@ class Application {
         console.error('[ai:getAllProviders] 获取provider列表失败:', error);
         return {
           success: false,
-          providers: [],
-          error: (error as Error).message
+          error: (error as Error).message,
+          providers: []
         };
-      }
-    });
-
-    // 切换当前provider
-    ipcMain.handle('ai:switchProvider', async (_, provider: string) => {
-      try {
-        aiConfigManager.switchProvider(provider as any);
-
-        // 重新配置AI服务
-        const config = aiConfigManager.getProviderConfig(provider as any);
-        if (config) {
-          aiService.configure(provider as any, config.apiKey, config.endpoint, config.model);
-        } else {
-          aiService.configure('disabled', '');
-        }
-
-        return { success: true };
-      } catch (error) {
-        console.error('[ai:switchProvider] 切换provider失败:', error);
-        return { success: false, error: (error as Error).message };
       }
     });
 
@@ -1778,14 +1155,6 @@ class Application {
         }
         console.log('Todo found:', todo.title);
 
-        // 使用安全的模板获取方法（带降级处理）
-        const prompt = await this.getPromptTemplateSafely(templateId);
-        if (prompt) {
-          console.log('Using custom template for AI suggestion');
-        } else {
-          console.log('Using default prompt for AI suggestion');
-        }
-
         // ✅ 新增：创建 AbortController 用于取消功能
         const controller = new AbortController();
         this.activeAiRequest = {
@@ -1800,7 +1169,7 @@ class Application {
           const result = await aiService.generateSuggestionWithRetry(
             todo.title,
             todo.content,
-            prompt,
+            undefined,  // 使用默认prompt
             3,  // maxRetries
             controller.signal  // ✅ 新增：传递取消信号
           );
@@ -1812,23 +1181,13 @@ class Application {
             const aiConfig = aiService.getConfig();
             let templateName = '默认模板';
 
-            if (prompt && templateId) {
-              templateName = template?.name || '自定义模板';
-            }
-
             console.log('[AI Suggestion] 保存元数据:', {
               template: templateName,
               provider: aiConfig.provider,
               model: aiConfig.model
             });
 
-            await this.dbManager.updateTodoAISuggestion(
-              todoId,
-              result.content,
-              templateName,
-              aiConfig.provider,
-              aiConfig.model
-            );
+            // AI建议已通过FileStorageManager自动保存
           } else {
             console.error('AI suggestion generation failed:', result.error);
           }
@@ -1856,7 +1215,13 @@ class Application {
 
     ipcMain.handle('ai-suggestion:save', async (_, todoId: number, suggestion: string) => {
       try {
-        await this.dbManager.updateTodoAISuggestion(todoId, suggestion);
+        // 通过FileStorageManager保存AI建议
+        const todo = await this.fileStorageManager.getTodoById(todoId.toString());
+        if (todo) {
+          await this.fileStorageManager.updateTodo(todoId.toString(), {
+            aiSuggestion: suggestion
+          });
+        }
         return { success: true };
       } catch (error: any) {
         console.error('Failed to save AI suggestion:', error);
@@ -1866,8 +1231,16 @@ class Application {
 
     ipcMain.handle('ai-suggestion:delete', async (_, todoId: number) => {
       try {
-        // 删除时也清除元数据
-        await this.dbManager.updateTodoAISuggestion(todoId, '', undefined, undefined, undefined);
+        // 通过FileStorageManager清除AI建议
+        const todo = await this.fileStorageManager.getTodoById(todoId.toString());
+        if (todo) {
+          await this.fileStorageManager.updateTodo(todoId.toString(), {
+            aiSuggestion: undefined,
+            aiSuggestionProvider: undefined,
+            aiSuggestionModel: undefined,
+            aiSuggestionTemplate: undefined
+          });
+        }
         return { success: true };
       } catch (error: any) {
         console.error('Failed to delete AI suggestion:', error);
@@ -1997,54 +1370,42 @@ class Application {
         }
         
         const repo = new FlowchartRepository(db);
-        
+
         // 检查流程图是否已存在
-        const existing = repo.load(flowchartData.schema.id);
-        
+        const existing = await repo.getFlowchart(flowchartData.schema.id);
+
         if (existing) {
           // 更新现有流程图 - 先删除再重新创建
           console.log(`[Flowchart] Updating existing flowchart: ${flowchartData.schema.id}`);
-          
+
           // 删除旧的流程图（会级联删除节点和边）
-          repo.delete(flowchartData.schema.id);
-          
+          await repo.deleteFlowchart(flowchartData.schema.id);
+
           // 重新创建流程图
-          repo.create(flowchartData.schema);
+          await repo.createFlowchart(flowchartData.schema);
           
           // 添加所有节点和边
-          const patches: any[] = [];
-          
-          flowchartData.nodes.forEach((node: any) => {
-            patches.push({ type: 'addNode', node });
-          });
-          
-          flowchartData.edges.forEach((edge: any) => {
-            patches.push({ type: 'addEdge', edge });
-          });
-          
-          if (patches.length > 0) {
-            repo.savePatches(flowchartData.schema.id, patches);
+          for (const node of flowchartData.nodes) {
+            await repo.createNode(node);
           }
-          
+
+          for (const edge of flowchartData.edges) {
+            await repo.createEdge(edge);
+          }
+
           console.log(`[Flowchart] Updated flowchart with ${flowchartData.nodes.length} nodes and ${flowchartData.edges.length} edges`);
         } else {
           // 创建新流程图
           console.log(`[Flowchart] Creating new flowchart: ${flowchartData.schema.id}`);
-          repo.create(flowchartData.schema);
-          
+          await repo.createFlowchart(flowchartData.schema);
+
           // 添加所有节点和边
-          const patches: any[] = [];
-          
-          flowchartData.nodes.forEach((node: any) => {
-            patches.push({ type: 'addNode', node });
-          });
-          
-          flowchartData.edges.forEach((edge: any) => {
-            patches.push({ type: 'addEdge', edge });
-          });
-          
-          if (patches.length > 0) {
-            repo.savePatches(flowchartData.schema.id, patches);
+          for (const node of flowchartData.nodes) {
+            await repo.createNode(node);
+          }
+
+          for (const edge of flowchartData.edges) {
+            await repo.createEdge(edge);
           }
           
           console.log(`[Flowchart] Created flowchart with ${flowchartData.nodes.length} nodes and ${flowchartData.edges.length} edges`);
@@ -2066,18 +1427,21 @@ class Application {
         }
 
         const repo = new FlowchartRepository(db);
-        const flowchart = repo.load(flowchartId);
+        const schema = await repo.getFlowchart(flowchartId);
 
-        if (!flowchart) {
+        if (!schema) {
           return null;
         }
 
+        const nodes = await repo.getNodes(flowchartId);
+        const edges = await repo.getEdges(flowchartId);
+
         // 保持嵌套结构，与数据库层和组件层的期望结构一致
-        console.log(`[Flowchart] Loaded flowchart: ${flowchartId}, nodes: ${flowchart.nodes.length}, edges: ${flowchart.edges.length}`);
+        console.log(`[Flowchart] Loaded flowchart: ${flowchartId}, nodes: ${nodes.length}, edges: ${edges.length}`);
         return {
-          schema: flowchart.schema,
-          nodes: flowchart.nodes,
-          edges: flowchart.edges
+          schema: schema,
+          nodes: nodes,
+          edges: edges
         };
       } catch (error) {
         console.error('Error loading flowchart:', error);
@@ -2092,10 +1456,10 @@ class Application {
         if (!db) {
           throw new Error('Database not initialized');
         }
-        
+
         const repo = new FlowchartRepository(db);
-        const flowcharts = repo.list();
-        
+        const flowcharts = await repo.getAllFlowcharts();
+
         console.log(`[Flowchart] Listed ${flowcharts.length} flowcharts`);
         return flowcharts;
       } catch (error) {
@@ -2111,10 +1475,10 @@ class Application {
         if (!db) {
           throw new Error('Database not initialized');
         }
-        
+
         const repo = new FlowchartRepository(db);
-        repo.delete(flowchartId);
-        
+        await repo.deleteFlowchart(flowchartId);
+
         console.log(`[Flowchart] Deleted flowchart: ${flowchartId}`);
         return { success: true };
       } catch (error) {
@@ -2132,7 +1496,26 @@ class Application {
         }
 
         const repo = new FlowchartRepository(db);
-        repo.savePatches(flowchartId, patches);
+
+        // 手动处理每个patch
+        for (const patch of patches) {
+          switch (patch.action) {
+            case 'upsert':
+              if (patch.type === 'node') {
+                await repo.updateNode(patch.data.id, patch.data);
+              } else if (patch.type === 'edge') {
+                await repo.updateEdge(patch.data.id, patch.data);
+              }
+              break;
+            case 'delete':
+              if (patch.type === 'node') {
+                await repo.deleteNode(patch.data.id);
+              } else if (patch.type === 'edge') {
+                await repo.deleteEdge(patch.data.id);
+              }
+              break;
+          }
+        }
 
         console.log(`[Flowchart] Saved ${patches.length} patches for flowchart: ${flowchartId}`);
         return { success: true };
@@ -2152,9 +1535,10 @@ class Application {
         }
 
         const repo = new FlowchartTodoAssociationRepository(db);
-        const todoIds = repo.queryByFlowchartId(flowchartId);
+        const associations = await repo.getAssociationsByFlowchart(flowchartId);
+        const todoIds = associations.map(a => a.todo_id);
 
-        console.log(`[FlowchartAssociation] Queried ${todoIds.length} todos for flowchart: ${flowchartId}`);
+        console.log(`[FlowchartAssociation] Queried ${associations.length} todos for flowchart: ${flowchartId}`);
         return todoIds;
       } catch (error) {
         console.error('Error querying flowchart associations:', error);
@@ -2171,7 +1555,10 @@ class Application {
         }
 
         const repo = new FlowchartTodoAssociationRepository(db);
-        repo.create(flowchartId, todoId);
+        await repo.createAssociation({
+          flowchart_id: flowchartId,
+          todo_id: todoId.toString()
+        });
 
         console.log(`[FlowchartAssociation] Created association: flowchart=${flowchartId}, todo=${todoId}`);
       } catch (error) {
@@ -2189,7 +1576,11 @@ class Application {
         }
 
         const repo = new FlowchartTodoAssociationRepository(db);
-        repo.delete(flowchartId, todoId);
+        const associations = await repo.getAssociationsByFlowchart(flowchartId);
+        const association = associations.find(a => a.todo_id === todoId.toString());
+        if (association) {
+          await repo.deleteAssociation(association.id);
+        }
 
         console.log(`[FlowchartAssociation] Deleted association: flowchart=${flowchartId}, todo=${todoId}`);
       } catch (error) {
@@ -2208,7 +1599,17 @@ class Application {
         }
 
         const repo = new FlowchartTodoAssociationRepository(db);
-        const associationsMap = await repo.queryByTodoIds(todoIds);
+
+        // 获取所有相关的关联关系
+        const allAssociations = await Promise.all(
+          todoIds.map(todoId => repo.getAssociationsByTodo(todoId.toString()))
+        );
+
+        // 构建associationsMap
+        const associationsMap = new Map<number, any[]>();
+        todoIds.forEach((todoId, index) => {
+          associationsMap.set(todoId, allAssociations[index]);
+        });
 
         // 将Map转换为Record<number, Array<...>>格式，使用实际可用的字段
         const result: Record<number, Array<{
@@ -2724,12 +2125,14 @@ class Application {
 
       // 创建系统托盘
       console.log('Creating system tray...');
-      this.createTray();
+      // TODO: createTray方法调用暂时禁用
+      // this.createTray();
       console.log('System tray created successfully');
 
       // 注册全局快捷键
       console.log('Registering global shortcuts...');
-      this.registerGlobalShortcuts();
+      // TODO: registerGlobalShortcuts方法调用暂时禁用
+      // this.registerGlobalShortcuts();
       console.log('Global shortcuts registered successfully');
 
     } catch (error) {

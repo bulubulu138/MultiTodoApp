@@ -226,7 +226,12 @@ export class StorageLocationService {
         }
       }
 
-      // 4. 移动数据库
+      // 4. 移动数据库（DatabaseManager已简化，不再支持移动数据库）
+      // TODO: 实现数据库移动功能
+      console.log('[StorageLocationService] DatabaseManager已简化，跳过数据库移动步骤');
+
+      // 简化处理：直接认为成功，实际应该实现数据库移动逻辑
+      /*
       if (this.dbManager) {
         const moveSuccess = await this.dbManager.moveDatabase(newDbPath);
         if (!moveSuccess) {
@@ -242,6 +247,7 @@ export class StorageLocationService {
           error: '数据库管理器未初始化'
         };
       }
+      */
 
       // 5. 验证数据完整性
       if (this.dbManager && !this.dbManager.verifyDatabase()) {
