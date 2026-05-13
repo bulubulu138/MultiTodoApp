@@ -1,166 +1,55 @@
 import Database from 'better-sqlite3';
 
-/**
- * 流程图关联信息
- */
-export interface FlowchartAssociationInfo {
-  flowchartId: string;
-  flowchartName: string;
-  flowchartDescription?: string;
-  createdAt: number;
+export interface FlowchartTodoAssociation {
+  id: string;
+  flowchart_id: string;
+  todo_id: string;
+  created_at: string;
 }
 
-/**
- * FlowchartTodoAssociationRepository
- *
- * 流程图与待办关联数据访问层
- * 负责管理流程图级别的待办关联关系
- */
 export class FlowchartTodoAssociationRepository {
-  private db: Database.Database;
+  constructor(private db: Database.Database) {}
 
-  constructor(db: Database.Database) {
-    this.db = db;
-  }
+  async createAssociation(association: Omit<FlowchartTodoAssociation, 'id' | 'created_at'>): Promise<FlowchartTodoAssociation> {
+    const id = `assoc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const now = new Date().toISOString();
 
-  /**
-   * 创建流程图与待办的关联
-   * @param flowchartId 流程图ID
-   * @param todoId 待办ID
-   */
-  create(flowchartId: string, todoId: number): void {
-    // 检查是否已存在
-    if (this.exists(flowchartId, todoId)) {
-      return;
-    }
+    const newAssociation: FlowchartTodoAssociation = {
+      id,
+      ...association,
+      created_at: now
+    };
 
     this.db.prepare(`
-      INSERT INTO flowchart_todo_associations (flowchart_id, todo_id, created_at)
-      VALUES (?, ?, ?)
-    `).run(flowchartId, todoId, Date.now());
+      INSERT INTO flowchart_todo_associations (id, flowchart_id, todo_id, created_at)
+      VALUES (?, ?, ?, ?)
+    `).run(
+      newAssociation.id,
+      newAssociation.flowchart_id,
+      newAssociation.todo_id,
+      newAssociation.created_at
+    );
+
+    return newAssociation;
   }
 
-  /**
-   * 删除流程图与待办的关联
-   * @param flowchartId 流程图ID
-   * @param todoId 待办ID
-   */
-  delete(flowchartId: string, todoId: number): void {
-    this.db.prepare(`
-      DELETE FROM flowchart_todo_associations
-      WHERE flowchart_id = ? AND todo_id = ?
-    `).run(flowchartId, todoId);
+  async getAssociationsByFlowchart(flowchartId: string): Promise<FlowchartTodoAssociation[]> {
+    return this.db.prepare('SELECT * FROM flowchart_todo_associations WHERE flowchart_id = ?').all(flowchartId) as any[];
   }
 
-  /**
-   * 查询流程图关联的所有待办ID
-   * @param flowchartId 流程图ID
-   * @returns 待办ID数组
-   */
-  queryByFlowchartId(flowchartId: string): number[] {
-    const rows = this.db.prepare(`
-      SELECT todo_id
-      FROM flowchart_todo_associations
-      WHERE flowchart_id = ?
-      ORDER BY created_at DESC
-    `).all(flowchartId) as Array<{ todo_id: number }>;
-
-    return rows.map(row => row.todo_id);
+  async getAssociationsByTodo(todoId: string): Promise<FlowchartTodoAssociation[]> {
+    return this.db.prepare('SELECT * FROM flowchart_todo_associations WHERE todo_id = ?').all(todoId) as any[];
   }
 
-  /**
-   * 查询待办关联的所有流程图信息
-   * @param todoId 待办ID
-   * @returns 流程图关联信息数组
-   */
-  queryByTodoId(todoId: number): FlowchartAssociationInfo[] {
-    const rows = this.db.prepare(`
-      SELECT
-        f.id as flowchart_id,
-        f.name as flowchart_name,
-        f.description as flowchart_description,
-        fta.created_at
-      FROM flowchart_todo_associations fta
-      INNER JOIN flowcharts f ON fta.flowchart_id = f.id
-      WHERE fta.todo_id = ?
-      ORDER BY fta.created_at DESC
-    `).all(todoId) as Array<{
-      flowchart_id: string;
-      flowchart_name: string;
-      flowchart_description: string | null;
-      created_at: number;
-    }>;
-
-    return rows.map(row => ({
-      flowchartId: row.flowchart_id,
-      flowchartName: row.flowchart_name,
-      flowchartDescription: row.flowchart_description || undefined,
-      createdAt: row.created_at
-    }));
+  async deleteAssociation(id: string): Promise<void> {
+    this.db.prepare('DELETE FROM flowchart_todo_associations WHERE id = ?').run(id);
   }
 
-  /**
-   * 批量查询多个待办关联的流程图信息
-   * @param todoIds 待办ID数组
-   * @returns Map<todoId, FlowchartAssociationInfo[]>
-   */
-  queryByTodoIds(todoIds: number[]): Map<number, FlowchartAssociationInfo[]> {
-    const result = new Map<number, FlowchartAssociationInfo[]>();
-
-    if (todoIds.length === 0) {
-      return result;
-    }
-
-    const placeholders = todoIds.map(() => '?').join(',');
-    const rows = this.db.prepare(`
-      SELECT
-        fta.todo_id,
-        f.id as flowchart_id,
-        f.name as flowchart_name,
-        f.description as flowchart_description,
-        fta.created_at
-      FROM flowchart_todo_associations fta
-      INNER JOIN flowcharts f ON fta.flowchart_id = f.id
-      WHERE fta.todo_id IN (${placeholders})
-      ORDER BY fta.todo_id, fta.created_at DESC
-    `).all(...todoIds) as Array<{
-      todo_id: number;
-      flowchart_id: string;
-      flowchart_name: string;
-      flowchart_description: string | null;
-      created_at: number;
-    }>;
-
-    for (const row of rows) {
-      const info: FlowchartAssociationInfo = {
-        flowchartId: row.flowchart_id,
-        flowchartName: row.flowchart_name,
-        flowchartDescription: row.flowchart_description || undefined,
-        createdAt: row.created_at
-      };
-
-      if (!result.has(row.todo_id)) {
-        result.set(row.todo_id, []);
-      }
-      result.get(row.todo_id)!.push(info);
-    }
-
-    return result;
+  async deleteAssociationsByFlowchart(flowchartId: string): Promise<void> {
+    this.db.prepare('DELETE FROM flowchart_todo_associations WHERE flowchart_id = ?').run(flowchartId);
   }
 
-  /**
-   * 检查关联是否存在
-   * @param flowchartId 流程图ID
-   * @param todoId 待办ID
-   * @returns 是否存在
-   */
-  exists(flowchartId: string, todoId: number): boolean {
-    const row = this.db.prepare(`
-      SELECT 1 FROM flowchart_todo_associations
-      WHERE flowchart_id = ? AND todo_id = ?
-      LIMIT 1
-    `).get(flowchartId, todoId);
-
-    return !!row;
+  async deleteAssociationsByTodo(todoId: string): Promise<void> {
+    this.db.prepare('DELETE FROM flowchart_todo_associations WHERE todo_id = ?').run(todoId);
   }
 }
