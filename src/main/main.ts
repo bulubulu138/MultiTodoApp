@@ -3,7 +3,6 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { DatabaseManager } from './database/DatabaseManager';
 import { FileStorageManager } from './FileStorageManager';
-import { MigrationService } from './MigrationService';
 import { ImageManager } from './utils/ImageManager';
 import { BackupManager } from './utils/BackupManager';
 import { generateContentHash } from './utils/hashUtils';
@@ -22,7 +21,6 @@ class Application {
   private mainWindow: BrowserWindow | null = null;
   private dbManager: DatabaseManager;
   private fileStorageManager: FileStorageManager | null = null;
-  private migrationService: MigrationService | null = null;
   private imageManager: ImageManager;
   private backupManager: BackupManager | null = null;
   private keywordProcessor: KeywordProcessor | null = null;
@@ -41,9 +39,6 @@ class Application {
     todoId: number;
     timestamp: number;
   } = null;
-
-  // ✅ 新增：迁移任务并发锁 - 防止多个迁移任务同时进行
-  private isMigrating: boolean = false;
 
   // ✅ 新增：存储位置管理
   private appConfig: any = null;
@@ -338,7 +333,6 @@ class Application {
 
       // 初始化 FileStorageManager
       this.fileStorageManager = new FileStorageManager(storagePath);
-      this.migrationService = new MigrationService(this.dbManager, this.fileStorageManager);
 
       console.log('[initializeFileStorage] ✅ File storage initialized successfully');
     } catch (error) {
@@ -346,48 +340,6 @@ class Application {
       console.warn('[initializeFileStorage] ⚠️ Falling back to database mode');
       this.useFileStorage = false;
       this.fileStorageManager = null;
-      this.migrationService = null;
-    }
-  }
-
-  /**
-   * 确保迁移服务已初始化（延迟初始化模式）
-   *
-   * 用于迁移场景：当用户从数据库模式迁移到文件模式时，
-   * migrationService 尚未初始化，需要按需创建。
-   *
-   * @param targetPath 目标存储路径
-   * @throws Error 如果初始化失败
-   */
-  private async ensureMigrationServiceInitialized(targetPath: string): Promise<void> {
-    console.log('[ensureMigrationServiceInitialized] Checking service status...');
-
-    // 如果服务已存在，无需重复初始化
-    if (this.migrationService && this.fileStorageManager) {
-      console.log('[ensureMigrationServiceInitialized] Service already initialized, skipping');
-      return;
-    }
-
-    console.log(`[ensureMigrationServiceInitialized] Initializing migration service for path: ${targetPath}`);
-    console.log('[ensureMigrationServiceInitialized] Creating FileStorageManager...');
-
-    try {
-      // 初始化 FileStorageManager
-      this.fileStorageManager = new FileStorageManager(targetPath);
-      console.log('[ensureMigrationServiceInitialized] FileStorageManager created');
-
-      console.log('[ensureMigrationServiceInitialized] Creating MigrationService...');
-      // 初始化 MigrationService
-      this.migrationService = new MigrationService(this.dbManager, this.fileStorageManager);
-      console.log('[ensureMigrationServiceInitialized] MigrationService created');
-
-      console.log('[ensureMigrationServiceInitialized] Migration service initialized successfully');
-    } catch (error) {
-      console.error('[ensureMigrationServiceInitialized] Failed to initialize migration service:', error);
-      // 清理可能部分初始化的资源
-      this.fileStorageManager = null;
-      this.migrationService = null;
-      throw new Error(`Failed to initialize migration service: ${(error as Error).message}`);
     }
   }
 
@@ -1678,141 +1630,6 @@ class Application {
         });
       } catch (error) {
         return { success: false, error: (error as Error).message };
-      }
-    });
-
-    ipcMain.handle('storage:migrate', async (_, targetPath: string, options: any) => {
-      console.log('[storage:migrate] ===== MIGRATION REQUEST RECEIVED =====');
-      console.log('[storage:migrate] Target path:', targetPath);
-      console.log('[storage:migrate] Options:', JSON.stringify(options));
-
-      // 并发保护：检查是否已有迁移任务在进行
-      if (this.isMigrating) {
-        console.warn('[storage:migrate] Migration already in progress, rejecting request');
-        return { success: false, error: '已有迁移任务正在进行中，请稍后再试' };
-      }
-
-      try {
-        // 延迟初始化：确保 migrationService 已创建
-        console.log('[storage:migrate] About to initialize migration service...');
-        await this.ensureMigrationServiceInitialized(targetPath);
-
-        if (!this.migrationService) {
-          console.error('[storage:migrate] Migration service initialization failed');
-          return { success: false, error: '迁移服务初始化失败' };
-        }
-
-        console.log('[storage:migrate] Migration service ready, starting migration...');
-
-        // 🔧 修复：在迁移开始前就更新存储模式设置
-        // 这样即使迁移过程中出现异常，重启后也能正确切换到文件存储模式
-        console.log('[storage:migrate] Updating storage mode settings BEFORE migration...');
-        try {
-          await this.dbManager.updateSettings({
-            storageMode: 'file',
-            storagePath: targetPath
-          });
-          console.log('[storage:migrate] ✅ Storage mode settings updated successfully');
-        } catch (error) {
-          console.error('[storage:migrate] ❌ Failed to update storage mode settings:', error);
-          return {
-            success: false,
-            error: '设置存储模式失败，请重试',
-            todosMigrated: 0,
-            relationsMigrated: 0,
-            assetsMigrated: 0,
-            errors: ['Failed to update storage mode settings'],
-            duration: 0
-          };
-        }
-
-        // 设置迁移锁
-        this.isMigrating = true;
-        console.log('[storage:migrate] Starting migration to:', targetPath);
-
-        const result = await this.migrationService.migrate(targetPath, options);
-
-        console.log('[storage:migrate] ===== MIGRATION COMPLETED =====');
-        console.log('[storage:migrate] Result:', JSON.stringify(result));
-
-        // 迁移完成后，根据验证结果智能处理
-        if (result.validation) {
-          const { status, successRate, missingTodos } = result.validation;
-
-          if (status === 'failed') {
-            // 完全失败 (<50%成功率)：回滚设置
-            console.log(`[storage:migrate] ❌ Migration failed (${successRate}% < 50%), rolling back settings...`);
-            try {
-              await this.dbManager.updateSettings({
-                storageMode: 'database',
-                storagePath: ''
-              });
-              console.log('[storage:migrate] ✅ Settings rolled back to database mode');
-            } catch (rollbackError) {
-              console.error('[storage:migrate] ❌ Failed to rollback settings:', rollbackError);
-            }
-          } else if (status === 'partial') {
-            // 部分成功 (50%-99%成功率)：保留设置，提供警告
-            console.warn(`[storage:migrate] ⚠️ Migration partially successful (${successRate}% ≥ 50%)`);
-            console.warn(`[storage:migrate] ${missingTodos.length} todos failed to migrate:`,
-              missingTodos.slice(0, 5).join(', '));
-            console.log('[storage:migrate] ✅ Settings preserved (partial success accepted)');
-          } else {
-            // 完全成功 (100%成功率)
-            console.log(`[storage:migrate] ✅ Migration completely successful (${successRate}%)`);
-          }
-        } else if (!result.success) {
-          // 没有验证结果但迁移失败，回滚设置（向后兼容）
-          console.log('[storage:migrate] ❌ Migration failed, rolling back storage mode settings...');
-          try {
-            await this.dbManager.updateSettings({
-              storageMode: 'database',
-              storagePath: ''
-            });
-            console.log('[storage:migrate] ✅ Settings rolled back to database mode');
-          } catch (rollbackError) {
-            console.error('[storage:migrate] ❌ Failed to rollback settings:', rollbackError);
-          }
-        }
-
-        return result;
-      } catch (error) {
-        console.error('[storage:migrate] ===== MIGRATION FAILED =====');
-        console.error('[storage:migrate] Error:', error);
-        return {
-          success: false,
-          todosMigrated: 0,
-          relationsMigrated: 0,
-          assetsMigrated: 0,
-          errors: [String(error)],
-          duration: 0
-        };
-      } finally {
-        // 确保释放迁移锁
-        this.isMigrating = false;
-        console.log('[storage:migrate] Migration lock released');
-      }
-    });
-
-    ipcMain.handle('storage:validateMigration', async (_, targetPath: string) => {
-      try {
-        // 延迟初始化：确保 migrationService 已创建
-        await this.ensureMigrationServiceInitialized(targetPath);
-
-        if (!this.migrationService) {
-          return { success: false, errors: ['迁移服务初始化失败'] };
-        }
-
-        return await this.migrationService.validateMigration(targetPath);
-      } catch (error) {
-        return {
-          success: false,
-          errors: [String(error)],
-          sourceCount: 0,
-          targetCount: 0,
-          missingTodos: [],
-          contentMismatches: []
-        };
       }
     });
 

@@ -96,8 +96,6 @@ export interface ElectronAPI {
   storage: {
     getMode: () => Promise<{mode: 'database' | 'file'; path: string | null}>;
     setMode: (mode: 'database' | 'file', storagePath?: string) => Promise<{success: boolean; error?: string}>;
-    migrate: (targetPath: string, options: any) => Promise<any>;
-    validateMigration: (targetPath: string) => Promise<any>;
   };
   
   // 图片API
@@ -523,10 +521,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getMode: () => ipcRenderer.invoke('storage:getMode'),
     setMode: (mode: 'database' | 'file', storagePath?: string) =>
       ipcRenderer.invoke('storage:setMode', mode, storagePath),
-    migrate: (targetPath: string, options: any) =>
-      ipcRenderer.invoke('storage:migrate', targetPath, options),
-    validateMigration: (targetPath: string) =>
-      ipcRenderer.invoke('storage:validateMigration', targetPath),
   },
   image: {
     upload: () => ipcRenderer.invoke('image:upload'),
