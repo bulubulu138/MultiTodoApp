@@ -10,7 +10,6 @@ import CustomTabManager from './CustomTabManager';
 import URLAuthorizationManager from './URLAuthorizationManager';
 import PromptTemplateManager from './PromptTemplateManager';
 import MarkdownFileBrowser from './MarkdownFileBrowser';
-import StorageDiagnosticModal from './StorageDiagnosticModal';
 
 const { Text } = Typography;
 
@@ -118,9 +117,6 @@ const StorageManagement: React.FC = () => {
   const [markdownPathValidation, setMarkdownPathValidation] = useState<any>(null);
   const [isValidatingMarkdownPath, setIsValidatingMarkdownPath] = useState(false);
   const [isUpdatingMarkdownPath, setIsUpdatingMarkdownPath] = useState(false);
-
-  // 存储诊断相关状态
-  const [showDiagnosticModal, setShowDiagnosticModal] = useState(false);
 
   useEffect(() => {
     loadStorageInfo();
@@ -1531,22 +1527,6 @@ const StorageManagement: React.FC = () => {
           <>
             <Card title={<><SyncOutlined /> 文件存储管理</>}>
               <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                <Alert
-                  message="存储完整性诊断"
-                  description="运行完整的存储系统检查，诊断文件-数据库映射不一致问题"
-                  type="info"
-                  showIcon
-                  action={
-                    <Button
-                      type="primary"
-                      icon={<ToolOutlined />}
-                      onClick={() => setShowDiagnosticModal(true)}
-                    >
-                      运行诊断
-                    </Button>
-                  }
-                />
-
                 <Descriptions bordered column={2}>
                   <Descriptions.Item label="存储路径">
                     {storageStats?.filePath || '未知'}
@@ -1607,12 +1587,6 @@ const StorageManagement: React.FC = () => {
           onRefresh={handleRefreshMarkdownFiles}
         />
       </Space>
-
-      {/* 存储诊断模态框 */}
-      <StorageDiagnosticModal
-        visible={showDiagnosticModal}
-        onClose={() => setShowDiagnosticModal(false)}
-      />
     </div>
   );
 };

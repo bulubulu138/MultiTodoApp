@@ -458,14 +458,6 @@ export interface ElectronAPI {
       issues: string[];
       recommendations: string[];
     }>;
-    checkStorageIntegrity: () => Promise<{
-      success: boolean;
-      healthy: boolean;
-      checks: any;
-      summary: string;
-      recommendations: string[];
-      error?: string;
-    }>;
   };
 }
 
@@ -708,6 +700,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     repairUuidMapping: () => ipcRenderer.invoke('debug:repairUuidMapping'),
     rebuildIndex: () => ipcRenderer.invoke('debug:rebuildIndex'),
     quickDiagnostic: () => ipcRenderer.invoke('debug:quickDiagnostic'),
-    checkStorageIntegrity: () => ipcRenderer.invoke('debug:checkStorageIntegrity'),
   },
 } as ElectronAPI);
