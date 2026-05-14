@@ -931,9 +931,6 @@ class Application {
       return { success: true, message: 'Data integrity check not yet implemented' };
     });
 
-    // AI 相关 - configure handler (deleted duplicate)
-    ipcMain.handle('ai:configure', async (_, provider: string, apiKey: string, endpoint?: string, model?: string) => {
-
     // AI 相关
     ipcMain.handle('ai:testConnection', async () => {
       return await aiService.testConnection();
