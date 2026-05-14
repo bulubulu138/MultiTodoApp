@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Todo } from '../../shared/types';
-import { toNumberId } from '../../shared/utils/typeUtils';
+import { toNumberId, toStringId } from '../../shared/utils/typeUtils';
 import { extractUrlTitlesFromContent } from '../utils/urlTitleStorage';
 
 // URL提取正则
@@ -100,11 +100,11 @@ function extractURLs(text: string): string[] {
  * 为多个待办事项批量获取URL标题
  */
 export function useBatchURLTitles(todos: Todo[]): {
-  getUrlTitlesForTodo: (todoId: number) => Map<string, string>;
+  getUrlTitlesForTodo: (todoId: string) => Map<string, string>;
   loading: boolean;
   refresh: () => Promise<void>;
 } {
-  const [titlesByTodo, setTitlesByTodo] = useState<Map<number, Map<string, string>>>(new Map());
+  const [titlesByTodo, setTitlesByTodo] = useState<Map<string, Map<string, string>>>(new Map());
   const [loading, setLoading] = useState(false);
   const cache = useRef(new URLTitleCache());
   const lastContentHashRef = useRef<string>('');
@@ -119,7 +119,7 @@ export function useBatchURLTitles(todos: Todo[]): {
   /**
    * 获取特定待办的URL标题
    */
-  const getUrlTitlesForTodo = useCallback((todoId: number): Map<string, string> => {
+  const getUrlTitlesForTodo = useCallback((todoId: string): Map<string, string> => {
     return titlesByTodo.get(todoId) || new Map();
   }, [titlesByTodo]);
 
@@ -136,15 +136,15 @@ export function useBatchURLTitles(todos: Todo[]): {
 
     try {
       // 收集所有需要获取的URL
-      const urlToTodoIds = new Map<string, number[]>();
-      const embeddedTitlesByTodo = new Map<number, Map<string, string>>();
+      const urlToTodoIds = new Map<string, string[]>();
+      const embeddedTitlesByTodo = new Map<string, Map<string, string>>();
 
       todosToFetch.forEach(todo => {
         if (!todo.content) return;
 
         // 提取嵌入的标题
         const embeddedTitles = extractUrlTitlesFromContent(todo.content);
-        embeddedTitlesByTodo.set(toNumberId(todo.id!), embeddedTitles);
+        embeddedTitlesByTodo.set(toStringId(todo.id!), embeddedTitles);
 
         // 提取所有URL
         const urls = extractURLs(todo.content);
@@ -152,7 +152,7 @@ export function useBatchURLTitles(todos: Todo[]): {
           if (!urlToTodoIds.has(url)) {
             urlToTodoIds.set(url, []);
           }
-          urlToTodoIds.get(url)!.push(toNumberId(todo.id!));
+          urlToTodoIds.get(url)!.push(toStringId(todo.id!));
         });
       });
 
@@ -197,14 +197,14 @@ export function useBatchURLTitles(todos: Todo[]): {
       }
 
       // 为每个待办构建标题Map
-      const newTitlesByTodo = new Map<number, Map<string, string>>();
+      const newTitlesByTodo = new Map<string, Map<string, string>>();
 
       todosToFetch.forEach(todo => {
         if (!todo.content) return;
 
         const todoTitles = new Map<string, string>();
         const urls = extractURLs(todo.content);
-        const embeddedTitles = embeddedTitlesByTodo.get(toNumberId(todo.id!)) || new Map();
+        const embeddedTitles = embeddedTitlesByTodo.get(toStringId(todo.id!)) || new Map();
 
         urls.forEach(url => {
           // 优先级：嵌入标题 > 授权数据库 > 缓存标题 > 新获取的标题
@@ -218,7 +218,7 @@ export function useBatchURLTitles(todos: Todo[]): {
           }
         });
 
-        newTitlesByTodo.set(toNumberId(todo.id!), todoTitles);
+        newTitlesByTodo.set(toStringId(todo.id!), todoTitles);
       });
 
       setTitlesByTodo(newTitlesByTodo);

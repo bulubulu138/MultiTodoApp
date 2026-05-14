@@ -1,5 +1,5 @@
 import { Todo, TodoRelation } from '../../shared/types';
-import { toNumberId } from '../../shared/utils/typeUtils';
+import { toNumberId, toStringId } from '../../shared/utils/typeUtils';
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { List, Card, Tag, Button, Space, Popconfirm, Select, Typography, Image, Tooltip, App, InputNumber } from 'antd';
 import { DeleteOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
@@ -68,7 +68,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
 }) => {
   const { message } = App.useApp();
   const colors = useThemeColors();
-  const [editingOrder, setEditingOrder] = useState<{[key: number]: number | null}>({});
+  const [editingOrder, setEditingOrder] = useState<Record<string, number | null>>({});
   const [savingOrder, setSavingOrder] = useState<Set<number>>(new Set());
   
   // 无限滚动：检测滚动到底部
@@ -261,53 +261,53 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
 
     try {
       // 1. 获取当前 tab 所有有序号的待办（排除当前待办）
-      const currentTabTodos = (allTodos || todos).filter(t => 
+      const currentTabTodos = (allTodos || todos).filter(t =>
         t.id !== todoId &&
-        t.displayOrders && 
+        t.displayOrders &&
         t.displayOrders[activeTab] != null
       );
-      
+
       // 2. 构建序号到待办的映射（用于快速查找）
       const orderToTodoMap = new Map<number, Todo>();
       currentTabTodos.forEach(t => {
         const order = t.displayOrders![activeTab]!;
         orderToTodoMap.set(order, t);
       });
-      
+
       // 3. 递归式冲突解决：收集所有需要调整的待办
       const adjustments: Array<{id: number; oldOrder: number; newOrder: number}> = [];
-      
+
       const resolveConflict = (targetOrder: number): void => {
         const conflictTodo = orderToTodoMap.get(targetOrder);
-        
+
         if (!conflictTodo) {
           // 没有冲突，这个序号可以使用
           return;
         }
-        
+
         // 有冲突，需要将冲突的待办移到下一个序号
         const nextOrder = targetOrder + 1;
-        
+
         // 递归检查下一个序号是否也有冲突
         resolveConflict(nextOrder);
-        
+
         // 记录这个待办需要被移动
         adjustments.push({
           id: typeof conflictTodo.id === 'number' ? conflictTodo.id : parseInt(String(conflictTodo.id!), 10),
           oldOrder: targetOrder,
           newOrder: nextOrder
         });
-        
+
         // 更新映射（模拟移动后的状态）
         orderToTodoMap.delete(targetOrder);
         orderToTodoMap.set(nextOrder, conflictTodo);
       };
-      
+
       // 从新序号开始检查冲突
       resolveConflict(newOrder);
-      
+
       console.log('[DEBUG] 冲突解决结果:', adjustments);
-      
+
       // 4. 批量更新需要调整的待办
       if (adjustments.length > 0) {
         const updates = adjustments.map(adj => ({
@@ -315,27 +315,27 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
           tabKey: activeTab,
           displayOrder: adj.newOrder
         }));
-        
+
         await window.electronAPI.todo.batchUpdateDisplayOrders(updates);
         message.success(`序号 ${newOrder} 已占用，已自动调整 ${adjustments.length} 个待办的序号`);
       }
-      
+
       // 5. 检查是否是并列分组，如果是则同步整组
-      const parallelGroup = parallelGroups.get(todoId);
+      const parallelGroup = parallelGroups.get(String(todoId));
       if (parallelGroup && parallelGroup.size > 1) {
         const groupUpdates = Array.from(parallelGroup)
-          .filter(id => id !== todoId)
+          .filter(id => parseInt(id, 10) !== todoId)
           .map(id => ({
-            id,
+            id: parseInt(id, 10), // 确保数字类型
             tabKey: activeTab,
             displayOrder: newOrder
           }));
-        
+
         if (groupUpdates.length > 0) {
           await window.electronAPI.todo.batchUpdateDisplayOrders(groupUpdates);
         }
       }
-      
+
       // 6. 设置当前待办的序号
       await onUpdateDisplayOrder(todoId, activeTab, newOrder);
       
@@ -366,10 +366,10 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
 
   // 性能优化：预计算关系映射，避免在 renderItem 中重复过滤
   const relationsByTodo = useMemo(() => {
-    const map = new Map<number, TodoRelation[]>();
+    const map = new Map<string, TodoRelation[]>();
     relations.forEach(r => {
-      const sourceId = toNumberId(r.source_id);
-      const targetId = toNumberId(r.target_id);
+      const sourceId = toStringId(r.source_id);
+      const targetId = toStringId(r.target_id);
       // 为 source_id 添加关系
       if (!map.has(sourceId)) map.set(sourceId, []);
       map.get(sourceId)!.push(r);
@@ -383,11 +383,11 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
 
   // 性能优化：预计算并列关系索引，避免重复过滤
   const parallelRelationsByTodo = useMemo(() => {
-    const map = new Map<number, TodoRelation[]>();
+    const map = new Map<string, TodoRelation[]>();
     relations.forEach(r => {
       if (r.relation_type === 'parallel') {
-        const sourceId = toNumberId(r.source_id);
-        const targetId = toNumberId(r.target_id);
+        const sourceId = toStringId(r.source_id);
+        const targetId = toStringId(r.target_id);
         if (!map.has(sourceId)) map.set(sourceId, []);
         map.get(sourceId)!.push(r);
 
@@ -400,36 +400,36 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
 
   // 使用 DFS 构建并列关系分组 Map（优化：使用预计算的并列关系索引）
   const parallelGroups = useMemo(() => {
-    const groups = new Map<number, Set<number>>();
-    const visited = new Set<number>();
-    
-    const dfs = (todoId: number, groupSet: Set<number>) => {
+    const groups = new Map<string, Set<string>>();
+    const visited = new Set<string>();
+
+    const dfs = (todoId: string, groupSet: Set<string>) => {
       if (visited.has(todoId)) return;
       visited.add(todoId);
       groupSet.add(todoId);
-      
+
       // 优化：直接从预计算的并列关系索引获取
       const parallelRels = parallelRelationsByTodo.get(todoId) || [];
       const relatedIds = parallelRels.map(r =>
-        toNumberId(r.source_id) === todoId ? toNumberId(r.target_id) : toNumberId(r.source_id)
+        toStringId(r.source_id) === todoId ? toStringId(r.target_id) : toStringId(r.source_id)
       );
 
       relatedIds.forEach(relatedId => dfs(relatedId, groupSet));
     };
-    
+
     todos.forEach(todo => {
-      const todoId = toNumberId(todo.id!);
+      const todoId = toStringId(todo.id!);
       if (!visited.has(todoId)) {
         const parallelRels = parallelRelationsByTodo.get(todoId) || [];
 
         if (parallelRels.length > 0) {
-          const groupSet = new Set<number>();
+          const groupSet = new Set<string>();
           dfs(todoId, groupSet);
           groupSet.forEach(id => groups.set(id, groupSet));
         }
       }
     });
-    
+
     return groups;
   }, [todos, parallelRelationsByTodo]);
 
@@ -483,9 +483,9 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
       renderItem={(todo, index) => {
         // Data validation guard
         if (!todo || !todo.id) return null;
-        
+
         // 获取当前显示的序号值（编辑中的值或原始值，使用当前tab的序号）
-        const todoId = toNumberId(todo.id!);
+        const todoId = toStringId(todo.id!);
         const currentDisplayOrder = editingOrder[todoId] !== undefined
           ? editingOrder[todoId]
           : (todo.displayOrders && todo.displayOrders[activeTab]);
@@ -499,19 +499,19 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
         const nextTodo = index < todos.length - 1 ? todos[index + 1] : null;
 
         // 检查是否在并列分组中
-        const parallelGroup = parallelGroups.get(todoId);
+        const parallelGroup = parallelGroups.get(String(todoId));
         const isInParallelGroup = parallelGroup && parallelGroup.size > 1;
 
         // 统一分组判断：所有排序模式下，只要有并列关系且相邻即显示分组
         // sortWithGroups 确保并列待办在所有模式下都相邻
         const isInGroup = isInParallelGroup &&
           (
-            (prevTodo && parallelGroup?.has(toNumberId(prevTodo.id!))) ||
-            (nextTodo && parallelGroup?.has(toNumberId(nextTodo.id!)))
+            (prevTodo && parallelGroup?.has(toStringId(prevTodo.id!))) ||
+            (nextTodo && parallelGroup?.has(toStringId(nextTodo.id!)))
           );
 
-        const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(toNumberId(prevTodo.id!)));
-        const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(toNumberId(nextTodo.id!)));
+        const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(toStringId(prevTodo.id!)));
+        const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(toStringId(nextTodo.id!)));
         
         // 调试日志
         if (isInGroup) {
@@ -583,7 +583,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                     }}
                     disabled={savingOrder.has(toNumberId(todo.id!)) || !!(isInGroup && !isGroupStart)}
                     placeholder="序号"
-                    style={{ 
+                    style={{
                       width: 70,
                       flexShrink: 0,
                       opacity: (isInGroup && !isGroupStart) ? 0.5 : 1
@@ -707,7 +707,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
               {todo.content && (
                 <TodoLinksPreview
                   content={todo.content}
-                  urlTitles={getUrlTitlesForTodo(toNumberId(todo.id!))}
+                  urlTitles={getUrlTitlesForTodo(toStringId(todo.id!))}
                 />
               )}
 

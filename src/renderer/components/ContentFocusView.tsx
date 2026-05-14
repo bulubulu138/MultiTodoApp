@@ -1,5 +1,5 @@
 import { Todo, TodoRelation, PromptTemplate } from '../../shared/types';
-import { toNumberId } from '../../shared/utils/typeUtils';
+import { toNumberId, toStringId } from '../../shared/utils/typeUtils';
 import React, { useState, useMemo, useCallback, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { Divider, Button, Checkbox, Space, Spin, Empty, App, Input, InputNumber, Tag, Tooltip } from 'antd';
 import { SaveOutlined, EyeOutlined, CheckCircleOutlined } from '@ant-design/icons';
@@ -46,7 +46,7 @@ interface ContentFocusItemProps {
   activeTab: string;
   allTodos: Todo[];
   relations: TodoRelation[];
-  parallelGroup?: Set<number>;
+  parallelGroup?: Set<string>;
   prevTodo: Todo | null;
   nextTodo: Todo | null;
   onUpdateDisplayOrder: (todoId: number, tabKey: string, displayOrder: number) => Promise<void>;
@@ -434,13 +434,13 @@ const ContentFocusItem = React.memo(
         // 5. 检查是否是并列分组，如果是则同步整组
         if (parallelGroup && parallelGroup.size > 1) {
           const groupUpdates = Array.from(parallelGroup)
-            .filter(id => id !== todo.id)
+            .filter(id => id !== toStringId(todo.id!))
             .map(id => ({
-              id,
+              id: parseInt(id, 10), // 确保数字类型
               tabKey: activeTab,
               displayOrder: newOrder
             }));
-          
+
           if (groupUpdates.length > 0) {
             await window.electronAPI.todo.batchUpdateDisplayOrders(groupUpdates);
           }
@@ -599,11 +599,11 @@ const ContentFocusItem = React.memo(
     // 计算分组边界和并列关系
     const isInParallelGroup = parallelGroup && parallelGroup.size > 1;
     const isInGroup = isInParallelGroup && (
-      (prevTodo && parallelGroup?.has(toNumberId(prevTodo.id!))) ||
-      (nextTodo && parallelGroup?.has(toNumberId(nextTodo.id!)))
+      (prevTodo && parallelGroup?.has(toStringId(prevTodo.id!))) ||
+      (nextTodo && parallelGroup?.has(toStringId(nextTodo.id!)))
     );
-    const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(toNumberId(prevTodo.id!)));
-    const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(toNumberId(nextTodo.id!)));
+    const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(toStringId(prevTodo.id!)));
+    const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(toStringId(nextTodo.id!)));
     
     // 检查是否有并列关系
     const hasParallel = relations.some(r => 
@@ -825,7 +825,7 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
   onDeleteSuggestion,
 }, ref) => {
   // 为每个待办项创建 ref
-  const itemRefsMap = useRef<Map<number, ContentFocusItemRef>>(new Map());
+  const itemRefsMap = useRef<Map<string, ContentFocusItemRef>>(new Map());
 
   // 🔥 新增：追踪当前激活的编辑器 todoId
   const activeEditorTodoIdRef = useRef<number | null>(null);
@@ -873,7 +873,7 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
 
     // 停用之前的编辑器
     if (previousTodoId) {
-      const previousRef = itemRefsMap.current.get(previousTodoId);
+      const previousRef = itemRefsMap.current.get(String(previousTodoId));
       if (previousRef && typeof previousRef.deactivate === 'function') {
         try {
           console.log('[EditorSwitch] Deactivating previous editor:', previousTodoId);
@@ -886,7 +886,7 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
 
     // 激活新的编辑器（如果指定了todoId）
     if (newTodoId !== null) {
-      const newRef = itemRefsMap.current.get(newTodoId);
+      const newRef = itemRefsMap.current.get(String(newTodoId));
       if (newRef && typeof newRef.activate === 'function') {
         try {
           console.log('[EditorSwitch] Activating new editor:', newTodoId);
@@ -911,7 +911,7 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
       const currentTodoId = activeEditorTodoIdRef.current;
       if (currentTodoId) {
         console.log('[ContainerClick] Clicked blank area, deactivating editor:', currentTodoId);
-        const currentRef = itemRefsMap.current.get(currentTodoId);
+        const currentRef = itemRefsMap.current.get(String(currentTodoId));
         if (currentRef && typeof currentRef.deactivate === 'function') {
           try {
             currentRef.deactivate();
@@ -927,19 +927,19 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
 
   // 使用 DFS 构建并列关系分组 Map（复用自TodoList）
   const parallelGroups = useMemo(() => {
-    const groups = new Map<number, Set<number>>();
-    const visited = new Set<number>();
-    
-    const dfs = (todoId: number, groupSet: Set<number>) => {
+    const groups = new Map<string, Set<string>>();
+    const visited = new Set<string>();
+
+    const dfs = (todoId: string, groupSet: Set<string>) => {
       if (visited.has(todoId)) return;
       visited.add(todoId);
       groupSet.add(todoId);
-      
+
       // 找到所有与该 todo 有并列关系的其他 todo
       const relatedIds = relations
         .filter(r => r.relation_type === 'parallel')
         .filter(r => r.source_id === todoId || r.target_id === todoId)
-        .map(r => toNumberId(r.source_id) === todoId ? toNumberId(r.target_id) : toNumberId(r.source_id));
+        .map(r => toStringId(r.source_id) === todoId ? toStringId(r.target_id) : toStringId(r.source_id));
 
       for (const relatedId of relatedIds) {
         dfs(relatedId, groupSet);
@@ -949,16 +949,16 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
     // 为每个有并列关系的 todo 构建分组
     todos.forEach(todo => {
       if (!todo.id) return;
-      
-      const hasParallel = relations.some(r => 
-        r.relation_type === 'parallel' && 
+
+      const hasParallel = relations.some(r =>
+        r.relation_type === 'parallel' &&
         (r.source_id === todo.id || r.target_id === todo.id)
       );
-      
-      if (hasParallel && !visited.has(toNumberId(todo.id))) {
-        const groupSet = new Set<number>();
-        dfs(toNumberId(todo.id), groupSet);
-        
+
+      if (hasParallel && !visited.has(toStringId(todo.id))) {
+        const groupSet = new Set<string>();
+        dfs(toStringId(todo.id), groupSet);
+
         // 将这个分组应用到所有成员
         groupSet.forEach(id => {
           groups.set(id, groupSet);
@@ -1009,7 +1009,7 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
               key={todo.id}
               ref={(itemRef) => {
                 if (itemRef && todo.id) {
-                  itemRefsMap.current.set(toNumberId(todo.id), itemRef);
+                  itemRefsMap.current.set(toStringId(todo.id), itemRef);
                 }
               }}
               todo={todo}
@@ -1026,7 +1026,7 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
               activeTab={activeTab}
               allTodos={allTodos || todos}
               relations={relations}
-              parallelGroup={parallelGroups.get(toNumberId(todo.id!))}
+              parallelGroup={parallelGroups.get(toStringId(todo.id!))}
               prevTodo={index > 0 ? todos[index - 1] : null}
               nextTodo={index < todos.length - 1 ? todos[index + 1] : null}
               onUpdateDisplayOrder={onUpdateDisplayOrder}

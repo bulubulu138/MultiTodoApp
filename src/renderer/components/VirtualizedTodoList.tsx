@@ -1,5 +1,5 @@
 import { Todo, TodoRelation } from '../../shared/types';
-import { toNumberId } from '../../shared/utils/typeUtils';
+import { toNumberId, toStringId } from '../../shared/utils/typeUtils';
 import React, { useState, useMemo, useCallback, memo } from 'react';
 import { Card, Tag, Button, Space, Popconfirm, Select, Typography, Tooltip, InputNumber, App } from 'antd';
 import { DeleteOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
@@ -33,7 +33,7 @@ interface VirtualizedTodoListProps {
   onUpdateDisplayOrder?: (id: number, tabKey: string, order: number | null) => Promise<void>;
   viewMode?: ViewMode;
   onUpdateInPlace?: (id: number, updates: Partial<Todo>) => void;
-  getUrlTitlesForTodo?: (todoId: number) => Map<string, string>;
+  getUrlTitlesForTodo?: (todoId: string) => Map<string, string>;
   colorTheme?: ColorTheme; // 主题色
 }
 
@@ -411,7 +411,7 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
     onView: (todo: Todo) => void;
     onRelationsChange?: () => Promise<void>;
     onUpdateDisplayOrder?: (id: number, tabKey: string, order: number | null) => Promise<void>;
-    getUrlTitlesForTodo?: (todoId: number) => Map<string, string>;
+    getUrlTitlesForTodo?: (todoId: string) => Map<string, string>;
     colorTheme?: ColorTheme;
   };
 
@@ -455,7 +455,7 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
         onView={onView}
         onRelationsChange={onRelationsChange}
         onUpdateDisplayOrder={onUpdateDisplayOrder}
-        urlTitles={getUrlTitlesForTodo ? getUrlTitlesForTodo(toNumberId(todo.id!)) : undefined}
+        urlTitles={getUrlTitlesForTodo ? getUrlTitlesForTodo(toStringId(todo.id!)) : undefined}
         colorTheme={colorTheme}
       />
     );

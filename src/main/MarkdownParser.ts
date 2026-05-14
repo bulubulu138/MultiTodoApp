@@ -22,18 +22,18 @@ export class MarkdownParser {
       tags: this.parseTags(data.tags),
       imageUrl: data.imageUrl as string | undefined,
       images: data.images as string | undefined,
-      startTime: data.startTime as string | undefined,
+      startTime: data.start_time as string | undefined || data.startTime as string | undefined,
       deadline: data.deadline as string | undefined,
       displayOrder: data.display_order as number | undefined,
       displayOrders: data.display_orders as { [key: string]: number } | undefined,
-      contentHash: data.content_hash as string | undefined,
+      contentHash: data.content_hash as string | undefined || data.contentHash as string | undefined,
       keywords: data.keywords as string[] | undefined,
       aiSuggestion: data.ai_suggestion as string | undefined,
       aiSuggestionGeneratedAt: data.ai_suggestion_generated_at as string | undefined,
       aiSuggestionTemplate: data.ai_suggestion_template as string | undefined,
       aiSuggestionProvider: data.ai_suggestion_provider as string | undefined,
       aiSuggestionModel: data.ai_suggestion_model as string | undefined,
-      completedAt: data.completed_at as string | undefined,
+      completedAt: data.completed_at as string | undefined || data.completedAt as string | undefined,
       createdAt: data.created_at as string || new Date().toISOString(),
       updatedAt: data.updated_at as string || new Date().toISOString()
     };
@@ -295,8 +295,8 @@ export class MarkdownParser {
     }
 
     return {
-      source_id: parseInt(currentTodoId) || 0, // 临时使用，后续需要 UUID 映射
-      target_id: parseInt(targetUuid) || 0, // 临时使用，后续需要 UUID 映射
+      source_id: currentTodoId, // 使用字符串 UUID
+      target_id: targetUuid, // 使用字符串 UUID
       relation_type: relationType,
       created_at: new Date().toISOString()
     };

@@ -7,16 +7,31 @@ import { Todo } from '../types';
 
 /**
  * 将 ID 转换为数字类型（用于数据库操作）
+ * 如果是UUID字符串，则生成一个临时的数字ID用于内部状态管理
  */
 export function toNumberId(id: number | string | undefined): number {
   if (id === undefined || id === null) {
     throw new Error('ID cannot be undefined or null');
   }
-  const numId = typeof id === 'number' ? id : parseInt(String(id), 10);
-  if (isNaN(numId)) {
-    throw new Error(`Invalid ID format: ${id}`);
+  if (typeof id === 'number') {
+    return id;
   }
-  return numId;
+
+  // 尝试解析为数字
+  const numId = parseInt(String(id), 10);
+  if (!isNaN(numId)) {
+    return numId;
+  }
+
+  // 对于UUID字符串，生成一个哈希数字用于状态管理
+  // 这是一个临时解决方案，确保不抛出错误
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    const char = id.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash);
 }
 
 /**

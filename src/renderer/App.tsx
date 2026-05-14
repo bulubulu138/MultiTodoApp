@@ -15,7 +15,7 @@ import ContentFocusView, { ContentFocusViewRef } from './components/ContentFocus
 import FirstRunDialog from './components/FirstRunDialog';
 import { getTheme, ThemeMode, ColorTheme } from './theme/themes';
 import { buildParallelGroups, selectGroupRepresentatives, sortWithGroups, getSortComparator } from './utils/sortWithGroups';
-import { toNumberId } from '../shared/utils/typeUtils';
+import { toStringId, areIdsEqual } from '../shared/utils/typeUtils';
 import { optimizedMotionVariants, useConditionalAnimation, shouldReduceMotion, useMotionPerformanceMonitor } from './utils/optimizedMotionVariants';
 import { PerformanceMonitor } from './utils/performanceMonitor';
 import { useGlobalKeyboardHandler } from './hooks/useGlobalKeyboardHandler';
@@ -80,8 +80,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const searchInputTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 保存状态追踪（用于专注模式的乐观更新）
-  const savingTodosRef = useRef<Set<number>>(new Set());
-  const pendingSavesRef = useRef<Map<number, Promise<void>>>(new Map());
+  const savingTodosRef = useRef<Set<string>>(new Set());
+  const pendingSavesRef = useRef<Map<string, Promise<void>>>(new Map());
   
   // ContentFocusView 的 ref，用于切换视图时保存
   const contentFocusRef = useRef<ContentFocusViewRef>(null);
@@ -628,20 +628,21 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   };
 
   // 专注模式专用：乐观更新（不刷新页面，保持滚动位置）
-  const handleUpdateTodoInPlace = useCallback(async (id: number, updates: Partial<Todo>) => {
+  const handleUpdateTodoInPlace = useCallback(async (id: string | number, updates: Partial<Todo>) => {
+    const idString = toStringId(id);
     // 1. 标记为正在保存
-    savingTodosRef.current.add(id);
-    
+    savingTodosRef.current.add(idString);
+
     // 2. 乐观更新本地状态（立即生效，不刷新页面）
     setTodos(prev => prev.map(todo => {
-      if (todo.id !== id) return todo;
-      
+      if (!areIdsEqual(todo.id, id)) return todo;
+
       // 准备乐观更新的数据
       const optimisticUpdates: Partial<Todo> = {
         ...updates,
         updatedAt: new Date().toISOString()
       };
-      
+
       // 如果状态改为 completed，设置 completedAt
       if (updates.status === 'completed' && !updates.completedAt) {
         optimisticUpdates.completedAt = new Date().toISOString();
@@ -650,30 +651,30 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       else if (updates.status && updates.status !== 'completed' && todo.status === 'completed') {
         optimisticUpdates.completedAt = undefined;
       }
-      
+
       return { ...todo, ...optimisticUpdates };
     }));
-    
+
     // 3. 创建保存 Promise 并追踪
     const savePromise = (async () => {
       try {
-        await window.electronAPI.todo.update(id, updates);
+        await window.electronAPI.todo.update(id as number, updates);
         // 保存成功，移除追踪
-        savingTodosRef.current.delete(id);
-        pendingSavesRef.current.delete(id);
+        savingTodosRef.current.delete(idString);
+        pendingSavesRef.current.delete(idString);
       } catch (error) {
         // 保存失败，移除追踪并回滚
         console.error('Update error:', error);
-        savingTodosRef.current.delete(id);
-        pendingSavesRef.current.delete(id);
-        
+        savingTodosRef.current.delete(idString);
+        pendingSavesRef.current.delete(idString);
+
         // 重新加载确保数据一致性
         await loadTodos();
         message.error('保存失败，已回滚更改');
       }
     })();
-    
-    pendingSavesRef.current.set(id, savePromise);
+
+    pendingSavesRef.current.set(idString, savePromise);
   }, []);
 
   // 等待所有保存完成
@@ -933,16 +934,17 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const syncParallelGroupsSilently = async () => {
     try {
       const parallelRelations = relations.filter(r => r.relation_type === 'parallel');
-      
+
       if (parallelRelations.length === 0) {
         return; // 静默返回
       }
 
       // 按关系分组 - 使用图算法找出所有连通分量
-      const graph = new Map<number, Set<number>>();
+      // 支持数字ID和UUID字符串ID的混合处理
+      const graph = new Map<string, Set<string>>();
       parallelRelations.forEach(r => {
-        const sourceId = toNumberId(r.source_id);
-        const targetId = toNumberId(r.target_id);
+        const sourceId = toStringId(r.source_id);
+        const targetId = toStringId(r.target_id);
         if (!graph.has(sourceId)) graph.set(sourceId, new Set());
         if (!graph.has(targetId)) graph.set(targetId, new Set());
         graph.get(sourceId)!.add(targetId);
@@ -950,10 +952,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       });
 
       // DFS找出所有连通分量
-      const visited = new Set<number>();
-      const groups: Set<number>[] = [];
+      const visited = new Set<string>();
+      const groups: Set<string>[] = [];
 
-      const dfs = (nodeId: number, currentGroup: Set<number>) => {
+      const dfs = (nodeId: string, currentGroup: Set<string>) => {
         visited.add(nodeId);
         currentGroup.add(nodeId);
         const neighbors = graph.get(nodeId);
@@ -968,7 +970,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
 
       graph.forEach((_, nodeId) => {
         if (!visited.has(nodeId)) {
-          const group = new Set<number>();
+          const group = new Set<string>();
           dfs(nodeId, group);
           groups.push(group);
         }
@@ -977,21 +979,21 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       // 为每组设置相同的displayOrder
       for (const todoIds of groups) {
         const groupTodos = Array.from(todoIds)
-          .map(id => todos.find(t => t.id === id))
+          .map(id => todos.find(t => areIdsEqual(t.id, id)))
           .filter((t): t is Todo => t !== undefined);
-        
+
         if (groupTodos.length === 0) continue;
 
-        // 使用组内最小的displayOrder，如果都没有则使用最小的ID
+        // 使用组内最小的displayOrder，如果都没有则使用当前时间戳
         const existingOrders = groupTodos
           .map(t => t.displayOrder)
           .filter((o): o is number => o !== undefined && o !== null);
-        
-        const syncOrder = existingOrders.length > 0 
-          ? Math.min(...existingOrders)
-          : Math.min(...Array.from(todoIds));
 
-        // 批量更新
+        const syncOrder = existingOrders.length > 0
+          ? Math.min(...existingOrders)
+          : Date.now();
+
+        // 批量更新 - 确保ID为数字类型以兼容API
         const updates = groupTodos
           .filter(t => t.displayOrder !== syncOrder)
           .map(t => ({

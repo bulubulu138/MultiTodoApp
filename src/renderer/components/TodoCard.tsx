@@ -1,5 +1,5 @@
 import { Todo, TodoRelation } from '../../shared/types';
-import { toNumberId } from '../../shared/utils/typeUtils';
+import { toNumberId, toStringId } from '../../shared/utils/typeUtils';
 import React, { useState, useCallback, memo } from 'react';
 import { Card, Tag, Button, Space, Popconfirm, Select, Typography, Tooltip, InputNumber, App } from 'antd';
 import { EditOutlined, DeleteOutlined, LinkOutlined, EyeOutlined, EyeInvisibleOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
@@ -29,9 +29,9 @@ interface TodoCardProps {
   onShowRelations: (todo: Todo) => void;
   onUpdateDisplayOrder?: (id: number, tabKey: string, order: number | null) => Promise<void>;
   onNavigateToFlowchart?: (flowchartId: string, nodeId: string) => void;
-  associationsByTodo: Map<number, any[]>;
-  parallelRelationsByTodo: Map<number, TodoRelation[]>;
-  parallelGroups: Map<number, Set<number>>;
+  associationsByTodo: Map<string, any[]>;
+  parallelRelationsByTodo: Map<string, TodoRelation[]>;
+  parallelGroups: Map<string, Set<string>>;
   prevTodo: Todo | null;
   nextTodo: Todo | null;
 }
@@ -165,19 +165,19 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
   const currentDisplayOrder = editingOrder !== null ? editingOrder : (todo.displayOrders?.[activeTab]);
 
   // 计算并列关系
-  const parallelRelations = parallelRelationsByTodo.get(toNumberId(todo.id!)) || [];
+  const parallelRelations = parallelRelationsByTodo.get(toStringId(todo.id!)) || [];
   const hasParallel = parallelRelations.length > 0;
 
-  // 计算分组信息
-  const parallelGroup = parallelGroups.get(toNumberId(todo.id!));
+  // 计算分组信息 - 使用字符串键访问 parallelGroups
+  const parallelGroup = parallelGroups.get(toStringId(todo.id!));
   const isInParallelGroup = parallelGroup && parallelGroup.size > 1;
   const isInGroup = isInParallelGroup &&
     (
-      (prevTodo && parallelGroup?.has(toNumberId(prevTodo.id!))) ||
-      (nextTodo && parallelGroup?.has(toNumberId(nextTodo.id!)))
+      (prevTodo && parallelGroup?.has(toStringId(prevTodo.id!))) ||
+      (nextTodo && parallelGroup?.has(toStringId(nextTodo.id!)))
     );
-  const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(toNumberId(prevTodo.id!)));
-  const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(toNumberId(nextTodo.id!)));
+  const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(toStringId(prevTodo.id!)));
+  const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(toStringId(nextTodo.id!)));
 
   return (
     <div style={{
@@ -299,7 +299,7 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
                 {onNavigateToFlowchart && (
                   <FlowchartIndicator
                     todoId={toNumberId(todo.id!)}
-                    associations={associationsByTodo.get(toNumberId(todo.id!)) || []}
+                    associations={associationsByTodo.get(toStringId(todo.id!)) || []}
                     onNavigate={onNavigateToFlowchart}
                     size="small"
                     showLabel={false}
