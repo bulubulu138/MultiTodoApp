@@ -1,39 +1,47 @@
-const Database = require('better-sqlite3');
+const fs = require('fs');
 const path = require('path');
-const app = require('electron').app || { getPath: () => process.env.APPDATA || (process.platform === 'darwin' ? process.env.HOME + '/Library/Application Support' : process.env.HOME + '/.config') };
 
-// 获取数据库路径
+// 获取应用数据路径
 const userDataPath = process.env.APPDATA || (process.platform === 'darwin'
   ? path.join(process.env.HOME, 'Library', 'Application Support')
   : path.join(process.env.HOME, '.config'));
 
-const dbPath = path.join(userDataPath, 'MultiTodo', 'todo_app.db');
+// 检查设置文件
+const settingsPath = path.join(userDataPath, 'Electron', 'settings.json');
+console.log('设置文件路径:', settingsPath);
 
-console.log('数据库路径:', dbPath);
+// 检查应用配置文件
+const appConfigPath = path.join(userDataPath, 'Electron', 'app-config.json');
+console.log('应用配置文件路径:', appConfigPath);
 
 try {
-  const db = new Database(dbPath, { readonly: true });
+  // 检查设置文件
+  if (fs.existsSync(settingsPath)) {
+    const settingsData = fs.readFileSync(settingsPath, 'utf-8');
+    const settings = JSON.parse(settingsData);
 
-  // 查询所有settings
-  console.log('\n=== 所有Settings ===');
-  const allSettings = db.prepare('SELECT key, value FROM settings').all();
-  allSettings.forEach(setting => {
-    console.log(`${setting.key} = ${setting.value}`);
-  });
-
-  // 专门查询AI相关配置
-  console.log('\n=== AI相关配置 ===');
-  const aiSettings = db.prepare("SELECT key, value FROM settings WHERE key LIKE 'ai%'").all();
-  if (aiSettings.length === 0) {
-    console.log('❌ 没有找到AI配置！');
-  } else {
-    aiSettings.forEach(setting => {
-      console.log(`${setting.key} = ${setting.value}`);
+    console.log('\n=== 当前设置 ===');
+    Object.entries(settings).forEach(([key, value]) => {
+      console.log(`${key} = ${JSON.stringify(value)}`);
     });
+  } else {
+    console.log('❌ 设置文件不存在，应用可能还未运行过');
   }
 
-  db.close();
+  // 检查应用配置
+  if (fs.existsSync(appConfigPath)) {
+    const appConfigData = fs.readFileSync(appConfigPath, 'utf-8');
+    const appConfig = JSON.parse(appConfigData);
+
+    console.log('\n=== 应用配置 ===');
+    console.log(`首次运行: ${appConfig.firstRun ? '是' : '否'}`);
+    console.log(`存储位置类型: ${appConfig.storageLocation?.type || 'default'}`);
+    console.log(`自定义路径: ${appConfig.storageLocation?.customPath || '未设置'}`);
+  }
+
+  console.log('\n✅ 使用 Markdown 文件存储，无需数据库配置检查');
+
 } catch (error) {
-  console.error('错误:', error.message);
+  console.error('❌ 读取配置文件时出错:', error.message);
   process.exit(1);
 }
