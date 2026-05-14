@@ -7,12 +7,9 @@
     "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
     "dev:main": "tsc -p tsconfig.main.json && electron dist/main/main.js",
     "dev:renderer": "webpack serve --config webpack.renderer.config.js",
-    "prebuild": "node scripts/prebuild-check.js",
     "build": "npm run build:main && npm run build:renderer",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "webpack --config webpack.renderer.config.js",
-    "rebuild": "electron-rebuild -f -w better-sqlite3",
-    "verify": "node scripts/verify-native-modules.js",
     "pack": "npm run build && electron-builder --dir",
     "predist": "npm run build",
     "dist": "electron-builder",
@@ -30,7 +27,6 @@
   "license": "MIT",
   "homepage": "https://github.com/yourusername/multi-todo-app",
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/dagre": "^0.7.53",
     "@types/node": "^20.0.0",
     "@types/pako": "^2.0.4",
@@ -41,9 +37,8 @@
     "@typescript-eslint/parser": "^6.0.0",
     "concurrently": "^8.0.0",
     "css-loader": "^6.8.0",
-    "electron": "^27.0.0",
+    "electron": "^27.3.11",
     "electron-builder": "^24.0.0",
-    "electron-rebuild": "^3.2.9",
     "eslint": "^8.0.0",
     "fast-check": "^4.5.3",
     "html-webpack-plugin": "^5.5.0",
@@ -58,7 +53,6 @@
     "@emotion/is-prop-valid": "^1.4.0",
     "@types/react-window": "^1.8.8",
     "antd": "^5.12.0",
-    "better-sqlite3": "^11.7.0",
     "buffer": "^6.0.3",
     "chokidar": "^3.5.3",
     "crypto-browserify": "^3.12.1",
@@ -97,7 +91,6 @@
       "dist/**/*",
       "node_modules/**/*",
       "package.json",
-      "!node_modules/better-sqlite3/build/Release/obj{,/**/*}",
       "!node_modules/**/test/**/*",
       "!node_modules/**/*.md",
       "!node_modules/**/{CHANGELOG.md,README.md,README,readme.md,readme}",
@@ -113,9 +106,6 @@
           "**/*"
         ]
       }
-    ],
-    "asarUnpack": [
-      "node_modules/better-sqlite3/**/*"
     ],
     "win": {
       "target": [

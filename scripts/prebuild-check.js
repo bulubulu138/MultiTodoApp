@@ -145,10 +145,8 @@ function checkNodeModules() {
   // 检查关键依赖
   const criticalDeps = [
     'electron',
-    'better-sqlite3',
     'segment',
-    'electron-builder',
-    'electron-rebuild'
+    'electron-builder'
   ];
 
   let allInstalled = true;
@@ -167,32 +165,12 @@ function checkNodeModules() {
 }
 
 /**
- * 检查原生模块编译状态
+ * 检查原生模块编译状态 (已弃用)
+ * MultiTodo 现在使用 Markdown 文件存储，不需要原生模块
  */
 function checkNativeModules() {
-  logInfo(`检查原生模块编译状态...`);
-  
-  const nodeModulesPath = path.join(__dirname, '..', 'node_modules');
-  const nativeModules = [
-    { name: 'better-sqlite3', binary: 'better_sqlite3.node' }
-  ];
-
-  let allCompiled = true;
-
-  for (const module of nativeModules) {
-    const buildPath = path.join(nodeModulesPath, module.name, 'build', 'Release');
-    const binaryPath = path.join(buildPath, module.binary);
-
-    if (fs.existsSync(binaryPath)) {
-      logSuccess(`${module.name} 已编译`);
-    } else {
-      logWarning(`${module.name} 未编译或编译失败`);
-      logWarning(`将在构建过程中自动重新编译`);
-      allCompiled = false;
-    }
-  }
-
-  return allCompiled;
+  logInfo(`跳过原生模块检查 (使用 Markdown 存储)`);
+  return true;
 }
 
 /**
@@ -238,7 +216,6 @@ async function main() {
     { name: '构建工具', fn: checkBuildTools, required: false },
     { name: 'Xcode 工具', fn: checkXcode, required: process.platform === 'darwin' },
     { name: '依赖安装', fn: checkNodeModules, required: true },
-    { name: '原生模块', fn: checkNativeModules, required: false },
     { name: 'dist 目录', fn: checkDistDirectory, required: false }
   ];
 
