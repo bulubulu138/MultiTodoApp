@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Space, Modal, message, Typography, Tag } from 'antd';
-import { ReloadOutlined, SaveOutlined, RollbackOutlined } from '@ant-design/icons';
+import { Table, Button, Space, message, Typography, Tag, Card, Statistic, Row, Col } from 'antd';
+import { ReloadOutlined, SaveOutlined, ClockCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { BackupInfo } from '../../shared/types';
 import dayjs from 'dayjs';
 
@@ -9,7 +9,12 @@ const { Text, Paragraph } = Typography;
 const BackupSettings: React.FC = () => {
   const [backups, setBackups] = useState<BackupInfo[]>([]);
   const [loading, setLoading] = useState(false);
-  
+  const [backupStatus, setBackupStatus] = useState<{
+    lastBackupTime: string;
+    nextBackupTime: string;
+    backupEnabled: boolean;
+  }>({ lastBackupTime: '', nextBackupTime: '', backupEnabled: false });
+
   // 加载备份列表
   const loadBackups = async () => {
     setLoading(true);
@@ -22,11 +27,30 @@ const BackupSettings: React.FC = () => {
       setLoading(false);
     }
   };
-  
+
+  // 加载备份状态
+  const loadBackupStatus = async () => {
+    try {
+      const status = await window.electronAPI.backup.getCurrentBackupStatus();
+      setBackupStatus(status);
+    } catch (error) {
+      console.error('加载备份状态失败:', error);
+    }
+  };
+
   useEffect(() => {
     loadBackups();
+    loadBackupStatus();
+
+    // 每5分钟刷新一次备份状态
+    const interval = setInterval(() => {
+      loadBackupStatus();
+      loadBackups();
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
   }, []);
-  
+
   // 手动创建备份
   const handleCreateBackup = async () => {
     setLoading(true);
@@ -34,35 +58,12 @@ const BackupSettings: React.FC = () => {
       await window.electronAPI.backup.create();
       message.success('备份创建成功');
       await loadBackups();
+      await loadBackupStatus();
     } catch (error) {
       message.error('备份创建失败');
     } finally {
       setLoading(false);
     }
-  };
-  
-  // 恢复备份
-  const handleRestore = (backup: BackupInfo) => {
-    Modal.confirm({
-      title: '确认恢复备份？',
-      content: `将使用 ${dayjs(backup.createdAt).format('YYYY-MM-DD HH:mm:ss')} 的备份覆盖当前数据，此操作不可撤销！`,
-      okText: '确认恢复',
-      cancelText: '取消',
-      okType: 'danger',
-      onOk: async () => {
-        try {
-          await window.electronAPI.backup.restore(backup.filepath);
-          message.success('备份恢复成功，请重启应用');
-          // 建议用户重启应用
-          Modal.info({
-            title: '恢复成功',
-            content: '备份已恢复，建议重启应用以加载新数据',
-          });
-        } catch (error) {
-          message.error('备份恢复失败');
-        }
-      }
-    });
   };
   
   const columns = [
@@ -98,37 +99,54 @@ const BackupSettings: React.FC = () => {
         </Paragraph>
       ),
     },
-    {
-      title: '操作',
-      key: 'action',
-      render: (_: any, record: BackupInfo) => (
-        <Button
-          size="small"
-          type="link"
-          icon={<RollbackOutlined />}
-          onClick={() => handleRestore(record)}
-        >
-          恢复
-        </Button>
-      ),
-    },
   ];
-  
+
   return (
     <div>
       <Space direction="vertical" style={{ width: '100%' }} size="large">
-        <div>
-          <Text strong>自动备份设置</Text>
-          <Paragraph type="secondary" style={{ marginTop: 8 }}>
-            系统每24小时自动备份一次数据库，最多保留最近7天的备份。
+        {/* 备份状态卡片 */}
+        <Card>
+          <Row gutter={16}>
+            <Col span={8}>
+              <Statistic
+                title="上次备份时间"
+                value={backupStatus.lastBackupTime ? dayjs(backupStatus.lastBackupTime).format('YYYY-MM-DD HH:mm:ss') : '从未备份'}
+                prefix={<ClockCircleOutlined />}
+                valueStyle={{ fontSize: '14px' }}
+              />
+            </Col>
+            <Col span={8}>
+              <Statistic
+                title="下次备份时间"
+                value={backupStatus.nextBackupTime ? dayjs(backupStatus.nextBackupTime).format('YYYY-MM-DD HH:mm:ss') : '未知'}
+                prefix={<ClockCircleOutlined />}
+                valueStyle={{ fontSize: '14px' }}
+              />
+            </Col>
+            <Col span={8}>
+              <Statistic
+                title="自动备份"
+                value={backupStatus.backupEnabled ? '已启用' : '未启用'}
+                prefix={<CheckCircleOutlined />}
+                valueStyle={{ fontSize: '14px', color: backupStatus.backupEnabled ? '#52c41a' : '#ff4d4f' }}
+              />
+            </Col>
+          </Row>
+        </Card>
+
+        {/* 备份设置说明 */}
+        <Card title="自动备份设置" size="small">
+          <Paragraph type="secondary">
+            系统每6小时自动备份一次数据库，备份保存为 Markdown 格式，仅保留最新的一个备份版本。
+            备份文件存储在当前数据库文件夹的 <code>.backup</code> 子文件夹中。
           </Paragraph>
           <Space>
-            <Tag color="blue">备份频率: 24小时</Tag>
-            <Tag color="green">保留时长: 7天</Tag>
-            <Tag color="orange">当前备份数: {backups.length}</Tag>
+            <Tag color="blue">备份频率: 6小时</Tag>
+            <Tag color="green">备份格式: Markdown</Tag>
+            <Tag color="orange">保留策略: 仅保留最新版本</Tag>
           </Space>
-        </div>
-        
+        </Card>
+
         <Space>
           <Button
             type="primary"
@@ -146,7 +164,7 @@ const BackupSettings: React.FC = () => {
             刷新列表
           </Button>
         </Space>
-        
+
         <Table
           columns={columns}
           dataSource={backups}

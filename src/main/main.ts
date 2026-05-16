@@ -16,6 +16,8 @@ import { URLAuthorizationService } from './services/URLAuthorizationServiceStub'
 // import { AuthorizationRefreshScheduler } from './services/AuthorizationRefreshScheduler';
 import { TodoRecommendation } from '../shared/types';
 import { aiConfigManager } from './config/AIConfigManager';
+import { databaseManager } from './services/DatabaseManager';
+import { appConfigManager } from './config/AppConfig';
 
 class Application {
   private mainWindow: BrowserWindow | null = null;
@@ -42,6 +44,7 @@ class Application {
   // ✅ 新增：存储位置管理
   private appConfig: any = null;
   private storageLocationService: any = null;
+  private databaseManager = databaseManager; // 数据库管理器
 
   constructor() {
     this.settingsManager = new SettingsManager(); // 用于设置
@@ -802,6 +805,71 @@ class Application {
       }
     });
 
+    // 新增：数据库管理 IPC 处理器
+    ipcMain.handle('storageLocation:getRecentDatabases', async () => {
+      try {
+        const databases = await this.databaseManager.getRecentDatabases();
+        return {
+          success: true,
+          databases
+        };
+      } catch (error) {
+        console.error('[IPC] Error getting recent databases:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    });
+
+    ipcMain.handle('storageLocation:validateDatabase', async (_, dbPath: string) => {
+      try {
+        const isValid = await this.databaseManager.validateDatabase(dbPath);
+        return {
+          valid: isValid,
+          error: isValid ? undefined : 'Invalid database'
+        };
+      } catch (error) {
+        console.error('[IPC] Error validating database:', error);
+        return {
+          valid: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    });
+
+    ipcMain.handle('storageLocation:initializeDatabase', async (_, dbPath: string) => {
+      try {
+        const success = await this.databaseManager.initializeDatabase(dbPath);
+        return {
+          success,
+          error: success ? undefined : 'Initialization failed'
+        };
+      } catch (error) {
+        console.error('[IPC] Error initializing database:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    });
+
+    ipcMain.handle('storageLocation:switchDatabase', async (_, dbPath: string) => {
+      try {
+        await this.databaseManager.switchDatabase(dbPath, false);
+        return {
+          success: true,
+          error: undefined
+        };
+      } catch (error) {
+        console.error('[IPC] Error switching database:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    });
+
     // 关系相关的IPC处理器
     ipcMain.handle('relations:getAll', async () => {
       return await this.fileStorageManager.getAllRelations();
@@ -874,11 +942,16 @@ class Application {
       return await this.backupManager?.createBackup();
     });
 
-    ipcMain.handle('backup:restore', async (_, backupPath: string) => {
-      await this.backupManager?.restoreBackup(backupPath);
-      // 重新加载数据库
-      this.settingsManager.close();
-      await this.settingsManager.initialize();
+    ipcMain.handle('backup:getCurrentBackupStatus', async () => {
+      if (!this.backupManager) {
+        return {
+          lastBackupTime: '',
+          nextBackupTime: '',
+          backupEnabled: false
+        };
+      }
+
+      return await this.backupManager.getBackupStatus();
     });
 
     // Settings - Data folder operations
@@ -1839,12 +1912,20 @@ class Application {
         throw settingsError;
       }
 
-      // 初始化备份管理器
-      console.log('Initializing backup manager...');
-      const storagePath = this.fileStorageManager.getStoragePath();
-      this.backupManager = new BackupManager(storagePath);
-      this.backupManager.startAutoBackup();
-      console.log('Backup manager initialized successfully');
+      // 初始化数据库管理器
+      console.log('Initializing database manager...');
+      try {
+        await this.databaseManager.initialize();
+        this.backupManager = this.databaseManager.getCurrentBackupManager();
+        console.log('Database manager initialized successfully');
+      } catch (dbError) {
+        console.error('Database manager initialization failed:', dbError);
+        // 降级为简单的备份管理器
+        const storagePath = this.fileStorageManager.getStoragePath();
+        this.backupManager = new BackupManager(storagePath, this.fileStorageManager);
+        this.backupManager.startAutoBackup();
+        console.log('Fallback backup manager initialized');
+      }
 
 
       // 初始化 AI 服务（从配置文件加载）
@@ -1957,9 +2038,13 @@ class Application {
     });
 
     // 注销全局快捷键并停止备份
-    app.on('will-quit', () => {
+    app.on('will-quit', async () => {
       globalShortcut.unregisterAll();
       this.backupManager?.stopAutoBackup();
+
+      // 清理数据库管理器
+      await this.databaseManager.shutdown();
+
       // this.authorizationRefreshScheduler?.stop(); // 暂时禁用
       console.log('Global shortcuts unregistered and backup stopped');
     });

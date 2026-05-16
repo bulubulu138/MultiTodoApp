@@ -1,6 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
+import { FileStorageManager } from '../FileStorageManager';
+import { Todo } from '../../shared/types';
 
 export interface BackupInfo {
   filename: string;
@@ -13,14 +15,16 @@ export interface BackupInfo {
 export class BackupManager {
   private backupDir: string;
   private sourceDbPath: string;
+  private fileStorageManager: FileStorageManager;
   private backupInterval: NodeJS.Timeout | null = null;
-  private readonly BACKUP_INTERVAL = 24 * 60 * 60 * 1000; // 24小时
-  private readonly RETENTION_DAYS = 7;
-  
-  constructor(sourceDbPath: string) {
+  private readonly BACKUP_INTERVAL = 6 * 60 * 60 * 1000; // 6小时
+  private lastBackupTime: Date | null = null;
+
+  constructor(sourceDbPath: string, fileStorageManager: FileStorageManager) {
     this.sourceDbPath = sourceDbPath;
-    const userDataPath = app.getPath('userData');
-    this.backupDir = path.join(userDataPath, 'backups');
+    this.fileStorageManager = fileStorageManager;
+    // 修改备份目录为数据库文件夹内的 .backup
+    this.backupDir = path.join(sourceDbPath, '.backup');
     this.ensureBackupDirectory();
   }
   
@@ -30,172 +34,268 @@ export class BackupManager {
       fs.mkdirSync(this.backupDir, { recursive: true });
     }
   }
-  
-  // 执行备份
-  public async createBackup(): Promise<BackupInfo> {
-    // 1. 生成备份文件名
-    const timestamp = new Date();
-    const filename = `todo_app_backup_${this.formatDate(timestamp)}.db`;
-    const backupPath = path.join(this.backupDir, filename);
-    
-    // 2. 复制数据库文件
-    await fs.promises.copyFile(this.sourceDbPath, backupPath);
-    
-    // 3. 获取文件信息
-    const stats = await fs.promises.stat(backupPath);
-    
-    // 4. 清理旧备份
-    await this.cleanOldBackups();
-    
-    return {
-      filename,
-      filepath: backupPath,
-      timestamp: timestamp.getTime(),
-      size: stats.size,
-      createdAt: timestamp.toISOString()
-    };
+
+  // 生成 Markdown 备份内容
+  private async generateMarkdownBackup(todos: Todo[]): Promise<string> {
+    const timestamp = new Date().toISOString();
+    const header = `# MultiTodo Backup
+
+**Generated**: ${timestamp}
+**Total Todos**: ${todos.length}
+**Database Path**: ${this.sourceDbPath}
+
+---
+
+`;
+
+    if (todos.length === 0) {
+      return header + `*No todos in this database yet.*`;
+    }
+
+    const content = todos.map(todo => {
+      let todoSection = `## ${todo.title || '(Untitled)'}
+
+- **ID**: \`${todo.id}\`
+- **Status**: ${todo.status}
+- **Priority**: ${todo.priority}
+- **Created**: ${todo.createdAt}
+- **Updated**: ${todo.updatedAt}
+`;
+
+      if (todo.content) {
+        todoSection += `
+### Content
+
+${todo.content}
+`;
+      }
+
+      if (todo.tags && todo.tags.length > 0) {
+        const tagsArray = Array.isArray(todo.tags) ? todo.tags : [];
+        todoSection += `
+### Tags
+
+${tagsArray.map((tag: string) => `\`${tag}\``).join(', ')}
+`;
+      }
+
+      if (todo.startTime || todo.deadline) {
+        todoSection += `
+### Time
+
+`;
+        if (todo.startTime) {
+          todoSection += `- **Start Time**: ${todo.startTime}\n`;
+        }
+        if (todo.deadline) {
+          todoSection += `- **Deadline**: ${todo.deadline}\n`;
+        }
+      }
+
+      if (todo.imageUrl) {
+        todoSection += `
+### Image
+
+![Todo Image](${todo.imageUrl})
+`;
+      }
+
+      return todoSection + '\n---\n\n';
+    }).join('\n');
+
+    return header + content;
   }
   
-  // 清理过期备份
+  // 执行备份（带重试机制）
+  public async createBackup(): Promise<BackupInfo> {
+    return await this.executeWithRetry(async () => {
+      // 1. 获取所有待办事项
+      const todos = await this.fileStorageManager.getAllTodos();
+
+      // 2. 生成备份文件名
+      const timestamp = new Date();
+      const filename = `backup_${timestamp.getTime()}.md`;
+      const backupPath = path.join(this.backupDir, filename);
+
+      // 3. 生成 Markdown 备份内容
+      const backupContent = await this.generateMarkdownBackup(todos);
+
+      // 4. 写入备份文件
+      await fs.promises.writeFile(backupPath, backupContent, 'utf-8');
+
+      // 5. 获取文件信息
+      const stats = await fs.promises.stat(backupPath);
+
+      // 6. 更新最后备份时间
+      this.lastBackupTime = timestamp;
+
+      // 7. 清理旧备份（只保留最新的一个）
+      await this.cleanOldBackups();
+
+      console.log(`[BackupManager] ✅ Backup created: ${filename} (${todos.length} todos)`);
+
+      return {
+        filename,
+        filepath: backupPath,
+        timestamp: timestamp.getTime(),
+        size: stats.size,
+        createdAt: timestamp.toISOString()
+      };
+    });
+  }
+
+  // 静默重试机制
+  private async executeWithRetry<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3
+  ): Promise<T> {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return await operation();
+      } catch (error) {
+        console.error(`[BackupManager] ❌ Retry ${i + 1}/${maxRetries} failed:`, error);
+        if (i === maxRetries - 1) {
+          console.error('[BackupManager] ❌ All retries failed, giving up silently');
+          throw error;
+        }
+        // 指数退避：1秒, 5秒, 15秒
+        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(i + 1, 2)));
+      }
+    }
+    throw new Error('All retries failed');
+  }
+  
+  // 清理旧备份（只保留最新的一个）
   private async cleanOldBackups(): Promise<void> {
-    const files = await fs.promises.readdir(this.backupDir);
-    const now = Date.now();
-    const retentionMs = this.RETENTION_DAYS * 24 * 60 * 60 * 1000;
-    
-    for (const file of files) {
-      if (!file.startsWith('todo_app_backup_') || !file.endsWith('.db')) {
-        continue;
+    try {
+      const files = await fs.promises.readdir(this.backupDir);
+
+      // 筛选出备份文件
+      const backupFiles = files.filter(file => file.startsWith('backup_') && file.endsWith('.md'));
+
+      if (backupFiles.length <= 1) {
+        return; // 只有一个或没有备份文件，不需要清理
       }
-      
-      const filepath = path.join(this.backupDir, file);
-      const stats = await fs.promises.stat(filepath);
-      
-      // 删除超过7天的备份
-      if (now - stats.mtimeMs > retentionMs) {
+
+      // 按文件名排序（文件名包含时间戳）
+      backupFiles.sort().reverse();
+
+      // 删除除最新文件外的所有文件
+      for (let i = 1; i < backupFiles.length; i++) {
+        const filepath = path.join(this.backupDir, backupFiles[i]);
         await fs.promises.unlink(filepath);
-        console.log(`Deleted old backup: ${file}`);
+        console.log(`[BackupManager] 🗑️ Deleted old backup: ${backupFiles[i]}`);
       }
+    } catch (error) {
+      console.error('[BackupManager] ❌ Error cleaning old backups:', error);
+      // 不抛出异常，避免影响备份功能
     }
   }
   
   // 获取所有备份列表
   public async listBackups(): Promise<BackupInfo[]> {
-    const files = await fs.promises.readdir(this.backupDir);
-    const backups: BackupInfo[] = [];
-    
-    for (const file of files) {
-      if (!file.startsWith('todo_app_backup_') || !file.endsWith('.db')) {
-        continue;
+    try {
+      const files = await fs.promises.readdir(this.backupDir);
+      const backups: BackupInfo[] = [];
+
+      for (const file of files) {
+        if (!file.startsWith('backup_') || !file.endsWith('.md')) {
+          continue;
+        }
+
+        const filepath = path.join(this.backupDir, file);
+        const stats = await fs.promises.stat(filepath);
+
+        // 从文件名解析时间戳：backup_[timestamp].md
+        const match = file.match(/backup_(\d+)\.md/);
+        let timestamp: number;
+        let createdAt: string;
+
+        if (match) {
+          timestamp = parseInt(match[1]);
+          createdAt = new Date(timestamp).toISOString();
+        } else {
+          // 解析失败，使用文件的修改时间
+          timestamp = stats.mtimeMs;
+          createdAt = stats.mtime.toISOString();
+          console.warn(`[BackupManager] ⚠️ Cannot parse timestamp from filename: ${file}`);
+        }
+
+        backups.push({
+          filename: file,
+          filepath,
+          timestamp,
+          size: stats.size,
+          createdAt
+        });
       }
-      
-      const filepath = path.join(this.backupDir, file);
-      const stats = await fs.promises.stat(filepath);
-      
-      // 从文件名解析真实的创建时间
-      // 文件名格式: todo_app_backup_YYYYMMDD_HHMMSS.db
-      let timestamp: number;
-      let createdAt: string;
-      
-      const match = file.match(/todo_app_backup_(\d{8})_(\d{6})\.db/);
-      if (match) {
-        // 成功从文件名解析时间
-        const dateStr = match[1]; // YYYYMMDD
-        const timeStr = match[2]; // HHMMSS
-        
-        const year = parseInt(dateStr.substr(0, 4));
-        const month = parseInt(dateStr.substr(4, 2)) - 1; // 月份从0开始
-        const day = parseInt(dateStr.substr(6, 2));
-        const hour = parseInt(timeStr.substr(0, 2));
-        const minute = parseInt(timeStr.substr(2, 2));
-        const second = parseInt(timeStr.substr(4, 2));
-        
-        const createdTime = new Date(year, month, day, hour, minute, second);
-        timestamp = createdTime.getTime();
-        createdAt = createdTime.toISOString();
-      } else {
-        // 解析失败，使用文件的 birthtime（创建时间），如果不可用则使用 mtime
-        timestamp = stats.birthtimeMs || stats.mtimeMs;
-        createdAt = new Date(stats.birthtime || stats.mtime).toISOString();
-        console.warn(`无法从文件名解析时间: ${file}，使用文件系统时间`);
-      }
-      
-      backups.push({
-        filename: file,
-        filepath,
-        timestamp,
-        size: stats.size,
-        createdAt
-      });
+
+      // 按时间降序排序
+      return backups.sort((a, b) => b.timestamp - a.timestamp);
+    } catch (error) {
+      console.error('[BackupManager] ❌ Error listing backups:', error);
+      return [];
     }
-    
-    // 按时间降序排序
-    return backups.sort((a, b) => b.timestamp - a.timestamp);
   }
   
   // 启动自动备份
   public startAutoBackup(): void {
+    console.log('[BackupManager] 🚀 Starting auto backup (interval: 6 hours)');
+
     // 检查是否需要立即备份
     this.checkAndBackup();
-    
+
     // 设置定时器
     this.backupInterval = setInterval(() => {
       this.checkAndBackup();
     }, this.BACKUP_INTERVAL);
   }
-  
+
   // 停止自动备份
   public stopAutoBackup(): void {
     if (this.backupInterval) {
       clearInterval(this.backupInterval);
       this.backupInterval = null;
+      console.log('[BackupManager] 🛑 Auto backup stopped');
     }
   }
-  
+
   // 检查并执行备份
   private async checkAndBackup(): Promise<void> {
     try {
       const backups = await this.listBackups();
       const now = Date.now();
-      
-      // 如果没有备份，或最后一次备份超过24小时，则执行备份
-      if (backups.length === 0 || now - backups[0].timestamp > this.BACKUP_INTERVAL) {
+
+      // 如果没有备份，或最后一次备份超过6小时，则执行备份
+      if (backups.length === 0 || !this.lastBackupTime || (now - this.lastBackupTime.getTime()) > this.BACKUP_INTERVAL) {
         const backup = await this.createBackup();
-        console.log(`Backup created: ${backup.filename}`);
+        console.log(`[BackupManager] ✅ Scheduled backup created: ${backup.filename}`);
+      } else {
+        console.log(`[BackupManager] ⏰ Backup check skipped, last backup was ${Math.round((now - this.lastBackupTime!.getTime()) / 1000 / 60)} minutes ago`);
       }
     } catch (error) {
-      console.error('Backup failed:', error);
+      console.error('[BackupManager] ❌ Auto backup check failed:', error);
+      // 静默失败，不影响主功能
     }
   }
-  
-  // 格式化日期为文件名
-  private formatDate(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
+
+  // 获取备份状态
+  public async getBackupStatus(): Promise<{
+    lastBackupTime: string;
+    nextBackupTime: string;
+    backupEnabled: boolean;
+  }> {
+    const lastBackupTime = this.lastBackupTime ? this.lastBackupTime.toISOString() : '';
+    const nextBackupTime = this.lastBackupTime
+      ? new Date(this.lastBackupTime.getTime() + this.BACKUP_INTERVAL).toISOString()
+      : '';
+
+    return {
+      lastBackupTime,
+      nextBackupTime,
+      backupEnabled: this.backupInterval !== null
+    };
   }
   
-  // 恢复备份（可选功能）
-  public async restoreBackup(backupPath: string): Promise<void> {
-    // 1. 备份当前数据库（以防恢复失败）
-    const tempBackup = path.join(this.backupDir, `temp_before_restore_${Date.now()}.db`);
-    await fs.promises.copyFile(this.sourceDbPath, tempBackup);
-    
-    try {
-      // 2. 覆盖当前数据库
-      await fs.promises.copyFile(backupPath, this.sourceDbPath);
-      
-      // 3. 删除临时备份
-      await fs.promises.unlink(tempBackup);
-    } catch (error) {
-      // 恢复失败，回滚
-      await fs.promises.copyFile(tempBackup, this.sourceDbPath);
-      await fs.promises.unlink(tempBackup);
-      throw error;
-    }
-  }
 }
 

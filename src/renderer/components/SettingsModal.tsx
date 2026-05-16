@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert, Tooltip, Collapse, Descriptions, Progress, Result, message, Spin } from 'antd';
-import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, ExportOutlined, LinkOutlined, BgColorsOutlined, CloudUploadOutlined, LockOutlined, SwapOutlined, FileTextOutlined, ToolOutlined } from '@ant-design/icons';
+import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert, Tooltip, Collapse, Descriptions, Progress, Result, message, Spin, List } from 'antd';
+import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, LinkOutlined, BgColorsOutlined, LockOutlined, SwapOutlined, FileTextOutlined, ToolOutlined, PlusOutlined } from '@ant-design/icons';
 import { App } from 'antd';
 import { Todo, CustomTab } from '../../shared/types';
 import { ColorTheme } from '../theme/themes';
@@ -75,11 +75,15 @@ interface SettingsModalProps {
 
 // 存储管理组件
 const StorageManagement: React.FC = () => {
+  const { modal } = App.useApp();
   const [storagePath, setStoragePath] = useState<string>('');
+  const [recentDatabases, setRecentDatabases] = useState<any[]>([]);
   const [showMarkdownBrowser, setShowMarkdownBrowser] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadStorageInfo();
+    loadRecentDatabases();
   }, []);
 
   const loadStorageInfo = async () => {
@@ -88,6 +92,17 @@ const StorageManagement: React.FC = () => {
       setStoragePath(info.path || '');
     } catch (error) {
       console.error('Error loading storage info:', error);
+    }
+  };
+
+  const loadRecentDatabases = async () => {
+    try {
+      const result = await window.electronAPI.storageLocation.getRecentDatabases();
+      if (result.success && result.databases) {
+        setRecentDatabases(result.databases);
+      }
+    } catch (error) {
+      console.error('Error loading recent databases:', error);
     }
   };
 
@@ -132,11 +147,79 @@ const StorageManagement: React.FC = () => {
     }
   };
 
+  const handleSwitchDatabase = async (dbPath: string) => {
+    console.log('[StorageManagement] Attempting to switch database:', dbPath);
+
+    modal.confirm({
+      title: '切换数据库？',
+      content: '切换数据库将重新加载应用，未保存的更改将会丢失。',
+      onOk: async () => {
+        setLoading(true);
+        try {
+          console.log('[StorageManagement] Calling switchDatabase API...');
+          const result = await window.electronAPI.storageLocation.switchDatabase(dbPath);
+          console.log('[StorageManagement] Switch result:', result);
+
+          if (result.success) {
+            message.success('数据库切换成功，正在重新加载...');
+            setTimeout(() => {
+              location.reload();
+            }, 1000);
+          } else {
+            message.error(result.error || '切换失败');
+          }
+        } catch (error) {
+          console.error('[StorageManagement] Switch error:', error);
+          message.error(`切换失败: ${error instanceof Error ? error.message : '未知错误'}`);
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
+  };
+
+  const handleAddNewDatabase = async () => {
+    try {
+      const folderPath = await window.electronAPI.storageLocation.selectFolder();
+      if (folderPath) {
+        setLoading(true);
+
+        // 验证数据库
+        const validation = await window.electronAPI.storageLocation.validateDatabase(folderPath);
+
+        if (!validation.valid) {
+          modal.confirm({
+            title: '初始化新数据库？',
+            content: `选择的文件夹似乎不是有效的数据库，是否要初始化为新数据库？`,
+            onOk: async () => {
+              const initResult = await window.electronAPI.storageLocation.initializeDatabase(folderPath);
+              if (initResult.success) {
+                message.success('数据库初始化成功');
+                await handleSwitchDatabase(folderPath);
+              } else {
+                message.error(initResult.error || '初始化失败');
+                setLoading(false);
+              }
+            },
+            onCancel: () => {
+              setLoading(false);
+            }
+          });
+        } else {
+          await handleSwitchDatabase(folderPath);
+        }
+      }
+    } catch (error) {
+      message.error('添加数据库失败');
+      setLoading(false);
+    }
+  };
+
   return (
     <div>
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {/* Markdown存储位置管理 */}
-        <Card title={<><FolderOpenOutlined /> Markdown存储位置</>}>
+        <Card title={<><FolderOpenOutlined /> 当前数据库</>}>
           <Space direction="vertical" size="middle" style={{ width: '100%' }}>
             <div>
               <Text type="secondary">当前存储位置：</Text>
@@ -161,6 +244,55 @@ const StorageManagement: React.FC = () => {
                 浏览和导入MD文件
               </Button>
             </Space>
+          </Space>
+        </Card>
+
+        {/* 最近使用的数据库 */}
+        <Card title={<><DatabaseOutlined /> 最近使用的数据库</>}>
+          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleAddNewDatabase}
+              loading={loading}
+            >
+              添加新数据库
+            </Button>
+
+            <List
+              dataSource={recentDatabases}
+              renderItem={(db: any) => (
+                <List.Item
+                  actions={[
+                    <Button
+                      type="link"
+                      onClick={() => handleSwitchDatabase(db.path)}
+                      disabled={db.path === storagePath}
+                    >
+                      切换
+                    </Button>
+                  ]}
+                >
+                  <List.Item.Meta
+                    avatar={db.isValid ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> : <CloseCircleOutlined style={{ color: '#ff4d4f' }} />}
+                    title={db.name}
+                    description={
+                      <Space direction="vertical" size="small">
+                        <Text type="secondary" style={{ fontSize: '12px' }}>
+                          {db.path}
+                        </Text>
+                        <Space>
+                          <Tag color="blue">{db.todoCount} 待办</Tag>
+                          <Text type="secondary" style={{ fontSize: '12px' }}>
+                            最后使用: {new Date(db.lastUsed).toLocaleString()}
+                          </Text>
+                        </Space>
+                      </Space>
+                    }
+                  />
+                </List.Item>
+              )}
+            />
           </Space>
         </Card>
 
@@ -196,7 +328,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [form] = Form.useForm();
   const [activeTab, setActiveTab] = useState('general');
   const [loading, setLoading] = useState(false);
-  const [importExportLoading, setImportExportLoading] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -217,58 +348,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const handleExportData = async () => {
-    try {
-      setImportExportLoading(true);
-      const result = await window.electronAPI.todo.exportAll();
-      if (result.success && result.data) {
-        // 创建并下载文件
-        const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `todos-export-${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        message.success('数据导出成功');
-      } else {
-        message.error('导出失败');
-      }
-    } catch (error) {
-      console.error('Export failed:', error);
-      message.error('导出失败');
-    } finally {
-      setImportExportLoading(false);
-    }
-  };
-
-  const handleImportData = async () => {
-    try {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '.json';
-      input.onchange = async (e) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
-        if (file) {
-          const text = await file.text();
-          const data = JSON.parse(text);
-          const result = await window.electronAPI.todo.importAll(data);
-          if (result.success) {
-            message.success('数据导入成功，正在重新加载...');
-            if (onReload) {
-              await onReload();
-            }
-          } else {
-            message.error('导入失败');
-          }
-        }
-      };
-      input.click();
-    } catch (error) {
-      console.error('Import failed:', error);
-      message.error('导入失败');
-    }
-  };
 
   const tabItems = [
     {
@@ -315,26 +394,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   />
                 </div>
               </div>
-            </Space>
-          </Card>
-
-          <Card title={<><ExportOutlined /> 数据管理</>}>
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Button
-                type="primary"
-                icon={<ExportOutlined />}
-                onClick={handleExportData}
-                loading={importExportLoading}
-              >
-                导出所有数据
-              </Button>
-              <Button
-                icon={<CloudUploadOutlined />}
-                onClick={handleImportData}
-                loading={importExportLoading}
-              >
-                导入数据
-              </Button>
             </Space>
           </Card>
         </Space>
