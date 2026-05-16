@@ -1,5 +1,4 @@
 import { Todo, TodoRelation } from '../../shared/types';
-import { toNumberId, toStringId } from '../../shared/utils/typeUtils';
 import React, { useState, useCallback, memo } from 'react';
 import { Card, Tag, Button, Space, Popconfirm, Select, Typography, Tooltip, InputNumber, App } from 'antd';
 import { EditOutlined, DeleteOutlined, LinkOutlined, EyeOutlined, EyeInvisibleOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
@@ -23,11 +22,11 @@ interface TodoCardProps {
   sortOption?: SortOption;
   activeTab: string;
   onEdit: (todo: Todo) => void;
-  onDelete: (id: number) => void;
-  onStatusChange: (id: number, updates: Partial<Todo>) => void;
+  onDelete: (id: string) => void;
+  onStatusChange: (id: string, updates: Partial<Todo>) => void;
   onView: (todo: Todo) => void;
   onShowRelations: (todo: Todo) => void;
-  onUpdateDisplayOrder?: (id: number, tabKey: string, order: number | null) => Promise<void>;
+  onUpdateDisplayOrder?: (id: string, tabKey: string, order: number | null) => Promise<void>;
   onNavigateToFlowchart?: (flowchartId: string, nodeId: string) => void;
   associationsByTodo: Map<string, any[]>;
   parallelRelationsByTodo: Map<string, TodoRelation[]>;
@@ -127,7 +126,7 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
 
   const handleStatusChange = useCallback((newStatus: string) => {
     const updates: Partial<Todo> = { status: newStatus as Todo['status'] };
-    onStatusChange(toNumberId(todo.id!), updates);
+    onStatusChange(todo.id, updates);
   }, [onStatusChange, todo.id]);
 
   const handleCopy = useCallback(async () => {
@@ -148,7 +147,7 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
     
     setSavingOrder(true);
     try {
-      await onUpdateDisplayOrder(toNumberId(todo.id!), activeTab, editingOrder);
+      await onUpdateDisplayOrder(todo.id, activeTab, editingOrder);
       setEditingOrder(null);
     } catch (error) {
       message.error('更新排序失败');
@@ -165,19 +164,19 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
   const currentDisplayOrder = editingOrder !== null ? editingOrder : (todo.displayOrders?.[activeTab]);
 
   // 计算并列关系
-  const parallelRelations = parallelRelationsByTodo.get(toStringId(todo.id!)) || [];
+  const parallelRelations = parallelRelationsByTodo.get(todo.id) || [];
   const hasParallel = parallelRelations.length > 0;
 
   // 计算分组信息 - 使用字符串键访问 parallelGroups
-  const parallelGroup = parallelGroups.get(toStringId(todo.id!));
+  const parallelGroup = parallelGroups.get(todo.id);
   const isInParallelGroup = parallelGroup && parallelGroup.size > 1;
   const isInGroup = isInParallelGroup &&
     (
-      (prevTodo && parallelGroup?.has(toStringId(prevTodo.id!))) ||
-      (nextTodo && parallelGroup?.has(toStringId(nextTodo.id!)))
+      (prevTodo && parallelGroup?.has(prevTodo.id)) ||
+      (nextTodo && parallelGroup?.has(nextTodo.id))
     );
-  const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(toStringId(prevTodo.id!)));
-  const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(toStringId(nextTodo.id!)));
+  const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(prevTodo.id));
+  const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(nextTodo.id));
 
   return (
     <div style={{
@@ -289,7 +288,7 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
                   {todo.title}
                 </Text>
                 <RelationIndicators
-                  todoId={toNumberId(todo.id!)}
+                  todoId={todo.id}
                   relations={relations}
                   allTodos={allTodos || []}
                   size="small"
@@ -298,8 +297,8 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
                 />
                 {onNavigateToFlowchart && (
                   <FlowchartIndicator
-                    todoId={toNumberId(todo.id!)}
-                    associations={associationsByTodo.get(toStringId(todo.id!)) || []}
+                    todoId={todo.id}
+                    associations={associationsByTodo.get(todo.id) || []}
                     onNavigate={onNavigateToFlowchart}
                     size="small"
                     showLabel={false}
@@ -349,7 +348,7 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
               </Tooltip>
               <Popconfirm
                 title="确定要删除吗？"
-                onConfirm={() => onDelete(toNumberId(todo.id!))}
+                onConfirm={() => onDelete(todo.id)}
                 okText="确定"
                 cancelText="取消"
               >

@@ -6,7 +6,7 @@ import { FlowchartAssociation } from '../../shared/types';
 const { Text } = Typography;
 
 interface FlowchartIndicatorProps {
-  todoId: number;
+  todoId: string;
   associations: FlowchartAssociation[];
   onNavigate: (flowchartId: string, nodeId: string) => void;
   size?: 'small' | 'default';

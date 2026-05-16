@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Modal, List, Card, Button, Space, Tag, Select, App, Typography, Segmented, Timeline } from 'antd';
 import { LinkOutlined, DeleteOutlined, PlusOutlined, ClockCircleOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { Todo, TodoRelation } from '../../shared/types';
-import { toNumberId } from '../../shared/utils/typeUtils';
 
 const { Option } = Select;
 const { Text } = Typography;
@@ -24,7 +23,7 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
 }) => {
   const { message } = App.useApp();
   const [relations, setRelations] = useState<TodoRelation[]>([]);
-  const [selectedTodoId, setSelectedTodoId] = useState<number | null>(null);
+  const [selectedTodoId, setSelectedTodoId] = useState<string | null>(null);
   const [newRelationType, setNewRelationType] = useState<'extends' | 'background' | 'parallel'>('background');
   const [viewMode, setViewMode] = useState<'timeline' | 'list'>('timeline');
 
@@ -36,9 +35,9 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
 
   const loadRelations = async () => {
     if (!todo?.id) return;
-    
+
     try {
-      const todoRelations = await window.electronAPI.relations.getByTodoId(toNumberId(todo.id));
+      const todoRelations = await window.electronAPI.relations.getByTodoId(todo.id);
       setRelations(todoRelations);
     } catch (error) {
       console.error('Error loading relations:', error);
@@ -59,8 +58,8 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
     }
 
     try {
-      let sourceId: number = toNumberId(todo.id);
-      let targetId: number = toNumberId(targetTodo.id);
+      let sourceId: string = todo.id;
+      let targetId: string = targetTodo.id;
       let relationType = newRelationType;
 
       // 处理关系方向和类型
@@ -68,20 +67,20 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
         // 当前todo extends targetTodo（子待办关系）
         // 含义：当前todo是targetTodo的子待办
         // 存储：source=当前todo, target=targetTodo, type='extends'
-        sourceId = toNumberId(todo.id!);
-        targetId = toNumberId(targetTodo.id!);
+        sourceId = todo.id;
+        targetId = targetTodo.id;
         relationType = 'extends';
       } else if (newRelationType === 'background') {
         // targetTodo background 当前todo（父待办关系）
         // 含义：targetTodo是当前todo的父待办
         // 存储：source=targetTodo, target=当前todo, type='background'
-        sourceId = toNumberId(targetTodo.id!);
-        targetId = toNumberId(todo.id!);
+        sourceId = targetTodo.id;
+        targetId = todo.id;
         relationType = 'background';
       } else if (newRelationType === 'parallel') {
         // 并列关系，保持原样（无方向性，双向查询时会自动匹配）
-        sourceId = toNumberId(todo.id!);
-        targetId = toNumberId(targetTodo.id!);
+        sourceId = todo.id;
+        targetId = targetTodo.id;
         relationType = 'parallel';
       }
 
@@ -112,7 +111,7 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
 
       // 乐观更新：先更新 UI，提升响应速度
       const tempRelation: TodoRelation = {
-        id: Date.now(), // 临时 ID
+        id: String(Date.now()), // 临时 ID (转换为字符串)
         source_id: sourceId,
         target_id: targetId,
         relation_type: relationType,
@@ -136,8 +135,8 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
           const targetTodoItem = todos.find(t => t.id === targetId);
           
           if (sourceTodo && targetTodoItem) {
-            // 使用较小的displayOrder，或者如果都没有则使用较小的ID
-            const syncOrder = sourceTodo.displayOrder ?? targetTodoItem.displayOrder ?? Math.min(sourceId, targetId);
+            // 使用较小的displayOrder，或者如果都没有则使用默认值0
+            const syncOrder = sourceTodo.displayOrder ?? targetTodoItem.displayOrder ?? 0;
             
             // 更新两个待办的displayOrder
             const updates: Promise<void>[] = [];
@@ -179,7 +178,7 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
     }
   };
 
-  const handleRemoveRelation = async (relationId: number) => {
+  const handleRemoveRelation = async (relationId: string) => {
     if (!relationId) return;
 
     try {
@@ -259,13 +258,13 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
   // 获取所有关联的待办（包括递归查找）
   const getAllRelatedTodos = (): { todo: Todo; relation: TodoRelation; displayType: 'background' | 'extends' | 'parallel' }[] => {
     const result: { todo: Todo; relation: TodoRelation; displayType: 'background' | 'extends' | 'parallel' }[] = [];
-    const visited = new Set<number>();
+    const visited = new Set<string>();
 
     relations.forEach(relation => {
       const { relatedTodo, displayType } = getDisplayRelation(relation);
-      if (relatedTodo && !visited.has(toNumberId(relatedTodo.id!))) {
+      if (relatedTodo && !visited.has(relatedTodo.id)) {
         result.push({ todo: relatedTodo, relation, displayType });
-        visited.add(toNumberId(relatedTodo.id!));
+        visited.add(relatedTodo.id);
       }
     });
 

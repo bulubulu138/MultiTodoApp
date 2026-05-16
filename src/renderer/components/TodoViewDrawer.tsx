@@ -1,8 +1,8 @@
 import { Todo, TodoRelation } from '../../shared/types';
 import { toNumberId } from '../../shared/utils/typeUtils';
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
-import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message, Image, Card, Empty, Spin, Tooltip, Progress, Alert } from 'antd';
-import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined, NodeIndexOutlined, FileTextOutlined, LinkOutlined, LoginOutlined, ReloadOutlined, SafetyOutlined, BulbOutlined } from '@ant-design/icons';
+import { Drawer, Descriptions, Tag, Space, Button, Typography, Divider, message, Image, Card, Empty, Spin, Tooltip, Progress, Alert, Modal } from 'antd';
+import { EditOutlined, ClockCircleOutlined, TagsOutlined, CopyOutlined, NodeIndexOutlined, FileTextOutlined, LinkOutlined, LoginOutlined, ReloadOutlined, SafetyOutlined, BulbOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import RelationContext from './RelationContext';
 import RelationsModal from './RelationsModal';
 import { copyTodoToClipboard } from '../utils/copyTodo';
@@ -10,6 +10,7 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import { useURLTitles } from '../hooks/useURLTitles';
 import { embedUrlTitleInContent } from '../utils/urlTitleStorage';
 import ReadOnlyMarkdown from './ReadOnlyMarkdown';
+import InlineEditPanel from './InlineEditPanel';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -36,6 +37,7 @@ interface TodoViewDrawerProps {
   onOpenFlowchart?: (flowchartId: string, nodeId?: string) => void; // 修改：nodeId改为可选
   onRelationsChange?: () => Promise<void>; // 新增
   onUpdateViewingTodo?: (todo: Todo) => void; // 新增
+  onTodoUpdate?: (id: string, updates: Partial<Todo>) => Promise<void>; // 新增：内联更新回调
 }
 
 const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
@@ -47,12 +49,20 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   onEdit,
   onOpenFlowchart, // 新增
   onRelationsChange, // 新增
-  onUpdateViewingTodo // 新增
+  onUpdateViewingTodo, // 新增
+  onTodoUpdate // 新增：内联更新回调
 }) => {
   const colors = useThemeColors();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState('');
   const [showRelationsModal, setShowRelationsModal] = useState(false); // 新增
+
+  // 🔧 新增：编辑模式下未保存状态追踪
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // 新增：编辑模式状态管理
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // 批量授权进度状态
   const [batchAuthProgress, setBatchAuthProgress] = useState<BatchAuthorizationProgress | null>(null);
@@ -237,6 +247,121 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
     setShowRelationsModal(true);
   }, [todo]);
 
+  // 新增：内联编辑模式处理函数
+  const handleToggleEditMode = useCallback(() => {
+    setIsEditMode(!isEditMode);
+  }, [isEditMode]);
+
+  // 新增：处理内联更新
+  const handleInlineUpdate = useCallback(async (updates: Partial<Todo>) => {
+    if (!todo || !onTodoUpdate) return;
+
+    console.log('[TodoViewDrawer] handleInlineUpdate: Starting update', {
+      todoId: todo.id,
+      updates,
+      currentTitle: todo.title
+    });
+
+    try {
+      setIsSaving(true);
+
+      // 🔧 修复：先调用App的handleInlineUpdate，它负责后端保存和状态管理
+      await onTodoUpdate(todo.id, updates);
+
+      // 🔧 修复：不再需要在这里调用onUpdateViewingTodo，因为App的handleInlineUpdate已经处理了
+      // 这样避免了使用可能过期的todo props
+
+      console.log('[TodoViewDrawer] handleInlineUpdate: Update completed successfully');
+    } catch (error) {
+      console.error('[TodoViewDrawer] handleInlineUpdate: Update failed', {
+        todoId: todo.id,
+        updates,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    } finally {
+      setIsSaving(false);
+    }
+  }, [todo, onTodoUpdate]);
+
+  // 新增：退出编辑模式
+  const handleExitEditMode = useCallback(() => {
+    // 🔧 优化：添加未保存确认
+    if (hasUnsavedChanges) {
+      Modal.confirm({
+        title: '确认退出编辑？',
+        icon: <ExclamationCircleOutlined />,
+        content: '您有未保存的更改，退出将丢失这些修改。是否确认退出？',
+        okText: '确认退出',
+        cancelText: '继续编辑',
+        okType: 'danger',
+        onOk: () => {
+          console.log('[TodoViewDrawer] User confirmed exit with unsaved changes');
+          setIsEditMode(false);
+          setHasUnsavedChanges(false);
+        }
+      });
+    } else {
+      console.log('[TodoViewDrawer] Exiting edit mode (no unsaved changes)');
+      setIsEditMode(false);
+    }
+  }, [hasUnsavedChanges]);
+
+  // 新增：取消编辑
+  const handleCancelEdit = useCallback(() => {
+    if (hasUnsavedChanges) {
+      Modal.confirm({
+        title: '确认取消编辑？',
+        icon: <ExclamationCircleOutlined />,
+        content: '您有未保存的更改，取消将丢失这些修改。是否确认取消？',
+        okText: '确认取消',
+        cancelText: '继续编辑',
+        okType: 'danger',
+        onOk: () => {
+          console.log('[TodoViewDrawer] User confirmed cancel with unsaved changes');
+          setIsEditMode(false);
+          setHasUnsavedChanges(false);
+        }
+      });
+    } else {
+      console.log('[TodoViewDrawer] Canceling edit mode (no unsaved changes)');
+      setIsEditMode(false);
+    }
+  }, [hasUnsavedChanges]);
+
+  // 🔧 新增：处理未保存状态变化
+  const handleUnsavedChange = useCallback((hasChanges: boolean) => {
+    console.log('[TodoViewDrawer] Unsaved change status updated:', hasChanges);
+    setHasUnsavedChanges(hasChanges);
+  }, []);
+
+  // 🔧 新增：安全关闭详情页（检查未保存状态）
+  const handleSafeClose = useCallback(() => {
+    if (isEditMode && hasUnsavedChanges) {
+      Modal.confirm({
+        title: '确认关闭？',
+        icon: <ExclamationCircleOutlined />,
+        content: '您正在编辑模式且有未保存的更改，关闭将丢失这些修改。是否确认关闭？',
+        okText: '确认关闭',
+        cancelText: '继续编辑',
+        okType: 'danger',
+        onOk: () => {
+          console.log('[TodoViewDrawer] User confirmed close with unsaved changes in edit mode');
+          setIsEditMode(false);
+          setHasUnsavedChanges(false);
+          onClose();
+        }
+      });
+    } else {
+      console.log('[TodoViewDrawer] Safe close (no unsaved changes or not in edit mode)');
+      if (isEditMode) {
+        setIsEditMode(false);
+        setHasUnsavedChanges(false);
+      }
+      onClose();
+    }
+  }, [isEditMode, hasUnsavedChanges, onClose]);
+
   // 新增：处理抽屉关闭时重置模态框状态
   useEffect(() => {
     if (!visible) {
@@ -302,7 +427,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
           });
 
           // Update the todo with the new content
-          await window.electronAPI.todo.update(toNumberId(todo.id), { content: updatedContent });
+          await window.electronAPI.todo.update(String(todo.id), { content: updatedContent });
 
           // 创建更新后的todo对象
           const syncedTodo = { ...todo, content: updatedContent };
@@ -597,7 +722,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
       }
       placement="right"
       width={showRelationContext ? 1200 : 800}
-      onClose={onClose}
+      onClose={handleSafeClose}
       open={visible}
       footer={
         <div style={{ textAlign: 'right' }}>
@@ -616,27 +741,37 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
               复制
             </Button>
             <Button onClick={onClose}>关闭</Button>
-            <Button 
-              type="primary" 
+            <Button
+              type="primary"
               icon={<EditOutlined />}
-              onClick={() => {
-                onClose();
-                onEdit(todo);
-              }}
+              onClick={isEditMode ? handleExitEditMode : handleToggleEditMode}
             >
-              编辑此待办
+              {isEditMode ? '退出编辑' : '编辑此待办'}
             </Button>
           </Space>
         </div>
       }
     >
-      <div style={{ display: 'flex', gap: 16 }}>
-        {/* 左侧：主要内容 */}
-        <div style={{ flex: showRelationContext ? 2 : 1 }}>
-          {/* 标题 */}
-          <Title level={3} style={{ marginTop: 0 }}>
-            {todo.title}
-          </Title>
+      {isEditMode ? (
+        // 编辑模式：显示InlineEditPanel
+        <InlineEditPanel
+          todo={todo}
+          allTodos={allTodos}
+          onUpdate={handleInlineUpdate}
+          onCancel={handleCancelEdit}
+          onExit={handleExitEditMode}
+          onUnsavedChange={handleUnsavedChange}
+          isSaving={isSaving}
+        />
+      ) : (
+        // 查看模式：显示原有内容
+        <div style={{ display: 'flex', gap: 16 }}>
+          {/* 左侧：主要内容 */}
+          <div style={{ flex: showRelationContext ? 2 : 1 }}>
+            {/* 标题 */}
+            <Title level={3} style={{ marginTop: 0 }}>
+              {todo.title}
+            </Title>
 
           {/* 基本信息 */}
           <Descriptions column={2} size="small" bordered style={{ marginBottom: 16 }}>
@@ -857,6 +992,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
           </div>
         )}
       </div>
+      )} {/* 结束编辑模式条件渲染 */}
       
       {/* 图片预览组件 - 带复制功能 */}
       <Image

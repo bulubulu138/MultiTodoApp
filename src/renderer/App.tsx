@@ -605,12 +605,12 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     }
   };
 
-  const handleUpdateTodo = async (id: number, updates: Partial<Todo>) => {
+  const handleUpdateTodo = async (id: string, updates: Partial<Todo>) => {
     PerformanceMonitor.start('save');
     let duration = 0;
 
     try {
-      await window.electronAPI.todo.update(id, updates);
+      await window.electronAPI.todo.update(String(id), updates);
       // 重新加载所有待办，确保数据一致性
       await loadTodos();
       setEditingTodo(null);
@@ -627,9 +627,115 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     }
   };
 
+  // 新增：内联编辑专用更新函数
+  const handleInlineUpdate = useCallback(async (id: string, updates: Partial<Todo>) => {
+    console.log('[App] handleInlineUpdate: Starting update', {
+      todoId: id,
+      updates,
+      currentViewingTodo: viewingTodo?.id
+    });
+
+    try {
+      // 调用后端API保存数据
+      await window.electronAPI.todo.update(String(id), updates);
+      console.log('[App] handleInlineUpdate: Backend API call successful');
+
+      // 🔧 修复：确保本地状态正确更新
+      setTodos(prev => {
+        const updated = prev.map(todo => {
+          if (todo.id === id) {
+            const updatedTodo = { ...todo, ...updates };
+            console.log('[App] handleInlineUpdate: Updating todo in list', {
+              todoId: id,
+              oldTitle: todo.title,
+              newTitle: updatedTodo.title
+            });
+            return updatedTodo;
+          }
+          return todo;
+        });
+
+        // 🔧 修复：同步更新viewingTodo（如果正在查看这个待办）
+        if (viewingTodo?.id === id) {
+          const updatedViewingTodo = { ...viewingTodo, ...updates };
+          console.log('[App] handleInlineUpdate: Updating viewingTodo', {
+            todoId: id,
+            oldTitle: viewingTodo.title,
+            newTitle: updatedViewingTodo.title
+          });
+          setViewingTodo(updatedViewingTodo);
+        }
+
+        return updated;
+      });
+
+      console.log('[App] handleInlineUpdate: All state updates completed');
+    } catch (error) {
+      console.error('[App] handleInlineUpdate: Update failed', {
+        todoId: id,
+        updates,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    }
+  }, [viewingTodo]);
+
+  // 🔧 新增：增量刷新机制 - 从文件系统重新加载单个待办
+  const handleRefreshTodo = useCallback(async (todoId: string) => {
+    try {
+      console.log('[App] handleRefreshTodo: Starting refresh', { todoId });
+
+      // 从文件系统获取最新数据
+      const latestTodo = await window.electronAPI.todo.getById(String(todoId));
+
+      if (!latestTodo) {
+        console.warn('[App] handleRefreshTodo: Todo not found', { todoId });
+        return false;
+      }
+
+      console.log('[App] handleRefreshTodo: Retrieved latest data', {
+        todoId,
+        title: latestTodo.title,
+        updatedAt: latestTodo.updatedAt
+      });
+
+      // 更新todos中的对应项
+      setTodos(prev => {
+        return prev.map(todo => {
+          if (todo.id === todoId) {
+            console.log('[App] handleRefreshTodo: Updating todo in list', {
+              todoId,
+              oldTitle: todo.title,
+              newTitle: latestTodo.title,
+              oldUpdatedAt: todo.updatedAt,
+              newUpdatedAt: latestTodo.updatedAt
+            });
+            return latestTodo;
+          }
+          return todo;
+        });
+      });
+
+      // 如果当前正在查看这个待办，也更新viewingTodo
+      if (viewingTodo?.id === todoId) {
+        console.log('[App] handleRefreshTodo: Updating viewingTodo');
+        setViewingTodo(latestTodo);
+      }
+
+      console.log('[App] handleRefreshTodo: Refresh completed successfully');
+      return true;
+    } catch (error) {
+      console.error('[App] handleRefreshTodo: Refresh failed', {
+        todoId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return false;
+    }
+  }, [viewingTodo]);
+
   // 专注模式专用：乐观更新（不刷新页面，保持滚动位置）
-  const handleUpdateTodoInPlace = useCallback(async (id: string | number, updates: Partial<Todo>) => {
-    const idString = toStringId(id);
+  const handleUpdateTodoInPlace = useCallback(async (id: string, updates: Partial<Todo>) => {
+    const idString = id;
     // 1. 标记为正在保存
     savingTodosRef.current.add(idString);
 
@@ -658,7 +764,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     // 3. 创建保存 Promise 并追踪
     const savePromise = (async () => {
       try {
-        await window.electronAPI.todo.update(id as number, updates);
+        await window.electronAPI.todo.update(String(id), updates);
         // 保存成功，移除追踪
         savingTodosRef.current.delete(idString);
         pendingSavesRef.current.delete(idString);
@@ -703,7 +809,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     }
   }, [message]);
 
-  const handleDeleteTodo = async (id: number) => {
+  const handleDeleteTodo = async (id: string) => {
     try {
       await window.electronAPI.todo.delete(id);
       setTodos(prev => prev.filter(todo => todo.id !== id));
@@ -776,10 +882,70 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     setQuickCreateContent(null); // 清空快速创建内容
   };
 
-  const handleViewTodo = (todo: Todo) => {
-    setViewingTodo(todo);
+  const handleViewTodo = useCallback((todo: Todo) => {
+    // 🔧 修复：从最新的todos列表中查找待办，确保数据同步
+    const latestTodo = todos.find(t => t.id === todo.id);
+
+    if (latestTodo) {
+      console.log('[App] handleViewTodo: Found latest todo from list', {
+        todoId: todo.id,
+        hasUpdate: JSON.stringify(latestTodo) !== JSON.stringify(todo),
+        latestTitle: latestTodo.title,
+        latestUpdatedAt: latestTodo.updatedAt
+      });
+      setViewingTodo(latestTodo);
+    } else {
+      // 如果找不到（可能被删除），使用传入的todo
+      console.warn('[App] handleViewTodo: Todo not found in latest list, using provided todo', {
+        todoId: todo.id
+      });
+      setViewingTodo(todo);
+    }
+
     setShowViewDrawer(true);
-  };
+  }, [todos]);
+
+  // 新增：详情页关闭处理函数
+  const handleCloseViewDrawer = useCallback(async () => {
+    console.log('[App] handleCloseViewDrawer: Closing drawer', {
+      currentViewingTodo: viewingTodo?.id
+    });
+
+    // 🔧 新增：增量刷新机制 - 关闭详情页时重新加载当前待办
+    if (viewingTodo) {
+      console.log('[App] handleCloseViewDrawer: Triggering incremental refresh');
+
+      // 从文件系统重新加载当前待办，确保显示最新数据
+      const refreshSuccess = await handleRefreshTodo(viewingTodo.id);
+
+      if (!refreshSuccess) {
+        console.warn('[App] handleCloseViewDrawer: Incremental refresh failed, falling back to data consistency check');
+
+        // 🔧 数据一致性检查：确保viewingTodo中的数据已经同步到todos列表
+        const todoInList = todos.find(t => t.id === viewingTodo.id);
+        if (todoInList) {
+          console.log('[App] handleCloseViewDrawer: Data consistency check', {
+            todoId: viewingTodo.id,
+            listTitle: todoInList.title,
+            viewingTitle: viewingTodo.title,
+            matches: todoInList.title === viewingTodo.title
+          });
+
+          // 如果不一致，使用todos列表中的最新数据
+          if (JSON.stringify(todoInList) !== JSON.stringify(viewingTodo)) {
+            console.warn('[App] handleCloseViewDrawer: Data inconsistency detected', {
+              todoId: viewingTodo.id,
+              listUpdatedAt: todoInList.updatedAt,
+              viewingUpdatedAt: viewingTodo.updatedAt
+            });
+          }
+        }
+      }
+    }
+
+    setShowViewDrawer(false);
+    setViewingTodo(null);
+  }, [viewingTodo, todos, handleRefreshTodo]);
 
   const handleEditFromView = (todo: Todo) => {
     setShowViewDrawer(false);
@@ -819,7 +985,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     updateCurrentTabSettings({ viewMode: mode });
   };
 
-  const handleUpdateDisplayOrder = async (id: number, tabKey: string, displayOrder: number | null) => {
+  const handleUpdateDisplayOrder = async (id: string, tabKey: string, displayOrder: number | null) => {
     try {
       // 读取当前 todo 的 displayOrders
       const todo = todos.find(t => t.id === id);
@@ -846,7 +1012,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   };
 
   // AI 建议处理函数
-  const handleGenerateSuggestion = async (todoId: number, templateId?: number) => {
+  const handleGenerateSuggestion = async (todoId: string, templateId?: number) => {
     try {
       console.log('[App] 开始生成AI建议, todoId:', todoId, 'templateId:', templateId);
 
@@ -892,7 +1058,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     }
   };
 
-  const handleSaveSuggestion = async (todoId: number, suggestion: string) => {
+  const handleSaveSuggestion = async (todoId: string, suggestion: string) => {
     try {
       const result = await window.electronAPI.aiSuggestion.save(todoId, suggestion);
       if (result.success) {
@@ -905,7 +1071,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     }
   };
 
-  const handleDeleteSuggestion = async (todoId: number) => {
+  const handleDeleteSuggestion = async (todoId: string) => {
     try {
       const result = await window.electronAPI.aiSuggestion.delete(todoId);
       if (result.success) {
@@ -993,11 +1159,11 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
           ? Math.min(...existingOrders)
           : Date.now();
 
-        // 批量更新 - 确保ID为数字类型以兼容API
+        // 批量更新 - 使用UUID字符串
         const updates = groupTodos
           .filter(t => t.displayOrder !== syncOrder)
           .map(t => ({
-            id: typeof t.id === 'number' ? t.id : parseInt(String(t.id!), 10),
+            uuid: String(t.id),
             displayOrder: syncOrder
           }));
 
@@ -1352,7 +1518,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
           quickCreateContent={quickCreateContent}
           onSubmit={editingTodo ?
             (data) => handleUpdateTodo(
-              typeof editingTodo.id === 'number' ? editingTodo.id : parseInt(String(editingTodo.id!), 10),
+              String(editingTodo.id),
               data
             ) :
             handleCreateTodo
@@ -1385,12 +1551,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         todo={viewingTodo}
         allTodos={todos}
         relations={relations}
-        onClose={() => {
-          setShowViewDrawer(false);
-          setViewingTodo(null);
-        }}
+        onClose={handleCloseViewDrawer}
         onEdit={handleEditFromView}
         onRelationsChange={loadRelations}
+        onTodoUpdate={handleInlineUpdate}
         onUpdateViewingTodo={handleUpdateViewingTodo}
       />
 

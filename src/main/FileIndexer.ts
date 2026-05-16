@@ -202,15 +202,15 @@ export class FileIndexer {
       console.log(`[FileIndexer] 🔄 Recovery completed: ${successCount} total, ${failCount} failed`);
     }
 
-    // 更新元数据
+    // 更新元数据（确保准确反映实际索引的数量）
     this.index.metadata.lastUpdated = Date.now();
     this.index.metadata.todoCount = this.index.todos.size;
 
     // 保存索引
     await this.saveIndex();
 
-    console.log(`[FileIndexer] 📊 Index build complete: ${successCount} success, ${failCount} failed, ${this.index.metadata.todoCount} total in index`);
-    console.log(`[FileIndexer] ✅ Index built successfully with ${this.index.metadata.todoCount} todos`);
+    console.log(`[FileIndexer] 📊 Index build complete: ${successCount} success, ${failCount} failed`);
+    console.log(`[FileIndexer] ✅ Total indexed todos: ${this.index.metadata.todoCount}`);
   }
 
   /**
@@ -239,8 +239,48 @@ export class FileIndexer {
   /**
    * 更新待办索引
    */
-  updateTodo(todo: Todo): Promise<void> {
-    return this.addTodo(todo);
+  async updateTodo(todo: Todo): Promise<void> {
+    const uuid = String(todo.id);
+
+    console.log(`[FileIndexer] 🔄 Updating index for todo: ${uuid}`);
+
+    // 先删除旧的索引条目（解决MiniSearch重复ID问题）
+    this.removeTodoSilently(uuid);
+
+    // 再添加新的索引条目
+    await this.addTodo(todo);
+
+    console.log(`[FileIndexer] ✅ Successfully updated index for todo: ${uuid}`);
+  }
+
+  /**
+   * 静默删除待办（不抛出异常）
+   */
+  private removeTodoSilently(uuid: string): void {
+    try {
+      const entry = this.index.todos.get(uuid);
+      if (!entry) return;
+
+      // 从主索引中删除
+      this.index.todos.delete(uuid);
+
+      // 从辅助索引中删除
+      this.removeFromIndexes(uuid, entry);
+
+      // 从全文搜索中删除
+      try {
+        this.index.fullText.remove({ id: uuid });
+      } catch (error) {
+        // MiniSearch.remove() 可能因为ID不存在而抛出异常，忽略
+        console.debug(`[FileIndexer] ID ${uuid} not found in MiniSearch, skipping removal`);
+      }
+
+      // 更新元数据
+      this.index.metadata.todoCount = this.index.todos.size;
+    } catch (error) {
+      console.warn(`[FileIndexer] Silent removal failed for ${uuid}:`, error);
+      // 静默处理，不抛出异常
+    }
   }
 
   /**

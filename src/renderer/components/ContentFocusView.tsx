@@ -1,5 +1,4 @@
 import { Todo, TodoRelation, PromptTemplate } from '../../shared/types';
-import { toNumberId, toStringId } from '../../shared/utils/typeUtils';
 import React, { useState, useMemo, useCallback, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { Divider, Button, Checkbox, Space, Spin, Empty, App, Input, InputNumber, Tag, Tooltip } from 'antd';
 import { SaveOutlined, EyeOutlined, CheckCircleOutlined } from '@ant-design/icons';
@@ -12,17 +11,17 @@ import { ColorTheme } from '../theme/themes';
 interface ContentFocusViewProps {
   todos: Todo[];
   allTodos?: Todo[];
-  onUpdate: (id: number, updates: Partial<Todo>) => void;
+  onUpdate: (id: string, updates: Partial<Todo>) => void;
   onView: (todo: Todo) => void;
   loading: boolean;
   activeTab: string;
   relations: TodoRelation[];
-  onUpdateDisplayOrder: (todoId: number, tabKey: string, displayOrder: number) => Promise<void>;
+  onUpdateDisplayOrder: (todoId: string, tabKey: string, displayOrder: number) => Promise<void>;
   colorTheme?: ColorTheme;
   promptTemplates?: PromptTemplate[];
-  onGenerateSuggestion?: (todoId: number, templateId?: number) => Promise<{ success: boolean; suggestion?: string; error?: string }>;
-  onSaveSuggestion?: (todoId: number, suggestion: string) => Promise<{ success: boolean; error?: string }>;
-  onDeleteSuggestion?: (todoId: number) => Promise<{ success: boolean; error?: string }>;
+  onGenerateSuggestion?: (todoId: string, templateId?: number) => Promise<{ success: boolean; suggestion?: string; error?: string }>;
+  onSaveSuggestion?: (todoId: string, suggestion: string) => Promise<{ success: boolean; error?: string }>;
+  onDeleteSuggestion?: (todoId: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 // 暴露给父组件的方法
@@ -40,7 +39,7 @@ export interface EditorLifecycleManager {
 // 单个待办项组件接口
 interface ContentFocusItemProps {
   todo: Todo;
-  onUpdate: (id: number, updates: Partial<Todo>) => void;
+  onUpdate: (id: string, updates: Partial<Todo>) => void;
   onView: (todo: Todo) => void;
   isLast: boolean;
   activeTab: string;
@@ -49,8 +48,8 @@ interface ContentFocusItemProps {
   parallelGroup?: Set<string>;
   prevTodo: Todo | null;
   nextTodo: Todo | null;
-  onUpdateDisplayOrder: (todoId: number, tabKey: string, displayOrder: number) => Promise<void>;
-  onSelectedTodoChange?: (todoId: number | null) => void; // 新增：选中待办变更回调
+  onUpdateDisplayOrder: (todoId: string, tabKey: string, displayOrder: number) => Promise<void>;
+  onSelectedTodoChange?: (todoId: string | null) => void; // 新增：选中待办变更回调
 }
 
 // 暴露给父组件的方法
@@ -91,7 +90,7 @@ const ContentFocusItem = React.memo(
 
     const lastSavedContentRef = useRef(todo.content);
     const lastSavedTitleRef = useRef(todo.title);
-    const currentProcessingTodoRef = useRef<number | null>(null); // 追踪当前正在处理的todoId
+    const currentProcessingTodoRef = useRef<string | null>(null); // 追踪当前正在处理的todoId
 
     // 用于存储最新的值，避免组件卸载时的闭包陷阱
     const latestTitleRef = useRef(editedTitle);
@@ -154,7 +153,7 @@ const ContentFocusItem = React.memo(
 
       setIsSaving(true);
       try {
-        await onUpdate(toNumberId(todo.id), { content: latestContent });
+        await onUpdate(todo.id, { content: latestContent });
         // 更新最后保存的内容引用
         lastSavedContentRef.current = latestContent;
         setEditedContent(latestContent);
@@ -192,7 +191,7 @@ const ContentFocusItem = React.memo(
         if (newTitle !== lastSavedTitleRef.current && newTitle.trim() && todo.id) {
           setIsSavingTitle(true);
           try {
-            await onUpdate(toNumberId(todo.id), { title: newTitle.trim() });
+            await onUpdate(todo.id, { title: newTitle.trim() });
             lastSavedTitleRef.current = newTitle.trim();
             setEditedTitle(newTitle.trim());
           } catch (error) {
@@ -217,7 +216,7 @@ const ContentFocusItem = React.memo(
       const trimmedTitle = editedTitle.trim();
       if (trimmedTitle !== lastSavedTitleRef.current && trimmedTitle && todo.id) {
         try {
-          await onUpdate(toNumberId(todo.id), { title: trimmedTitle });
+          await onUpdate(todo.id, { title: trimmedTitle });
           lastSavedTitleRef.current = trimmedTitle;
           setEditedTitle(trimmedTitle);
         } catch {
@@ -324,13 +323,13 @@ const ContentFocusItem = React.memo(
         const currentContent = editorRef.current?.getLatestHtml() ?? lastSavedContentRef.current;
         const currentTodoId = latestTodoIdRef.current;
         if (currentContent !== lastSavedContentRef.current && currentTodoId) {
-          onUpdate(toNumberId(currentTodoId), { content: currentContent });
+          onUpdate(currentTodoId, { content: currentContent });
         }
 
         // 保存标题（同步，不等待）
         const currentTitle = latestTitleRef.current.trim();
         if (currentTitle !== lastSavedTitleRef.current && currentTitle && currentTodoId) {
-          onUpdate(toNumberId(currentTodoId), { title: currentTitle });
+          onUpdate(currentTodoId, { title: currentTitle });
         }
       };
     }, [todo.id]); // 添加todo.id依赖以确保正确的标识
@@ -346,7 +345,7 @@ const ContentFocusItem = React.memo(
       };
       
       try {
-        await onUpdate(toNumberId(todo.id), updates);
+        await onUpdate(todo.id, updates);
         message.success(checked ? '已标记为完成' : '已标记为待办');
       } catch (error) {
         message.error('更新状态失败');
@@ -388,7 +387,7 @@ const ContentFocusItem = React.memo(
         });
         
         // 3. 递归式冲突解决：收集所有需要调整的待办
-        const adjustments: Array<{id: number; oldOrder: number; newOrder: number}> = [];
+        const adjustments: Array<{id: string; oldOrder: number; newOrder: number}> = [];
         
         const resolveConflict = (targetOrder: number): void => {
           const conflictTodo = orderToTodoMap.get(targetOrder);
@@ -406,7 +405,7 @@ const ContentFocusItem = React.memo(
           
           // 记录这个待办需要被移动
           adjustments.push({
-            id: toNumberId(conflictTodo.id!),
+            id: conflictTodo.id,
             oldOrder: targetOrder,
             newOrder: nextOrder
           });
@@ -422,7 +421,7 @@ const ContentFocusItem = React.memo(
         // 4. 批量更新需要调整的待办
         if (adjustments.length > 0) {
           const updates = adjustments.map(adj => ({
-            id: adj.id,
+            uuid: String(adj.id),
             tabKey: activeTab,
             displayOrder: adj.newOrder
           }));
@@ -434,9 +433,9 @@ const ContentFocusItem = React.memo(
         // 5. 检查是否是并列分组，如果是则同步整组
         if (parallelGroup && parallelGroup.size > 1) {
           const groupUpdates = Array.from(parallelGroup)
-            .filter(id => id !== toStringId(todo.id!))
+            .filter(id => id !== todo.id)
             .map(id => ({
-              id: parseInt(id, 10), // 确保数字类型
+              uuid: String(id),
               tabKey: activeTab,
               displayOrder: newOrder
             }));
@@ -447,7 +446,7 @@ const ContentFocusItem = React.memo(
         }
         
         // 6. 设置当前待办的序号
-        await onUpdateDisplayOrder(toNumberId(todo.id), activeTab, newOrder);
+        await onUpdateDisplayOrder(todo.id, activeTab, newOrder);
         
         // 清除编辑状态
         setEditingOrder(undefined);
@@ -536,7 +535,7 @@ const ContentFocusItem = React.memo(
       console.log('[EditorActivate] 激活编辑器，todoId:', todo.id);
 
       // 更新待办选择状态（这会触发 AI 建议面板的更新）
-      onSelectedTodoChange(toNumberId(todo.id));
+      onSelectedTodoChange(todo.id);
     }, [todo.id, onSelectedTodoChange]);
 
     // 保留原有函数名以兼容可能的引用（内部实现改为调用新函数）
@@ -599,11 +598,11 @@ const ContentFocusItem = React.memo(
     // 计算分组边界和并列关系
     const isInParallelGroup = parallelGroup && parallelGroup.size > 1;
     const isInGroup = isInParallelGroup && (
-      (prevTodo && parallelGroup?.has(toStringId(prevTodo.id!))) ||
-      (nextTodo && parallelGroup?.has(toStringId(nextTodo.id!)))
+      (prevTodo && parallelGroup?.has(prevTodo.id)) ||
+      (nextTodo && parallelGroup?.has(nextTodo.id))
     );
-    const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(toStringId(prevTodo.id!)));
-    const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(toStringId(nextTodo.id!)));
+    const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(prevTodo.id));
+    const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(nextTodo.id));
     
     // 检查是否有并列关系
     const hasParallel = relations.some(r => 
@@ -670,7 +669,7 @@ const ContentFocusItem = React.memo(
             {/* 关联指示器 */}
             {todo.id && (
               <RelationIndicators
-                todoId={toNumberId(todo.id)}
+                todoId={todo.id}
                 relations={relations}
                 allTodos={allTodos}
                 size="small"
@@ -828,29 +827,29 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
   const itemRefsMap = useRef<Map<string, ContentFocusItemRef>>(new Map());
 
   // 🔥 新增：追踪当前激活的编辑器 todoId
-  const activeEditorTodoIdRef = useRef<number | null>(null);
+  const activeEditorTodoIdRef = useRef<string | null>(null);
 
   // AI 建议相关状态
-  const [selectedTodoId, setSelectedTodoId] = useState<number | null>(null);
+  const [selectedTodoId, setSelectedTodoId] = useState<string | null>(null);
   const [suggestionPanelWidth, setSuggestionPanelWidth] = useState(300);
   const [suggestionPanelCollapsed, setSuggestionPanelCollapsed] = useState(false);
 
   // AI 建议事件处理
-  const handleGenerateSuggestion = async (todoId: number, templateId?: number) => {
+  const handleGenerateSuggestion = async (todoId: string, templateId?: number) => {
     if (onGenerateSuggestion) {
       return await onGenerateSuggestion(todoId, templateId);
     }
     return { success: false, error: 'AI建议功能未启用' };
   };
 
-  const handleSaveSuggestion = async (todoId: number, suggestion: string) => {
+  const handleSaveSuggestion = async (todoId: string, suggestion: string) => {
     if (onSaveSuggestion) {
       return await onSaveSuggestion(todoId, suggestion);
     }
     return { success: false, error: 'AI建议功能未启用' };
   };
 
-  const handleDeleteSuggestion = async (todoId: number) => {
+  const handleDeleteSuggestion = async (todoId: string) => {
     if (onDeleteSuggestion) {
       return await onDeleteSuggestion(todoId);
     }
@@ -860,7 +859,7 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
   const selectedTodo = todos.find(t => t.id === selectedTodoId) || null;
 
   // 🔥 新增：编辑器切换时的完整生命周期管理
-  const handleEditorSwitch = useCallback((newTodoId: number | null) => {
+  const handleEditorSwitch = useCallback((newTodoId: string | null) => {
     const previousTodoId = activeEditorTodoIdRef.current;
 
     console.log('[EditorSwitch] Switching from', previousTodoId, 'to', newTodoId);
@@ -939,7 +938,7 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
       const relatedIds = relations
         .filter(r => r.relation_type === 'parallel')
         .filter(r => r.source_id === todoId || r.target_id === todoId)
-        .map(r => toStringId(r.source_id) === todoId ? toStringId(r.target_id) : toStringId(r.source_id));
+        .map(r => String(r.source_id) === todoId ? String(r.target_id) : String(r.source_id));
 
       for (const relatedId of relatedIds) {
         dfs(relatedId, groupSet);
@@ -955,9 +954,9 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
         (r.source_id === todo.id || r.target_id === todo.id)
       );
 
-      if (hasParallel && !visited.has(toStringId(todo.id))) {
+      if (hasParallel && !visited.has(todo.id)) {
         const groupSet = new Set<string>();
-        dfs(toStringId(todo.id), groupSet);
+        dfs(todo.id, groupSet);
 
         // 将这个分组应用到所有成员
         groupSet.forEach(id => {
@@ -1009,24 +1008,24 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
               key={todo.id}
               ref={(itemRef) => {
                 if (itemRef && todo.id) {
-                  itemRefsMap.current.set(toStringId(todo.id), itemRef);
+                  itemRefsMap.current.set(todo.id, itemRef);
                 }
               }}
               todo={todo}
               onUpdate={onUpdate}
               onView={(todo) => {
-                setSelectedTodoId(toNumberId(todo.id!));
+                setSelectedTodoId(todo.id);
                 onView(todo);
                 // 🔥 触发编辑器切换
                 if (todo.id) {
-                  handleEditorSwitch(toNumberId(todo.id));
+                  handleEditorSwitch(todo.id);
                 }
               }}
               isLast={index === todos.length - 1}
               activeTab={activeTab}
               allTodos={allTodos || todos}
               relations={relations}
-              parallelGroup={parallelGroups.get(toStringId(todo.id!))}
+              parallelGroup={parallelGroups.get(todo.id)}
               prevTodo={index > 0 ? todos[index - 1] : null}
               nextTodo={index < todos.length - 1 ? todos[index + 1] : null}
               onUpdateDisplayOrder={onUpdateDisplayOrder}

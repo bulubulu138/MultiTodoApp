@@ -8,9 +8,9 @@ import { useThemeColors } from '../hooks/useThemeColors';
 interface AISuggestionPanelProps {
   todo: Todo | null;
   templates: PromptTemplate[];
-  onGenerate: (todoId: number, templateId?: number) => Promise<{ success: boolean; suggestion?: string; error?: string }>;
-  onDelete: (todoId: number) => Promise<{ success: boolean; error?: string }>;
-  onSave?: (todoId: number, suggestion: string) => Promise<{ success: boolean; error?: string }>;
+  onGenerate: (todoId: string, templateId?: number) => Promise<{ success: boolean; suggestion?: string; error?: string }>;
+  onDelete: (todoId: string) => Promise<{ success: boolean; error?: string }>;
+  onSave?: (todoId: string, suggestion: string) => Promise<{ success: boolean; error?: string }>;
   width: number;
   onWidthChange: (width: number) => void;
   collapsed?: boolean;
@@ -113,7 +113,7 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
         }
       }
 
-      const todoId = typeof todo.id === 'number' ? todo.id : parseInt(String(todo.id!), 10);
+      const todoId = String(todo.id!);
       const result = await onGenerate(todoId, selectedTemplateId);
 
       console.log('[AISuggestionPanel] AI建议生成结果:', result);
@@ -158,7 +158,7 @@ const AISuggestionPanel: React.FC<AISuggestionPanelProps> = ({
     if (!todo?.id) return;
 
     try {
-      const todoId = typeof todo.id === 'number' ? todo.id : parseInt(String(todo.id), 10);
+      const todoId = String(todo.id!);
       const result = await onDelete(todoId);
       if (result.success) {
         message.success('已删除建议');

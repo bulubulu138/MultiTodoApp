@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { Card, Space, Typography, Collapse, Tag, Popover } from 'antd';
 import { Todo, TodoRelation } from '../../shared/types';
-import { toNumberId } from '../../shared/utils/typeUtils';
 import { useThemeColors } from '../hooks/useThemeColors';
 
 const { Text } = Typography;
@@ -159,29 +158,29 @@ const RelationContext: React.FC<RelationContextProps> = ({
   // 查找所有父待办（递归）
   const backgrounds = useMemo(() => {
     const result: Todo[] = [];
-    const visited = new Set<number>();
+    const visited = new Set<string>();
     const maxDepth = 5; // 限制递归深度
 
-    function recurse(currentId: number, depth: number) {
+    function recurse(currentId: string, depth: number) {
       if (visited.has(currentId) || depth >= maxDepth) return;
       visited.add(currentId);
 
       // 找到所有指向当前todo的background关系
       const bgRelations = relations.filter(
-        r => r.target_id === currentId && r.relation_type === 'background'
+        r => String(r.target_id) === currentId && r.relation_type === 'background'
       );
 
       bgRelations.forEach(rel => {
         const bgTodo = allTodos.find(t => t && t.id === rel.source_id);
-        if (bgTodo && !visited.has(toNumberId(bgTodo.id!))) {
+        if (bgTodo && !visited.has(bgTodo.id)) {
           result.push(bgTodo);
-          recurse(toNumberId(bgTodo.id!), depth + 1);
+          recurse(bgTodo.id, depth + 1);
         }
       });
     }
 
     if (currentTodo.id) {
-      recurse(toNumberId(currentTodo.id), 0);
+      recurse(currentTodo.id, 0);
     }
 
     return result.sort((a, b) =>
@@ -192,7 +191,7 @@ const RelationContext: React.FC<RelationContextProps> = ({
   // 查找兄弟待办
   const backgroundExtensions = useMemo(() => {
     const result: Todo[] = [];
-    const visited = new Set<number>();
+    const visited = new Set<string>();
 
     backgrounds.forEach(bg => {
       // 找到以背景为 source 的 background 关系
@@ -203,11 +202,9 @@ const RelationContext: React.FC<RelationContextProps> = ({
 
       extendsRels.forEach(rel => {
         const extTodo = allTodos.find(t => t && t.id === rel.target_id);
-        const extTodoId = extTodo ? toNumberId(extTodo.id!) : 0;
-        const currentTodoId = currentTodo.id ? toNumberId(currentTodo.id) : 0;
-        if (extTodo && !visited.has(extTodoId) && extTodoId !== currentTodoId) {
+        if (extTodo && !visited.has(extTodo.id) && extTodo.id !== currentTodo.id) {
           result.push(extTodo);
-          visited.add(extTodoId);
+          visited.add(extTodo.id);
         }
       });
     });

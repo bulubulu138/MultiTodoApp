@@ -1,5 +1,4 @@
 import { Todo, TodoRelation } from '../../shared/types';
-import { toNumberId, toStringId } from '../../shared/utils/typeUtils';
 import React, { useState, useMemo, useCallback, memo } from 'react';
 import { Card, Tag, Button, Space, Popconfirm, Select, Typography, Tooltip, InputNumber, App } from 'antd';
 import { DeleteOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
@@ -23,16 +22,16 @@ interface VirtualizedTodoListProps {
   allTodos?: Todo[];
   loading: boolean;
   onEdit: (todo: Todo) => void;
-  onDelete: (id: number) => void;
-  onStatusChange: (id: number, updates: Partial<Todo>) => void;
+  onDelete: (id: string) => void;
+  onStatusChange: (id: string, updates: Partial<Todo>) => void;
   onView: (todo: Todo) => void;
   relations?: TodoRelation[];
   onRelationsChange?: () => Promise<void>;
   sortOption?: SortOption;
   activeTab: string;
-  onUpdateDisplayOrder?: (id: number, tabKey: string, order: number | null) => Promise<void>;
+  onUpdateDisplayOrder?: (id: string, tabKey: string, order: number | null) => Promise<void>;
   viewMode?: ViewMode;
-  onUpdateInPlace?: (id: number, updates: Partial<Todo>) => void;
+  onUpdateInPlace?: (id: string, updates: Partial<Todo>) => void;
   getUrlTitlesForTodo?: (todoId: string) => Map<string, string>;
   colorTheme?: ColorTheme; // 主题色
 }
@@ -50,11 +49,11 @@ interface VirtualizedTodoItemProps {
   sortOption?: SortOption;
   activeTab: string;
   onEdit: (todo: Todo) => void;
-  onDelete: (id: number) => void;
-  onStatusChange: (id: number, updates: Partial<Todo>) => void;
+  onDelete: (id: string) => void;
+  onStatusChange: (id: string, updates: Partial<Todo>) => void;
   onView: (todo: Todo) => void;
   onRelationsChange?: () => Promise<void>;
-  onUpdateDisplayOrder?: (id: number, tabKey: string, order: number | null) => Promise<void>;
+  onUpdateDisplayOrder?: (id: string, tabKey: string, order: number | null) => Promise<void>;
   urlTitles?: Map<string, string>;
   colorTheme?: ColorTheme;
 }
@@ -160,7 +159,7 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
     );
   }, []);
 
-  const handleStatusChange = useCallback((todoId: number, newStatus: string) => {
+  const handleStatusChange = useCallback((todoId: string, newStatus: string) => {
     const updates: Partial<Todo> = { status: newStatus as Todo['status'] };
     onStatusChange(todoId, updates);
   }, [onStatusChange]);
@@ -181,7 +180,7 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
   const handleOrderSave = useCallback(async () => {
     if (onUpdateDisplayOrder && editingOrder !== null) {
       try {
-        await onUpdateDisplayOrder(toNumberId(todo.id!), activeTab, editingOrder);
+        await onUpdateDisplayOrder(todo.id, activeTab, editingOrder);
         setEditingOrder(null);
       } catch (error) {
         message.error('更新排序失败');
@@ -247,7 +246,7 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
               </Text>
               {todo.id && (
                 <RelationIndicators
-                  todoId={toNumberId(todo.id)}
+                  todoId={todo.id}
                   relations={relations}
                   allTodos={allTodos || []}
                   size="small"
@@ -274,7 +273,7 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
             </Tooltip>
             <Popconfirm
               title="确定要删除吗？"
-              onConfirm={() => onDelete(toNumberId(todo.id!))}
+              onConfirm={() => onDelete(todo.id)}
               okText="确定"
               cancelText="取消"
             >
@@ -328,7 +327,7 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
             </Tag>
             <Select
               value={todo.status}
-              onChange={(value) => handleStatusChange(toNumberId(todo.id!), value)}
+              onChange={(value) => handleStatusChange(todo.id, value)}
               size="small"
               style={{ minWidth: 90 }}
             >
@@ -406,11 +405,11 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
     sortOption?: SortOption;
     activeTab: string;
     onEdit: (todo: Todo) => void;
-    onDelete: (id: number) => void;
-    onStatusChange: (id: number, updates: Partial<Todo>) => void;
+    onDelete: (id: string) => void;
+    onStatusChange: (id: string, updates: Partial<Todo>) => void;
     onView: (todo: Todo) => void;
     onRelationsChange?: () => Promise<void>;
-    onUpdateDisplayOrder?: (id: number, tabKey: string, order: number | null) => Promise<void>;
+    onUpdateDisplayOrder?: (id: string, tabKey: string, order: number | null) => Promise<void>;
     getUrlTitlesForTodo?: (todoId: string) => Map<string, string>;
     colorTheme?: ColorTheme;
   };
@@ -455,7 +454,7 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
         onView={onView}
         onRelationsChange={onRelationsChange}
         onUpdateDisplayOrder={onUpdateDisplayOrder}
-        urlTitles={getUrlTitlesForTodo ? getUrlTitlesForTodo(toStringId(todo.id!)) : undefined}
+        urlTitles={getUrlTitlesForTodo ? getUrlTitlesForTodo(todo.id) : undefined}
         colorTheme={colorTheme}
       />
     );
@@ -480,14 +479,28 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
   );
 }, (prevProps, nextProps) => {
   // 自定义比较函数，只在关键 props 改变时重新渲染
-  return (
+  // 🔧 优化：增加内容检测，确保数据更新时能触发渲染
+  const basicChecks =
     prevProps.colorTheme === nextProps.colorTheme &&
     prevProps.todos.length === nextProps.todos.length &&
     prevProps.loading === nextProps.loading &&
     prevProps.sortOption === nextProps.sortOption &&
     prevProps.activeTab === nextProps.activeTab &&
-    prevProps.viewMode === nextProps.viewMode
-  );
+    prevProps.viewMode === nextProps.viewMode;
+
+  // 如果基础检查通过，进一步检查todos内容是否真正变化
+  if (basicChecks && prevProps.todos.length > 0 && nextProps.todos.length > 0) {
+    // 🔧 新增：检查关键更新字段（updatedAt）是否变化
+    // 优化性能：只检查第一个和最后一个元素的updatedAt，避免遍历整个数组
+    const firstTodoChanged = prevProps.todos[0].updatedAt !== nextProps.todos[0].updatedAt;
+    const lastTodoChanged = prevProps.todos[prevProps.todos.length - 1].updatedAt !== nextProps.todos[prevProps.todos.length - 1].updatedAt;
+
+    // 如果首尾元素的updatedAt都相同，则认为内容没有变化
+    // 这种启发式方法在大多数场景下有效，且性能开销小
+    return !firstTodoChanged && !lastTodoChanged;
+  }
+
+  return basicChecks;
 });
 
 VirtualizedTodoList.displayName = 'VirtualizedTodoList';

@@ -6,7 +6,7 @@ import { TodoRelation } from '../../shared/types';
  * @param relations 所有关联关系
  * @returns 各类型关联数量
  */
-export const getRelationCounts = (todoId: number, relations: TodoRelation[]) => {
+export const getRelationCounts = (todoId: string, relations: TodoRelation[]) => {
   const counts = {
     extends: 0,
     background: 0,
@@ -33,7 +33,7 @@ export const getRelationCounts = (todoId: number, relations: TodoRelation[]) => 
  * @returns 按类型分组的关联待办
  */
 export const getRelatedTodos = (
-  todoId: number, 
+  todoId: string,
   relations: TodoRelation[],
   allTodos: any[]
 ) => {

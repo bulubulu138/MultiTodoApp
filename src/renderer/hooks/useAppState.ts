@@ -184,7 +184,7 @@ export const useAppState = () => {
     }
   }, [actions]);
 
-  const updateTodo = useCallback(async (id: number, updates: Partial<Todo>) => {
+  const updateTodo = useCallback(async (id: string, updates: Partial<Todo>) => {
     try {
       const updatedTodo = await window.electronAPI.todo.update(id, updates);
       dispatch(actions.updateTodo(id, updates));
@@ -195,7 +195,7 @@ export const useAppState = () => {
     }
   }, [actions]);
 
-  const deleteTodo = useCallback(async (id: number) => {
+  const deleteTodo = useCallback(async (id: string) => {
     try {
       await window.electronAPI.todo.delete(id);
       dispatch(actions.deleteTodo(id));
@@ -205,17 +205,18 @@ export const useAppState = () => {
     }
   }, [actions]);
 
-  const bulkUpdateTodos = useCallback(async (updates: Array<{ id: number; updates: Partial<Todo> }>) => {
+  const bulkUpdateTodos = useCallback(async (updates: Array<{ uuid: string; updates: Partial<Todo> }>) => {
     try {
       // 批量更新到数据库
-      const promises = updates.map(({ id, updates }) =>
-        window.electronAPI.todo.update(id, updates)
+      const promises = updates.map(({ uuid, updates }) =>
+        window.electronAPI.todo.update(uuid, updates)
       );
 
       await Promise.all(promises);
 
-      // 批量更新状态
-      dispatch(actions.bulkUpdateTodos(updates));
+      // 转换为 dispatch 需要的格式
+      const dispatchUpdates = updates.map(({ uuid, updates }) => ({ id: uuid, updates }));
+      dispatch(actions.bulkUpdateTodos(dispatchUpdates));
     } catch (error) {
       console.error('Error bulk updating todos:', error);
       throw error;

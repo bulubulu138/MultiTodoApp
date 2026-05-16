@@ -5,7 +5,7 @@ import { TodoRelation, Todo } from '../../shared/types';
 import { getRelationCounts, getRelatedTodos } from '../utils/relationUtils';
 
 interface RelationIndicatorsProps {
-  todoId: number;
+  todoId: string;
   relations: TodoRelation[];
   allTodos: Todo[];
   size?: 'small' | 'default';

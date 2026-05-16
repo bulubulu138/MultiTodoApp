@@ -1,8 +1,11 @@
 // 统一的类型定义文件
 // 所有组件都从这里导入类型，避免重复定义
 
+// Todo ID 类型别名，提高语义化
+export type TodoId = string;
+
 export interface Todo {
-  id?: number | string; // 支持数字 ID（SQLite）或 UUID 字符串（文件存储）
+  id: TodoId;
   title: string;
   content: string;
   status: 'pending' | 'in_progress' | 'completed';
@@ -75,9 +78,9 @@ export interface CustomTab {
 }
 
 export interface TodoRelation {
-  id?: number;
-  source_id: number | string; // 支持 SQLite 数字 ID 或 UUID 字符串
-  target_id: number | string; // 支持 SQLite 数字 ID 或 UUID 字符串
+  id?: TodoId;
+  source_id: TodoId;
+  target_id: TodoId;
   relation_type: 'extends' | 'background' | 'parallel';
   created_at: string;
 }

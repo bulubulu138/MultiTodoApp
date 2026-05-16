@@ -35,7 +35,7 @@ class Application {
   // ✅ 新增：全局并发锁 - 用于AI建议任务的并发控制
   private activeAiRequest: null | {
     controller: AbortController;
-    todoId: number;
+    todoId: string;
     timestamp: number;
   } = null;
 
@@ -484,6 +484,11 @@ class Application {
       return await this.fileStorageManager.getAllTodos();
     });
 
+    ipcMain.handle('todo:getById', async (_, uuid: string) => {
+      // 🔧 新增：根据UUID获取单个待办，用于增量刷新
+      return await this.fileStorageManager.getTodoByUuid(uuid);
+    });
+
     ipcMain.handle('todo:create', async (_, todo) => {
       return await this.fileStorageManager.createTodo(todo);
     });
@@ -493,28 +498,28 @@ class Application {
       return await this.fileStorageManager.createTodo(todo);
     });
 
-    ipcMain.handle('todo:update', async (_, id, updates) => {
-      await this.fileStorageManager.updateTodo(id, updates);
+    ipcMain.handle('todo:update', async (_, uuid: string, updates) => {
+      await this.fileStorageManager.updateTodo(uuid, updates);
     });
 
-    ipcMain.handle('todo:delete', async (_, id) => {
-      await this.fileStorageManager.deleteTodo(id);
+    ipcMain.handle('todo:delete', async (_, uuid: string) => {
+      await this.fileStorageManager.deleteTodo(uuid);
     });
 
     ipcMain.handle('todo:generateHash', async (_, title: string, content: string) => {
       return generateContentHash(title, content);
     });
 
-    ipcMain.handle('todo:findDuplicate', async (_, contentHash: string, excludeId?: number) => {
+    ipcMain.handle('todo:findDuplicate', async (_, contentHash: string, excludeUuid?: string) => {
       // 简化实现：直接返回null，让前端处理重复检查
       return null;
     });
 
-    ipcMain.handle('todo:batchUpdateDisplayOrder', async (_, updates: {id: number, displayOrder: number}[]) => {
+    ipcMain.handle('todo:batchUpdateDisplayOrder', async (_, updates: {uuid: string, displayOrder: number}[]) => {
       // 简化实现：逐个更新
       for (const update of updates) {
         try {
-          await this.fileStorageManager.updateTodo(update.id.toString(), { displayOrder: update.displayOrder });
+          await this.fileStorageManager.updateTodo(update.uuid, { displayOrder: update.displayOrder });
         } catch (error) {
           console.error('Failed to update display order:', error);
         }
@@ -522,11 +527,11 @@ class Application {
       return { success: true };
     });
 
-    ipcMain.handle('todo:batchUpdateDisplayOrders', async (_, updates: {id: number, tabKey: string, displayOrder: number}[]) => {
+    ipcMain.handle('todo:batchUpdateDisplayOrders', async (_, updates: {uuid: string, tabKey: string, displayOrder: number}[]) => {
       // 简化实现：逐个更新
       for (const update of updates) {
         try {
-          await this.fileStorageManager.updateTodo(update.id.toString(), { displayOrders: {} });
+          await this.fileStorageManager.updateTodo(update.uuid, { displayOrders: {} });
         } catch (error) {
           console.error('Failed to update display orders:', error);
         }
@@ -534,11 +539,11 @@ class Application {
       return { success: true };
     });
 
-    ipcMain.handle('todo:bulkUpdateTodos', async (_, updates: Array<{id: number; updates: any}>) => {
+    ipcMain.handle('todo:bulkUpdateTodos', async (_, updates: Array<{uuid: string; updates: any}>) => {
       // 简化实现：逐个更新
-      for (const { id, updates: todoUpdates } of updates) {
+      for (const { uuid, updates: todoUpdates } of updates) {
         try {
-          await this.fileStorageManager.updateTodo(id.toString(), todoUpdates);
+          await this.fileStorageManager.updateTodo(uuid, todoUpdates);
         } catch (error) {
           console.error('Failed to update todo:', error);
         }
@@ -546,11 +551,11 @@ class Application {
       return { success: true };
     });
 
-    ipcMain.handle('todo:bulkDeleteTodos', async (_, ids: number[]) => {
+    ipcMain.handle('todo:bulkDeleteTodos', async (_, uuids: string[]) => {
       // 简化实现：逐个删除
-      for (const id of ids) {
+      for (const uuid of uuids) {
         try {
-          await this.fileStorageManager.deleteTodo(id.toString());
+          await this.fileStorageManager.deleteTodo(uuid);
         } catch (error) {
           console.error('Failed to delete todo:', error);
         }
@@ -804,7 +809,7 @@ class Application {
 
     ipcMain.handle('relations:getByTodoId', async (_, todoId) => {
       const relations = await this.fileStorageManager.getAllRelations();
-      return relations.filter(r => r.source_id === Number(todoId) || r.target_id === Number(todoId));
+      return relations.filter(r => String(r.source_id) === String(todoId) || String(r.target_id) === String(todoId));
     });
 
     ipcMain.handle('relations:getByType', async (_, relationType) => {
@@ -823,11 +828,11 @@ class Application {
     ipcMain.handle('relations:deleteByTodoId', async (_, todoId) => {
       // 简化实现：获取相关的关系然后删除
       const relations = await this.fileStorageManager.getAllRelations();
-      const todoRelations = relations.filter(r => r.source_id === Number(todoId) || r.target_id === Number(todoId));
+      const todoRelations = relations.filter(r => String(r.source_id) === String(todoId) || String(r.target_id) === String(todoId));
 
       for (const relation of todoRelations) {
         if (relation.id !== undefined) {
-          await this.fileStorageManager.deleteRelation(relation.id);
+          await this.fileStorageManager.deleteRelation(String(relation.id));
         }
       }
     });
@@ -836,21 +841,21 @@ class Application {
       // 简化实现：查找并删除特定的关系
       const relations = await this.fileStorageManager.getAllRelations();
       const targetRelation = relations.find(r =>
-        r.source_id === Number(sourceId) &&
-        r.target_id === Number(targetId) &&
+        String(r.source_id) === String(sourceId) &&
+        String(r.target_id) === String(targetId) &&
         r.relation_type === relationType
       );
 
       if (targetRelation && targetRelation.id !== undefined) {
-        await this.fileStorageManager.deleteRelation(targetRelation.id);
+        await this.fileStorageManager.deleteRelation(String(targetRelation.id));
       }
     });
 
     ipcMain.handle('relations:exists', async (_, sourceId, targetId, relationType) => {
       const relations = await this.fileStorageManager.getAllRelations();
       return relations.some(r =>
-        r.source_id === Number(sourceId) &&
-        r.target_id === Number(targetId) &&
+        String(r.source_id) === String(sourceId) &&
+        String(r.target_id) === String(targetId) &&
         r.relation_type === relationType
       );
     });
@@ -1054,7 +1059,7 @@ class Application {
     });
 
     // AI 建议相关
-    ipcMain.handle('ai-suggestion:generate', async (_, todoId: number, templateId?: number) => {
+    ipcMain.handle('ai-suggestion:generate', async (_, todoId: string, templateId?: number) => {
       try {
         console.log('=== AI Suggestion Generation Debug ===');
         console.log('todoId:', todoId, 'templateId:', templateId);
@@ -1130,10 +1135,10 @@ class Application {
       }
     });
 
-    ipcMain.handle('ai-suggestion:save', async (_, todoId: number, suggestion: string) => {
+    ipcMain.handle('ai-suggestion:save', async (_, todoId: string, suggestion: string) => {
       try {
         // 通过FileStorageManager保存AI建议
-        const todo = await this.fileStorageManager.getTodoById(todoId.toString());
+        const todo = await this.fileStorageManager.getTodoById(todoId);
         if (todo) {
           await this.fileStorageManager.updateTodo(todoId.toString(), {
             aiSuggestion: suggestion
@@ -1146,12 +1151,12 @@ class Application {
       }
     });
 
-    ipcMain.handle('ai-suggestion:delete', async (_, todoId: number) => {
+    ipcMain.handle('ai-suggestion:delete', async (_, todoId: string) => {
       try {
         // 通过FileStorageManager清除AI建议
-        const todo = await this.fileStorageManager.getTodoById(todoId.toString());
+        const todo = await this.fileStorageManager.getTodoById(todoId);
         if (todo) {
-          await this.fileStorageManager.updateTodo(todoId.toString(), {
+          await this.fileStorageManager.updateTodo(todoId, {
             aiSuggestion: undefined,
             aiSuggestionProvider: undefined,
             aiSuggestionModel: undefined,

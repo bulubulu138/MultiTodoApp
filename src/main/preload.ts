@@ -36,16 +36,17 @@ export interface ElectronAPI {
   // 待办事项API
   todo: {
     getAll: () => Promise<any[]>;
+    getById: (uuid: string) => Promise<any | null>;  // 🔧 新增：根据ID获取单个待办
     create: (todo: any) => Promise<any>;
     createManualAtTop: (todo: any, tabKey: string) => Promise<any>;
-    update: (id: number, updates: any) => Promise<any>;
-    delete: (id: number) => Promise<boolean>;
+    update: (uuid: string, updates: any) => Promise<any>;  // 修复：uuid 参数类型为 string
+    delete: (uuid: string) => Promise<boolean>;  // 修复：uuid 参数类型为 string
     generateHash: (title: string, content: string) => Promise<string>;
-    findDuplicate: (contentHash: string, excludeId?: number) => Promise<any | null>;
-    batchUpdateDisplayOrder: (updates: {id: number, displayOrder: number}[]) => Promise<void>;
-    batchUpdateDisplayOrders: (updates: {id: number, tabKey: string, displayOrder: number}[]) => Promise<void>;
-    bulkUpdateTodos: (updates: Array<{id: number; updates: any}>) => Promise<void>;
-    bulkDeleteTodos: (ids: number[]) => Promise<void>;
+    findDuplicate: (contentHash: string, excludeUuid?: string) => Promise<any | null>;  // 修复：excludeUuid 参数类型为 string
+    batchUpdateDisplayOrder: (updates: {uuid: string, displayOrder: number}[]) => Promise<void>;  // 修复：uuid 参数类型为 string
+    batchUpdateDisplayOrders: (updates: {uuid: string, tabKey: string, displayOrder: number}[]) => Promise<void>;  // 修复：uuid 参数类型为 string
+    bulkUpdateTodos: (updates: Array<{uuid: string; updates: any}>) => Promise<void>;  // 修复：uuid 参数类型为 string
+    bulkDeleteTodos: (uuids: string[]) => Promise<void>;  // 修复：uuids 参数类型为 string
   };
   
   // 关键词和推荐API
@@ -70,10 +71,10 @@ export interface ElectronAPI {
 
   // AI 建议API
   aiSuggestion: {
-    generate: (todoId: number, templateId?: number) => Promise<AISuggestionResponse>;
+    generate: (todoId: string, templateId?: number) => Promise<AISuggestionResponse>;
     cancel: () => Promise<{success: boolean; error?: string}>;  // ✅ 新增
-    save: (todoId: number, suggestion: string) => Promise<{success: boolean; error?: string}>;
-    delete: (todoId: number) => Promise<{success: boolean; error?: string}>;
+    save: (todoId: string, suggestion: string) => Promise<{success: boolean; error?: string}>;
+    delete: (todoId: string) => Promise<{success: boolean; error?: string}>;
   };
 
   // Prompt 模板API
@@ -115,13 +116,13 @@ export interface ElectronAPI {
   // 关系API
   relations: {
     getAll: () => Promise<any[]>;
-    getByTodoId: (todoId: number) => Promise<any[]>;
+    getByTodoId: (todoId: string) => Promise<any[]>;
     getByType: (relationType: string) => Promise<any[]>;
     create: (relation: any) => Promise<number>;
-    delete: (id: number) => Promise<void>;
-    deleteByTodoId: (todoId: number) => Promise<void>;
-    deleteSpecific: (sourceId: number, targetId: number, relationType: string) => Promise<void>;
-    exists: (sourceId: number, targetId: number, relationType: string) => Promise<boolean>;
+    delete: (id: string) => Promise<void>;
+    deleteByTodoId: (todoId: string) => Promise<void>;
+    deleteSpecific: (sourceId: string, targetId: string, relationType: string) => Promise<void>;
+    exists: (sourceId: string, targetId: string, relationType: string) => Promise<boolean>;
     buildTree: () => Promise<{roots: any[]; relations: any[]}>;
   };
 
@@ -134,7 +135,7 @@ export interface ElectronAPI {
   
   // 流程图API
   flowchart: {
-    getAssociationsByTodoIds: (todoIds: number[]) => Promise<Record<number, Array<{
+    getAssociationsByTodoIds: (todoIds: string[]) => Promise<Record<string, Array<{
       flowchartId: string;
       flowchartName: string;
       nodeId: string;
@@ -149,9 +150,9 @@ export interface ElectronAPI {
 
   // 流程图待办关联API
   flowchartTodoAssociation: {
-    queryByFlowchart: (flowchartId: string) => Promise<number[]>;
-    create: (flowchartId: string, todoId: number) => Promise<void>;
-    delete: (flowchartId: string, todoId: number) => Promise<void>;
+    queryByFlowchart: (flowchartId: string) => Promise<string[]>;
+    create: (flowchartId: string, todoId: string) => Promise<void>;
+    delete: (flowchartId: string, todoId: string) => Promise<void>;
   };
 
   // Shell API
@@ -463,16 +464,17 @@ export interface ElectronAPI {
 contextBridge.exposeInMainWorld('electronAPI', {
   todo: {
     getAll: () => ipcRenderer.invoke('todo:getAll'),
+    getById: (uuid: string) => ipcRenderer.invoke('todo:getById', uuid),  // 🔧 新增：根据ID获取单个待办
     create: (todo: any) => ipcRenderer.invoke('todo:create', todo),
     createManualAtTop: (todo: any, tabKey: string) => ipcRenderer.invoke('todo:createManualAtTop', todo, tabKey),
-    update: (id: number, updates: any) => ipcRenderer.invoke('todo:update', id, updates),
-    delete: (id: number) => ipcRenderer.invoke('todo:delete', id),
+    update: (uuid: string, updates: any) => ipcRenderer.invoke('todo:update', uuid, updates),  // 修复：uuid 参数类型为 string
+    delete: (uuid: string) => ipcRenderer.invoke('todo:delete', uuid),  // 修复：uuid 参数类型为 string
     generateHash: (title: string, content: string) => ipcRenderer.invoke('todo:generateHash', title, content),
-    findDuplicate: (contentHash: string, excludeId?: number) => ipcRenderer.invoke('todo:findDuplicate', contentHash, excludeId),
-    batchUpdateDisplayOrder: (updates: {id: number, displayOrder: number}[]) => ipcRenderer.invoke('todo:batchUpdateDisplayOrder', updates),
-    batchUpdateDisplayOrders: (updates: {id: number, tabKey: string, displayOrder: number}[]) => ipcRenderer.invoke('todo:batchUpdateDisplayOrders', updates),
-    bulkUpdateTodos: (updates: Array<{id: number; updates: any}>) => ipcRenderer.invoke('todo:bulkUpdateTodos', updates),
-    bulkDeleteTodos: (ids: number[]) => ipcRenderer.invoke('todo:bulkDeleteTodos', ids),
+    findDuplicate: (contentHash: string, excludeUuid?: string) => ipcRenderer.invoke('todo:findDuplicate', contentHash, excludeUuid),  // 修复：excludeUuid 参数类型为 string
+    batchUpdateDisplayOrder: (updates: {uuid: string, displayOrder: number}[]) => ipcRenderer.invoke('todo:batchUpdateDisplayOrder', updates),  // 修复：uuid 参数类型为 string
+    batchUpdateDisplayOrders: (updates: {uuid: string, tabKey: string, displayOrder: number}[]) => ipcRenderer.invoke('todo:batchUpdateDisplayOrders', updates),  // 修复：uuid 参数类型为 string
+    bulkUpdateTodos: (updates: Array<{uuid: string; updates: any}>) => ipcRenderer.invoke('todo:bulkUpdateTodos', updates),  // 修复：uuid 参数类型为 string
+    bulkDeleteTodos: (uuids: string[]) => ipcRenderer.invoke('todo:bulkDeleteTodos', uuids),  // 修复：uuids 参数类型为 string
   },
   keywords: {
     getRecommendations: (title: string, content: string, excludeId?: number) => 
@@ -494,13 +496,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getConfigPath: () => ipcRenderer.invoke('ai:getConfigPath'),
   },
   aiSuggestion: {
-    generate: (todoId: number, templateId?: number) =>
+    generate: (todoId: string, templateId?: number) =>
       ipcRenderer.invoke('ai-suggestion:generate', todoId, templateId),
     cancel: () =>  // ✅ 新增
       ipcRenderer.invoke('ai-suggestion:cancel'),
-    save: (todoId: number, suggestion: string) =>
+    save: (todoId: string, suggestion: string) =>
       ipcRenderer.invoke('ai-suggestion:save', todoId, suggestion),
-    delete: (todoId: number) =>
+    delete: (todoId: string) =>
       ipcRenderer.invoke('ai-suggestion:delete', todoId),
   },
   promptTemplates: {
@@ -534,14 +536,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   relations: {
     getAll: () => ipcRenderer.invoke('relations:getAll'),
-    getByTodoId: (todoId: number) => ipcRenderer.invoke('relations:getByTodoId', todoId),
+    getByTodoId: (todoId: string) => ipcRenderer.invoke('relations:getByTodoId', todoId),
     getByType: (relationType: string) => ipcRenderer.invoke('relations:getByType', relationType),
     create: (relation: any) => ipcRenderer.invoke('relations:create', relation),
-    delete: (id: number) => ipcRenderer.invoke('relations:delete', id),
-    deleteByTodoId: (todoId: number) => ipcRenderer.invoke('relations:deleteByTodoId', todoId),
-    deleteSpecific: (sourceId: number, targetId: number, relationType: string) =>
+    delete: (id: string) => ipcRenderer.invoke('relations:delete', id),
+    deleteByTodoId: (todoId: string) => ipcRenderer.invoke('relations:deleteByTodoId', todoId),
+    deleteSpecific: (sourceId: string, targetId: string, relationType: string) =>
       ipcRenderer.invoke('relations:deleteSpecific', sourceId, targetId, relationType),
-    exists: (sourceId: number, targetId: number, relationType: string) =>
+    exists: (sourceId: string, targetId: string, relationType: string) =>
       ipcRenderer.invoke('relations:exists', sourceId, targetId, relationType),
     buildTree: () => ipcRenderer.invoke('relations:buildTree'),
   },
@@ -551,7 +553,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     restore: (backupPath: string) => ipcRenderer.invoke('backup:restore', backupPath),
   },
   flowchart: {
-    getAssociationsByTodoIds: (todoIds: number[]) =>
+    getAssociationsByTodoIds: (todoIds: string[]) =>
       ipcRenderer.invoke('flowchart:getAssociationsByTodoIds', todoIds),
     save: (flowchartData: any) =>
       ipcRenderer.invoke('flowchart:save', flowchartData),
@@ -567,9 +569,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   flowchartTodoAssociation: {
     queryByFlowchart: (flowchartId: string) =>
       ipcRenderer.invoke('flowchart-todo-association:queryByFlowchart', flowchartId),
-    create: (flowchartId: string, todoId: number) =>
+    create: (flowchartId: string, todoId: string) =>
       ipcRenderer.invoke('flowchart-todo-association:create', flowchartId, todoId),
-    delete: (flowchartId: string, todoId: number) =>
+    delete: (flowchartId: string, todoId: string) =>
       ipcRenderer.invoke('flowchart-todo-association:delete', flowchartId, todoId),
   },
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),

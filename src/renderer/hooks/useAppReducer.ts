@@ -36,8 +36,9 @@ export type AppAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_TODOS'; payload: Todo[] }
   | { type: 'ADD_TODO'; payload: Todo }
-  | { type: 'UPDATE_TODO'; payload: { id: number; updates: Partial<Todo> } }
-  | { type: 'DELETE_TODO'; payload: number }
+  | { type: 'UPDATE_TODO'; payload: { id: string; updates: Partial<Todo> } }
+  | { type: 'DELETE_TODO'; payload: string }
+  | { type: 'BULK_UPDATE_TODOS'; payload: Array<{ id: string; updates: Partial<Todo> }> }
   | { type: 'SET_RELATIONS'; payload: TodoRelation[] }
   | { type: 'ADD_RELATION'; payload: TodoRelation }
   | { type: 'DELETE_RELATION'; payload: number }
@@ -114,21 +115,21 @@ export const appReducer = (state: AppState, action: AppAction): AppState => {
       return {
         ...state,
         todos: state.todos.map(todo =>
-          todo.id === action.payload.id ? { ...todo, ...action.payload.updates } : todo
+          String(todo.id) === String(action.payload.id) ? { ...todo, ...action.payload.updates } : todo
         )
       };
 
     case 'DELETE_TODO':
       return {
         ...state,
-        todos: state.todos.filter(todo => todo.id !== action.payload)
+        todos: state.todos.filter(todo => String(todo.id) !== String(action.payload))
       };
 
     case 'BULK_UPDATE_TODOS':
       return {
         ...state,
         todos: state.todos.map(todo => {
-          const update = action.payload.find(u => u.id === todo.id);
+          const update = action.payload.find(u => String(u.id) === String(todo.id));
           return update ? { ...todo, ...update.updates } : todo;
         })
       };
@@ -256,14 +257,14 @@ export const createAppActions = {
   setLoading: (payload: boolean): AppAction => ({ type: 'SET_LOADING', payload }),
   setTodos: (payload: Todo[]): AppAction => ({ type: 'SET_TODOS', payload }),
   addTodo: (payload: Todo): AppAction => ({ type: 'ADD_TODO', payload }),
-  updateTodo: (id: number, updates: Partial<Todo>): AppAction => ({
+  updateTodo: (id: string, updates: Partial<Todo>): AppAction => ({
     type: 'UPDATE_TODO',
     payload: { id, updates }
   }),
-  deleteTodo: (payload: number): AppAction => ({ type: 'DELETE_TODO', payload }),
-  bulkUpdateTodos: (payload: Array<{ id: number; updates: Partial<Todo> }>): AppAction => ({
+  deleteTodo: (payload: string): AppAction => ({ type: 'DELETE_TODO', payload }),
+  bulkUpdateTodos: (payload: Array<{ uuid: string; updates: Partial<Todo> }>): AppAction => ({
     type: 'BULK_UPDATE_TODOS',
-    payload
+    payload: payload.map(({ uuid, updates }) => ({ id: uuid, updates }))
   }),
   setRelations: (payload: TodoRelation[]): AppAction => ({ type: 'SET_RELATIONS', payload }),
   addRelation: (payload: TodoRelation): AppAction => ({ type: 'ADD_RELATION', payload }),

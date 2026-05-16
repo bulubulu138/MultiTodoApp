@@ -1,5 +1,4 @@
 import { Todo, TodoRelation } from '../../shared/types';
-import { toNumberId, toStringId } from '../../shared/utils/typeUtils';
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { List, Card, Tag, Button, Space, Popconfirm, Select, Typography, Image, Tooltip, App, InputNumber } from 'antd';
 import { DeleteOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
@@ -25,16 +24,16 @@ interface TodoListProps {
   allTodos?: Todo[]; // Full list for finding related todos across all statuses
   loading: boolean;
   onEdit: (todo: Todo) => void;
-  onDelete: (id: number) => void;
-  onStatusChange: (id: number, updates: Partial<Todo>) => void;
+  onDelete: (id: string) => void;
+  onStatusChange: (id: string, updates: Partial<Todo>) => void;
   onView: (todo: Todo) => void;
   relations?: TodoRelation[];
   onRelationsChange?: () => Promise<void>; // Callback to refresh global relations
   sortOption?: SortOption; // 当前排序选项
   activeTab: string; // 当前激活的 Tab（用于多Tab独立排序）
-  onUpdateDisplayOrder?: (id: number, tabKey: string, order: number | null) => Promise<void>; // 更新显示序号
+  onUpdateDisplayOrder?: (id: string, tabKey: string, order: number | null) => Promise<void>; // 更新显示序号
   viewMode?: ViewMode; // 视图模式
-  onUpdateInPlace?: (id: number, updates: Partial<Todo>) => void; // 专注模式专用：乐观更新
+  onUpdateInPlace?: (id: string, updates: Partial<Todo>) => void; // 专注模式专用：乐观更新
   enableVirtualScroll?: boolean; // 是否启用虚拟滚动
   onNavigateToFlowchart?: (flowchartId: string, nodeId: string) => void; // 跳转到流程图
   hasMoreData?: boolean; // 是否还有更多数据
@@ -69,7 +68,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   const { message } = App.useApp();
   const colors = useThemeColors();
   const [editingOrder, setEditingOrder] = useState<Record<string, number | null>>({});
-  const [savingOrder, setSavingOrder] = useState<Set<number>>(new Set());
+  const [savingOrder, setSavingOrder] = useState<Set<string>>(new Set());
   
   // 无限滚动：检测滚动到底部
   const listContainerRef = useRef<HTMLDivElement>(null);
@@ -158,7 +157,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   }, []);
 
   // 性能优化：使用 useCallback 缓存函数
-  const handleStatusChange = useCallback((todoId: number, newStatus: string) => {
+  const handleStatusChange = useCallback((todoId: string, newStatus: string) => {
     const updates: Partial<Todo> = { status: newStatus as Todo['status'] };
     // 注意：completedAt 和 updatedAt 由数据库层自动处理
     onStatusChange(todoId, updates);
@@ -225,21 +224,21 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   };
 
   // 处理序号变化 - 性能优化：使用useCallback
-  const handleOrderChange = useCallback((todoId: number, value: number | null) => {
+  const handleOrderChange = useCallback((todoId: string, value: number | null) => {
     setEditingOrder(prev => ({ ...prev, [todoId]: value }));
   }, []);
 
   // 保存序号（支持多Tab独立排序）- 优化版：递归式冲突解决
-  const handleOrderSave = async (todoId: number, currentValue: number | undefined) => {
+  const handleOrderSave = async (todoId: string, currentValue: number | undefined) => {
     const newOrder = editingOrder[todoId];
-    
+
     console.log('[DEBUG TodoList] handleOrderSave:', {
       todoId,
       newOrder,
       currentValue,
       activeTab
     });
-    
+
     // 如果没有变化，不保存
     if (newOrder === undefined || newOrder === currentValue) {
       console.log('[DEBUG TodoList] 无变化，跳过保存');
@@ -275,7 +274,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
       });
 
       // 3. 递归式冲突解决：收集所有需要调整的待办
-      const adjustments: Array<{id: number; oldOrder: number; newOrder: number}> = [];
+      const adjustments: Array<{id: string; oldOrder: number; newOrder: number}> = [];
 
       const resolveConflict = (targetOrder: number): void => {
         const conflictTodo = orderToTodoMap.get(targetOrder);
@@ -293,7 +292,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
 
         // 记录这个待办需要被移动
         adjustments.push({
-          id: typeof conflictTodo.id === 'number' ? conflictTodo.id : parseInt(String(conflictTodo.id!), 10),
+          id: conflictTodo.id,
           oldOrder: targetOrder,
           newOrder: nextOrder
         });
@@ -311,7 +310,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
       // 4. 批量更新需要调整的待办
       if (adjustments.length > 0) {
         const updates = adjustments.map(adj => ({
-          id: adj.id,
+          uuid: String(adj.id),
           tabKey: activeTab,
           displayOrder: adj.newOrder
         }));
@@ -324,9 +323,9 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
       const parallelGroup = parallelGroups.get(String(todoId));
       if (parallelGroup && parallelGroup.size > 1) {
         const groupUpdates = Array.from(parallelGroup)
-          .filter(id => parseInt(id, 10) !== todoId)
+          .filter(id => id !== String(todoId))
           .map(id => ({
-            id: parseInt(id, 10), // 确保数字类型
+            uuid: String(id),
             tabKey: activeTab,
             displayOrder: newOrder
           }));
@@ -368,8 +367,8 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   const relationsByTodo = useMemo(() => {
     const map = new Map<string, TodoRelation[]>();
     relations.forEach(r => {
-      const sourceId = toStringId(r.source_id);
-      const targetId = toStringId(r.target_id);
+      const sourceId = String(r.source_id);
+      const targetId = String(r.target_id);
       // 为 source_id 添加关系
       if (!map.has(sourceId)) map.set(sourceId, []);
       map.get(sourceId)!.push(r);
@@ -386,8 +385,8 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
     const map = new Map<string, TodoRelation[]>();
     relations.forEach(r => {
       if (r.relation_type === 'parallel') {
-        const sourceId = toStringId(r.source_id);
-        const targetId = toStringId(r.target_id);
+        const sourceId = String(r.source_id);
+        const targetId = String(r.target_id);
         if (!map.has(sourceId)) map.set(sourceId, []);
         map.get(sourceId)!.push(r);
 
@@ -411,14 +410,14 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
       // 优化：直接从预计算的并列关系索引获取
       const parallelRels = parallelRelationsByTodo.get(todoId) || [];
       const relatedIds = parallelRels.map(r =>
-        toStringId(r.source_id) === todoId ? toStringId(r.target_id) : toStringId(r.source_id)
+        String(r.source_id) === todoId ? String(r.target_id) : String(r.source_id)
       );
 
       relatedIds.forEach(relatedId => dfs(relatedId, groupSet));
     };
 
     todos.forEach(todo => {
-      const todoId = toStringId(todo.id!);
+      const todoId = todo.id;
       if (!visited.has(todoId)) {
         const parallelRels = parallelRelationsByTodo.get(todoId) || [];
 
@@ -485,7 +484,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
         if (!todo || !todo.id) return null;
 
         // 获取当前显示的序号值（编辑中的值或原始值，使用当前tab的序号）
-        const todoId = toStringId(todo.id!);
+        const todoId = todo.id;
         const currentDisplayOrder = editingOrder[todoId] !== undefined
           ? editingOrder[todoId]
           : (todo.displayOrders && todo.displayOrders[activeTab]);
@@ -506,12 +505,12 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
         // sortWithGroups 确保并列待办在所有模式下都相邻
         const isInGroup = isInParallelGroup &&
           (
-            (prevTodo && parallelGroup?.has(toStringId(prevTodo.id!))) ||
-            (nextTodo && parallelGroup?.has(toStringId(nextTodo.id!)))
+            (prevTodo && parallelGroup?.has(prevTodo.id)) ||
+            (nextTodo && parallelGroup?.has(nextTodo.id))
           );
 
-        const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(toStringId(prevTodo.id!)));
-        const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(toStringId(nextTodo.id!)));
+        const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(prevTodo.id));
+        const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(nextTodo.id));
         
         // 调试日志
         if (isInGroup) {
@@ -576,12 +575,12 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                     size="small"
                     min={0}
                     value={currentDisplayOrder}
-                    onChange={(value) => handleOrderChange(toNumberId(todo.id!), value)}
-                    onBlur={() => handleOrderSave(toNumberId(todo.id!), todo.displayOrders?.[activeTab])}
+                    onChange={(value) => handleOrderChange(todo.id, value)}
+                    onBlur={() => handleOrderSave(todo.id, todo.displayOrders?.[activeTab])}
                     onPressEnter={(e) => {
                       e.currentTarget.blur();
                     }}
-                    disabled={savingOrder.has(toNumberId(todo.id!)) || !!(isInGroup && !isGroupStart)}
+                    disabled={savingOrder.has(todo.id) || !!(isInGroup && !isGroupStart)}
                     placeholder="序号"
                     style={{
                       width: 70,
@@ -653,7 +652,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                     {/* 关联指示器 */}
                     {todo.id && (
                       <RelationIndicators
-                        todoId={toNumberId(todo.id!)}
+                        todoId={todo.id}
                         relations={relations}
                         allTodos={allTodos || []}
                         size="small"
@@ -686,7 +685,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                   </Tooltip>
                   <Popconfirm
                     title="确定要删除吗？"
-                    onConfirm={() => onDelete(toNumberId(todo.id!))}
+                    onConfirm={() => onDelete(todo.id)}
                     okText="确定"
                     cancelText="取消"
                   >
@@ -707,7 +706,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
               {todo.content && (
                 <TodoLinksPreview
                   content={todo.content}
-                  urlTitles={getUrlTitlesForTodo(toStringId(todo.id!))}
+                  urlTitles={getUrlTitlesForTodo(todo.id)}
                 />
               )}
 
@@ -725,7 +724,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                   </Tag>
                   <Select
                     value={todo.status}
-                    onChange={(value) => handleStatusChange(toNumberId(todo.id!), value)}
+                    onChange={(value) => handleStatusChange(todo.id, value)}
                     size="small"
                     style={{ minWidth: 90 }}
                   >
