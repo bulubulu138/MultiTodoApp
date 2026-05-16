@@ -593,7 +593,15 @@ export class FileStorageManager {
 
     try {
       const content = await fs.promises.readFile(relationsPath, 'utf-8');
-      return JSON.parse(content);
+      const relations = JSON.parse(content);
+
+      // 确保所有ID都是string类型，符合TodoRelation接口定义
+      return relations.map((relation: any) => ({
+        ...relation,
+        id: relation.id !== undefined ? String(relation.id) : undefined,
+        source_id: String(relation.source_id),
+        target_id: String(relation.target_id)
+      }));
     } catch {
       return [];
     }

@@ -1470,11 +1470,11 @@ class Application {
       }
     });
 
-    ipcMain.handle('flowchart-todo-association:create', async (_, flowchartId: string, todoId: number) => {
+    ipcMain.handle('flowchart-todo-association:create', async (_, flowchartId: string, todoId: string) => {
       try {
         this.flowchartTodoAssociationManager.createAssociation({
           flowchart_id: flowchartId,
-          todo_id: todoId.toString()
+          todo_id: todoId
         });
 
         console.log(`[FlowchartAssociation] Created association: flowchart=${flowchartId}, todo=${todoId}`);
@@ -1484,10 +1484,10 @@ class Application {
       }
     });
 
-    ipcMain.handle('flowchart-todo-association:delete', async (_, flowchartId: string, todoId: number) => {
+    ipcMain.handle('flowchart-todo-association:delete', async (_, flowchartId: string, todoId: string) => {
       try {
         const associations = this.flowchartTodoAssociationManager.getAssociationsByFlowchart(flowchartId);
-        const association = associations.find(a => a.todo_id === todoId.toString());
+        const association = associations.find(a => a.todo_id === todoId);
         if (association) {
           this.flowchartTodoAssociationManager.deleteAssociation(association.id);
         }

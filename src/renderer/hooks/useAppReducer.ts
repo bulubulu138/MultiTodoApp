@@ -142,7 +142,7 @@ export const appReducer = (state: AppState, action: AppAction): AppState => {
     case 'DELETE_RELATION':
       return {
         ...state,
-        relations: state.relations.filter(relation => relation.id !== action.payload)
+        relations: state.relations.filter(relation => String(relation.id) !== String(action.payload))
       };
 
     case 'SET_SETTINGS':
@@ -261,9 +261,9 @@ export const createAppActions = {
     payload: { id, updates }
   }),
   deleteTodo: (payload: string): AppAction => ({ type: 'DELETE_TODO', payload }),
-  bulkUpdateTodos: (payload: Array<{ uuid: string; updates: Partial<Todo> }>): AppAction => ({
+  bulkUpdateTodos: (payload: Array<{ id: string; updates: Partial<Todo> }>): AppAction => ({
     type: 'BULK_UPDATE_TODOS',
-    payload: payload.map(({ uuid, updates }) => ({ id: uuid, updates }))
+    payload
   }),
   setRelations: (payload: TodoRelation[]): AppAction => ({ type: 'SET_RELATIONS', payload }),
   addRelation: (payload: TodoRelation): AppAction => ({ type: 'ADD_RELATION', payload }),

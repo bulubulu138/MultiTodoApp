@@ -205,17 +205,17 @@ export const useAppState = () => {
     }
   }, [actions]);
 
-  const bulkUpdateTodos = useCallback(async (updates: Array<{ uuid: string; updates: Partial<Todo> }>) => {
+  const bulkUpdateTodos = useCallback(async (updates: Array<{ id: string; updates: Partial<Todo> }>) => {
     try {
       // 批量更新到数据库
-      const promises = updates.map(({ uuid, updates }) =>
-        window.electronAPI.todo.update(uuid, updates)
+      const promises = updates.map(({ id, updates }) =>
+        window.electronAPI.todo.update(id, updates)
       );
 
       await Promise.all(promises);
 
       // 转换为 dispatch 需要的格式
-      const dispatchUpdates = updates.map(({ uuid, updates }) => ({ id: uuid, updates }));
+      const dispatchUpdates = updates.map(({ id, updates }) => ({ id, updates }));
       dispatch(actions.bulkUpdateTodos(dispatchUpdates));
     } catch (error) {
       console.error('Error bulk updating todos:', error);
