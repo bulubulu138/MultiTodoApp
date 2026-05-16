@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { PromptTemplate, AISuggestionResponse } from '../shared/types';
+import type { PromptTemplate, AISuggestionResponse, TodoRelation } from '../shared/types';
 
 /**
  * 批量授权结果
@@ -120,7 +120,7 @@ export interface ElectronAPI {
     getAll: () => Promise<any[]>;
     getByTodoId: (todoId: string) => Promise<any[]>;
     getByType: (relationType: string) => Promise<any[]>;
-    create: (relation: any) => Promise<number>;
+    create: (relation: any) => Promise<TodoRelation>;
     delete: (id: string) => Promise<void>;
     deleteByTodoId: (todoId: string) => Promise<void>;
     deleteSpecific: (sourceId: string, targetId: string, relationType: string) => Promise<void>;
@@ -132,7 +132,11 @@ export interface ElectronAPI {
   backup: {
     list: () => Promise<any[]>;
     create: () => Promise<any>;
-    restore: (backupPath: string) => Promise<void>;
+    getCurrentBackupStatus: () => Promise<{
+      lastBackupTime: string;
+      nextBackupTime: string;
+      backupEnabled: boolean;
+    }>;
   };
   
   // 流程图API
@@ -275,6 +279,30 @@ export interface ElectronAPI {
     }>;
     selectFolder: () => Promise<string | null>;
     openInExplorer: (path: string) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    // 新增数据库管理 API
+    getRecentDatabases: () => Promise<{
+      success: boolean;
+      databases?: Array<{
+        path: string;
+        name: string;
+        lastUsed: string;
+        todoCount: number;
+        isValid: boolean;
+      }>;
+      error?: string;
+    }>;
+    validateDatabase: (dbPath: string) => Promise<{
+      valid: boolean;
+      error?: string;
+    }>;
+    initializeDatabase: (dbPath: string) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    switchDatabase: (dbPath: string) => Promise<{
       success: boolean;
       error?: string;
     }>;
@@ -430,7 +458,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   backup: {
     list: () => ipcRenderer.invoke('backup:list'),
     create: () => ipcRenderer.invoke('backup:create'),
-    restore: (backupPath: string) => ipcRenderer.invoke('backup:restore', backupPath),
+    getCurrentBackupStatus: () => ipcRenderer.invoke('backup:getCurrentBackupStatus'),
   },
   flowchart: {
     getAssociationsByTodoIds: (todoIds: string[]) =>
@@ -521,6 +549,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     moveStorage: (newPath: string) => ipcRenderer.invoke('storageLocation:moveStorage', newPath),
     selectFolder: () => ipcRenderer.invoke('storageLocation:selectFolder'),
     openInExplorer: (path: string) => ipcRenderer.invoke('storageLocation:openInExplorer', path),
+    // 新增数据库管理 API
+    getRecentDatabases: () => ipcRenderer.invoke('storageLocation:getRecentDatabases'),
+    validateDatabase: (dbPath: string) => ipcRenderer.invoke('storageLocation:validateDatabase', dbPath),
+    initializeDatabase: (dbPath: string) => ipcRenderer.invoke('storageLocation:initializeDatabase', dbPath),
+    switchDatabase: (dbPath: string) => ipcRenderer.invoke('storageLocation:switchDatabase', dbPath),
   },
 
   // 混合存储
@@ -533,6 +566,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     importMarkdownFile: (filePath: string) => ipcRenderer.invoke('hybridStorage:importMarkdownFile', filePath),
     exportTodoAsMarkdown: (todoId: number) => ipcRenderer.invoke('hybridStorage:exportTodoAsMarkdown', todoId),
     invalidateCache: () => ipcRenderer.invoke('hybridStorage:invalidateCache'),
+  },
+
+  // 混合存储事件
+  hybridStorageEvents: {
+    onConfigChange: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on('hybridStorage:config-changed', listener);
+      return () => ipcRenderer.removeListener('hybridStorage:config-changed', listener);
+    },
   },
 
   // 调试工具

@@ -47,7 +47,7 @@ export class PerformanceMonitor {
     searchResponseTime: 300,    // 300ms
     saveResponseTime: 100,      // 100ms
     memoryUsage: 200 * 1024 * 1024, // 200MB
-    domNodeCount: 500,          // 500 nodes
+    domNodeCount: 3000,         // 3000 nodes (adjusted for modern complex applications)
   };
 
   /**
@@ -281,12 +281,12 @@ export class PerformanceMonitor {
    */
   private static warn(label: string, message: string): void {
     console.warn(`[Performance Warning] ${message}`);
-    
-    // 在开发环境中，可以显示更详细的信息
+
+    // 在开发环境中，详细信息使用 console.log 而非 console.warn 以减少视觉干扰
     if (this.isDevelopment) {
-      console.warn(`[Performance Warning] Label: ${label}`);
-      console.warn(`[Performance Warning] Average: ${this.getAverage(label).toFixed(2)}ms`);
-      console.warn(`[Performance Warning] History:`, this.measurements.get(label));
+      console.log(`[Performance Warning] Label: ${label}`);
+      console.log(`[Performance Warning] Average: ${this.getAverage(label).toFixed(2)}ms`);
+      console.log(`[Performance Warning] History:`, this.measurements.get(label));
     }
   }
 
@@ -447,7 +447,7 @@ export class PerformanceMonitor {
 
     // DOM 节点建议
     const domNodeCount = document.getElementsByTagName('*').length;
-    if (domNodeCount > this.thresholds.domNodeCount) {
+    if (domNodeCount > this.thresholds.domNodeCount) {  // Use unified threshold configuration
       suggestions.push(`DOM 节点数量较多（${domNodeCount}），建议使用虚拟滚动或懒加载`);
     }
 

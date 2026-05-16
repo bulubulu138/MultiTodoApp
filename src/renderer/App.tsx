@@ -109,8 +109,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       // 记录初始加载时间
       PerformanceMonitor.start('initial-load');
       
-      // 启动定期监控（每10秒）
-      const monitoringTimer = PerformanceMonitor.startMonitoring(10000);
+      // 启动定期监控（每60秒）
+      const monitoringTimer = PerformanceMonitor.startMonitoring(60000);
       
       return () => {
         if (monitoringTimer) {

@@ -226,8 +226,7 @@ export const useAppState = () => {
   // 关系操作函数
   const createRelation = useCallback(async (relationData: Omit<TodoRelation, 'id'>) => {
     try {
-      const newRelationId = await window.electronAPI.relations.create(relationData);
-      const newRelation = { ...relationData, id: newRelationId };
+      const newRelation = await window.electronAPI.relations.create(relationData);
       dispatch(actions.addRelation(newRelation));
       return newRelation;
     } catch (error) {
@@ -236,7 +235,7 @@ export const useAppState = () => {
     }
   }, [actions]);
 
-  const deleteRelation = useCallback(async (id: number) => {
+  const deleteRelation = useCallback(async (id: string) => {
     try {
       await window.electronAPI.relations.delete(id);
       dispatch(actions.deleteRelation(id));

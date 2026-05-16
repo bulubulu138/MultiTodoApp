@@ -41,7 +41,7 @@ export type AppAction =
   | { type: 'BULK_UPDATE_TODOS'; payload: Array<{ id: string; updates: Partial<Todo> }> }
   | { type: 'SET_RELATIONS'; payload: TodoRelation[] }
   | { type: 'ADD_RELATION'; payload: TodoRelation }
-  | { type: 'DELETE_RELATION'; payload: number }
+  | { type: 'DELETE_RELATION'; payload: string }
   | { type: 'SET_SETTINGS'; payload: Record<string, string> }
   | { type: 'UPDATE_SETTING'; payload: { key: string; value: string } }
   | { type: 'SET_CUSTOM_TABS'; payload: CustomTab[] }
@@ -64,7 +64,6 @@ export type AppAction =
   | { type: 'SET_EDITING_TODO'; payload: Todo | null }
   | { type: 'SET_VIEWING_TODO'; payload: Todo | null }
   | { type: 'SET_QUICK_CREATE_CONTENT'; payload: string | null }
-  | { type: 'BULK_UPDATE_TODOS'; payload: Array<{ id: number; updates: Partial<Todo> }> }
   | { type: 'TOGGLE_FORM' }
   | { type: 'TOGGLE_SETTINGS' }
   | { type: 'TOGGLE_EXPORT' }
@@ -268,7 +267,7 @@ export const createAppActions = {
   }),
   setRelations: (payload: TodoRelation[]): AppAction => ({ type: 'SET_RELATIONS', payload }),
   addRelation: (payload: TodoRelation): AppAction => ({ type: 'ADD_RELATION', payload }),
-  deleteRelation: (payload: number): AppAction => ({ type: 'DELETE_RELATION', payload }),
+  deleteRelation: (payload: string): AppAction => ({ type: 'DELETE_RELATION', payload }),
   setSettings: (payload: Record<string, string>): AppAction => ({ type: 'SET_SETTINGS', payload }),
   updateSetting: (key: string, value: string): AppAction => ({
     type: 'UPDATE_SETTING',

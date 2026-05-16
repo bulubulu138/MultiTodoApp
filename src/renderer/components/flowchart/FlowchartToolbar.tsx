@@ -63,7 +63,7 @@ export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
   const [editingName, setEditingName] = useState('');
 
   // 待办关联状态
-  const [associatedTodoIds, setAssociatedTodoIds] = useState<number[]>([]);
+  const [associatedTodoIds, setAssociatedTodoIds] = useState<string[]>([]);
   const [loadingAssociations, setLoadingAssociations] = useState(false);
 
   // 加载已关联的待办
@@ -88,7 +88,7 @@ export const FlowchartToolbar: React.FC<FlowchartToolbarProps> = ({
   };
 
   // 处理待办关联
-  const handleTodoAssociation = async (todoId: number, checked: boolean) => {
+  const handleTodoAssociation = async (todoId: string, checked: boolean) => {
     if (!flowchartId) return;
     
     try {
