@@ -47,6 +47,8 @@ export interface ElectronAPI {
     batchUpdateDisplayOrders: (updates: {uuid: string, tabKey: string, displayOrder: number}[]) => Promise<void>;  // 修复：uuid 参数类型为 string
     bulkUpdateTodos: (updates: Array<{uuid: string; updates: any}>) => Promise<void>;  // 修复：uuid 参数类型为 string
     bulkDeleteTodos: (uuids: string[]) => Promise<void>;  // 修复：uuids 参数类型为 string
+    exportAll: () => Promise<any>;  // 导出所有数据
+    importAll: (data: any) => Promise<any>;  // 导入数据
   };
   
   // 关键词和推荐API
@@ -322,130 +324,6 @@ export interface ElectronAPI {
     onConfigChange: (callback: () => void) => () => void;
   };
 
-  // 数据同步API
-  dataSync: {
-    getConfig: () => Promise<{
-      success: boolean;
-      config?: {
-        enabled: boolean;
-        interval: number;
-        autoSyncOnSwitch: boolean;
-        conflictResolution: string;
-      };
-      error?: string;
-    }>;
-    updateConfig: (newConfig: any) => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
-    getStatus: () => Promise<{
-      success: boolean;
-      status?: string;
-      lastSyncTime?: number;
-      error?: string;
-    }>;
-    manualSync: () => Promise<{
-      success: boolean;
-      result?: {
-        success: boolean;
-        startTime: number;
-        endTime: number;
-        duration: number;
-        itemsProcessed: number;
-        itemsSuccess: number;
-        itemsFailed: number;
-        errors: string[];
-      };
-      error?: string;
-    }>;
-    getStats: () => Promise<{
-      success: boolean;
-      stats?: {
-        lastSyncTime: number;
-        syncStatus: string;
-        totalSyncs: number;
-        successfulSyncs: number;
-        failedSyncs: number;
-        averageDuration: number;
-      };
-      error?: string;
-    }>;
-    getHistory: () => Promise<{
-      success: boolean;
-      history?: any[];
-      error?: string;
-    }>;
-    clearHistory: () => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
-  };
-
-  // 文件系统监控器API
-  filesystemWatcher: {
-    getConfig: () => Promise<{
-      success: boolean;
-      config?: {
-        enabled: boolean;
-        debounceDelay: number;
-        ignorePatterns: RegExp[];
-        autoSync: boolean;
-        notifyChanges: boolean;
-      };
-      error?: string;
-    }>;
-    updateConfig: (newConfig: any) => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
-    getStatus: () => Promise<{
-      success: boolean;
-      status?: string;
-      error?: string;
-    }>;
-    getStats: () => Promise<{
-      success: boolean;
-      stats?: {
-        status: string;
-        watchPath: string;
-        filesWatched: number;
-        changesDetected: number;
-        lastChangeTime: number;
-        uptime: number;
-        errors: number;
-      };
-      error?: string;
-    }>;
-    start: () => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
-    stop: () => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
-    pause: () => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
-    resume: () => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
-    refresh: () => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
-    getWatchedFiles: () => Promise<{
-      success: boolean;
-      files?: string[];
-      error?: string;
-    }>;
-    resetStats: () => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
-  };
 
   // 调试工具API
   debug: {
@@ -475,6 +353,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     batchUpdateDisplayOrders: (updates: {uuid: string, tabKey: string, displayOrder: number}[]) => ipcRenderer.invoke('todo:batchUpdateDisplayOrders', updates),  // 修复：uuid 参数类型为 string
     bulkUpdateTodos: (updates: Array<{uuid: string; updates: any}>) => ipcRenderer.invoke('todo:bulkUpdateTodos', updates),  // 修复：uuid 参数类型为 string
     bulkDeleteTodos: (uuids: string[]) => ipcRenderer.invoke('todo:bulkDeleteTodos', uuids),  // 修复：uuids 参数类型为 string
+    exportAll: () => ipcRenderer.invoke('todo:exportAll'),  // 导出所有数据
+    importAll: (data: any) => ipcRenderer.invoke('todo:importAll', data),  // 导入数据
   },
   keywords: {
     getRecommendations: (title: string, content: string, excludeId?: number) => 
@@ -653,41 +533,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     importMarkdownFile: (filePath: string) => ipcRenderer.invoke('hybridStorage:importMarkdownFile', filePath),
     exportTodoAsMarkdown: (todoId: number) => ipcRenderer.invoke('hybridStorage:exportTodoAsMarkdown', todoId),
     invalidateCache: () => ipcRenderer.invoke('hybridStorage:invalidateCache'),
-  },
-
-  // 混合存储事件
-  hybridStorageEvents: {
-    onConfigChange: (callback: () => void) => {
-      const listener = () => callback();
-      ipcRenderer.on('hybridStorage:configChanged', listener);
-      return () => ipcRenderer.removeListener('hybridStorage:configChanged', listener);
-    }
-  },
-
-  // 数据同步
-  dataSync: {
-    getConfig: () => ipcRenderer.invoke('dataSync:getConfig'),
-    updateConfig: (newConfig: any) => ipcRenderer.invoke('dataSync:updateConfig', newConfig),
-    getStatus: () => ipcRenderer.invoke('dataSync:getStatus'),
-    manualSync: () => ipcRenderer.invoke('dataSync:manualSync'),
-    getStats: () => ipcRenderer.invoke('dataSync:getStats'),
-    getHistory: () => ipcRenderer.invoke('dataSync:getHistory'),
-    clearHistory: () => ipcRenderer.invoke('dataSync:clearHistory'),
-  },
-
-  // 文件系统监控器
-  filesystemWatcher: {
-    getConfig: () => ipcRenderer.invoke('filesystemWatcher:getConfig'),
-    updateConfig: (newConfig: any) => ipcRenderer.invoke('filesystemWatcher:updateConfig', newConfig),
-    getStatus: () => ipcRenderer.invoke('filesystemWatcher:getStatus'),
-    getStats: () => ipcRenderer.invoke('filesystemWatcher:getStats'),
-    start: () => ipcRenderer.invoke('filesystemWatcher:start'),
-    stop: () => ipcRenderer.invoke('filesystemWatcher:stop'),
-    pause: () => ipcRenderer.invoke('filesystemWatcher:pause'),
-    resume: () => ipcRenderer.invoke('filesystemWatcher:resume'),
-    refresh: () => ipcRenderer.invoke('filesystemWatcher:refresh'),
-    getWatchedFiles: () => ipcRenderer.invoke('filesystemWatcher:getWatchedFiles'),
-    resetStats: () => ipcRenderer.invoke('filesystemWatcher:resetStats'),
   },
 
   // 调试工具
