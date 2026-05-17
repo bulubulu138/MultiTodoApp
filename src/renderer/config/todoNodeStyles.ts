@@ -26,9 +26,21 @@ export const TODO_NODE_STYLES: TodoNodeThemeStyles = {
       borderColor: '#d9d9d9',     // 灰色边框
       borderWidth: 2,
       color: '#262626'            // 深灰色文字（对比度 12.6:1）
+    },
+    paused: {
+      backgroundColor: '#fff7e6', // 浅橙色背景
+      borderColor: '#fa8c16',     // 橙色边框
+      borderWidth: 2,
+      color: '#ad4e00'            // 深橙色文字（对比度 6.5:1）
+    },
+    today_completed: {
+      backgroundColor: '#e6f7ff', // 浅蓝色背景
+      borderColor: '#1890ff',     // 蓝色边框
+      borderWidth: 2,
+      color: '#003a8c'            // 深蓝色文字（对比度 8.1:1）
     }
   },
-  
+
   // 暗黑模式样式
   dark: {
     completed: {
@@ -48,6 +60,18 @@ export const TODO_NODE_STYLES: TodoNodeThemeStyles = {
       borderColor: '#595959',     // 中灰色边框
       borderWidth: 2,
       color: '#e8e8e8'            // 浅灰色文字（对比度 10.2:1）
+    },
+    paused: {
+      backgroundColor: '#2b1d0e', // 深橙色背景
+      borderColor: '#d46b08',     // 亮橙色边框
+      borderWidth: 2,
+      color: '#ff9c6e'            // 浅橙色文字（对比度 7.8:1）
+    },
+    today_completed: {
+      backgroundColor: '#002766', // 深蓝色背景
+      borderColor: '#0050b3',     // 亮蓝色边框
+      borderWidth: 2,
+      color: '#85a5ff'            // 浅蓝色文字（对比度 7.9:1）
     }
   }
 };

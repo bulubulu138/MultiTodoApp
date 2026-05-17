@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, Space, Select, Tooltip, Segmented, Input } from 'antd';
-import { PlusOutlined, SettingOutlined, CalendarOutlined, SortAscendingOutlined, UnorderedListOutlined, AlignLeftOutlined, SearchOutlined, ApartmentOutlined } from '@ant-design/icons';
+import { PlusOutlined, SettingOutlined, CalendarOutlined, SortAscendingOutlined, UnorderedListOutlined, AlignLeftOutlined, AppstoreOutlined, SearchOutlined, ApartmentOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 
 const { Option } = Select;
@@ -11,9 +11,10 @@ export type SortOption =
   | 'createdAt-asc'
   | 'updatedAt-desc'
   | 'updatedAt-asc'
-  | 'manual';
+  | 'manual'
+  | 'drag';
 
-export type ViewMode = 'card' | 'content-focus';
+export type ViewMode = 'card' | 'content-focus' | 'compact';
 
 interface ToolbarProps {
   onAddTodo: () => void;
@@ -61,6 +62,7 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
           suffixIcon={<SortAscendingOutlined />}
         >
           <Option value="manual">手动排序</Option>
+          <Option value="drag">拖拽排序</Option>
           <Option value="createdAt-desc">创建时间 ↓ 新→旧</Option>
           <Option value="createdAt-asc">创建时间 ↑ 旧→新</Option>
           <Option value="updatedAt-desc">更新时间 ↓ 新→旧</Option>
@@ -76,6 +78,11 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
                 label: '卡片',
                 value: 'card',
                 icon: <UnorderedListOutlined />,
+              },
+              {
+                label: '紧凑',
+                value: 'compact',
+                icon: <AppstoreOutlined />,
               },
               {
                 label: '专注',

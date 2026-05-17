@@ -5,6 +5,7 @@ import { DeleteOutlined, CopyOutlined, PlayCircleOutlined, ClockCircleOutlined, 
 import { motion } from 'framer-motion';
 import { SortOption, ViewMode } from './Toolbar';
 import ContentFocusView from './ContentFocusView';
+import DragDropTodoList from './DragDropTodoList';
 import RelationIndicators from './RelationIndicators';
 import VirtualizedTodoList from './VirtualizedTodoList';
 import TodoLinksPreview from './TodoLinksPreview';
@@ -40,6 +41,7 @@ interface TodoListProps {
   onLoadMore?: () => void; // 加载更多数据的回调
   totalCount?: number; // 总数据量
   colorTheme?: ColorTheme; // 主题色
+  onDragEnd?: (newOrder: Todo[]) => void; // 拖拽排序结束回调
 }
 
 // 性能优化：使用 React.memo 避免不必要的重渲染
@@ -64,6 +66,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   onLoadMore,
   totalCount = 0,
   colorTheme = 'purple',
+  onDragEnd,
 }) => {
   const { message } = App.useApp();
   const colors = useThemeColors();
@@ -431,6 +434,130 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
 
     return groups;
   }, [todos, parallelRelationsByTodo]);
+
+  // 如果是拖拽排序模式，使用拖拽排序组件
+  if (sortOption === 'drag' && onDragEnd) {
+    return (
+      <DragDropTodoList
+        todos={todos}
+        activeTab={activeTab}
+        onDragEnd={onDragEnd}
+        renderTodoItem={(todo, isDragging, dragHandleProps) => {
+          // 渲染单个任务项的逻辑
+          const todoGroups = relationsByTodo?.get(todo.id) || [];
+          const parallelGroup = parallelRelationsByTodo?.get(todo.id);
+          const isInGroup = parallelGroup && parallelGroup.length > 1;
+          const isGroupStart = isInGroup && todoGroups[0]?.source_id === todo.id;
+          const isGroupEnd = isInGroup && todoGroups[todoGroups.length - 1]?.target_id === todo.id;
+
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              style={{ marginBottom: isGroupEnd && isInGroup ? 16 : 6 }}
+            >
+              <Card
+                hoverable
+                style={{
+                  borderRadius: 8,
+                  borderLeft: `4px solid ${colors.textPrimary}`,
+                  borderRight: isInGroup && isGroupStart ? `4px solid ${colors.textPrimary}` : undefined,
+                  borderTop: isInGroup && isGroupStart ? `1px solid ${colors.textPrimary}` : undefined,
+                  borderBottom: isInGroup && isGroupEnd ? `1px solid ${colors.textPrimary}` : undefined,
+                  opacity: isDragging ? 0.5 : 1,
+                  cursor: isDragging ? 'grabbing' : 'default',
+                }}
+                onClick={() => onView(todo)}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  {/* 拖拽手柄 */}
+                  {dragHandleProps && (
+                    <div
+                      {...dragHandleProps.attributes}
+                      {...dragHandleProps.listeners}
+                      style={{
+                        cursor: 'grab',
+                        padding: '4px 8px',
+                        marginRight: '8px',
+                        opacity: 0.6,
+                        transition: 'opacity 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                      onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
+                      title="拖拽排序"
+                    >
+                      ⋮⋮
+                    </div>
+                  )}
+
+                  {/* 任务内容 */}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                      <Text strong style={{ fontSize: 16, flex: 1 }}>
+                        {todo.title}
+                      </Text>
+                      <Tag color={getPriorityColor(todo.priority)}>{getPriorityText(todo.priority)}</Tag>
+                    </div>
+                    {todo.content && (
+                      <Paragraph
+                        ellipsis={{ rows: 2 }}
+                        style={{ marginBottom: 8, color: '#666' }}
+                      >
+                        {extractPlainText(todo.content)}
+                      </Paragraph>
+                    )}
+                    <Space size="middle">
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        创建于 {dayjs(todo.createdAt).format('YYYY-MM-DD HH:mm')}
+                      </Text>
+                      {todo.deadline && (
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          截止 {dayjs(todo.deadline).format('YYYY-MM-DD HH:mm')}
+                        </Text>
+                      )}
+                      {renderTags(todo.tags)}
+                    </Space>
+                  </div>
+                </div>
+              </Card>
+            </motion.div>
+          );
+        }}
+      />
+    );
+  }
+
+  // 如果是紧凑视图模式，使用紧凑组件
+  if (viewMode === 'compact') {
+    const { default: CompactTodoView } = require('./CompactTodoView');
+    return (
+      <CompactTodoView
+        todos={todos}
+        allTodos={allTodos}
+        onUpdate={async (id: string, updates: any) => {
+          (onUpdateInPlace || onStatusChange)(id, updates);
+        }}
+        onView={onView}
+        activeTab={activeTab}
+        relations={relations}
+        sortOption={sortOption}
+        onDragEnd={onUpdateDisplayOrder ? async (newOrder: Todo[]) => {
+          // 更新显示顺序 - 批量更新每个项目的显示顺序
+          for (let i = 0; i < newOrder.length; i++) {
+            const todo = newOrder[i];
+            if (todo.status !== 'today_completed') { // 跳过今日已完成项目
+              await onUpdateDisplayOrder(todo.id, activeTab, i);
+            }
+          }
+        } : undefined}
+      />
+    );
+  }
 
   // 如果是内容专注模式，使用专用组件
   if (viewMode === 'content-focus') {

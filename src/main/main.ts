@@ -9,13 +9,10 @@ import { ImageManager } from './utils/ImageManager';
 import { BackupManager } from './utils/BackupManager';
 import { generateContentHash } from './utils/hashUtils';
 import { keywordExtractor, KeywordExtractor } from './services/KeywordExtractor';
-import { aiService } from './services/AIService';
 import { urlTitleService } from './services/URLTitleService';
 import { URLAuthService } from './services/URLAuthServiceStub';
 import { URLAuthorizationService } from './services/URLAuthorizationServiceStub';
 // import { AuthorizationRefreshScheduler } from './services/AuthorizationRefreshScheduler';
-import { TodoRecommendation } from '../shared/types';
-import { aiConfigManager } from './config/AIConfigManager';
 import { databaseManager } from './services/DatabaseManager';
 import { appConfigManager } from './config/AppConfig';
 
@@ -34,12 +31,6 @@ class Application {
   private urlAuthorizationService: URLAuthorizationService | null = null;
   // private authorizationRefreshScheduler: AuthorizationRefreshScheduler | null = null;
 
-  // ✅ 新增：全局并发锁 - 用于AI建议任务的并发控制
-  private activeAiRequest: null | {
-    controller: AbortController;
-    todoId: string;
-    timestamp: number;
-  } = null;
 
   // ✅ 新增：存储位置管理
   private appConfig: any = null;
@@ -167,6 +158,9 @@ class Application {
     this.mainWindow.on('closed', () => {
       this.mainWindow = null;
     });
+
+    // 设置DatabaseManager的主窗口引用
+    this.databaseManager.setMainWindow(this.mainWindow);
   }
 
   private async loadDevServer(retries = 10): Promise<void> {
@@ -460,20 +454,18 @@ class Application {
       errors.push('SettingsManager is not initialized');
     }
 
-    // 检查AI服务
-    try {
-      const config = aiService.getConfig();
-      if (!config.enabled) {
-        console.warn('AI service is disabled (this is OK if user has not configured it yet)');
-      }
-    } catch (error) {
-      errors.push('AI service is not available');
-    }
-
     return {
       success: errors.length === 0,
       errors
     };
+  }
+
+  /**
+   * 获取今日完成管理器
+   * @returns TodayCompletedManager实例或null
+   */
+  private getTodayCompletedManager(): any {
+    return this.databaseManager.getTodayCompletedManager();
   }
 
   /**
@@ -484,29 +476,29 @@ class Application {
   private setupIpcHandlers(): void {
     // 待办事项相关的IPC处理器
     ipcMain.handle('todo:getAll', async () => {
-      return await this.fileStorageManager.getAllTodos();
+      return await this.databaseManager.getStorageManager().getAllTodos();
     });
 
     ipcMain.handle('todo:getById', async (_, uuid: string) => {
       // 🔧 新增：根据UUID获取单个待办，用于增量刷新
-      return await this.fileStorageManager.getTodoByUuid(uuid);
+      return await this.databaseManager.getStorageManager().getTodoByUuid(uuid);
     });
 
     ipcMain.handle('todo:create', async (_, todo) => {
-      return await this.fileStorageManager.createTodo(todo);
+      return await this.databaseManager.getStorageManager().createTodo(todo);
     });
 
     ipcMain.handle('todo:createManualAtTop', async (_, todo, tabKey: string) => {
       // 简化实现：直接创建todo，暂不支持标签特定顺序
-      return await this.fileStorageManager.createTodo(todo);
+      return await this.databaseManager.getStorageManager().createTodo(todo);
     });
 
     ipcMain.handle('todo:update', async (_, uuid: string, updates) => {
-      await this.fileStorageManager.updateTodo(uuid, updates);
+      await this.databaseManager.getStorageManager().updateTodo(uuid, updates);
     });
 
     ipcMain.handle('todo:delete', async (_, uuid: string) => {
-      await this.fileStorageManager.deleteTodo(uuid);
+      await this.databaseManager.getStorageManager().deleteTodo(uuid);
     });
 
     ipcMain.handle('todo:generateHash', async (_, title: string, content: string) => {
@@ -522,7 +514,7 @@ class Application {
       // 简化实现：逐个更新
       for (const update of updates) {
         try {
-          await this.fileStorageManager.updateTodo(update.uuid, { displayOrder: update.displayOrder });
+          await this.databaseManager.getStorageManager().updateTodo(update.uuid, { displayOrder: update.displayOrder });
         } catch (error) {
           console.error('Failed to update display order:', error);
         }
@@ -531,14 +523,32 @@ class Application {
     });
 
     ipcMain.handle('todo:batchUpdateDisplayOrders', async (_, updates: {uuid: string, tabKey: string, displayOrder: number}[]) => {
-      // 简化实现：逐个更新
+      // 按待办分组更新
+      const groupedUpdates = new Map<string, Array<{tabKey: string; displayOrder: number}>>();
+
       for (const update of updates) {
-        try {
-          await this.fileStorageManager.updateTodo(update.uuid, { displayOrders: {} });
-        } catch (error) {
-          console.error('Failed to update display orders:', error);
+        if (!groupedUpdates.has(update.uuid)) {
+          groupedUpdates.set(update.uuid, []);
+        }
+        groupedUpdates.get(update.uuid)!.push({
+          tabKey: update.tabKey,
+          displayOrder: update.displayOrder
+        });
+      }
+
+      // 批量更新
+      for (const [uuid, displayOrders] of groupedUpdates) {
+        const todo = await this.databaseManager.getStorageManager().getTodoById(uuid);
+        if (todo) {
+          const newDisplayOrders = todo.displayOrders || {};
+          displayOrders.forEach(({ tabKey, displayOrder }) => {
+            newDisplayOrders[tabKey] = displayOrder;
+          });
+
+          await this.databaseManager.getStorageManager().updateTodo(uuid, { displayOrders: newDisplayOrders });
         }
       }
+
       return { success: true };
     });
 
@@ -546,7 +556,7 @@ class Application {
       // 简化实现：逐个更新
       for (const { uuid, updates: todoUpdates } of updates) {
         try {
-          await this.fileStorageManager.updateTodo(uuid, todoUpdates);
+          await this.databaseManager.getStorageManager().updateTodo(uuid, todoUpdates);
         } catch (error) {
           console.error('Failed to update todo:', error);
         }
@@ -558,12 +568,27 @@ class Application {
       // 简化实现：逐个删除
       for (const uuid of uuids) {
         try {
-          await this.fileStorageManager.deleteTodo(uuid);
+          await this.databaseManager.getStorageManager().deleteTodo(uuid);
         } catch (error) {
           console.error('Failed to delete todo:', error);
         }
       }
       return { success: true };
+    });
+
+    ipcMain.handle('todo:toggleTodayCompleted', async (_, uuid: string, currentState: string) => {
+      try {
+        const todayCompletedManager = this.getTodayCompletedManager();
+        if (!todayCompletedManager) {
+          return { success: false, error: 'Today completed manager not initialized' };
+        }
+
+        await todayCompletedManager.toggleTodayCompleted(uuid, currentState);
+        return { success: true };
+      } catch (error) {
+        console.error('[IPC] Failed to toggle today_completed:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      }
     });
 
     // 设置相关
@@ -872,42 +897,42 @@ class Application {
 
     // 关系相关的IPC处理器
     ipcMain.handle('relations:getAll', async () => {
-      return await this.fileStorageManager.getAllRelations();
+      return await this.databaseManager.getStorageManager().getAllRelations();
     });
 
     ipcMain.handle('relations:getByTodoId', async (_, todoId) => {
-      const relations = await this.fileStorageManager.getAllRelations();
+      const relations = await this.databaseManager.getStorageManager().getAllRelations();
       return relations.filter(r => String(r.source_id) === String(todoId) || String(r.target_id) === String(todoId));
     });
 
     ipcMain.handle('relations:getByType', async (_, relationType) => {
-      const relations = await this.fileStorageManager.getAllRelations();
+      const relations = await this.databaseManager.getStorageManager().getAllRelations();
       return relations.filter(r => r.relation_type === relationType);
     });
 
     ipcMain.handle('relations:create', async (_, relation) => {
-      return await this.fileStorageManager.createRelation(relation);
+      return await this.databaseManager.getStorageManager().createRelation(relation);
     });
 
     ipcMain.handle('relations:delete', async (_, id) => {
-      return await this.fileStorageManager.deleteRelation(id);
+      return await this.databaseManager.getStorageManager().deleteRelation(id);
     });
 
     ipcMain.handle('relations:deleteByTodoId', async (_, todoId) => {
       // 简化实现：获取相关的关系然后删除
-      const relations = await this.fileStorageManager.getAllRelations();
+      const relations = await this.databaseManager.getStorageManager().getAllRelations();
       const todoRelations = relations.filter(r => String(r.source_id) === String(todoId) || String(r.target_id) === String(todoId));
 
       for (const relation of todoRelations) {
         if (relation.id !== undefined) {
-          await this.fileStorageManager.deleteRelation(String(relation.id));
+          await this.databaseManager.getStorageManager().deleteRelation(String(relation.id));
         }
       }
     });
 
     ipcMain.handle('relations:deleteSpecific', async (_, sourceId, targetId, relationType) => {
       // 简化实现：查找并删除特定的关系
-      const relations = await this.fileStorageManager.getAllRelations();
+      const relations = await this.databaseManager.getStorageManager().getAllRelations();
       const targetRelation = relations.find(r =>
         String(r.source_id) === String(sourceId) &&
         String(r.target_id) === String(targetId) &&
@@ -915,12 +940,12 @@ class Application {
       );
 
       if (targetRelation && targetRelation.id !== undefined) {
-        await this.fileStorageManager.deleteRelation(String(targetRelation.id));
+        await this.databaseManager.getStorageManager().deleteRelation(String(targetRelation.id));
       }
     });
 
     ipcMain.handle('relations:exists', async (_, sourceId, targetId, relationType) => {
-      const relations = await this.fileStorageManager.getAllRelations();
+      const relations = await this.databaseManager.getStorageManager().getAllRelations();
       return relations.some(r =>
         String(r.source_id) === String(sourceId) &&
         String(r.target_id) === String(targetId) &&
@@ -1009,301 +1034,8 @@ class Application {
       return { success: true, message: 'Data integrity check not yet implemented' };
     });
 
-    // AI 相关
-    ipcMain.handle('ai:testConnection', async () => {
-      return await aiService.testConnection();
-    });
 
-    ipcMain.handle('ai:configure', async (_, provider: string, apiKey: string, endpoint?: string, model?: string) => {
-      try {
-        console.log('[ai:configure] 接收到配置请求:', { provider, apiKey: apiKey ? '***' : '(empty)', endpoint, model });
 
-        // ✅ 添加参数验证
-        if (!provider || provider === 'disabled') {
-          console.log('[ai:configure] Provider is disabled');
-          aiService.configure('disabled', '');
-          aiConfigManager.updateProvider('disabled', '', '', '');
-          return { success: true };
-        }
-
-        if (!apiKey || apiKey.length === 0) {
-          console.warn('[ai:configure] API Key is empty, AI service will be disabled');
-          aiService.configure(provider as any, '', endpoint, model);
-          aiConfigManager.updateProvider(provider as any, '', endpoint || '', model || '');
-          return { success: true };
-        }
-
-        // 配置AI服务
-        aiService.configure(provider as any, apiKey, endpoint, model);
-        console.log('[ai:configure] 配置后的状态:', {
-          provider,
-          apiKeyLength: apiKey.length,
-          endpoint,
-          model
-        });
-
-        // 验证AI服务是否成功启用
-        if (provider !== 'disabled' && !aiService) {
-          console.error('[ai:configure] ⚠️  警告：配置后AI服务仍未启用！provider:', provider, 'apiKeyLength:', apiKey.length);
-        }
-
-        // 保存到配置文件
-        console.log('[ai:configure] 准备保存到配置文件');
-        aiConfigManager.updateProvider(provider as any, apiKey, endpoint || '', model || '');
-        console.log('[ai:configure] 配置文件保存成功');
-
-        return { success: true };
-      } catch (error) {
-        console.error('[ai:configure] 保存失败:', error);
-        return { success: false, error: (error as Error).message };
-      }
-    });
-
-    ipcMain.handle('ai:getConfig', async () => {
-      return aiService.getConfig();
-    });
-
-    ipcMain.handle('ai:getSupportedProviders', async () => {
-      const { AIService } = await import('./services/AIService');
-      return AIService.getSupportedProviders();
-    });
-
-    ipcMain.handle('ai:getAvailableModels', async (_, provider: string) => {
-      const { AIService } = await import('./services/AIService');
-      return AIService.getAvailableModels(provider as any);
-    });
-
-    ipcMain.handle('ai:fetchModels', async (_, provider: string, apiKey: string, endpoint?: string) => {
-      const { AIService } = await import('./services/AIService');
-      return await AIService.fetchAvailableModels(provider as any, apiKey, endpoint);
-    });
-
-    // 获取所有已配置的providers
-    ipcMain.handle('ai:getAllProviders', async () => {
-      try {
-        const providers = aiConfigManager.getAllProviders();
-        return {
-          success: true,
-          providers: providers.map(({ provider, config }) => ({
-            provider,
-            apiKey: config.apiKey ? '***' : '', // 隐藏实际key
-            endpoint: config.endpoint,
-            model: config.model,
-            enabled: config.enabled,
-            updatedAt: config.updatedAt
-          }))
-        };
-      } catch (error) {
-        console.error('[ai:getAllProviders] 获取provider列表失败:', error);
-        return {
-          success: false,
-          error: (error as Error).message,
-          providers: []
-        };
-      }
-    });
-
-    // 删除provider配置
-    ipcMain.handle('ai:deleteProvider', async (_, provider: string) => {
-      try {
-        aiConfigManager.deleteProvider(provider as any);
-
-        // 如果删除的是当前provider，重新配置
-        const { provider: currentProvider, config } = aiConfigManager.getCurrentProviderConfig();
-        if (currentProvider === 'disabled' || !config) {
-          aiService.configure('disabled', '');
-        } else {
-          aiService.configure(currentProvider, config.apiKey, config.endpoint, config.model);
-        }
-
-        return { success: true };
-      } catch (error) {
-        console.error('[ai:deleteProvider] 删除provider失败:', error);
-        return { success: false, error: (error as Error).message };
-      }
-    });
-
-    // 获取配置文件路径
-    ipcMain.handle('ai:getConfigPath', async () => {
-      return {
-        success: true,
-        path: aiConfigManager.getConfigPath()
-      };
-    });
-
-    // AI 建议相关
-    ipcMain.handle('ai-suggestion:generate', async (_, todoId: string, templateId?: number) => {
-      try {
-        console.log('=== AI Suggestion Generation Debug ===');
-        console.log('todoId:', todoId, 'templateId:', templateId);
-
-        // ✅ 新增：并发检查
-        if (this.activeAiRequest) {
-          console.warn('[AI Suggestion] 已有AI任务正在运行，拒绝新请求');
-          return { success: false, error: '已有AI任务正在运行，请稍后' };
-        }
-
-        const todo = await this.fileStorageManager.getTodoById(todoId.toString());
-        if (!todo) {
-          console.error('Todo not found:', todoId);
-          return { success: false, error: '待办不存在' };
-        }
-        console.log('Todo found:', todo.title);
-
-        // ✅ 新增：创建 AbortController 用于取消功能
-        const controller = new AbortController();
-        this.activeAiRequest = {
-          controller,
-          todoId,
-          timestamp: Date.now()
-        };
-        console.log('[AI Suggestion] Active AI request created:', todoId);
-
-        try {
-          console.log('Calling aiService.generateSuggestionWithRetry');
-          const result = await aiService.generateSuggestionWithRetry(
-            todo.title,
-            todo.content,
-            undefined,  // 使用默认prompt
-            3,  // maxRetries
-            controller.signal  // ✅ 新增：传递取消信号
-          );
-
-          if (result.success && result.content) {
-            console.log('AI suggestion generated successfully, saving to database');
-
-            // ✅ 新增：获取AI配置信息
-            const aiConfig = aiService.getConfig();
-            let templateName = '默认模板';
-
-            console.log('[AI Suggestion] 保存元数据:', {
-              template: templateName,
-              provider: aiConfig.provider,
-              model: aiConfig.model
-            });
-
-            // AI建议已通过FileStorageManager自动保存
-          } else {
-            console.error('AI suggestion generation failed:', result.error);
-          }
-
-          // ✅ 修复：将content字段映射为suggestion字段，与AISuggestionResponse接口保持一致
-          // 这样可以确保返回的结构符合TypeScript类型定义
-          return {
-            success: result.success,
-            suggestion: result.success ? result.content : undefined,
-            error: result.error
-          };
-        } finally {
-          // ✅ 新增：确保锁释放（try...finally保证）
-          console.log('[AI Suggestion] Releasing active AI request lock');
-          this.activeAiRequest = null;
-        }
-      } catch (error: any) {
-        console.error('Failed to generate AI suggestion:', error);
-        console.error('Error stack:', error.stack);
-        // ✅ 新增：确保异常时也释放锁
-        this.activeAiRequest = null;
-        return { success: false, error: error.message || '生成失败' };
-      }
-    });
-
-    ipcMain.handle('ai-suggestion:save', async (_, todoId: string, suggestion: string) => {
-      try {
-        // 通过FileStorageManager保存AI建议
-        const todo = await this.fileStorageManager.getTodoById(todoId);
-        if (todo) {
-          await this.fileStorageManager.updateTodo(todoId.toString(), {
-            aiSuggestion: suggestion
-          });
-        }
-        return { success: true };
-      } catch (error: any) {
-        console.error('Failed to save AI suggestion:', error);
-        return { success: false, error: error.message };
-      }
-    });
-
-    ipcMain.handle('ai-suggestion:delete', async (_, todoId: string) => {
-      try {
-        // 通过FileStorageManager清除AI建议
-        const todo = await this.fileStorageManager.getTodoById(todoId);
-        if (todo) {
-          await this.fileStorageManager.updateTodo(todoId, {
-            aiSuggestion: undefined,
-            aiSuggestionProvider: undefined,
-            aiSuggestionModel: undefined,
-            aiSuggestionTemplate: undefined
-          });
-        }
-        return { success: true };
-      } catch (error: any) {
-        console.error('Failed to delete AI suggestion:', error);
-        return { success: false, error: error.message };
-      }
-    });
-
-    // ✅ 新增：取消AI建议生成
-    ipcMain.handle('ai-suggestion:cancel', async () => {
-      try {
-        console.log('[AI Suggestion] Cancel requested, activeAiRequest:', !!this.activeAiRequest);
-
-        if (!this.activeAiRequest) {
-          console.warn('[AI Suggestion] No active AI request to cancel');
-          return { success: false, error: '没有正在运行的任务' };
-        }
-
-        console.log('[AI Suggestion] Aborting active AI request');
-        this.activeAiRequest.controller.abort();  // 发送中止信号
-        this.activeAiRequest = null;  // 立即释放锁
-
-        return { success: true };
-      } catch (error: any) {
-        console.error('Failed to cancel AI suggestion:', error);
-        return { success: false, error: error.message };
-      }
-    });
-
-    // Prompt 模板相关
-    ipcMain.handle('prompt-templates:getAll', async () => {
-      try {
-      } catch (error: any) {
-        console.error('Failed to get all prompt templates:', error);
-        return [];
-      }
-    });
-
-    ipcMain.handle('prompt-templates:getById', async (_, id: number) => {
-      try {
-      } catch (error: any) {
-        console.error('Failed to get prompt template by id:', error);
-        return null;
-      }
-    });
-
-    ipcMain.handle('prompt-templates:create', async (_, template) => {
-      try {
-      } catch (error: any) {
-        console.error('Failed to create prompt template:', error);
-        throw error;
-      }
-    });
-
-    ipcMain.handle('prompt-templates:update', async (_, id: number, updates) => {
-      try {
-      } catch (error: any) {
-        console.error('Failed to update prompt template:', error);
-        throw error;
-      }
-    });
-
-    ipcMain.handle('prompt-templates:delete', async (_, id: number) => {
-      try {
-      } catch (error: any) {
-        console.error('Failed to delete prompt template:', error);
-        throw error;
-      }
-    });
 
     // 打开外部链接
     ipcMain.handle('shell:openExternal', async (_, url: string) => {
@@ -1657,7 +1389,7 @@ class Application {
     ipcMain.handle('url-auth:getAllUrls', async () => {
       try {
         // 获取所有待办事项
-        const todos = await this.fileStorageManager.getAllTodos();
+        const todos = await this.databaseManager.getStorageManager().getAllTodos();
 
         // 提取所有URL
         const urlPattern = /(https?:\/\/[^\s<>"]+)/g;
@@ -1921,44 +1653,13 @@ class Application {
       } catch (dbError) {
         console.error('Database manager initialization failed:', dbError);
         // 降级为简单的备份管理器
-        const storagePath = this.fileStorageManager.getStoragePath();
+        const storagePath = this.databaseManager.getStorageManager().getStoragePath();
         this.backupManager = new BackupManager(storagePath, this.fileStorageManager);
         this.backupManager.startAutoBackup();
         console.log('Fallback backup manager initialized');
       }
 
 
-      // 初始化 AI 服务（从配置文件加载）
-      console.log('Initializing AI service from config file...');
-      try {
-        const { provider, config } = aiConfigManager.getCurrentProviderConfig();
-
-        console.log('[AI Init] 从配置文件读取的配置:', {
-          provider,
-          hasConfig: !!config,
-          apiKey: config?.apiKey ? '***' : '(empty)',
-          endpoint: config?.endpoint,
-          model: config?.model,
-          enabled: config?.enabled
-        });
-
-        // 如果有有效配置，初始化AI服务
-        if (provider !== 'disabled' && config && config.enabled && config.apiKey) {
-          console.log('[AI Init] 配置有效，开始初始化AI服务');
-          aiService.configure(
-            provider,
-            config.apiKey,
-            config.endpoint,
-            config.model
-          );
-          console.log('[AI Init] AI服务配置成功');
-        } else {
-          console.log('[AI Init] 配置无效或为空，AI服务保持禁用状态');
-        }
-      } catch (error) {
-        console.error('[AI Init] AI服务配置失败:', error);
-      }
-      console.log('AI service initialization completed');
 
 
       // Initialize URL auth service (simplified)

@@ -325,6 +325,30 @@ class AppConfigManager {
   }
 
   /**
+   * 更新数据库路径（统一更新方法，原子性操作）
+   * 同时更新 storageLocation 和 currentDatabasePath，确保配置一致性
+   */
+  public updateDatabasePath(dbPath: string): void {
+    console.log(`[AppConfig] 🔄 Updating database path atomically: ${dbPath}`);
+
+    // 同时更新两个相关配置字段
+    this.config.storageLocation = {
+      type: 'custom',
+      customPath: dbPath,
+      lastUpdated: new Date().toISOString()
+    };
+    this.config.currentDatabasePath = dbPath;
+
+    // 只调用一次 saveConfig，确保原子性
+    this.saveConfig();
+
+    console.log(`[AppConfig] ✅ Database path updated atomically:`, {
+      storageLocation: this.config.storageLocation,
+      currentDatabasePath: this.config.currentDatabasePath
+    });
+  }
+
+  /**
    * 获取当前数据库路径
    */
   public getCurrentDatabasePath(): string {

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { PromptTemplate, AISuggestionResponse, TodoRelation } from '../shared/types';
+import type { TodoRelation } from '../shared/types';
 
 /**
  * 批量授权结果
@@ -49,43 +49,16 @@ export interface ElectronAPI {
     bulkDeleteTodos: (uuids: string[]) => Promise<void>;  // 修复：uuids 参数类型为 string
     exportAll: () => Promise<any>;  // 导出所有数据
     importAll: (data: any) => Promise<any>;  // 导入数据
+    toggleTodayCompleted: (uuid: string, currentState: string) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;  // 今日完成状态切换
   };
   
   // 关键词和推荐API
   keywords: {
     getRecommendations: (title: string, content: string, excludeId?: number) => Promise<any[]>;
     batchGenerate: () => Promise<{success: boolean; total?: number; processed?: number; failed?: number; error?: string}>;
-  };
-  
-  // AI API
-  ai: {
-    testConnection: () => Promise<{success: boolean; message: string}>;
-    configure: (provider: string, apiKey: string, endpoint?: string, model?: string) => Promise<{success: boolean; error?: string}>;
-    getConfig: () => Promise<{provider: string; endpoint: string; model: string; enabled: boolean}>;
-    getSupportedProviders: () => Promise<Array<{value: string; label: string; endpoint: string}>>;
-    getAvailableModels: (provider: string) => Promise<Array<{id: string; name: string; description?: string}>>;
-    fetchModels: (provider: string, apiKey: string, endpoint?: string) => Promise<{success: boolean; models: Array<{id: string; name: string}>; error?: string}>;
-    getAllProviders: () => Promise<{success: boolean; providers: Array<{provider: string; apiKey: string; endpoint: string; model: string; enabled: boolean; updatedAt: string}>; error?: string}>;
-    switchProvider: (provider: string) => Promise<{success: boolean; error?: string}>;
-    deleteProvider: (provider: string) => Promise<{success: boolean; error?: string}>;
-    getConfigPath: () => Promise<{success: boolean; path: string}>;
-  };
-
-  // AI 建议API
-  aiSuggestion: {
-    generate: (todoId: string, templateId?: number) => Promise<AISuggestionResponse>;
-    cancel: () => Promise<{success: boolean; error?: string}>;  // ✅ 新增
-    save: (todoId: string, suggestion: string) => Promise<{success: boolean; error?: string}>;
-    delete: (todoId: string) => Promise<{success: boolean; error?: string}>;
-  };
-
-  // Prompt 模板API
-  promptTemplates: {
-    getAll: () => Promise<PromptTemplate[]>;
-    getById: (id: number) => Promise<PromptTemplate | null>;
-    create: (template: Omit<PromptTemplate, 'id' | 'createdAt' | 'updatedAt'>) => Promise<PromptTemplate>;
-    update: (id: number, updates: Partial<PromptTemplate>) => Promise<void>;
-    delete: (id: number) => Promise<void>;
   };
   
   // 设置API
@@ -247,6 +220,10 @@ export interface ElectronAPI {
   onQuickCreateTodo: (callback: (data: { content: string }) => void) => void;
   removeQuickCreateListener: () => void;
 
+  // 今日完成事件API
+  onTodayCompletedMidnightConversion: (callback: (data: { convertedCount: number }) => void) => void;
+  removeTodayCompletedListeners: () => void;
+
   // 存储位置API
   storageLocation: {
     getConfig: () => Promise<{
@@ -383,44 +360,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     bulkDeleteTodos: (uuids: string[]) => ipcRenderer.invoke('todo:bulkDeleteTodos', uuids),  // 修复：uuids 参数类型为 string
     exportAll: () => ipcRenderer.invoke('todo:exportAll'),  // 导出所有数据
     importAll: (data: any) => ipcRenderer.invoke('todo:importAll', data),  // 导入数据
+    toggleTodayCompleted: (uuid: string, currentState: string) =>
+      ipcRenderer.invoke('todo:toggleTodayCompleted', uuid, currentState),  // 今日完成状态切换
   },
   keywords: {
     getRecommendations: (title: string, content: string, excludeId?: number) => 
       ipcRenderer.invoke('keywords:getRecommendations', title, content, excludeId),
     batchGenerate: () => ipcRenderer.invoke('keywords:batchGenerate'),
-  },
-  ai: {
-    testConnection: () => ipcRenderer.invoke('ai:testConnection'),
-    configure: (provider: string, apiKey: string, endpoint?: string, model?: string) =>
-      ipcRenderer.invoke('ai:configure', provider, apiKey, endpoint, model),
-    getConfig: () => ipcRenderer.invoke('ai:getConfig'),
-    getSupportedProviders: () => ipcRenderer.invoke('ai:getSupportedProviders'),
-    getAvailableModels: (provider: string) => ipcRenderer.invoke('ai:getAvailableModels', provider),
-    fetchModels: (provider: string, apiKey: string, endpoint?: string) =>
-      ipcRenderer.invoke('ai:fetchModels', provider, apiKey, endpoint),
-    getAllProviders: () => ipcRenderer.invoke('ai:getAllProviders'),
-    switchProvider: (provider: string) => ipcRenderer.invoke('ai:switchProvider', provider),
-    deleteProvider: (provider: string) => ipcRenderer.invoke('ai:deleteProvider', provider),
-    getConfigPath: () => ipcRenderer.invoke('ai:getConfigPath'),
-  },
-  aiSuggestion: {
-    generate: (todoId: string, templateId?: number) =>
-      ipcRenderer.invoke('ai-suggestion:generate', todoId, templateId),
-    cancel: () =>  // ✅ 新增
-      ipcRenderer.invoke('ai-suggestion:cancel'),
-    save: (todoId: string, suggestion: string) =>
-      ipcRenderer.invoke('ai-suggestion:save', todoId, suggestion),
-    delete: (todoId: string) =>
-      ipcRenderer.invoke('ai-suggestion:delete', todoId),
-  },
-  promptTemplates: {
-    getAll: () => ipcRenderer.invoke('prompt-templates:getAll'),
-    getById: (id: number) => ipcRenderer.invoke('prompt-templates:getById', id),
-    create: (template: Omit<PromptTemplate, 'id' | 'createdAt' | 'updatedAt'>) =>
-      ipcRenderer.invoke('prompt-templates:create', template),
-    update: (id: number, updates: Partial<PromptTemplate>) =>
-      ipcRenderer.invoke('prompt-templates:update', id, updates),
-    delete: (id: number) => ipcRenderer.invoke('prompt-templates:delete', id),
   },
   settings: {
     get: (key?: string) => ipcRenderer.invoke(key === 'dbPath' ? 'settings:getDbPath' : 'settings:get'),
@@ -575,6 +521,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('hybridStorage:config-changed', listener);
       return () => ipcRenderer.removeListener('hybridStorage:config-changed', listener);
     },
+  },
+
+  // 今日完成事件监听
+  onTodayCompletedMidnightConversion: (callback: (data: { convertedCount: number }) => void) => {
+    ipcRenderer.on('today-completed:midnight-conversion', (_event, data) => callback(data));
+  },
+  removeTodayCompletedListeners: () => {
+    ipcRenderer.removeAllListeners('today-completed:midnight-conversion');
   },
 
   // 调试工具

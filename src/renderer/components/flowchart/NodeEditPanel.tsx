@@ -71,10 +71,12 @@ export const NodeEditPanel: React.FC<NodeEditPanelProps> = ({
 
   // 获取待办任务的状态标签
   const getStatusTag = (status: Todo['status']) => {
-    const statusMap = {
+    const statusMap: Record<string, { color: string; text: string }> = {
       pending: { color: 'default', text: '待办' },
       in_progress: { color: 'processing', text: '进行中' },
-      completed: { color: 'success', text: '已完成' }
+      completed: { color: 'success', text: '已完成' },
+      paused: { color: 'warning', text: '已暂停' },
+      today_completed: { color: 'cyan', text: '今日完成' }
     };
     const config = statusMap[status];
     return <Tag color={config.color}>{config.text}</Tag>;

@@ -172,11 +172,12 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
 
     const timer = setTimeout(() => {
       setIsReady(true);
-    }, 50);
+    }, 100);
 
     return () => {
       clearTimeout(timer);
       setIsMounted(false);
+      setIsReady(false);
       setEditorInstance(null);
 
       // 🔥 清理：解锁滚动容器和清理定时器
@@ -187,7 +188,6 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
         try {
           mutationObserverRef.current.disconnect();
           mutationObserverRef.current = null;
-          console.log('[QuillScrollBlock] MutationObserver disconnected');
         } catch (error) {
           console.warn('[QuillScrollBlock] Failed to disconnect MutationObserver:', error);
         }
@@ -197,7 +197,6 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       if (editorInstance) {
         try {
           editorInstance.off('text-change');
-          console.log('[QuillScrollBlock] Text-change event listener removed');
         } catch (error) {
           console.warn('[QuillScrollBlock] Failed to remove text-change listener:', error);
         }
@@ -290,35 +289,50 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
   };
 
   const getEditorSafely = useCallback(() => {
-    if (!isMounted || !quillRef.current) return null;
+    // 检查组件是否已挂载
+    if (!isMounted) {
+      return null;
+    }
+
+    // 检查 quillRef 是否存在
+    if (!quillRef.current) {
+      return null;
+    }
 
     try {
+      // 尝试获取编辑器实例
+      const editor = quillRef.current.getEditor();
+
+      // 验证编辑器实例是否有效
+      if (!editor || typeof editor !== 'object') {
+        return null;
+      }
+
+      // 缓存编辑器实例
       if (!editorInstance) {
-        const editor = quillRef.current.getEditor();
-        if (editor) {
-          // 🔥 核心修复1：覆盖 scrollSelectionIntoView 方法
-          const originalScrollIntoView = editor.scrollSelectionIntoView.bind(editor);
-          editor.scrollSelectionIntoView = function() {
-            // 不做任何操作，直接返回，阻止 window.scrollBy() 调用
-            return;
-          };
+        // 🔥 核心修复1：覆盖 scrollSelectionIntoView 方法
+        const originalScrollIntoView = editor.scrollSelectionIntoView.bind(editor);
+        editor.scrollSelectionIntoView = function() {
+          // 不做任何操作，直接返回，阻止 window.scrollBy() 调用
+          return;
+        };
 
-          // 🔥 核心修复2：使用 Object.defineProperty 永久锁定，防止被重置
-          try {
-            Object.defineProperty(editor, 'scrollSelectionIntoView', {
-              value: function() {
-                console.log('[QuillScrollBlock] Blocked scrollSelectionIntoView call');
-                return;
-              },
-              writable: false,
-              configurable: false
-            });
-          } catch (error) {
-            console.warn('[QuillScrollBlock] Failed to lock scrollSelectionIntoView:', error);
-          }
+        // 🔥 核心修复2：使用 Object.defineProperty 永久锁定，防止被重置
+        try {
+          Object.defineProperty(editor, 'scrollSelectionIntoView', {
+            value: function() {
+              console.log('[QuillScrollBlock] Blocked scrollSelectionIntoView call');
+              return;
+            },
+            writable: false,
+            configurable: false
+          });
+        } catch (error) {
+          console.warn('[QuillScrollBlock] Failed to lock scrollSelectionIntoView:', error);
+        }
 
-          // 🔥 核心修复3：拦截 window.scrollBy 调用（最后防线）
-          if (!(window.scrollBy as any)._quillIntercepted) {
+        // 🔥 核心修复3：拦截 window.scrollBy 调用（最后防线）
+        if (!(window.scrollBy as any)._quillIntercepted) {
             const originalScrollBy = window.scrollBy.bind(window);
             (window.scrollBy as any) = function(...args: [number, number] | [ScrollToOptions]) {
               // 检查是否是编辑器触发的滚动
@@ -466,18 +480,16 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
             } catch (error) {
               console.warn('[QuillScrollBlock] Failed to setup DOM interception:', error);
             }
-          };
-          setupDOMScrollInterception();
+        };
+        setupDOMScrollInterception();
 
-          setEditorInstance(editor);
-          return editor;
-        }
-        return null;
+        setEditorInstance(editor);
+        return editor;
       }
 
-      return editorInstance;
+      return editorInstance || null;
     } catch (error) {
-      console.warn('Editor access failed:', error);
+      // 静默处理编辑器未初始化的情况
       setEditorInstance(null);
       return null;
     }
@@ -509,14 +521,11 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
   useEffect(() => {
     const editor = getEditorSafely();
     if (!editor?.root) {
-      console.log('[RichTextEditor] Editor not ready for link click handler');
       return;
     }
 
     const editorElement = editor.root;
     if (!editorElement) return;
-
-    console.log('[RichTextEditor] Setting up link click handler');
 
     const handleLinkClick = async (event: Event) => {
       const target = event.target as HTMLElement;
@@ -553,7 +562,6 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
     editorElement.addEventListener('click', handleLinkClick, { capture: true });
 
     return () => {
-      console.log('[RichTextEditor] Cleaning up link click handler');
       editorElement.removeEventListener('click', handleLinkClick, { capture: true });
     };
   }, [editorInstance, getEditorSafely]);

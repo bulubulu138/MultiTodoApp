@@ -5,9 +5,12 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { app, BrowserWindow } from 'electron';
 import { FileStorageManager } from '../FileStorageManager';
 import { BackupManager } from '../utils/BackupManager';
 import { appConfigManager, DatabaseRecord } from '../config/AppConfig';
+import { TodayCompletedScheduler } from './TodayCompletedScheduler';
+import { TodayCompletedManager } from './TodayCompletedManager';
 
 export interface DatabaseInfo {
   path: string;
@@ -23,6 +26,19 @@ export class DatabaseManager {
   private currentBackupManager: BackupManager | null = null;
   private currentDatabasePath: string = '';
   private isInitialized: boolean = false;
+  private todayCompletedScheduler: TodayCompletedScheduler | null = null;
+  private mainWindow: BrowserWindow | null = null;
+
+  /**
+   * 安全地获取当前存储管理器
+   * 如果存储管理器不存在，抛出错误
+   */
+  public getStorageManager(): FileStorageManager {
+    if (!this.currentStorageManager) {
+      throw new Error('[DatabaseManager] StorageManager is not initialized. Please call initialize() first.');
+    }
+    return this.currentStorageManager;
+  }
 
   /**
    * 初始化数据库管理器
@@ -40,6 +56,27 @@ export class DatabaseManager {
       const currentPath = appConfigManager.getCurrentDatabasePath();
       console.log(`[DatabaseManager] 📂 Current database path: ${currentPath}`);
 
+      // ✅ 新增：配置一致性检查
+      const storageLocation = appConfigManager.getStorageLocation();
+      if (storageLocation.type === 'custom' && storageLocation.customPath !== currentPath) {
+        console.warn('[DatabaseManager] ⚠️ Configuration inconsistency detected:', {
+          'storageLocation.customPath': storageLocation.customPath,
+          'currentDatabasePath': currentPath
+        });
+
+        // 尝试修复：使用 currentDatabasePath 作为正确值
+        console.log('[DatabaseManager] 🔧 Attempting to fix configuration inconsistency...');
+        appConfigManager.updateDatabasePath(currentPath);
+        console.log('[DatabaseManager] ✅ Configuration fixed');
+      } else if (storageLocation.type === 'default' && currentPath !== path.join(app.getPath('userData'), 'todos')) {
+        console.warn('[DatabaseManager] ⚠️ Configuration inconsistency detected (default path mismatch):', {
+          'storageLocation.type': storageLocation.type,
+          'currentDatabasePath': currentPath
+        });
+      } else {
+        console.log('[DatabaseManager] ✅ Configuration consistency check passed');
+      }
+
       // 验证并初始化当前数据库
       const isValid = await appConfigManager.validateDatabase(currentPath);
 
@@ -50,6 +87,14 @@ export class DatabaseManager {
 
       // 切换到当前数据库
       await this.switchDatabase(currentPath, false);
+
+      // ✅ 初始化今日完成调度器
+      if (this.currentStorageManager) {
+        this.todayCompletedScheduler = new TodayCompletedScheduler(this.currentStorageManager, this.mainWindow || undefined);
+        await this.todayCompletedScheduler.checkOnStartup(); // 启动时检查
+        this.todayCompletedScheduler.start(); // 启动定时任务
+        console.log('[DatabaseManager] ✅ Today completed scheduler initialized');
+      }
 
       this.isInitialized = true;
       console.log('[DatabaseManager] ✅ Database manager initialized successfully');
@@ -73,7 +118,14 @@ export class DatabaseManager {
         console.log('[DatabaseManager] 🛑 Stopped current backup manager');
       }
 
-      // 2. 停止当前的存储管理器
+      // 2. 停止当前的今日完成调度器
+      if (this.todayCompletedScheduler) {
+        this.todayCompletedScheduler.stop();
+        this.todayCompletedScheduler = null;
+        console.log('[DatabaseManager] 🛑 Stopped today completed scheduler');
+      }
+
+      // 3. 停止当前的存储管理器
       if (this.currentStorageManager) {
         await this.currentStorageManager.stopWatching();
         this.currentStorageManager = null;
@@ -94,9 +146,16 @@ export class DatabaseManager {
       this.currentBackupManager = new BackupManager(dbPath, this.currentStorageManager);
       this.currentBackupManager.startAutoBackup();
 
-      // 6. 更新配置
-      appConfigManager.setStorageLocation('custom', dbPath);
-      appConfigManager.setCurrentDatabasePath(dbPath);
+      // 6. 创建新的今日完成调度器
+      this.todayCompletedScheduler = new TodayCompletedScheduler(this.currentStorageManager, this.mainWindow || undefined);
+      await this.todayCompletedScheduler.checkOnStartup(); // 启动时检查
+      this.todayCompletedScheduler.start(); // 启动定时任务
+      console.log('[DatabaseManager] ✅ Today completed scheduler initialized');
+
+      // 6. 原子性更新配置（同时更新 storageLocation 和 currentDatabasePath）
+      console.log('[DatabaseManager] 💾 Updating configuration atomically...');
+      appConfigManager.updateDatabasePath(dbPath);
+      console.log('[DatabaseManager] ✅ Configuration updated successfully');
 
       // 7. 更新数据库历史记录
       const todos = await this.currentStorageManager.getAllTodos();
@@ -211,6 +270,11 @@ export class DatabaseManager {
         this.currentBackupManager = null;
       }
 
+      if (this.todayCompletedScheduler) {
+        this.todayCompletedScheduler.stop();
+        this.todayCompletedScheduler = null;
+      }
+
       if (this.currentStorageManager) {
         await this.currentStorageManager.stopWatching();
         this.currentStorageManager = null;
@@ -221,6 +285,23 @@ export class DatabaseManager {
     } catch (error) {
       console.error('[DatabaseManager] ❌ Failed to shutdown database manager:', error);
     }
+  }
+
+  /**
+   * 设置主窗口引用（用于通知渲染进程）
+   */
+  setMainWindow(mainWindow: BrowserWindow | null): void {
+    this.mainWindow = mainWindow;
+    if (this.todayCompletedScheduler) {
+      this.todayCompletedScheduler.setMainWindow(mainWindow || undefined);
+    }
+  }
+
+  /**
+   * 获取今日完成管理器
+   */
+  getTodayCompletedManager(): TodayCompletedManager | null {
+    return this.todayCompletedScheduler?.['todayCompletedManager'] || null;
   }
 }
 

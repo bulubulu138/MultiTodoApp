@@ -1,6 +1,6 @@
 import { Todo, TodoRelation, CalendarViewSize, CustomTab } from '../shared/types';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Layout, App as AntApp, Tabs, ConfigProvider, FloatButton, Modal, Typography, Space, Tag } from 'antd';
+import { Layout, App as AntApp, Tabs, ConfigProvider, FloatButton, Modal, Typography, Space, Tag, notification } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { VerticalAlignTopOutlined } from '@ant-design/icons';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,6 +12,7 @@ import SettingsModal from './components/SettingsModal';
 import TodoViewDrawer from './components/TodoViewDrawer';
 import CalendarDrawer from './components/CalendarDrawer';
 import ContentFocusView, { ContentFocusViewRef } from './components/ContentFocusView';
+import CompactTodoView from './components/CompactTodoView';
 import FirstRunDialog from './components/FirstRunDialog';
 import { getTheme, ThemeMode, ColorTheme } from './theme/themes';
 import { buildParallelGroups, selectGroupRepresentatives, sortWithGroups, getSortComparator } from './utils/sortWithGroups';
@@ -19,6 +20,7 @@ import { toStringId, areIdsEqual } from '../shared/utils/typeUtils';
 import { optimizedMotionVariants, useConditionalAnimation, shouldReduceMotion, useMotionPerformanceMonitor } from './utils/optimizedMotionVariants';
 import { PerformanceMonitor } from './utils/performanceMonitor';
 import { useGlobalKeyboardHandler } from './hooks/useGlobalKeyboardHandler';
+import { syncParallelGroupOrders } from './utils/orderConflictResolver';
 import dayjs from 'dayjs';
 
 const { Content } = Layout;
@@ -67,13 +69,12 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   // ✅ 新增：首次运行状态
   const [showFirstRunDialog, setShowFirstRunDialog] = useState(false);
   const [storageLocationConfig, setStorageLocationConfig] = useState<any>(null);
-
-  // AI 建议相关状态
-  const [promptTemplates, setPromptTemplates] = useState<any[]>([]);
-  
   // 分页状态管理
   const [displayCount, setDisplayCount] = useState<number>(50); // 初始显示50条
   const [hasMoreData, setHasMoreData] = useState<boolean>(true); // 是否还有更多数据
+
+  // 拖拽排序状态管理
+  const [dragDropOrder, setDragDropOrder] = useState<{ [tabKey: string]: string[] }>({});
 
   // 搜索结果缓存 - 提升搜索性能
   const searchCacheRef = useRef<Map<string, Todo[]>>(new Map());
@@ -236,6 +237,28 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
+
+  // 监听午夜转换事件
+  useEffect(() => {
+    const handleMidnightConversion = (data: { convertedCount: number }) => {
+      if (data.convertedCount > 0) {
+        notification.info({
+          message: '待办状态更新',
+          description: `已将 ${data.convertedCount} 个"今日已完成"项目转换为"已完成"状态`,
+          duration: 5
+        });
+
+        // 刷新待办列表
+        window.location.reload();
+      }
+    };
+
+    window.electronAPI.onTodayCompletedMidnightConversion(handleMidnightConversion);
+
+    return () => {
+      window.electronAPI.removeTodayCompletedListeners();
+    };
+  }, [message]);
 
   // 监听页面可见性变化，页面隐藏时自动保存
   useEffect(() => {
@@ -473,14 +496,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       }
       
       setTabSettings(loadedTabSettings);
-
-      // 加载 Prompt 模板
-      try {
-        const templates = await window.electronAPI.promptTemplates.getAll();
-        setPromptTemplates(templates);
-      } catch (error) {
-        console.error('Failed to load prompt templates:', error);
-      }
     } catch (error) {
       message.error('加载设置失败');
       console.error('Error loading settings:', error);
@@ -500,14 +515,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     }
   };
 
-  const handleReloadPromptTemplates = async () => {
-    try {
-      const templates = await window.electronAPI.promptTemplates.getAll();
-      setPromptTemplates(templates);
-    } catch (error) {
-      console.error('Failed to reload prompt templates:', error);
-    }
-  };
 
   // 加载更多数据（分页）
   const loadMore = useCallback(() => {
@@ -847,18 +854,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     }
   };
 
-  // AI配置保存回调 - 用于AI配置保存后的状态同步，不关闭Modal
-  const handleAIConfigUpdate = async (newSettings: Record<string, string>) => {
-    try {
-      await window.electronAPI.settings.update(newSettings);
-      setSettings(prev => ({ ...prev, ...newSettings }));
-      message.success('AI配置已保存');
-    } catch (error) {
-      message.error('保存AI配置失败');
-      console.error('Error updating AI config:', error);
-    }
-  };
-
   const handleEditTodo = (todo: Todo) => {
     setEditingTodo(todo);
     setShowForm(true);
@@ -971,6 +966,74 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     updateCurrentTabSettings({ sortOption: option });
   };
 
+  // 获取当前标签的拖拽排序
+  const getCurrentDragOrder = useCallback((): string[] | null => {
+    if (getCurrentTabSettings().sortOption !== 'drag') {
+      return null;
+    }
+    return dragDropOrder[activeTab] || null;
+  }, [dragDropOrder, activeTab, getCurrentTabSettings]);
+
+  // 拖拽结束处理
+  const handleDragEnd = async (newOrder: Todo[]) => {
+    // 乐观更新本地状态（立即生效）
+    setDragDropOrder((prev) => ({
+      ...prev,
+      [activeTab]: newOrder.map((todo) => todo.id),
+    }));
+
+    // 显示保存中状态
+    const hide = message.loading('保存中...', 0);
+
+    try {
+      // 构建并列分组映射
+      const parallelGroupsMap = buildParallelGroups(newOrder, relations);
+
+      // 并行执行所有异步操作
+      const [dbResult] = await Promise.all([
+        // 数据库批量更新
+        window.electronAPI.todo.batchUpdateDisplayOrders(
+          newOrder.map((todo, index) => ({
+            uuid: todo.id,
+            tabKey: activeTab,
+            displayOrder: index,
+          }))
+        ),
+        // 并行处理并列分组同步
+        ...newOrder.map(todo => {
+          const parallelGroup = parallelGroupsMap.get(todo.id);
+          if (parallelGroup && parallelGroup.size > 1) {
+            const currentIndex = newOrder.findIndex(t => t.id === todo.id);
+            return syncParallelGroupOrders({
+              groupId: parallelGroup,
+              currentTodoId: todo.id,
+              newOrder: currentIndex,
+              activeTab
+            });
+          }
+          return Promise.resolve();
+        })
+      ]);
+
+      hide();
+      message.success('排序已保存');
+
+      // 增量更新 todos，避免全量刷新
+      setTodos(prevTodos => {
+        const updatedMap = new Map(newOrder.map(t => [t.id, t]));
+        return prevTodos.map(t => updatedMap.get(t.id) || t);
+      });
+
+    } catch (error) {
+      hide();
+      message.error('保存失败');
+      console.error('Failed to update drag order:', error);
+
+      // 回滚到之前的状态
+      await loadTodos();
+    }
+  };
+
   const handleViewModeChange = async (mode: ViewMode) => {
     // 如果从专注模式切换出去，先保存所有未保存的内容
     if (currentTabSettings.viewMode === 'content-focus' && mode !== 'content-focus') {
@@ -982,7 +1045,13 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         return;
       }
     }
-    updateCurrentTabSettings({ viewMode: mode });
+
+    // 紧凑模式强制使用手动排序
+    if (mode === 'compact') {
+      updateCurrentTabSettings({ viewMode: mode, sortOption: 'manual' });
+    } else {
+      updateCurrentTabSettings({ viewMode: mode });
+    }
   };
 
   const handleUpdateDisplayOrder = async (id: string, tabKey: string, displayOrder: number | null) => {
@@ -1008,79 +1077,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       message.error('更新排序失败');
       console.error('Error updating display order:', error);
       throw error;
-    }
-  };
-
-  // AI 建议处理函数
-  const handleGenerateSuggestion = async (todoId: string, templateId?: number) => {
-    try {
-      console.log('[App] 开始生成AI建议, todoId:', todoId, 'templateId:', templateId);
-
-      // ✅ 添加AI配置预检查
-      const aiConfig = await window.electronAPI.ai.getConfig();
-      console.log('[App] AI配置状态:', {
-        ...aiConfig,
-        apiKey: aiConfig.enabled ? '***' : '(empty)'
-      });
-
-      if (!aiConfig.enabled) {
-        console.warn('[App] AI服务未启用，无法生成建议');
-        return { success: false, error: 'AI服务未配置，请先在设置中配置AI服务' };
-      }
-
-      const result = await window.electronAPI.aiSuggestion.generate(todoId, templateId);
-
-      console.log('[App] AI建议生成结果:', result);
-      console.log('[App] 检查结果字段:', {
-        hasSuccess: 'success' in result,
-        hasSuggestion: 'suggestion' in result,
-        success: result.success,
-        suggestionLength: result.suggestion?.length || 0,
-        error: result.error
-      });
-
-      if (result.success && result.suggestion) {
-        // 重新加载待办以获取最新的AI建议
-        await loadTodos();
-        console.log('[App] AI建议生成成功，已重新加载待办列表');
-        return { success: true, suggestion: result.suggestion };
-      } else {
-        console.warn('[App] AI建议生成失败:', {
-          success: result.success,
-          hasSuggestion: !!result.suggestion,
-          error: result.error
-        });
-        return { success: false, error: result.error };
-      }
-    } catch (error: any) {
-      console.error('[App] AI建议生成异常:', error);
-      return { success: false, error: error.message || '生成失败' };
-    }
-  };
-
-  const handleSaveSuggestion = async (todoId: string, suggestion: string) => {
-    try {
-      const result = await window.electronAPI.aiSuggestion.save(todoId, suggestion);
-      if (result.success) {
-        // 重新加载待办以获取最新的AI建议
-        await loadTodos();
-      }
-      return result;
-    } catch (error: any) {
-      return { success: false, error: error.message || '保存失败' };
-    }
-  };
-
-  const handleDeleteSuggestion = async (todoId: string) => {
-    try {
-      const result = await window.electronAPI.aiSuggestion.delete(todoId);
-      if (result.success) {
-        // 重新加载待办以获取最新的AI建议
-        await loadTodos();
-      }
-      return result;
-    } catch (error: any) {
-      return { success: false, error: error.message || '删除失败' };
     }
   };
 
@@ -1218,6 +1214,12 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
           .filter(Boolean);
         return tags.includes(targetTag);
       });
+    } else if (activeTab === 'pending') {
+      // 待办tab中包含pending和today_completed状态的待办
+      return validTodos.filter(todo => todo.status === 'pending' || todo.status === 'today_completed');
+    } else if (activeTab === 'completed') {
+      // 已完成tab中不包含today_completed状态的待办（它们只显示在待办tab中）
+      return validTodos.filter(todo => todo.status === 'completed');
     } else {
       return activeTab === 'all' ? validTodos : validTodos.filter(todo => todo.status === activeTab);
     }
@@ -1283,6 +1285,67 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     const currentSettings = getCurrentTabSettings();
     const sortOption = currentSettings.sortOption;
 
+    // 拖拽排序模式
+    if (sortOption === 'drag') {
+      const dragOrder = getCurrentDragOrder();
+      if (!dragOrder || dragOrder.length === 0) {
+        // 如果没有拖拽排序，使用 displayOrders 作为默认顺序
+        const withOrder = searchedTodos.filter(todo =>
+          todo.displayOrders && todo.displayOrders[activeTab] != null
+        );
+        const withoutOrder = searchedTodos.filter(todo =>
+          !todo.displayOrders || todo.displayOrders[activeTab] == null
+        );
+
+        const manualComparator = (a: Todo, b: Todo) => {
+          const orderA = a.displayOrders?.[activeTab];
+          const orderB = b.displayOrders?.[activeTab];
+          if (orderA != null && orderB != null) {
+            if (orderA !== orderB) return orderA - orderB;
+          }
+          const numA = typeof a.id === 'number' ? a.id : parseInt(String(a.id || 0), 10);
+          const numB = typeof b.id === 'number' ? b.id : parseInt(String(b.id || 0), 10);
+          return numA - numB;
+        };
+
+        const groupRepresentatives = selectGroupRepresentatives(parallelGroups, searchedTodos, manualComparator);
+
+        const sorted = sortWithGroups(withOrder, parallelGroups, groupRepresentatives, (a, b) => {
+          const orderA = a.displayOrders![activeTab]!;
+          const orderB = b.displayOrders![activeTab]!;
+          if (orderA !== orderB) return orderA - orderB;
+          const numA = typeof a.id === 'number' ? a.id : parseInt(String(a.id || 0), 10);
+          const numB = typeof b.id === 'number' ? b.id : parseInt(String(b.id || 0), 10);
+          return numA - numB;
+        });
+
+        const sortedWithoutOrder = sortWithGroups(withoutOrder, parallelGroups, groupRepresentatives, (a, b) => {
+          const aTime = new Date(a.createdAt).getTime();
+          const bTime = new Date(b.createdAt).getTime();
+          return bTime - aTime;
+        });
+
+        return [...sorted, ...sortedWithoutOrder];
+      }
+
+      // 按照拖拽排序排列
+      const todoMap = new Map(searchedTodos.map((todo) => [todo.id, todo]));
+      const sorted: Todo[] = [];
+
+      dragOrder.forEach((id) => {
+        const todo = todoMap.get(id);
+        if (todo) {
+          sorted.push(todo);
+          todoMap.delete(id);
+        }
+      });
+
+      // 添加不在拖拽排序中的任务
+      todoMap.forEach((todo) => sorted.push(todo));
+
+      return sorted;
+    }
+
     // 手动排序模式
     if (sortOption === 'manual') {
       // 分为有序号和无序号两组
@@ -1329,7 +1392,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     const comparator = getSortComparator(sortOption);
     const groupRepresentatives = selectGroupRepresentatives(parallelGroups, searchedTodos, comparator);
     return sortWithGroups(searchedTodos, parallelGroups, groupRepresentatives, comparator);
-  }, [searchedTodos, parallelGroups, activeTab, getCurrentTabSettings]);
+  }, [searchedTodos, parallelGroups, activeTab, getCurrentTabSettings, getCurrentDragOrder]);
 
   // 第五层：应用分页限制
   const paginatedTodos = useMemo(() => {
@@ -1469,10 +1532,17 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
                   relations={relations}
                   onUpdateDisplayOrder={handleUpdateDisplayOrder}
                   colorTheme={colorTheme}
-                  promptTemplates={promptTemplates}
-                  onGenerateSuggestion={handleGenerateSuggestion}
-                  onSaveSuggestion={handleSaveSuggestion}
-                  onDeleteSuggestion={handleDeleteSuggestion}
+                />
+              ) : currentTabSettings.viewMode === 'compact' ? (
+                <CompactTodoView
+                  todos={filteredTodos}
+                  allTodos={todos}
+                  onUpdate={handleUpdateTodoInPlace}
+                  onView={handleViewTodo}
+                  activeTab={activeTab}
+                  relations={relations}
+                  sortOption={currentTabSettings.sortOption}
+                  onDragEnd={handleDragEnd}
                 />
               ) : (
                 <TodoList
@@ -1495,6 +1565,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
                   onLoadMore={loadMore}
                   totalCount={filteredTodos.length}
                   colorTheme={colorTheme}
+                  onDragEnd={handleDragEnd}
                 />
               )}
             </motion.div>
@@ -1541,9 +1612,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         existingTags={existingTags}
         colorTheme={colorTheme}
         onColorThemeChange={onColorThemeChange}
-        promptTemplates={promptTemplates}
-        onTemplatesChange={handleReloadPromptTemplates}
-        onAIConfigUpdate={handleAIConfigUpdate}
       />
 
       <TodoViewDrawer

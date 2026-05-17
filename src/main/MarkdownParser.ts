@@ -28,12 +28,8 @@ export class MarkdownParser {
       displayOrders: data.display_orders as { [key: string]: number } | undefined,
       contentHash: data.content_hash as string | undefined || data.contentHash as string | undefined,
       keywords: data.keywords as string[] | undefined,
-      aiSuggestion: data.ai_suggestion as string | undefined,
-      aiSuggestionGeneratedAt: data.ai_suggestion_generated_at as string | undefined,
-      aiSuggestionTemplate: data.ai_suggestion_template as string | undefined,
-      aiSuggestionProvider: data.ai_suggestion_provider as string | undefined,
-      aiSuggestionModel: data.ai_suggestion_model as string | undefined,
       completedAt: data.completed_at as string | undefined || data.completedAt as string | undefined,
+      todayCompletedAt: data.today_completed_at as string | undefined || data.todayCompletedAt as string | undefined,
       createdAt: data.created_at as string || new Date().toISOString(),
       updatedAt: data.updated_at as string || new Date().toISOString()
     };
@@ -59,16 +55,12 @@ export class MarkdownParser {
     // 添加可选字段
     if (todo.deadline) frontmatter.deadline = todo.deadline;
     if (todo.completedAt) frontmatter.completed_at = todo.completedAt;
+    if (todo.todayCompletedAt) frontmatter.today_completed_at = todo.todayCompletedAt;
     if (todo.displayOrder !== undefined) frontmatter.display_order = todo.displayOrder;
     if (todo.displayOrders) frontmatter.display_orders = todo.displayOrders;
     if (todo.contentHash) frontmatter.content_hash = todo.contentHash;
     if (todo.keywords) frontmatter.keywords = todo.keywords;
     if (todo.startTime) frontmatter.start_time = todo.startTime;
-    if (todo.aiSuggestion) frontmatter.ai_suggestion = todo.aiSuggestion;
-    if (todo.aiSuggestionGeneratedAt) frontmatter.ai_suggestion_generated_at = todo.aiSuggestionGeneratedAt;
-    if (todo.aiSuggestionTemplate) frontmatter.ai_suggestion_template = todo.aiSuggestionTemplate;
-    if (todo.aiSuggestionProvider) frontmatter.ai_suggestion_provider = todo.aiSuggestionProvider;
-    if (todo.aiSuggestionModel) frontmatter.ai_suggestion_model = todo.aiSuggestionModel;
 
     // 添加附件列表（Obsidian 风格）
     if (attachments.length > 0) {

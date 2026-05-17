@@ -819,12 +819,6 @@ export class FileStorageManager {
     const metadata = {
       content_hash: todo.contentHash,
       display_orders: todo.displayOrders,
-      ai_metadata: {
-        suggestion_generated_at: todo.aiSuggestionGeneratedAt,
-        template: todo.aiSuggestionTemplate,
-        provider: todo.aiSuggestionProvider,
-        model: todo.aiSuggestionModel
-      },
       internal_metadata: {
         version: 1,
         migrated_from_sqlite: false,

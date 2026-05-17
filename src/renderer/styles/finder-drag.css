@@ -1,0 +1,262 @@
+/**
+ * Finder 风格拖拽样式
+ * macOS Finder 风格的拖拽体验优化
+ */
+
+/* 基础拖拽样式 */
+.todo-item-sortable {
+  transition: transform 250ms ease, opacity 250ms ease, box-shadow 250ms ease;
+  will-change: transform, opacity;
+}
+
+/* 拖拽中的项目 */
+.todo-item-sortable.dragging {
+  opacity: 0.5;
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* 拖拽覆盖层 */
+.drag-overlay {
+  cursor: grabbing;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* 拖拽列表容器 */
+.drag-drop-todo-list {
+  position: relative;
+  min-height: 100px;
+}
+
+/* 位置指示器 */
+.placement-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: #1890ff;
+  box-shadow: 0 0 8px rgba(24, 144, 255, 0.5);
+  transform-origin: left;
+  z-index: 1000;
+  transition: top 150ms ease-out;
+  pointer-events: none;
+}
+
+/* 拖拽手柄样式 */
+.drag-handle {
+  cursor: grab;
+  transition: all 200ms ease-out;
+  user-select: none;
+}
+
+.drag-handle:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* 紧凑 Todo 项样式 */
+.compact-todo-item {
+  transition: background-color 200ms ease, opacity 200ms ease;
+}
+
+.compact-todo-item:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.compact-todo-item.dragging {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* 今日已完成的项目 */
+.compact-todo-item.today-completed {
+  opacity: 0.4;
+}
+
+.compact-todo-item.today-completed:hover {
+  opacity: 0.5;
+}
+
+/* 性能级别样式 - 高性能 */
+.performance-high .todo-item-sortable {
+  transition: transform 250ms ease, opacity 250ms ease, box-shadow 250ms ease;
+}
+
+.performance-high .drag-overlay {
+  transform: scale(1.05) rotate(2deg);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  transition: transform 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+/* 性能级别样式 - 中等性能 */
+.performance-medium .todo-item-sortable {
+  transition: transform 150ms ease, opacity 150ms ease, box-shadow 150ms ease;
+}
+
+.performance-medium .drag-overlay {
+  transform: scale(1.02) rotate(1deg);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25);
+  transition: transform 100ms ease-out, box-shadow 100ms ease-out;
+}
+
+/* 性能级别样式 - 低性能 */
+.performance-low .todo-item-sortable {
+  transition: none;
+}
+
+.performance-low .drag-overlay {
+  transform: none;
+  box-shadow: none;
+  transition: none;
+}
+
+/* 减少动画偏好 */
+.reduce-drag-motion .todo-item-sortable {
+  transition: none;
+}
+
+.reduce-drag-motion .drag-overlay {
+  transform: none;
+  box-shadow: none;
+  transition: none;
+}
+
+.reduce-drag-motion .placement-indicator {
+  transition: none;
+}
+
+/* 触摸设备优化 */
+@media (pointer: coarse) {
+  .drag-handle {
+    width: 44px;
+    height: 44px;
+    font-size: 14px;
+  }
+
+  .compact-todo-item {
+    height: 44px;
+  }
+}
+
+/* 深色主题优化 */
+.dark-theme .placement-indicator {
+  background-color: #177ddc;
+  box-shadow: 0 0 8px rgba(23, 125, 220, 0.5);
+}
+
+.dark-theme .compact-todo-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.dark-theme .compact-todo-item.dragging {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* 动画优化 */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.todo-item-sortable.animate-in {
+  animation: slideIn 250ms ease-out;
+}
+
+@keyframes elasticDrop {
+  0% {
+    transform: translateY(-20px) scale(1.05);
+    opacity: 0.9;
+  }
+  50% {
+    transform: translateY(5px) scale(1.02);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.todo-item-sortable.elastic-drop {
+  animation: elasticDrop 300ms ease-out;
+}
+
+/* 磁吸效果 */
+.todo-item-sortable.snap-target {
+  box-shadow: 0 0 0 2px #1890ff;
+  transition: box-shadow 150ms ease-out;
+}
+
+/* 焦点样式 */
+.todo-item-sortable:focus-within {
+  outline: 2px solid #1890ff;
+  outline-offset: 2px;
+}
+
+/* 禁用状态 */
+.todo-item-sortable.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* 加载状态 */
+.todo-item-sortable.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.todo-item-sortable.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 2px solid #1890ff;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 响应式优化 */
+@media (max-width: 768px) {
+  .drag-handle {
+    width: 28px;
+    height: 28px;
+    font-size: 10px;
+  }
+
+  .compact-todo-item {
+    height: 32px;
+  }
+}
+
+/* 打印样式 */
+@media print {
+  .drag-handle,
+  .placement-indicator,
+  .drag-overlay {
+    display: none;
+  }
+
+  .todo-item-sortable {
+    break-inside: avoid;
+  }
+}

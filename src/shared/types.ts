@@ -8,7 +8,7 @@ export interface Todo {
   id: TodoId;
   title: string;
   content: string;
-  status: 'pending' | 'in_progress' | 'completed';
+  status: 'pending' | 'in_progress' | 'completed' | 'paused' | 'today_completed';
   priority: 'low' | 'medium' | 'high';
   tags: string;
   imageUrl?: string;
@@ -18,55 +18,15 @@ export interface Todo {
   displayOrder?: number; // 手动排序序号（向后兼容，保留）
   displayOrders?: { [tabKey: string]: number }; // 多Tab独立排序序号
   contentHash?: string; // 内容哈希值，用于去重检测
-  keywords?: string[]; // 关键词数组，用于智能推荐
-  aiSuggestion?: string; // AI生成的建议内容
-  aiSuggestionGeneratedAt?: string; // AI建议生成时间
-  aiSuggestionTemplate?: string; // AI建议使用的prompt模板名称
-  aiSuggestionProvider?: string; // AI建议使用的AI服务提供商
-  aiSuggestionModel?: string; // AI建议使用的AI模型
+  keywords?: string[]; // 关键词数组
   completedAt?: string; // 完成时间，准确记录待办完成的时间点
+  todayCompletedAt?: string; // 今日完成时间，标记何时进入今日已完成状态
   createdAt: string;
   updatedAt: string;
 }
 
 export interface Settings {
   [key: string]: string;
-}
-
-// AI 提供商类型
-export type AIProvider = 'disabled' | 'kimi' | 'deepseek' | 'doubao' | 'openai' | 'glm' | 'claude' | 'qwen' | 'custom';
-
-// AI 配置接口
-export interface AIConfig {
-  provider: AIProvider;
-  apiKey: string;
-  apiEndpoint?: string; // 自定义端点
-  model?: string; // AI模型选择
-  enabled: boolean;
-}
-
-// 待办推荐结果
-export interface TodoRecommendation {
-  todo: Todo;
-  similarity: number; // 相似度 0-1
-  matchedKeywords: string[]; // 匹配的关键词
-}
-
-// Prompt 模板类型
-export interface PromptTemplate {
-  id?: number;
-  name: string;
-  content: string;
-  category: 'general' | 'planning' | 'analysis' | 'improvement' | 'custom';
-  createdAt: string;
-  updatedAt: string;
-}
-
-// AI 建议响应类型
-export interface AISuggestionResponse {
-  success: boolean;
-  suggestion?: string;
-  error?: string;
 }
 
 export interface CustomTab {
@@ -185,6 +145,8 @@ export interface TodoNodeStyleMap {
   completed: TodoNodeStyleConfig;
   in_progress: TodoNodeStyleConfig;
   pending: TodoNodeStyleConfig;
+  paused: TodoNodeStyleConfig;
+  today_completed: TodoNodeStyleConfig;
 }
 
 // 待办节点主题样式配置

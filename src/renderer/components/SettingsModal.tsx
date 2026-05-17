@@ -8,7 +8,6 @@ import TagManagement from './TagManagement';
 import BackupSettings from './BackupSettings';
 import CustomTabManager from './CustomTabManager';
 import URLAuthorizationManager from './URLAuthorizationManager';
-import PromptTemplateManager from './PromptTemplateManager';
 import MarkdownFileBrowser from './MarkdownFileBrowser';
 
 const { Text } = Typography;
@@ -68,9 +67,6 @@ interface SettingsModalProps {
   existingTags?: string[];
   colorTheme?: ColorTheme;
   onColorThemeChange?: (theme: ColorTheme) => void;
-  promptTemplates?: any[];
-  onTemplatesChange?: () => Promise<void>;
-  onAIConfigUpdate?: (settings: Record<string, string>) => void;
 }
 
 // 存储管理组件
@@ -321,9 +317,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   existingTags = [],
   colorTheme,
   onColorThemeChange,
-  promptTemplates = [],
-  onTemplatesChange,
-  onAIConfigUpdate,
 }) => {
   const [form] = Form.useForm();
   const [activeTab, setActiveTab] = useState('general');
@@ -355,34 +348,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       label: '通用',
       children: (
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
-          <Card title={<><BulbOutlined /> AI 配置</>}>
-            <Form.Item
-              label="API 密钥"
-              name="apiKey"
-              tooltip="用于 AI 功能的 API 密钥"
-            >
-              <Input.Password placeholder="输入 API 密钥" />
-            </Form.Item>
-            <Form.Item
-              label="API 基础 URL"
-              name="apiBaseUrl"
-              tooltip="自定义 API 基础 URL"
-            >
-              <Input placeholder="输入 API 基础 URL" />
-            </Form.Item>
-            <Form.Item
-              label="AI 模型"
-              name="aiModel"
-              tooltip="选择使用的 AI 模型"
-            >
-              <Select placeholder="选择 AI 模型">
-                <Select.Option value="gpt-4">GPT-4</Select.Option>
-                <Select.Option value="gpt-3.5-turbo">GPT-3.5 Turbo</Select.Option>
-                <Select.Option value="claude-3">Claude 3</Select.Option>
-              </Select>
-            </Form.Item>
-          </Card>
-
           <Card title={<><TagOutlined /> 主题设置</>}>
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
               <div>
@@ -430,17 +395,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       key: 'urlAuth',
       label: 'URL 授权',
       children: <URLAuthorizationManager />,
-    },
-    {
-      key: 'templates',
-      label: '提示词模板',
-      children: <PromptTemplateManager
-        visible={false}
-        onClose={() => {}}
-        templates={promptTemplates}
-        onReload={onTemplatesChange || (() => Promise.resolve())}
-        embedded={true}
-      />,
     },
   ];
 

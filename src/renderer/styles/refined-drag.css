@@ -1,0 +1,434 @@
+/**
+ * 精致拖拽样式系统
+ * 现代极简主义风格，避免廉价感
+ */
+
+/* ============================================
+   基础拖拽容器
+   ============================================ */
+
+.refined-drag-container {
+  position: relative;
+  min-height: 60px;
+  perspective: 1000px; /* 3D 透视效果 */
+  transform-style: preserve-3d;
+}
+
+/* ============================================
+   精致可拖拽项
+   ============================================ */
+
+.refined-draggable-item {
+  position: relative;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity, box-shadow;
+  transform-origin: center center;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* 悬停状态 */
+.refined-draggable-item:not(.dragging):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(24, 144, 255, 0.1);
+  z-index: 10;
+}
+
+/* 拖拽中的项目 */
+.refined-draggable-item.dragging {
+  position: relative;
+  z-index: 1000;
+  opacity: 0.9;
+  transform: scale(1.08) rotate(3deg);
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 0 60px rgba(24, 144, 255, 0.1);
+  filter: blur(2px);
+  cursor: grabbing;
+  transition: none; /* 拖拽时禁用过渡以获得实时反馈 */
+}
+
+/* 拖拽预览（DragOverlay）*/
+.refined-drag-overlay {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  transform-origin: center center;
+  cursor: grabbing;
+  filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.3));
+}
+
+.refined-drag-overlay::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(24, 144, 255, 0.1), rgba(24, 144, 255, 0));
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* ============================================
+   精致拖拽手柄
+   ============================================ */
+
+.refined-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  cursor: grab;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 14px;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.refined-drag-handle:hover {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(24, 144, 255, 0.2);
+  color: rgba(24, 144, 255, 0.8);
+  transform: scale(1.05);
+}
+
+.refined-drag-handle:active {
+  cursor: grabbing;
+  background: rgba(24, 144, 255, 0.1);
+  border-color: rgba(24, 144, 255, 0.4);
+  color: rgba(24, 144, 255, 1);
+}
+
+/* 手柄图标样式 */
+.refined-drag-handle .handle-icon {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.refined-drag-handle:hover .handle-icon {
+  transform: translateY(-1px);
+}
+
+/* ============================================
+   精致位置指示器
+   ============================================ */
+
+.refined-placement-indicator {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #1890ff, transparent);
+  border-radius: 2px;
+  box-shadow:
+    0 0 12px rgba(24, 144, 255, 0.5),
+    0 0 24px rgba(24, 144, 255, 0.3);
+  transform-origin: left center;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0;
+  transform: scaleX(0);
+  transition:
+    top 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.refined-placement-indicator.visible {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+/* 指示器光晕效果 */
+.refined-placement-indicator::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  background: radial-gradient(circle, rgba(24, 144, 255, 0.2), transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* ============================================
+   拖拽时的相邻元素效果
+   ============================================ */
+
+.refined-draggable-item.neighbor-top {
+  transform: translateY(8px) scale(0.98);
+  opacity: 0.7;
+}
+
+.refined-draggable-item.neighbor-bottom {
+  transform: translateY(-8px) scale(0.98);
+  opacity: 0.7;
+}
+
+/* ============================================
+   精致磁吸效果
+   ============================================ */
+
+.refined-draggable-item.snap-target {
+  box-shadow:
+    0 0 0 2px #1890ff,
+    0 0 20px rgba(24, 144, 255, 0.4),
+    0 0 40px rgba(24, 144, 255, 0.2);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ============================================
+   性能优化样式
+   ============================================ */
+
+/* 高性能模式 */
+.performance-high .refined-draggable-item {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.performance-high .refined-draggable-item.dragging {
+  filter: blur(2px);
+}
+
+/* 中等性能模式 */
+.performance-medium .refined-draggable-item {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.performance-medium .refined-draggable-item.dragging {
+  filter: blur(1px);
+  transform: scale(1.05) rotate(1.5deg);
+}
+
+/* 低性能模式 */
+.performance-low .refined-draggable-item {
+  transition: all 0.2s ease;
+}
+
+.performance-low .refined-draggable-item.dragging {
+  filter: none;
+  transform: scale(1.02);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* ============================================
+   减少动画偏好
+   ============================================ */
+
+.reduce-drag-motion .refined-draggable-item {
+  transition: none;
+}
+
+.reduce-drag-motion .refined-draggable-item.dragging {
+  filter: none;
+  transform: scale(1.02);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.reduce-drag-motion .refined-placement-indicator {
+  transition: none;
+}
+
+/* ============================================
+   深色主题适配
+   ============================================ */
+
+[data-theme='dark'] .refined-draggable-item:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(64, 169, 255, 0.2);
+}
+
+[data-theme='dark'] .refined-draggable-item.dragging {
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 0 60px rgba(64, 169, 255, 0.2);
+}
+
+[data-theme='dark'] .refined-drag-handle {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+[data-theme='dark'] .refined-drag-handle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(64, 169, 255, 0.3);
+  color: rgba(64, 169, 255, 0.9);
+}
+
+[data-theme='dark'] .refined-drag-handle:active {
+  background: rgba(64, 169, 255, 0.2);
+  border-color: rgba(64, 169, 255, 0.5);
+  color: rgba(64, 169, 255, 1);
+}
+
+[data-theme='dark'] .refined-placement-indicator {
+  background: linear-gradient(90deg, transparent, #40a9ff, transparent);
+  box-shadow:
+    0 0 12px rgba(64, 169, 255, 0.6),
+    0 0 24px rgba(64, 169, 255, 0.4);
+}
+
+[data-theme='dark'] .refined-placement-indicator::before {
+  background: radial-gradient(circle, rgba(64, 169, 255, 0.3), transparent 70%);
+}
+
+/* ============================================
+   触摸设备优化
+   ============================================ */
+
+@media (pointer: coarse) {
+  .refined-drag-handle {
+    width: 44px;
+    height: 44px;
+  }
+
+  .refined-draggable-item.dragging {
+    transform: scale(1.05) rotate(1deg);
+    filter: blur(1px);
+  }
+}
+
+/* ============================================
+   响应式设计
+   ============================================ */
+
+@media (max-width: 768px) {
+  .refined-drag-handle {
+    width: 32px;
+    height: 32px;
+  }
+
+  .refined-draggable-item.dragging {
+    transform: scale(1.06) rotate(2deg);
+  }
+
+  .refined-placement-indicator {
+    left: 8px;
+    right: 8px;
+  }
+}
+
+/* ============================================
+   动画关键帧
+   ============================================ */
+
+@keyframes refinedFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes refinedDrop {
+  0% {
+    transform: translateY(-10px) scale(1.08) rotate(3deg);
+    opacity: 0.9;
+  }
+  60% {
+    transform: translateY(2px) scale(1.02) rotate(0.5deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes refinedShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* 应用动画的类 */
+.refined-draggable-item.animate-in {
+  animation: refinedFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.refined-draggable-item.elastic-drop {
+  animation: refinedDrop 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ============================================
+   特殊状态样式
+   ============================================ */
+
+/* 加载状态 */
+.refined-draggable-item.loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.refined-draggable-item.loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+[data-theme='dark'] .refined-draggable-item.loading::after {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+/* 错误状态 */
+.refined-draggable-item.error {
+  border: 1px solid #ff4d4f;
+  box-shadow: 0 0 12px rgba(255, 77, 79, 0.3);
+  animation: refinedShake 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes refinedShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+
+/* ============================================
+   焦点样式 - 可访问性
+   ============================================ */
+
+.refined-draggable-item:focus-within {
+  outline: 2px solid #1890ff;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.refined-drag-handle:focus {
+  outline: 2px solid #1890ff;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ============================================
+   打印样式
+   ============================================ */
+
+@media print {
+  .refined-drag-handle,
+  .refined-placement-indicator,
+  .refined-drag-overlay {
+    display: none;
+  }
+
+  .refined-draggable-item {
+    break-inside: avoid;
+    box-shadow: none;
+  }
+}
