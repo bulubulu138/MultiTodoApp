@@ -488,16 +488,20 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
     prevProps.activeTab === nextProps.activeTab &&
     prevProps.viewMode === nextProps.viewMode;
 
-  // 如果基础检查通过，进一步检查todos内容是否真正变化
-  if (basicChecks && prevProps.todos.length > 0 && nextProps.todos.length > 0) {
-    // 🔧 新增：检查关键更新字段（updatedAt）是否变化
-    // 优化性能：只检查第一个和最后一个元素的updatedAt，避免遍历整个数组
-    const firstTodoChanged = prevProps.todos[0].updatedAt !== nextProps.todos[0].updatedAt;
-    const lastTodoChanged = prevProps.todos[prevProps.todos.length - 1].updatedAt !== nextProps.todos[prevProps.todos.length - 1].updatedAt;
+  // 🔧 改进的内容检查：使用更可靠的策略
+  if (prevProps.todos.length > 0 && nextProps.todos.length > 0) {
+    // 检查数组引用是否变化（最常见的情况）
+    if (prevProps.todos !== nextProps.todos) return false;
 
-    // 如果首尾元素的updatedAt都相同，则认为内容没有变化
-    // 这种启发式方法在大多数场景下有效，且性能开销小
-    return !firstTodoChanged && !lastTodoChanged;
+    // 检查关键元素是否变化
+    const sampleSize = Math.min(5, prevProps.todos.length); // 检查前5个元素
+    for (let i = 0; i < sampleSize; i++) {
+      if (prevProps.todos[i].updatedAt !== nextProps.todos[i].updatedAt) {
+        return false; // 有变化，需要重新渲染
+      }
+    }
+
+    return true; // 无变化，跳过重新渲染
   }
 
   return basicChecks;
