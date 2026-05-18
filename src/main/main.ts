@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, nativeImage, globalShortcut, clipboard } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import { Todo, TodoRelation, TodoTreeNode, TreeRelationData } from '../shared/types';
 import { SettingsManager } from './SettingsManager';
 import { FlowchartFileManager } from './FlowchartFileManager';
 import { FlowchartTodoAssociationManager } from './FlowchartTodoAssociationManager';
@@ -954,8 +955,114 @@ class Application {
     });
 
     ipcMain.handle('relations:buildTree', async () => {
-      // 简化实现：返回空树结构
-      return { nodes: [], edges: [] };
+      try {
+        const storageManager = this.databaseManager.getStorageManager();
+
+        // 获取所有待办和关系
+        const allTodos = await storageManager.getAllTodos();
+        const allRelations = await storageManager.getAllRelations();
+
+        // 构建待办映射，便于快速查找
+        const todoMap = new Map<string, Todo>();
+        allTodos.forEach(todo => {
+          todoMap.set(String(todo.id), todo);
+        });
+
+        // 构建邻接表：child_id -> parent_ids (background关系)
+        const childToParents = new Map<string, string[]>();
+        // 构建邻接表：parent_id -> child_ids (extends关系)
+        const parentToChildren = new Map<string, string[]>();
+
+        allRelations.forEach(rel => {
+          const sourceId = String(rel.source_id);
+          const targetId = String(rel.target_id);
+
+          if (rel.relation_type === 'background') {
+            // target以source为背景，即source是target的父节点
+            if (!childToParents.has(targetId)) {
+              childToParents.set(targetId, []);
+            }
+            childToParents.get(targetId)!.push(sourceId);
+          } else if (rel.relation_type === 'extends') {
+            // source延伸了target，即target是source的父节点
+            if (!parentToChildren.has(targetId)) {
+              parentToChildren.set(targetId, []);
+            }
+            parentToChildren.get(targetId)!.push(sourceId);
+          }
+          // parallel关系暂不处理
+        });
+
+        // 识别根节点：没有background父节点的待办
+        const rootIds = new Set<string>();
+        allTodos.forEach(todo => {
+          const todoId = String(todo.id);
+          if (!childToParents.has(todoId) || childToParents.get(todoId)!.length === 0) {
+            rootIds.add(todoId);
+          }
+        });
+
+        // 使用迭代算法（BFS）构建树，避免递归栈溢出
+        const roots: TodoTreeNode[] = [];
+        const visited = new Set<string>();
+        const maxDepth = 50;
+        const maxNodes = 1000;
+
+        for (const rootId of rootIds) {
+          if (visited.has(rootId)) continue;
+
+          const queue: Array<{ id: string; depth: number; parentArray: TodoTreeNode[] }> = [];
+          queue.push({ id: rootId, depth: 0, parentArray: roots });
+
+          while (queue.length > 0 && roots.length < maxNodes) {
+            const { id, depth, parentArray } = queue.shift()!;
+
+            // 防止循环依赖和过深树
+            if (visited.has(id) || depth >= maxDepth) {
+              continue;
+            }
+
+            visited.add(id);
+
+            const todo = todoMap.get(id);
+            if (!todo) continue;
+
+            // 创建树节点
+            const treeNode: TodoTreeNode = {
+              key: id,
+              title: todo.title,
+              todo: todo,
+              children: []
+            };
+
+            parentArray.push(treeNode);
+
+            // 查找子节点（通过extends关系）
+            const childIds = parentToChildren.get(id) || [];
+            for (const childId of childIds) {
+              if (!visited.has(childId)) {
+                queue.push({
+                  id: childId,
+                  depth: depth + 1,
+                  parentArray: treeNode.children!
+                });
+              }
+            }
+          }
+        }
+
+        return {
+          roots: roots,
+          relations: allRelations
+        };
+      } catch (error) {
+        console.error('[buildTree] Error building tree:', error);
+        // 出错时返回空树，避免前端崩溃
+        return {
+          roots: [],
+          relations: []
+        };
+      }
     });
 
     // Backup operations

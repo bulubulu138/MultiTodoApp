@@ -62,36 +62,54 @@ const TodoPositionSelector: React.FC<TodoPositionSelectorProps> = ({
 
   // 从后端数据构建树形数据
   const buildTreeDataFromData = (data: TreeRelationData) => {
-    const convertNode = (node: TodoTreeNode): TreeDataNode => {
-      return {
-        key: node.key,
-        title: (
-          <Space>
-            <span>{node.title}</span>
-            <Tag color={getStatusColor(node.todo.status)}>{getStatusLabel(node.todo.status)}</Tag>
-          </Space>
-        ),
-        todo: node.todo,
-        children: node.children ? node.children.map(convertNode) : undefined
+    try {
+      // 防御性检查：确保数据格式正确
+      if (!data) {
+        console.error('[buildTreeDataFromData] Invalid data: data is null or undefined');
+        setTreeData([]);
+        return;
+      }
+
+      if (!data.roots || !Array.isArray(data.roots)) {
+        console.error('[buildTreeDataFromData] Invalid data: roots is not an array', data);
+        setTreeData([]);
+        return;
+      }
+
+      const convertNode = (node: TodoTreeNode): TreeDataNode => {
+        return {
+          key: node.key,
+          title: (
+            <Space>
+              <span>{node.title}</span>
+              <Tag color={getStatusColor(node.todo.status)}>{getStatusLabel(node.todo.status)}</Tag>
+            </Space>
+          ),
+          todo: node.todo,
+          children: node.children ? node.children.map(convertNode) : undefined
+        };
       };
-    };
 
-    const nodes = data.roots.map(convertNode);
-    setTreeData(nodes);
+      const nodes = data.roots.map(convertNode);
+      setTreeData(nodes);
 
-    // 默认展开所有节点
-    const getAllKeys = (nodes: TreeDataNode[]): React.Key[] => {
-      const keys: React.Key[] = [];
-      nodes.forEach(node => {
-        keys.push(node.key);
-        if (node.children) {
-          keys.push(...getAllKeys(node.children));
-        }
-      });
-      return keys;
-    };
+      // 默认展开所有节点
+      const getAllKeys = (nodes: TreeDataNode[]): React.Key[] => {
+        const keys: React.Key[] = [];
+        nodes.forEach(node => {
+          keys.push(node.key);
+          if (node.children) {
+            keys.push(...getAllKeys(node.children));
+          }
+        });
+        return keys;
+      };
 
-    setExpandedKeys(getAllKeys(nodes));
+      setExpandedKeys(getAllKeys(nodes));
+    } catch (error) {
+      console.error('[buildTreeDataFromData] Error building tree data:', error);
+      setTreeData([]);
+    }
   };
 
   // 过滤树形数据（基于搜索值）
