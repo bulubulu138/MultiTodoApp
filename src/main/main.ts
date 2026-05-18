@@ -489,8 +489,8 @@ class Application {
     });
 
     ipcMain.handle('todo:createManualAtTop', async (_, todo, tabKey: string) => {
-      // 简化实现：直接创建todo，暂不支持标签特定顺序
-      return await this.databaseManager.getStorageManager().createTodo(todo);
+      // 使用新的创建方法，新待办将被添加到顶部并自动调整其他待办的排序号
+      return await this.databaseManager.getStorageManager().createTodoWithDisplayOrder(todo, tabKey, 'top');
     });
 
     ipcMain.handle('todo:update', async (_, uuid: string, updates) => {

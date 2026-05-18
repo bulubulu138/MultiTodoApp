@@ -27,7 +27,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const [editorInstance, setEditorInstance] = useState<any>(null);
+  const editorInstanceRef = useRef<any>(null);
   const [hasError, setHasError] = useState(false);
 
   // 添加输入状态和焦点状态追踪
@@ -47,11 +47,11 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
 
   // 🔥 新增：查找外部滚动容器的函数
   const findScrollContainer = useCallback(() => {
-    if (!editorInstance) return null;
+    if (!editorInstanceRef.current) return null;
 
     try {
       // 从编辑器根元素开始，向上查找最近的滚动容器
-      const editorRoot = editorInstance.root;
+      const editorRoot = editorInstanceRef.current.root;
       if (!editorRoot) return null;
 
       let currentElement: HTMLElement | null = editorRoot.parentElement;
@@ -76,7 +76,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       console.warn('[QuillScrollBlock] Failed to find scroll container:', error);
       return null;
     }
-  }, [editorInstance]);
+  }, []); // editorInstanceRef 是 ref，不需要作为依赖
 
   // 🔥 新增：锁定外部滚动容器的滚动
   const lockScrollContainer = useCallback((duration: number = 300) => {
@@ -177,8 +177,9 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
     return () => {
       clearTimeout(timer);
       setIsMounted(false);
-      setIsReady(false);
-      setEditorInstance(null);
+      // 🔥 关键修复：不重置 isReady，避免无限加载循环
+      // setIsReady(false);
+      editorInstanceRef.current = null;
 
       // 🔥 清理：解锁滚动容器和清理定时器
       unlockScrollContainer();
@@ -194,25 +195,25 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       }
 
       // 🔥 清理：断开 text-change 事件监听器
-      if (editorInstance) {
+      if (editorInstanceRef.current) {
         try {
-          editorInstance.off('text-change');
+          editorInstanceRef.current.off('text-change');
         } catch (error) {
           console.warn('[QuillScrollBlock] Failed to remove text-change listener:', error);
         }
       }
     };
-  }, [unlockScrollContainer, editorInstance]);
+  }, [unlockScrollContainer]);
 
   useEffect(() => {
-    if (isReady && editorInstance && value !== editorInstance.root.innerHTML) {
+    if (isReady && editorInstanceRef.current && value !== editorInstanceRef.current.root.innerHTML) {
       try {
         if (isComposingRef.current || isFocusedRef.current) {
           return;
         }
 
-        const currentHtml = editorInstance.root.innerHTML;
-        const currentText = editorInstance.getText();
+        const currentHtml = editorInstanceRef.current.root.innerHTML;
+        const currentText = editorInstanceRef.current.getText();
         const incomingText = value.replace(/<[^>]*>/g, '').trim();
         const shouldSyncHtml = currentText.trim() !== incomingText;
 
@@ -220,10 +221,10 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
           // 🔥🔥 关键修复：在内容同步前锁定外部滚动容器的滚动，延长到 300ms
           lockScrollContainer(300);
 
-          const selection = editorInstance.getSelection();
+          const selection = editorInstanceRef.current.getSelection();
 
           try {
-            const historyModule = editorInstance.getModule('history');
+            const historyModule = editorInstanceRef.current.getModule('history');
             if (historyModule) {
               historyModule.clear();
             }
@@ -232,10 +233,10 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
           }
 
           // 🔥 关键修复：内容替换后重新覆盖 scrollSelectionIntoView，确保始终有效
-          editorInstance.clipboard.dangerouslyPasteHTML(value);
+          editorInstanceRef.current.clipboard.dangerouslyPasteHTML(value);
 
           // 🔥 确保滚动覆盖在内容替换后仍然有效
-          editorInstance.scrollSelectionIntoView = function() {
+          editorInstanceRef.current.scrollSelectionIntoView = function() {
             return;
           };
 
@@ -250,7 +251,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
 
           if (selection) {
             try {
-              editorInstance.setSelection(selection.index, selection.length);
+              editorInstanceRef.current.setSelection(selection.index, selection.length);
             } catch {
               // noop
             }
@@ -261,7 +262,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
         unlockScrollContainer();
       }
     }
-  }, [value, isReady, editorInstance, lockScrollContainer, unlockScrollContainer]);
+  }, [value, isReady, lockScrollContainer, unlockScrollContainer]);
 
   // 🔥 新增：判断事件目标是否为工具栏相关元素（普通函数，避免作用域问题）
   const isToolbarElement = (element: HTMLElement | null): boolean => {
@@ -309,7 +310,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       }
 
       // 缓存编辑器实例
-      if (!editorInstance) {
+      if (!editorInstanceRef.current) {
         // 🔥 核心修复1：覆盖 scrollSelectionIntoView 方法
         const originalScrollIntoView = editor.scrollSelectionIntoView.bind(editor);
         editor.scrollSelectionIntoView = function() {
@@ -483,17 +484,17 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
         };
         setupDOMScrollInterception();
 
-        setEditorInstance(editor);
+        editorInstanceRef.current = editor;
         return editor;
       }
 
-      return editorInstance || null;
+      return editorInstanceRef.current || null;
     } catch (error) {
       // 静默处理编辑器未初始化的情况
-      setEditorInstance(null);
+      editorInstanceRef.current = null;
       return null;
     }
-  }, [isMounted, editorInstance]);
+  }, [isMounted]);
 
   const getLatestHtml = useCallback(() => {
     const editor = getEditorSafely();
@@ -564,7 +565,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
     return () => {
       editorElement.removeEventListener('click', handleLinkClick, { capture: true });
     };
-  }, [editorInstance, getEditorSafely]);
+  }, [getEditorSafely]); // editorInstanceRef 是 ref，不需要作为依赖
 
   // 🔥 useEffect 2：滚动事件拦截
   useEffect(() => {
@@ -697,7 +698,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       // 🔥🔥 清理：确保解锁滚动容器
       unlockScrollContainer();
     };
-  }, [editorInstance, getEditorSafely, lockScrollContainer, unlockScrollContainer]);
+  }, [getEditorSafely, lockScrollContainer, unlockScrollContainer]); // editorInstanceRef 是 ref，不需要作为依赖
 
   // 🔥 useEffect 3：焦点和输入法事件
   useEffect(() => {
@@ -794,7 +795,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       editorElement.removeEventListener('blur', handleBlur);
       editorElement.removeEventListener('keydown', handleKeyDown);
     };
-  }, [editorInstance, getEditorSafely, onChange, lockScrollContainer]);
+  }, [getEditorSafely, onChange, lockScrollContainer]); // editorInstanceRef 是 ref，不需要作为依赖
 
   const imageHandler = async () => {
     const editor = getEditorSafely();

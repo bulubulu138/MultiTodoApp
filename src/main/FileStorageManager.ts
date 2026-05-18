@@ -165,6 +165,82 @@ export class FileStorageManager {
   }
 
   /**
+   * 创建待办并设置显示顺序（手动排序模式专用）
+   * 新待办将添加到列表顶部，所有现有待办的排序号依次递增
+   */
+  async createTodoWithDisplayOrder(
+    todo: Omit<Todo, 'id'>,
+    tabKey: string,
+    position: 'top' | 'bottom' = 'top'
+  ): Promise<Todo> {
+    console.log(`[createTodoWithDisplayOrder] Creating todo at ${position} for tab: ${tabKey}`);
+
+    // 1. 获取当前Tab下所有待办的排序号
+    const allTodos = await this.getAllTodos();
+    const currentTabTodos = allTodos.filter(t =>
+      t.displayOrders &&
+      t.displayOrders[tabKey] != null
+    );
+
+    console.log(`[createTodoWithDisplayOrder] Found ${currentTabTodos.length} todos with display orders in tab ${tabKey}`);
+
+    // 2. 为新待办分配排序号
+    let newTodoOrder: number;
+    if (position === 'top') {
+      // 插入到顶部：新待办排序号为0
+      newTodoOrder = 0;
+    } else {
+      // 插入到底部：新待办排序号为当前最大值+1
+      const maxOrder = currentTabTodos.length > 0
+        ? Math.max(...currentTabTodos.map(t => t.displayOrders![tabKey]!))
+        : -1;
+      newTodoOrder = maxOrder + 1;
+    }
+
+    console.log(`[createTodoWithDisplayOrder] New todo will get order: ${newTodoOrder}`);
+
+    // 3. 创建新待办并设置排序号
+    const todoWithOrder: Omit<Todo, 'id'> = {
+      ...todo,
+      displayOrders: {
+        ...todo.displayOrders,
+        [tabKey]: newTodoOrder
+      }
+    };
+
+    const newTodo = await this.createTodo(todoWithOrder);
+    console.log(`[createTodoWithDisplayOrder] Created todo with ID: ${newTodo.id}`);
+
+    // 4. 如果插入到顶部，需要调整所有其他待办的排序号
+    if (position === 'top' && currentTabTodos.length > 0) {
+      console.log(`[createTodoWithDisplayOrder] Adjusting display orders for ${currentTabTodos.length} existing todos`);
+
+      // 构建批量更新列表
+      const batchUpdates: Array<{ uuid: string; tabKey: string; displayOrder: number }> = [];
+
+      // 所有现有待办的排序号+1
+      currentTabTodos.forEach(todo => {
+        const oldOrder = todo.displayOrders![tabKey]!;
+        const newOrder = oldOrder + 1;
+        batchUpdates.push({
+          uuid: todo.id,
+          tabKey: tabKey,
+          displayOrder: newOrder
+        });
+        console.log(`[createTodoWithDisplayOrder] Todo ${todo.id}: ${oldOrder} -> ${newOrder}`);
+      });
+
+      // 批量更新排序号
+      if (batchUpdates.length > 0) {
+        await this.batchUpdateDisplayOrders(batchUpdates);
+        console.log(`[createTodoWithDisplayOrder] Successfully updated ${batchUpdates.length} todos' display orders`);
+      }
+    }
+
+    return newTodo;
+  }
+
+  /**
    * 根据 UUID 获取待办（Obsidian 风格）
    */
   async getTodoById(uuid: string): Promise<Todo | null> {

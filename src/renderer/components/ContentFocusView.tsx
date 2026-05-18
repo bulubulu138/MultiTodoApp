@@ -71,6 +71,7 @@ const ContentFocusItem = React.memo(
     const isComposingRef = useRef(false); // 追踪输入法状态
     const editorRef = useRef<RichTextEditorRef>(null);
     const editorFocusedRef = useRef(false); // 🔥 新增：追踪编辑器焦点状态
+    const editorReadyRef = useRef(false); // 🔥 新增：追踪编辑器初始化状态，防止在初始化过程中触发同步
 
     // 使用共享的序号编辑 Hook
     const {
@@ -103,19 +104,37 @@ const ContentFocusItem = React.memo(
       latestTodoIdRef.current = todo.id;
     }, [todo.id]);
 
-    // 🔥 关键修复：同步外部更新的 todo.content（仅在编辑器失焦时才同步）
+    // 🔥 新增：延迟设置编辑器就绪状态，确保编辑器完全初始化后才允许外部内容同步
+    useEffect(() => {
+      // 重置就绪状态
+      editorReadyRef.current = false;
+
+      // 延迟设置就绪状态，给编辑器足够的初始化时间
+      const readyTimer = setTimeout(() => {
+        editorReadyRef.current = true;
+      }, 200); // 200ms 延迟，确保编辑器完全初始化
+
+      return () => {
+        clearTimeout(readyTimer);
+        editorReadyRef.current = false;
+      };
+    }, [todo.id]); // 当 todo.id 变化时（切换到不同的 todo），重新初始化就绪状态
+
+    // 🔥 关键修复：同步外部更新的 todo.content（仅在编辑器失焦且初始化完成后才同步）
     useEffect(() => {
       // 只在以下情况下才同步外部value到编辑器：
       // 1. 外部内容确实发生了变化（todo.content !== lastSavedContentRef.current）
       // 2. 当前不在保存中（!isSaving）
       // 3. **编辑器不在焦点状态**（!editorFocusedRef.current）← 这是关键！
       // 4. 用户不在编辑中（!isCurrentlyEditing）
+      // 5. **编辑器已完全初始化**（editorReadyRef.current）← 新增！防止在初始化过程中触发同步
       //
       // 这样可以防止编辑期间的外部value同步破坏Quill的history栈，
       // 特别是在撤销操作期间，外部value同步会覆盖撤销结果
+      // 同时防止在编辑器初始化过程中触发同步，避免无限加载循环
       const isCurrentlyEditing = editedContent !== lastSavedContentRef.current;
 
-      if (todo.content !== lastSavedContentRef.current && !isSaving && !isCurrentlyEditing && !editorFocusedRef.current) {
+      if (todo.content !== lastSavedContentRef.current && !isSaving && !isCurrentlyEditing && !editorFocusedRef.current && editorReadyRef.current) {
         setEditedContent(todo.content);
         lastSavedContentRef.current = todo.content;
       }
