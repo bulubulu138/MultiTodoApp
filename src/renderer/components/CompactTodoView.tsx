@@ -217,4 +217,37 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
   );
 };
 
-export default CompactTodoView;
+// 为 CompactTodoView 添加记忆化，优化性能并确保数据变化时能重新渲染
+const MemoizedCompactTodoView = React.memo(CompactTodoView, (prevProps, nextProps) => {
+  // 基础属性检查
+  const basicChecks =
+    prevProps.todos.length === nextProps.todos.length &&
+    prevProps.activeTab === nextProps.activeTab &&
+    prevProps.sortOption === nextProps.sortOption &&
+    prevProps.relations.length === nextProps.relations.length;
+
+  // 如果基础检查失败，需要重新渲染
+  if (!basicChecks) return false;
+
+  // 检查 todos 数组内容是否真正变化
+  // 首先检查数组引用是否变化（最常见且重要的变化）
+  if (prevProps.todos !== nextProps.todos) return false;
+
+  // 如果数组引用相同，再进行内容检查（可选，因为引用变化已经处理了大多数情况）
+  // 使用轻量级策略：检查首尾元素的关键属性
+  if (prevProps.todos.length > 0 && nextProps.todos.length > 0) {
+    const firstChanged = prevProps.todos[0].id !== nextProps.todos[0].id ||
+                        prevProps.todos[0].updatedAt !== nextProps.todos[0].updatedAt;
+    const lastChanged = prevProps.todos[prevProps.todos.length - 1].id !== nextProps.todos[prevProps.todos.length - 1].id ||
+                       prevProps.todos[prevProps.todos.length - 1].updatedAt !== nextProps.todos[prevProps.todos.length - 1].updatedAt;
+
+    // 如果首尾元素有变化，需要重新渲染
+    if (firstChanged || lastChanged) return false;
+  }
+
+  return basicChecks;
+});
+
+MemoizedCompactTodoView.displayName = 'MemoizedCompactTodoView';
+
+export default MemoizedCompactTodoView;

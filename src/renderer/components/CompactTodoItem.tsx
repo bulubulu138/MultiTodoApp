@@ -251,4 +251,19 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
   );
 };
 
-export default CompactTodoItem;
+// 为 CompactTodoItem 添加记忆化，优化性能并确保数据变化时能重新渲染
+const MemoizedCompactTodoItem = React.memo(CompactTodoItem, (prevProps, nextProps) => {
+  // 自定义比较函数，只在关键 props 改变时重新渲染
+  return (
+    prevProps.todo.id === nextProps.todo.id &&
+    prevProps.todo.status === nextProps.todo.status &&
+    prevProps.todo.updatedAt === nextProps.todo.updatedAt &&
+    prevProps.todo.title === nextProps.todo.title &&
+    prevProps.currentDisplayOrder === nextProps.currentDisplayOrder &&
+    prevProps.savingOrder === nextProps.savingOrder
+  );
+});
+
+MemoizedCompactTodoItem.displayName = 'MemoizedCompactTodoItem';
+
+export default MemoizedCompactTodoItem;
