@@ -89,6 +89,19 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
     return date.format('HH:mm');
   };
 
+  // 按精确日期过滤待办（公共过滤逻辑）
+  const filterTodosByExactDate = (
+    todos: Todo[],
+    dateStr: string,
+    timeField: 'startTime' | 'deadline' | 'completedAt' | 'createdAt'
+  ): Todo[] => {
+    return todos.filter(todo =>
+      todo &&
+      todo[timeField] &&
+      dayjs(todo[timeField]).format('YYYY-MM-DD') === dateStr
+    );
+  };
+
   // 日期单元格内容渲染
   const dateCellRender = (date: Dayjs) => {
     const dateStr = date.format('YYYY-MM-DD');
@@ -99,16 +112,26 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
     );
     
     // 找出当天截止的待办
-    const deadlineTodos = todos.filter(todo => 
+    const deadlineTodos = todos.filter(todo =>
       todo && todo.deadline && dayjs(todo.deadline).format('YYYY-MM-DD') === dateStr
     );
-    
+
+    // 找出当天完成的待办
+    const completedTodos = todos.filter(todo =>
+      todo.status === 'completed' &&
+      todo.completedAt &&
+      dayjs(todo.completedAt).format('YYYY-MM-DD') === dateStr
+    );
+
+    // 找出当天创建的待办
+    const createdTodos = filterTodosByExactDate(todos, dateStr, 'createdAt');
+
     // 找出逾期的待办（截止日期在这一天，且未完成，且已过期）
-    const overdueTodos = deadlineTodos.filter(todo => 
+    const overdueTodos = deadlineTodos.filter(todo =>
       todo.status !== 'completed' && dayjs(todo.deadline).isBefore(dayjs())
     );
     
-    if (startingTodos.length === 0 && deadlineTodos.length === 0) {
+    if (startingTodos.length === 0 && deadlineTodos.length === 0 && completedTodos.length === 0 && createdTodos.length === 0) {
       return null;
     }
     
@@ -141,10 +164,31 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
           ))}
           {/* 截止的待办 */}
           {deadlineTodos.slice(0, 3).map(todo => (
-            <Badge 
+            <Badge
               key={`deadline-${todo.id}`}
               status="error"
               color={getPriorityColor(todo.priority)}
+            />
+          ))}
+          {/* 完成的待办 - 绿色数字 Badge */}
+          {completedTodos.length > 0 && (
+            <Badge
+              count={completedTodos.length}
+              style={{
+                backgroundColor: '#52c41a',
+                fontSize: viewSize === 'compact' ? 9 : (viewSize === 'standard' ? 10 : 11),
+                height: viewSize === 'compact' ? 14 : (viewSize === 'standard' ? 16 : 18),
+                lineHeight: viewSize === 'compact' ? '14px' : (viewSize === 'standard' ? '16px' : '18px'),
+                minWidth: viewSize === 'compact' ? 14 : (viewSize === 'standard' ? 16 : 18)
+              }}
+            />
+          )}
+          {/* 创建的待办 - 蓝色加号 Badge */}
+          {createdTodos.slice(0, 2).map(todo => (
+            <Badge
+              key={`created-${todo.id}`}
+              status="processing"
+              color="#1890ff"
             />
           ))}
         </div>
@@ -159,33 +203,35 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
 
   // 获取选中日期的待办 - 使用 useMemo 优化性能
   const selectedTodoLists = useMemo(() => {
-    if (!selectedDate) return { overdue: [], starting: [], deadline: [] };
-    
+    if (!selectedDate) return { overdue: [], starting: [], deadline: [], completed: [], created: [] };
+
     const dateStr = selectedDate.format('YYYY-MM-DD');
     const now = dayjs();
-    
-    // 使用精确的日期比较
-    const starting = todos.filter(todo => 
-      todo && todo.startTime && dayjs(todo.startTime).format('YYYY-MM-DD') === dateStr
+
+    // 使用公共过滤函数
+    const starting = filterTodosByExactDate(todos, dateStr, 'startTime');
+    const deadline = filterTodosByExactDate(todos, dateStr, 'deadline');
+    const completed = todos.filter(todo =>
+      todo.status === 'completed' &&
+      todo.completedAt &&
+      dayjs(todo.completedAt).format('YYYY-MM-DD') === dateStr
     );
-    
-    const deadline = todos.filter(todo => 
-      todo && todo.deadline && dayjs(todo.deadline).format('YYYY-MM-DD') === dateStr
-    );
-    
+    const created = filterTodosByExactDate(todos, dateStr, 'createdAt');
+
     // 筛选逾期的待办（从 deadline 中筛选未完成且已过期的）
-    const overdue = deadline.filter(todo => 
-      todo && todo.status !== 'completed' && dayjs(todo.deadline).isBefore(now)
+    const overdue = deadline.filter(todo =>
+      todo.status !== 'completed' &&
+      dayjs(todo.deadline).isBefore(now)
     ).sort((a, b) => {
       // 按逾期时长排序（逾期越久越靠前）
       return dayjs(a.deadline!).diff(dayjs(b.deadline!));
     });
-    
-    return { overdue, starting, deadline };
+
+    return { overdue, starting, deadline, completed, created };
   }, [selectedDate, todos]);
 
-  const { overdue, starting, deadline } = selectedTodoLists;
-  const hasSelectedTodos = overdue.length > 0 || starting.length > 0 || deadline.length > 0;
+  const { overdue, starting, deadline, completed, created } = selectedTodoLists;
+  const hasSelectedTodos = overdue.length > 0 || starting.length > 0 || deadline.length > 0 || completed.length > 0 || created.length > 0;
 
   return (
     <>
@@ -413,7 +459,108 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
               />
             </>
           )}
-              
+
+          {/* 完成的待办 */}
+          {completed.length > 0 && (
+            <>
+              <Divider style={{ margin: '12px 0' }} />
+              <div style={{ marginBottom: 12 }}>
+                <Text strong style={{ fontSize: 14, color: colors.textColor }}>
+                  ✅ 完成的待办 ({completed.length})
+                </Text>
+              </div>
+              <List
+                size="small"
+                dataSource={completed}
+                renderItem={(todo) => (
+                  <List.Item
+                    onClick={() => {
+                      onSelectTodo(todo);
+                      onClose();
+                    }}
+                    style={{
+                      cursor: 'pointer',
+                      padding: '6px 10px',
+                      background: 'rgba(82, 196, 26, 0.1)',
+                      color: colors.textColor,
+                      marginBottom: 6,
+                      borderRadius: 4,
+                      border: '1px solid #52c41a',
+                      fontSize: 13
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(82, 196, 26, 0.2)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(82, 196, 26, 0.1)'}
+                  >
+                    <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                      <Space>
+                        <Tag color={getPriorityColor(todo.priority)}>
+                          {getPriorityText(todo.priority)}
+                        </Tag>
+                        <Text style={{ color: '#52c41a' }}>{todo.title}</Text>
+                      </Space>
+                      {todo.completedAt && (
+                        <Text type="secondary" style={{ fontSize: 12, color: '#666666' }}>
+                          {formatTime(todo.completedAt)}
+                        </Text>
+                      )}
+                    </Space>
+                  </List.Item>
+                )}
+                style={{ marginBottom: 16 }}
+              />
+            </>
+          )}
+
+          {/* 创建的待办 */}
+          {created.length > 0 && (
+            <>
+              <Divider style={{ margin: '12px 0' }} />
+              <div style={{ marginBottom: 12 }}>
+                <Text strong style={{ fontSize: 14, color: colors.textColor }}>
+                  ➕ 创建的待办 ({created.length})
+                </Text>
+              </div>
+              <List
+                size="small"
+                dataSource={created}
+                renderItem={(todo) => (
+                  <List.Item
+                    onClick={() => {
+                      onSelectTodo(todo);
+                      onClose();
+                    }}
+                    style={{
+                      cursor: 'pointer',
+                      padding: '6px 10px',
+                      background: 'rgba(24, 144, 255, 0.1)',
+                      color: colors.textColor,
+                      marginBottom: 6,
+                      borderRadius: 4,
+                      border: '1px solid #1890ff',
+                      fontSize: 13
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(24, 144, 255, 0.2)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(24, 144, 255, 0.1)'}
+                  >
+                    <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                      <Space>
+                        <Tag color={getPriorityColor(todo.priority)}>
+                          {getPriorityText(todo.priority)}
+                        </Tag>
+                        <Text style={{ color: colors.textColor }}>{todo.title}</Text>
+                      </Space>
+                      {todo.createdAt && (
+                        <Text type="secondary" style={{ fontSize: 12, color: '#666666' }}>
+                          {formatTime(todo.createdAt)}
+                        </Text>
+                      )}
+                    </Space>
+                  </List.Item>
+                )}
+              />
+            </>
+          )}
+
               {!hasSelectedTodos && (
                 <div style={{ textAlign: 'center', padding: 20, color: '#999' }}>
                   <Text type="secondary">该日期没有安排待办事项</Text>
