@@ -974,6 +974,25 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     return dragDropOrder[activeTab] || null;
   }, [dragDropOrder, activeTab, getCurrentTabSettings]);
 
+  // 辅助函数：更新待办事项的 displayOrders
+  const updateTodosWithNewDisplayOrders = (todos: Todo[], newOrder: Todo[], tabKey: string): Todo[] => {
+    const newOrderMap = new Map(newOrder.map((todo, index) => [todo.id, index]));
+    return todos.map(todo => {
+      const newDisplayOrder = newOrderMap.get(todo.id);
+      if (newDisplayOrder !== undefined) {
+        return {
+          ...todo,
+          displayOrders: {
+            ...(todo.displayOrders || {}),
+            [tabKey]: newDisplayOrder
+          },
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return todo;
+    });
+  };
+
   // 拖拽结束处理
   const handleDragEnd = async (newOrder: Todo[]) => {
     // 乐观更新本地状态（立即生效）
@@ -1018,10 +1037,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       hide();
       message.success('排序已保存');
 
-      // 增量更新 todos，避免全量刷新
+      // 更新本地 todos 状态，包含最新的 displayOrders
       setTodos(prevTodos => {
-        const updatedMap = new Map(newOrder.map(t => [t.id, t]));
-        return prevTodos.map(t => updatedMap.get(t.id) || t);
+        return updateTodosWithNewDisplayOrders(prevTodos, newOrder, activeTab);
       });
 
     } catch (error) {

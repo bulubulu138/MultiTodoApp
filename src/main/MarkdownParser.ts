@@ -1,22 +1,37 @@
 import matter from 'gray-matter';
+import * as path from 'path';
 import { Todo, TodoRelation } from '../shared/types';
+import { ImageExtractor, ImageExtractionResult } from './utils/ImageExtractor';
 
 /**
  * Markdown 文件解析和生成器
  * 负责在 Todo 对象和 Markdown 文件之间进行转换
  */
 export class MarkdownParser {
+  private storagePath?: string;
+
+  /**
+   * 设置存储路径（用于相对路径转换）
+   */
+  setStoragePath(storagePath: string): void {
+    this.storagePath = storagePath;
+  }
+
   /**
    * 从 Markdown 文件内容解析 Todo 对象
    */
   parseTodo(markdown: string, metaPath?: string): Todo {
     const { data, content } = matter(markdown);
 
+    // 提取内容并处理图片引用
+    const extractedContent = this.extractContent(content);
+    const processedContent = this.preserveImageReferences(extractedContent);
+
     // 解析 YAML frontmatter
     const todo: Todo = {
       id: data.id as string || this.generateUUID(),
       title: data.title as string || '',
-      content: this.extractContent(content),
+      content: processedContent,
       status: data.status as Todo['status'] || 'pending',
       priority: data.priority as Todo['priority'] || 'medium',
       tags: this.parseTags(data.tags),
@@ -39,8 +54,19 @@ export class MarkdownParser {
 
   /**
    * 从 Todo 对象生成 Markdown 文件内容（Obsidian 风格）
+   * @param todo - Todo对象
+   * @param relations - 关系数组
+   * @param attachments - 附件数组
+   * @param storagePath - 存储路径（可选，用于图片提取）
+   * @param mdFileName - Markdown文件名（可选，用于图片命名）
    */
-  generateTodo(todo: Todo, relations: TodoRelation[] = [], attachments: string[] = []): string {
+  async generateTodo(
+    todo: Todo,
+    relations: TodoRelation[] = [],
+    attachments: string[] = [],
+    storagePath?: string,
+    mdFileName?: string
+  ): Promise<string> {
     // 生成 YAML frontmatter
     const frontmatter: Record<string, any> = {
       title: todo.title,
@@ -62,25 +88,75 @@ export class MarkdownParser {
     if (todo.keywords) frontmatter.keywords = todo.keywords;
     if (todo.startTime) frontmatter.start_time = todo.startTime;
 
+    // 处理HTML内容中的图片提取
+    let processedContent = todo.content || '';
+    let extractedAttachments: string[] = [];
+
+    if (processedContent && storagePath && mdFileName) {
+      // 检查内容是否已经处理过（包含file://协议路径），避免重复处理
+      const isAlreadyProcessed = this.isContentAlreadyProcessed(processedContent);
+
+      if (!isAlreadyProcessed) {
+        try {
+          const imageExtractor = new ImageExtractor();
+          const baseName = mdFileName.replace(/\.md$/, '');
+
+        // 调用修改后的extractImagesFromHtml方法，传入storagePath
+        const extractionResult: ImageExtractionResult = imageExtractor.extractImagesFromHtml(processedContent, baseName, storagePath);
+
+        // 更新内容（现在应该包含file://协议路径）
+        processedContent = extractionResult.updatedHtml;
+
+        // 处理并保存提取的图片
+        if (extractionResult.images.length > 0) {
+          console.log(`[MarkdownParser] Extracted ${extractionResult.images.length} images from HTML content`);
+
+          // 保存每个图片到文件系统
+          for (let i = 0; i < extractionResult.images.length; i++) {
+            const imageData = extractionResult.images[i];
+            const fileName = imageData.fileName || imageExtractor.generateImageFileName(baseName, i + 1, imageData.extension);
+            const saveResult = await imageExtractor.processAndSaveImage(imageData, storagePath, fileName);
+
+            if (saveResult.success) {
+              extractedAttachments.push(saveResult.relativePath);
+              console.log(`[MarkdownParser] Successfully saved image ${i + 1}: ${fileName}`);
+            } else {
+              console.warn(`[MarkdownParser] Failed to save image ${i + 1}: ${fileName}`);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('[MarkdownParser] Image extraction failed, using original content:', error);
+        // 如果提取失败，使用原始内容
+        processedContent = todo.content || '';
+      }
+    } else {
+      console.log('[MarkdownParser] Content already processed (contains file:// paths), skipping extraction to prevent corruption');
+    }
+    }
+
+    // 合并附件列表（既有传入的attachments，也有提取的图片）
+    const allAttachments = [...attachments, ...extractedAttachments];
+
     // 添加附件列表（Obsidian 风格）
-    if (attachments.length > 0) {
-      frontmatter.attachments = attachments;
+    if (allAttachments.length > 0) {
+      frontmatter.attachments = allAttachments;
     }
 
     // 生成 Markdown 内容
     let markdown = matter.stringify('', frontmatter);
 
-    // 添加内容部分
-    if (todo.content) {
+    // 添加内容部分（使用处理后的内容）
+    if (processedContent) {
       markdown += '\n## Content\n\n';
-      markdown += todo.content;
+      markdown += processedContent;
       markdown += '\n';
     }
 
     // 添加附件部分（使用标准 Markdown 图片语法）
-    if (attachments.length > 0) {
+    if (allAttachments.length > 0) {
       markdown += '\n## Attachments\n\n';
-      attachments.forEach((att, index) => {
+      allAttachments.forEach((att, index) => {
         const fileName = att.replace('./', '');
         markdown += `
 
@@ -99,7 +175,7 @@ export class MarkdownParser {
       });
     }
 
-    return markdown;
+    return Promise.resolve(markdown);
   }
 
   /**
@@ -226,6 +302,38 @@ export class MarkdownParser {
   }
 
   /**
+   * 保留HTML中的图片引用，确保向后兼容
+   * 将相对路径图片引用转换为file://协议供UI显示
+   */
+  private preserveImageReferences(content: string): string {
+    if (!this.storagePath) {
+      // 如果没有设置存储路径，保持原样
+      return content;
+    }
+
+    // 匹配HTML中的img标签的src属性，只处理相对路径
+    // 支持: ./xxx.png, xxx.png, ../xxx.png 等格式
+    // 但跳过已经转换为file://、http://、https://的路径
+    return content.replace(/<img\s([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi, (match, beforeSrc, srcValue, afterSrc) => {
+      // 如果已经是file://协议或http://协议，直接返回（避免重复处理）
+      if (srcValue.startsWith('file://') || srcValue.startsWith('http://') || srcValue.startsWith('https://')) {
+        return match;
+      }
+
+      // 检查是否是已损坏的路径或特殊协议
+      if (srcValue.startsWith('://') || srcValue === '//:0' || srcValue === '/') {
+        console.warn(`[MarkdownParser] preserveImageReferences found suspicious path: "${srcValue}", keeping as-is`);
+        return match;
+      }
+
+      // 构建完整路径
+      const fullPath = path.join(this.storagePath!, srcValue);
+      const normalizedPath = fullPath.replace(/\\/g, '/');
+      return `<img${beforeSrc}src="file://${normalizedPath}"${afterSrc}>`;
+    });
+  }
+
+  /**
    * 从 Todo 中提取附件信息
    */
   private extractAttachments(todo: Todo): Array<{ description: string; filename: string }> {
@@ -315,6 +423,25 @@ export class MarkdownParser {
 
     // 这里需要获取目标待办的标题，暂时使用占位符
     return `[${icon} ${text}](../todo-${relation.target_id}/todo.md)`;
+  }
+
+  /**
+   * 检查内容是否已经处理过（包含file://协议路径）
+   * 避免重复处理导致路径损坏
+   */
+  private isContentAlreadyProcessed(content: string): boolean {
+    // 不仅检查 file:// 协议，还要验证路径有效性
+    const fileProtocolPattern = /<img[^>]*src=["']file:\/\/([^"']+)["'][^>]*>/gi;
+    const matches = Array.from(content.matchAll(fileProtocolPattern));
+
+    for (const match of matches) {
+      const filePath = match[1];
+      // 检查路径是否有效（不是 //:0 等损坏路径）
+      if (filePath && !filePath.startsWith('//:') && filePath.length > 5) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

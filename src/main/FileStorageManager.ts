@@ -24,6 +24,7 @@ export class FileStorageManager {
   constructor(storagePath?: string) {
     this.storagePath = storagePath || path.join(app.getPath('userData'), 'todos');
     this.markdownParser = new MarkdownParser();
+    this.markdownParser.setStoragePath(this.storagePath); // 设置存储路径用于相对路径转换
     this.fileIndexer = new FileIndexer(this.storagePath);
     this.initializeStorage();
   }
@@ -115,8 +116,8 @@ export class FileStorageManager {
         console.log(`[createTodo] todo.images: ${newTodo.images ? 'present' : 'absent'}`);
       }
 
-      // 步骤 3: 生成并保存 Markdown 文件
-      const markdown = this.markdownParser.generateTodo(newTodo, [], attachments);
+      // 步骤 3: 生成并保存 Markdown 文件（传递存储路径和文件名用于图片提取）
+      const markdown = await this.markdownParser.generateTodo(newTodo, [], attachments, this.storagePath, fileName);
       await this.atomicWrite(todoPath, markdown);
       console.log(`[createTodo] ✅ Markdown file created: ${fileName}`);
 
@@ -408,7 +409,7 @@ export class FileStorageManager {
     }
 
     const todoPath = path.join(this.storagePath, fileName);
-    const markdown = this.markdownParser.generateTodo(updatedTodo);
+    const markdown = await this.markdownParser.generateTodo(updatedTodo, [], [], this.storagePath, fileName);
 
     await this.atomicWrite(todoPath, markdown);
 
@@ -839,42 +840,69 @@ export class FileStorageManager {
   }
 
   /**
-   * 启动文件监听（Obsidian 风格）
+   * 启动文件监听（优化版：减少与文件操作的冲突）
    */
   private startFileWatcher(): void {
     if (this.fileWatcher) {
       return;
     }
 
-    // 监听所有 .md 文件
+    // 监听所有 .md 文件（仅监听待办文件，不监听元数据目录）
     this.fileWatcher = chokidar.watch(
       path.join(this.storagePath, '*.md'),
       {
         ignoreInitial: true,
-        usePolling: process.platform === 'win32'
+        // Windows平台优化：降低轮询频率，减少文件锁冲突
+        usePolling: process.platform === 'win32',
+        interval: 300,      // 300ms检查一次（降低频率）
+        binaryInterval: 1000, // 二进制文件1s检查一次
+        // 添加防抖延迟
+        awaitWriteFinish: {
+          stabilityThreshold: 200,  // 200ms稳定期
+          pollInterval: 100       // 100ms检查间隔
+        }
       }
     );
 
-    this.fileWatcher.on('change', async (filePath: string) => {
-      try {
-        const markdown = await fs.promises.readFile(filePath, 'utf-8');
-        const todo = this.markdownParser.parseTodo(markdown);
+    // 添加变化防抖机制
+    let changeTimer: NodeJS.Timeout | null = null;
+    const pendingChanges = new Set<string>();
 
-        // 确保 todo.id 存在且为字符串
-        if (!todo.id) {
-          console.warn(`[startFileWatcher] Todo missing ID in file: ${filePath}`);
-          return;
-        }
+    this.fileWatcher.on('change', (filePath: string) => {
+      // 防抖：批量处理变化
+      pendingChanges.add(filePath);
 
-        const uuid = String(todo.id);
-
-        // 更新缓存和索引
-        this.updateCache(uuid, todo);
-        await this.fileIndexer.updateTodo(todo);
-      } catch (error) {
-        console.error(`[startFileWatcher] Error processing file change:`, error);
+      if (changeTimer) {
+        clearTimeout(changeTimer);
       }
+
+      changeTimer = setTimeout(async () => {
+        const changes = Array.from(pendingChanges);
+        pendingChanges.clear();
+
+        console.log(`[startFileWatcher] Processing ${changes.length} file changes`);
+
+        for (const filePath of changes) {
+          try {
+            const markdown = await fs.promises.readFile(filePath, 'utf-8');
+            const todo = this.markdownParser.parseTodo(markdown);
+
+            if (!todo.id) {
+              console.warn(`[startFileWatcher] Todo missing ID in file: ${filePath}`);
+              continue;
+            }
+
+            const uuid = String(todo.id);
+            this.updateCache(uuid, todo);
+            await this.fileIndexer.updateTodo(todo);
+          } catch (error) {
+            console.error(`[startFileWatcher] Error processing file change ${filePath}:`, error);
+          }
+        }
+      }, 300); // 300ms防抖延迟
     });
+
+    console.log('[startFileWatcher] File watcher started with optimized configuration');
   }
 
   /**
@@ -930,27 +958,77 @@ export class FileStorageManager {
     }
 
     const todoPath = path.join(this.storagePath, fileName);
-    const markdown = this.markdownParser.generateTodo(todo, relations);
+    const markdown = await this.markdownParser.generateTodo(todo, relations, [], this.storagePath, fileName);
 
     await this.atomicWrite(todoPath, markdown);
   }
 
   /**
-   * 原子性文件写入
+   * 原子性文件写入（增强版：支持Windows文件锁处理）
    */
   private async atomicWrite(filePath: string, content: string): Promise<void> {
     const tempPath = `${filePath}.tmp`;
+    const maxRetries = 5;
+    const baseDelay = 50;
 
-    try {
-      await fs.promises.writeFile(tempPath, content, 'utf-8');
-      await fs.promises.rename(tempPath, filePath);
-    } catch (error) {
-      // 清理临时文件
-      if (fs.existsSync(tempPath)) {
-        await fs.promises.unlink(tempPath).catch(() => {});
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // 预清理可能存在的旧临时文件
+        if (fs.existsSync(tempPath)) {
+          try {
+            await fs.promises.unlink(tempPath);
+            console.log(`[atomicWrite] Cleaned up existing temp file: ${tempPath}`);
+          } catch (cleanupError) {
+            console.warn(`[atomicWrite] Cleanup warning: ${cleanupError}`);
+          }
+        }
+
+        await fs.promises.writeFile(tempPath, content, 'utf-8');
+
+        // 短暂延迟，确保文件系统完成写入
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        await fs.promises.rename(tempPath, filePath);
+        console.log(`[atomicWrite] Successfully wrote: ${filePath} (attempt ${attempt + 1}/${maxRetries})`);
+        return; // 成功则退出
+
+      } catch (error) {
+        const isPermissionError = this.isPermissionError(error);
+
+        if (isPermissionError && attempt < maxRetries - 1) {
+          const delay = baseDelay * Math.pow(2, attempt);
+          console.warn(`[atomicWrite] Permission error on ${filePath}, retry ${attempt + 1}/${maxRetries} after ${delay}ms`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // 最终清理临时文件
+        if (fs.existsSync(tempPath)) {
+          try {
+            await fs.promises.unlink(tempPath);
+            console.log(`[atomicWrite] Final cleanup: ${tempPath}`);
+          } catch (finalCleanupError) {
+            console.error(`[atomicWrite] Final cleanup failed: ${finalCleanupError}`);
+          }
+        }
+
+        console.error(`[atomicWrite] Failed after ${attempt + 1} attempts: ${filePath}`);
+        throw error;
       }
-      throw error;
     }
+  }
+
+  /**
+   * 判断是否为权限相关错误
+   */
+  private isPermissionError(error: any): boolean {
+    const errorMessage = error?.message || String(error);
+    return errorMessage.includes('EPERM') ||
+           errorMessage.includes('permission') ||
+           errorMessage.includes('locked') ||
+           errorMessage.includes('EBUSY') ||
+           errorMessage.includes('ENOENT') ||
+           errorMessage.includes('EACCES');
   }
 
   /**
@@ -1195,49 +1273,69 @@ export class FileStorageManager {
   }
 
   /**
-   * 更新 UUID 到文件名的映射
+   * 更新 UUID 到文件名的映射（优化版：添加文件锁和改进重试策略）
    */
+  private uuidMapLock: Promise<void> = Promise.resolve();
+
   private async updateUuidToFileMap(uuid: string, fileName: string): Promise<void> {
-    const mapPath = path.join(this.storagePath, '.multitodo-metadata', 'uuid-to-file.json');
-    const maxRetries = 3;
-    let attempt = 0;
+    // 等待之前的操作完成，实现简单的队列锁
+    await this.uuidMapLock;
 
-    while (attempt < maxRetries) {
-      try {
-        let uuidMap: Record<string, string> = {};
+    // 创建新的锁
+    const lock = this.withLock(async () => {
+      const mapPath = path.join(this.storagePath, '.multitodo-metadata', 'uuid-to-file.json');
+      const maxRetries = 4; // 增加到4次重试
 
-        // 读取现有映射
-        if (fs.existsSync(mapPath)) {
-          try {
-            const content = await fs.promises.readFile(mapPath, 'utf-8');
-            uuidMap = JSON.parse(content);
-          } catch (readError) {
-            console.error(`[updateUuidToFileMap] ⚠️ Error reading UUID map (attempt ${attempt + 1}):`, readError);
-            // 如果文件损坏，重新开始
-            uuidMap = {};
+      console.log(`[updateUuidToFileMap] Starting update for ${uuid} -> ${fileName}`);
+
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          let uuidMap: Record<string, string> = {};
+
+          // 读取现有映射
+          if (fs.existsSync(mapPath)) {
+            try {
+              const content = await fs.promises.readFile(mapPath, 'utf-8');
+              uuidMap = JSON.parse(content);
+            } catch (readError) {
+              console.error(`[updateUuidToFileMap] ⚠️ Error reading UUID map (attempt ${attempt + 1}):`, readError);
+              // 如果文件损坏，重新开始
+              uuidMap = {};
+            }
           }
+
+          // 更新映射
+          uuidMap[uuid] = fileName;
+
+          // 保存映射
+          await this.atomicWrite(mapPath, JSON.stringify(uuidMap, null, 2));
+          console.log(`[updateUuidToFileMap] ✅ Successfully updated mapping: ${uuid} -> ${fileName} (attempt ${attempt + 1}/${maxRetries})`);
+          return; // 成功则返回
+
+        } catch (error) {
+          if (attempt >= maxRetries - 1) {
+            console.error(`[updateUuidToFileMap] ❌ All retries exhausted for ${uuid}:`, error);
+            throw new Error(`UUID mapping update failed after ${maxRetries} attempts: ${error instanceof Error ? error.message : String(error)}`);
+          }
+
+          // 使用指数退避策略
+          const delay = 100 * Math.pow(1.5, attempt); // 100ms, 150ms, 225ms, 337ms
+          console.error(`[updateUuidToFileMap] ❌ Failed to update mapping (attempt ${attempt + 1}/${maxRetries}), retry after ${delay}ms:`, error);
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
-
-        // 更新映射
-        uuidMap[uuid] = fileName;
-
-        // 保存映射
-        await this.atomicWrite(mapPath, JSON.stringify(uuidMap, null, 2));
-        console.log(`[updateUuidToFileMap] ✅ Successfully updated mapping: ${uuid} -> ${fileName}`);
-        return; // 成功则返回
-
-      } catch (error) {
-        attempt++;
-        console.error(`[updateUuidToFileMap] ❌ Failed to update mapping (attempt ${attempt}/${maxRetries}):`, error);
-
-        if (attempt >= maxRetries) {
-          throw new Error(`UUID mapping update failed after ${maxRetries} attempts: ${error instanceof Error ? error.message : String(error)}`);
-        }
-
-        // 等待后重试
-        await new Promise(resolve => setTimeout(resolve, 100 * attempt));
       }
-    }
+    });
+
+    // 更新全局锁
+    this.uuidMapLock = lock;
+    await lock;
+  }
+
+  /**
+   * 锁包装器
+   */
+  private async withLock<T>(fn: () => Promise<T>): Promise<T> {
+    return fn();
   }
 
   /**

@@ -47,9 +47,17 @@ export class TodoFileNormalizer {
 
       // 4. 如果生成了新ID，写回文件
       if (wasNormalized) {
-        const newMarkdown = this.markdownParser.generateTodo(todo);
+        // 传递 storagePath 和 fileName 以保持图片路径处理的一致性
+        const fileName = path.basename(filePath);
+        const newMarkdown = await this.markdownParser.generateTodo(
+          todo,
+          [], // relations
+          [], // attachments
+          this.storagePath,
+          fileName
+        );
         await this.atomicWrite(filePath, newMarkdown);
-        console.log(`[TodoFileNormalizer] Normalized ${path.basename(filePath)}: assigned UUID ${todo.id}`);
+        console.log(`[TodoFileNormalizer] Normalized ${fileName}: assigned UUID ${todo.id}`);
       }
 
       return {
