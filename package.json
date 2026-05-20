@@ -37,8 +37,9 @@
     "@typescript-eslint/parser": "^6.0.0",
     "concurrently": "^8.0.0",
     "css-loader": "^6.8.0",
+    "dmg-builder": "^24.13.3",
     "electron": "^27.3.11",
-    "electron-builder": "^24.0.0",
+    "electron-builder": "^24.13.3",
     "eslint": "^8.0.0",
     "fast-check": "^4.5.3",
     "html-webpack-plugin": "^5.5.0",
@@ -137,22 +138,22 @@
       "include": "assets/installer.nsh"
     },
     "mac": {
-      "target": "dmg",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
       "icon": "assets/icon.icns",
       "category": "public.app-category.productivity",
       "artifactName": "${productName}-${version}-${arch}.${ext}",
-      "identity": null,
-      "hardenedRuntime": false,
+      "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "assets/entitlements.mac.plist",
-      "entitlementsInherit": "assets/entitlements.mac.plist",
-      "extendInfo": {
-        "NSCameraUsageDescription": "This app does not use the camera.",
-        "NSMicrophoneUsageDescription": "This app does not use the microphone.",
-        "NSDocumentsFolderUsageDescription": "This app needs to access your documents to manage your tasks.",
-        "NSDownloadsFolderUsageDescription": "This app needs to access your downloads to manage your tasks.",
-        "NSDesktopFolderUsageDescription": "This app needs to access your desktop to manage your tasks."
-      }
+      "entitlementsInherit": "assets/entitlements.mac.plist"
     },
     "dmg": {
       "contents": [
