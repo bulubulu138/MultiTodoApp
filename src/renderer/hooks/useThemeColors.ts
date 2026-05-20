@@ -15,6 +15,10 @@ export interface ThemeColors {
   textPrimary: string;
   completedBg: string; // 已完成待办的背景色
   completedText: string; // 已完成待办的文字颜色
+  dragHandleBg: string; // 拖拽手柄背景色
+  dragHandleBorder: string; // 拖拽手柄边框色
+  dragHandleText: string; // 拖拽手柄图标颜色
+  dragHandleDisabled: string; // 拖拽手柄禁用色
 }
 
 /**
@@ -84,6 +88,11 @@ export const useThemeColors = (): ThemeColors => {
       completedText: isDark
         ? '#ffffff'                         // 暗黑模式：使用100%不透明度的纯白色
         : '#1a1a1a',                       // 亮色模式：深色文字，与浅色背景形成对比
+      // 拖拽手柄中性色配置
+      dragHandleBg: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(128, 128, 128, 0.08)',
+      dragHandleBorder: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(128, 128, 128, 0.15)',
+      dragHandleText: isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(0, 0, 0, 0.45)',
+      dragHandleDisabled: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
     };
   }, [isDark, colorTheme]);
 };

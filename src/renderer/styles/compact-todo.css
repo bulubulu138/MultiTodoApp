@@ -95,33 +95,48 @@
 }
 
 .compact-todo-item .drag-handle {
-  margin-left: 4px; /* 减小间距 */
-  flex-shrink: 0;
+  /* 尺寸和布局 */
+  width: 24px;
+  height: 24px;
+  margin-right: 4px; /* 从marginLeft改为marginRight */
+
+  /* 视觉样式 */
+  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.08);
+  border: 1px solid rgba(128, 128, 128, 0.15);
+
+  /* 交互样式 */
   cursor: grab;
-  opacity: 0.5; /* 稍微提高默认透明度 */
-  font-size: 10px; /* 减小字体 */
-  user-select: none;
-  transition: opacity 0.2s;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+
+  /* 布局属性 */
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 16px; /* 固定宽度 */
-  height: 16px; /* 固定高度 */
-  line-height: 1;
+  user-select: none;
+
+  /* 文本样式 */
+  font-size: 14px;
+  letter-spacing: 1px;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .compact-todo-item .drag-handle:hover {
-  opacity: 1;
+  opacity: 0.9; /* 仅透明度变化，无背景色变化 */
+  cursor: grab;
 }
 
 .compact-todo-item .drag-handle:active {
   cursor: grabbing;
+  opacity: 1;
 }
 
 .compact-todo-item .drag-handle.disabled {
   cursor: not-allowed;
-  opacity: 0.15; /* 禁用状态更明显 */
-  pointer-events: none; /* 禁用交互 */
+  opacity: 0.2;
+  pointer-events: none;
 }
 
 /* checkbox样式优化 */
@@ -154,8 +169,49 @@
   }
 
   .compact-todo-item .drag-handle {
-    margin-left: 4px;
-    font-size: 11px;
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    margin-right: 3px;
+  }
+}
+
+/* 小屏幕和高密度显示 */
+@media (max-width: 768px), (-webkit-min-device-pixel-ratio: 2) {
+  .compact-todo-item .drag-handle {
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    margin-right: 3px;
+  }
+}
+
+/* 中等屏幕 */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .compact-todo-item .drag-handle {
+    width: 22px;
+    height: 22px;
+    font-size: 13px;
+    margin-right: 3.5px;
+  }
+}
+
+/* 大屏幕（默认） */
+@media (min-width: 1025px) {
+  .compact-todo-item .drag-handle {
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
+    margin-right: 4px;
+  }
+}
+
+/* 触摸设备优化 */
+@media (pointer: coarse) {
+  .compact-todo-item .drag-handle {
+    width: 28px;
+    height: 28px;
+    margin-right: 5px;
   }
 }
 
@@ -179,6 +235,12 @@
 
   .compact-todo-item input:focus {
     background-color: var(--content-bg, #1a1a1a);
+  }
+
+  .compact-todo-item .drag-handle {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.45);
   }
 }
 

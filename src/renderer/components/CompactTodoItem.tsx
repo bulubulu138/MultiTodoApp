@@ -161,20 +161,23 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
   };
 
   const dragHandleStyle: React.CSSProperties = {
-    marginLeft: '4px', // 减小间距
+    width: '24px', // 精致尺寸
+    height: '24px', // 方形纵横比
+    borderRadius: '4px', // 细腻圆角
+    marginRight: '4px', // 4px间距到下一个元素
     flexShrink: 0,
-    cursor: canDrag ? 'grab' : 'not-allowed',
-    opacity: canDrag ? (isHoveringDragHandle ? 0.8 : 0.6) : 0.2,
-    fontSize: '12px', // 增大字体
-    userSelect: 'none',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '32px', // 从 16px 增加到 32px
-    height: '32px', // 从 16px 增加到 32px
-    borderRadius: '6px', // 增加圆角
-    transition: 'all 200ms ease-out', // 增加过渡动画
-    backgroundColor: isHoveringDragHandle && canDrag ? 'rgba(0, 0, 0, 0.06)' : 'transparent',
+    cursor: canDrag ? 'grab' : 'not-allowed',
+    userSelect: 'none',
+    opacity: canDrag ? (isHoveringDragHandle ? 0.9 : 0.6) : 0.2, // 仅透明度变化
+    fontSize: '14px', // 增大字体以提高可见性
+    letterSpacing: '1px', // 增加字间距以在视觉上分隔
+    color: colors.dragHandleText, // 使用主题中性色
+    transition: 'opacity 0.2s ease', // 仅过渡透明度
+    backgroundColor: colors.dragHandleBg, // 中性灰色背景
+    border: `1px solid ${colors.dragHandleBorder}`, // 细微边框
   };
 
   // 处理容器双击事件
@@ -210,6 +213,20 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
       className={`compact-todo-item ${isTodayCompleted ? 'today-completed' : ''}`}
       onDoubleClick={handleContainerDoubleClick}
     >
+      {/* 拖拽手柄（在拖拽模式下显示） - 移至左侧 */}
+      {enableDrag && (
+        <div
+          style={dragHandleStyle}
+          {...(canDrag ? dragHandleProps?.attributes : {})}
+          {...(canDrag ? dragHandleProps?.listeners : {})}
+          {...(!canDrag ? { title: '今日已完成的项目不可拖拽' } : {})}
+          onMouseEnter={() => setIsHoveringDragHandle(true)}
+          onMouseLeave={() => setIsHoveringDragHandle(false)}
+        >
+          ⋮⋮
+        </div>
+      )}
+
       {/* Checkbox */}
       <Checkbox
         checked={isTodayCompleted}
@@ -233,20 +250,6 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
         disabled={isSaving}
         placeholder="输入待办标题..."
       />
-
-      {/* 拖拽手柄（在拖拽模式下显示） */}
-      {enableDrag && (
-        <div
-          style={dragHandleStyle}
-          {...(canDrag ? dragHandleProps?.attributes : {})}
-          {...(canDrag ? dragHandleProps?.listeners : {})}
-          {...(!canDrag ? { title: '今日已完成的项目不可拖拽' } : {})}
-          onMouseEnter={() => setIsHoveringDragHandle(true)}
-          onMouseLeave={() => setIsHoveringDragHandle(false)}
-        >
-          ⋮⋮
-        </div>
-      )}
     </div>
   );
 };
