@@ -464,7 +464,8 @@ export class MarkdownParser {
   private isContentAlreadyProcessed(content: string): boolean {
     // 使用更强的正则表达式匹配多种 file:// 协议格式变体
     // 匹配：file://path, file:///path, file:/path 等
-    const fileProtocolPattern = new RegExp('<img[^>]*src=["\']file:/{1,3}([^"\']+)["\'][^>]*>', 'gi');
+    // 正则字面量形式，避免字符串转义混淆，提高可读性
+    const fileProtocolPattern = /<img[^>]*src=["']file:\/{1,3}([^"']+)["'][^>]*>/gi;
     const matches = Array.from(content.matchAll(fileProtocolPattern));
 
     console.log(`[MarkdownParser] isContentAlreadyProcessed: Found ${matches.length} file protocol images`);
