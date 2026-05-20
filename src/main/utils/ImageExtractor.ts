@@ -1,5 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import {
+  normalizeFileProtocolPath,
+  isValidFileProtocolPath,
+  normalizeImagePath
+} from './pathNormalizer';
 
 /**
  * 图片提取结果接口
@@ -89,9 +94,11 @@ export class ImageExtractor {
       const [fullMatch, src] = match;
       console.log(`[ImageExtractor] Processing img src: ${src}`);
 
-      // 检查是否是错误路径格式
-      if (src === '//:0' || src === '/' || src === '') {
-        console.warn(`[ImageExtractor] Found corrupted image path: "${src}", removing from HTML`);
+      // 使用增强的路径验证函数检查错误路径格式
+      const isValidPath = isValidFileProtocolPath(src);
+
+      if (!isValidPath && (src.startsWith('file://') || src === '//:0' || src === '/' || src === '')) {
+        console.warn(`[ImageExtractor] Found corrupted/invalid image path: "${src}", removing from HTML`);
         // 移除错误的img标签
         replacements.push({ originalImgTag: fullMatch, newSrc: '' });
         continue;
@@ -106,10 +113,8 @@ export class ImageExtractor {
         imageData.fileName = fileName;
         images.push(imageData);
 
-        // 生成file://协议路径
-        const fileProtocolPath = storagePath
-          ? `file://${path.join(storagePath, fileName).replace(/\\/g, '/')}`
-          : `file://${fileName}`;
+        // 使用新的路径标准化函数生成 file:// 协议路径
+        const fileProtocolPath = normalizeImagePath(src, storagePath);
 
         console.log(`[ImageExtractor] Replacing ${src.substring(0, 50)}... -> ${fileProtocolPath}`);
 
@@ -117,11 +122,15 @@ export class ImageExtractor {
         replacements.push({ originalImgTag: fullMatch, newSrc: fileProtocolPath });
         imageIndex++;
       } else if (imageData.type === 'relative') {
-        // 对于相对路径，检查是否是有效的图片文件引用
-        if (src.startsWith('./') && src.length > 5 && !src.includes('//:')) {
-          console.log(`[ImageExtractor] Keeping valid relative path: ${src}`);
+        // 对于相对路径，使用新的路径标准化函数
+        const normalizedPath = normalizeImagePath(src, storagePath);
+
+        // 如果路径发生改变，需要替换
+        if (normalizedPath !== src) {
+          console.log(`[ImageExtractor] Normalized relative path: ${src} -> ${normalizedPath}`);
+          replacements.push({ originalImgTag: fullMatch, newSrc: normalizedPath });
         } else {
-          console.warn(`[ImageExtractor] Found suspicious relative path: "${src}", skipping`);
+          console.log(`[ImageExtractor] Keeping relative path unchanged: ${src}`);
         }
       }
     }

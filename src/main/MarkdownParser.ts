@@ -2,6 +2,12 @@ import matter from 'gray-matter';
 import * as path from 'path';
 import { Todo, TodoRelation } from '../shared/types';
 import { ImageExtractor, ImageExtractionResult } from './utils/ImageExtractor';
+import {
+  normalizeFileProtocolPath,
+  isValidFileProtocolPath,
+  repairCorruptedPath,
+  normalizeImagePath
+} from './utils/pathNormalizer';
 
 /**
  * Markdown 文件解析和生成器
@@ -304,6 +310,7 @@ export class MarkdownParser {
   /**
    * 保留HTML中的图片引用，确保向后兼容
    * 将相对路径图片引用转换为file://协议供UI显示
+   * 使用增强的路径标准化逻辑处理多种格式变体
    */
   private preserveImageReferences(content: string): string {
     if (!this.storagePath) {
@@ -311,25 +318,50 @@ export class MarkdownParser {
       return content;
     }
 
+    console.log(`[MarkdownParser] preserveImageReferences: Processing content of length ${content.length}`);
+
     // 匹配HTML中的img标签的src属性，只处理相对路径
     // 支持: ./xxx.png, xxx.png, ../xxx.png 等格式
     // 但跳过已经转换为file://、http://、https://的路径
     return content.replace(/<img\s([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi, (match, beforeSrc, srcValue, afterSrc) => {
-      // 如果已经是file://协议或http://协议，直接返回（避免重复处理）
-      if (srcValue.startsWith('file://') || srcValue.startsWith('http://') || srcValue.startsWith('https://')) {
+      console.log(`[MarkdownParser] Processing image src: ${srcValue}`);
+
+      // 如果已经是file://协议，进行标准化处理
+      if (srcValue.startsWith('file://')) {
+        // 尝试修复和标准化现有的 file:// 路径
+        const repairedPath = repairCorruptedPath(srcValue);
+        if (repairedPath) {
+          const normalizedPath = normalizeFileProtocolPath(repairedPath);
+          if (normalizedPath !== srcValue) {
+            console.log(`[MarkdownParser] Normalized existing file:// path from ${srcValue} to ${normalizedPath}`);
+            return `<img${beforeSrc}src="${normalizedPath}"${afterSrc}>`;
+          }
+        }
+        return match;
+      }
+
+      // 如果是http://或https://协议，直接返回
+      if (srcValue.startsWith('http://') || srcValue.startsWith('https://')) {
         return match;
       }
 
       // 检查是否是已损坏的路径或特殊协议
       if (srcValue.startsWith('://') || srcValue === '//:0' || srcValue === '/') {
-        console.warn(`[MarkdownParser] preserveImageReferences found suspicious path: "${srcValue}", keeping as-is`);
-        return match;
+        console.warn(`[MarkdownParser] preserveImageReferences found corrupted path: "${srcValue}", removing img tag`);
+        // 移除损坏的图片标签
+        return '';
       }
 
-      // 构建完整路径
-      const fullPath = path.join(this.storagePath!, srcValue);
-      const normalizedPath = fullPath.replace(/\\/g, '/');
-      return `<img${beforeSrc}src="file://${normalizedPath}"${afterSrc}>`;
+      // 处理相对路径
+      try {
+        const normalizedPath = normalizeImagePath(srcValue, this.storagePath);
+        console.log(`[MarkdownParser] Converted relative path ${srcValue} to ${normalizedPath}`);
+        return `<img${beforeSrc}src="${normalizedPath}"${afterSrc}>`;
+      } catch (error) {
+        console.error(`[MarkdownParser] Error processing path ${srcValue}:`, error);
+        // 如果处理出错，保持原样
+        return match;
+      }
     });
   }
 
@@ -430,17 +462,30 @@ export class MarkdownParser {
    * 避免重复处理导致路径损坏
    */
   private isContentAlreadyProcessed(content: string): boolean {
-    // 不仅检查 file:// 协议，还要验证路径有效性
-    const fileProtocolPattern = /<img[^>]*src=["']file:\/\/([^"']+)["'][^>]*>/gi;
+    // 使用更强的正则表达式匹配多种 file:// 协议格式变体
+    // 匹配：file://path, file:///path, file:/path 等
+    const fileProtocolPattern = /<img[^>]*src=["'](file:\/{1,3}([^"']+)["'][^>]*>/gi;
     const matches = Array.from(content.matchAll(fileProtocolPattern));
+
+    console.log(`[MarkdownParser] isContentAlreadyProcessed: Found ${matches.length} file protocol images`);
 
     for (const match of matches) {
       const filePath = match[1];
-      // 检查路径是否有效（不是 //:0 等损坏路径）
-      if (filePath && !filePath.startsWith('//:') && filePath.length > 5) {
+      const fullMatch = match[0];
+
+      console.log(`[MarkdownParser] Checking file protocol path: ${filePath}`);
+
+      // 使用新的路径验证函数检查有效性
+      const isValid = isValidFileProtocolPath(`file://${filePath}`);
+
+      if (isValid) {
+        console.log(`[MarkdownParser] Found valid file protocol path, skipping reprocessing`);
         return true;
+      } else {
+        console.warn(`[MarkdownParser] Found invalid file protocol path: ${filePath}, will reprocess`);
       }
     }
+
     return false;
   }
 
