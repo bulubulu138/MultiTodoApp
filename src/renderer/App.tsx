@@ -579,6 +579,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         ? await window.electronAPI.todo.createManualAtTop(todoData, activeTab)
         : await window.electronAPI.todo.create(todoData);
 
+      // 乐观更新：直接将新待办添加到列表中（避免重新加载320+待办）
+      setTodos(prev => [newTodo, ...prev]);
+
       // 处理位置选择器中选择的关系
       if (pendingPosition && pendingPosition.mode !== 'root' && pendingPosition.targetTodoId) {
         const relationType = pendingPosition.mode === 'extends' ? 'extends' : 'parallel';
@@ -589,6 +592,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
             target_id: pendingPosition.targetTodoId,
             relation_type: relationType
           });
+          // 只在创建关系时需要刷新关系列表
+          await loadRelations();
           message.success('待办事项创建成功，关联关系已建立');
         } catch (error) {
           console.error('Failed to create relation:', error);
@@ -601,12 +606,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         message.success('待办事项创建成功');
       }
 
-      // 重新加载所有待办，确保数据一致性（与更新操作保持一致）
-      await loadTodos();
-      // 同时刷新关联关系
-      await loadRelations();
       setShowForm(false);
     } catch (error) {
+      // 失败时回滚：重新加载确保数据一致性
+      await loadTodos();
       message.error('创建待办事项失败');
       console.error('Error creating todo:', error);
     }
@@ -618,11 +621,22 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
 
     try {
       await window.electronAPI.todo.update(String(id), updates);
-      // 重新加载所有待办，确保数据一致性
-      await loadTodos();
+
+      // 乐观更新：直接更新本地状态而不是重新加载所有待办
+      setTodos(prev => {
+        return prev.map(todo => {
+          if (todo.id === id) {
+            return { ...todo, ...updates, updatedAt: new Date().toISOString() };
+          }
+          return todo;
+        });
+      });
+
       setEditingTodo(null);
       message.success('待办事项更新成功');
     } catch (error) {
+      // 失败时回滚：重新加载确保数据一致性
+      await loadTodos();
       message.error('更新待办事项失败');
       console.error('Error updating todo:', error);
     } finally {
@@ -1089,9 +1103,16 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       }
 
       await window.electronAPI.todo.update(id, { displayOrders: newDisplayOrders });
-      await loadTodos();
+
+      // 乐观更新：直接更新本地状态而不是重新加载所有待办
+      setTodos(prev => prev.map(t =>
+        t.id === id ? { ...t, displayOrders: newDisplayOrders, updatedAt: new Date().toISOString() } : t
+      ));
+
       message.success('排序已更新');
     } catch (error) {
+      // 失败时回滚：重新加载确保数据一致性
+      await loadTodos();
       message.error('更新排序失败');
       console.error('Error updating display order:', error);
       throw error;
@@ -1183,10 +1204,17 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
 
         if (updates.length > 0) {
           await window.electronAPI.todo.batchUpdateDisplayOrder(updates);
+
+          // 乐观更新：只更新涉及到的待办项
+          setTodos(prev => prev.map(t => {
+            const needsUpdate = updates.some(u => u.uuid === String(t.id));
+            if (needsUpdate) {
+              return { ...t, displayOrder: syncOrder, updatedAt: new Date().toISOString() };
+            }
+            return t;
+          }));
         }
       }
-
-      await loadTodos();
     } catch (error) {
       console.error('Error syncing parallel groups silently:', error);
       // 静默失败，不打扰用户

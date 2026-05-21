@@ -485,6 +485,11 @@ class Application {
       return await this.databaseManager.getStorageManager().getTodoByUuid(uuid);
     });
 
+    ipcMain.handle('todo:getMultipleByIds', async (_, uuids: string[]) => {
+      // 🔧 新增：批量获取待办，优先使用缓存
+      return await this.databaseManager.getStorageManager().getMultipleTodosByUuids(uuids);
+    });
+
     ipcMain.handle('todo:create', async (_, todo) => {
       return await this.databaseManager.getStorageManager().createTodo(todo);
     });

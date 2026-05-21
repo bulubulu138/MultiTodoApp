@@ -37,6 +37,7 @@ export interface ElectronAPI {
   todo: {
     getAll: () => Promise<any[]>;
     getById: (uuid: string) => Promise<any | null>;  // 🔧 新增：根据ID获取单个待办
+    getMultipleByIds: (uuids: string[]) => Promise<any[]>;  // 🔧 新增：批量获取待办，优先使用缓存
     create: (todo: any) => Promise<any>;
     createManualAtTop: (todo: any, tabKey: string) => Promise<any>;
     update: (uuid: string, updates: any) => Promise<any>;  // 修复：uuid 参数类型为 string
@@ -348,6 +349,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   todo: {
     getAll: () => ipcRenderer.invoke('todo:getAll'),
     getById: (uuid: string) => ipcRenderer.invoke('todo:getById', uuid),  // 🔧 新增：根据ID获取单个待办
+    getMultipleByIds: (uuids: string[]) => ipcRenderer.invoke('todo:getMultipleByIds', uuids),  // 🔧 新增：批量获取待办，优先使用缓存
     create: (todo: any) => ipcRenderer.invoke('todo:create', todo),
     createManualAtTop: (todo: any, tabKey: string) => ipcRenderer.invoke('todo:createManualAtTop', todo, tabKey),
     update: (uuid: string, updates: any) => ipcRenderer.invoke('todo:update', uuid, updates),  // 修复：uuid 参数类型为 string

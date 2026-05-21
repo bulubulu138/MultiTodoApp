@@ -299,68 +299,113 @@ export class FileStorageManager {
   }
 
   /**
-   * 获取所有待办
+   * 获取所有待办（性能优化版本）
    */
   async getAllTodos(): Promise<Todo[]> {
     const entries = await this.fileIndexer.getAllTodos();
     const todos: Todo[] = [];
     const failures: Array<{ uuid: string; reason: string }> = [];
 
-    console.log(`[FileStorageManager] 🚀 getAllTodos: Starting`);
-    console.log(`[FileStorageManager] 📊 Index contains ${entries.length} entries`);
-    console.log(`[FileStorageManager] 📂 Storage path: ${this.storagePath}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[FileStorageManager] 🚀 getAllTodos: Starting`);
+      console.log(`[FileStorageManager] 📊 Index contains ${entries.length} entries`);
+      console.log(`[FileStorageManager] 📂 Storage path: ${this.storagePath}`);
+    }
 
-    console.log(`[FileStorageManager] 📋 Sample index entries (first 5):`);
-    entries.slice(0, 5).forEach(entry => {
-      console.log(`   - ${entry.uuid}: ${entry.title || 'Untitled'} (${entry.filePath})`);
-    });
-
-    console.log('[FileStorageManager] 🔄 Loading each todo from file system...');
-
-    for (const entry of entries) {
-      console.log(`[FileStorageManager] 📖 Attempting to load: ${entry.uuid} (${entry.filePath})`);
+    // 性能优化：使用Promise.all并行加载待办，而不是串行
+    const loadPromises = entries.map(async (entry) => {
       try {
         const todo = await this.getTodoById(entry.uuid);
         if (todo) {
-          todos.push(todo);
-          console.log(`[FileStorageManager] ✅ Successfully loaded: ${todo.title || 'Untitled'}`);
+          return { success: true, todo };
         } else {
-          const reason = 'getTodoById returned null';
-          console.warn(`[FileStorageManager] ❌ Failed to load: ${entry.uuid} - ${reason}`);
-          failures.push({ uuid: entry.uuid, reason });
+          return { success: false, uuid: entry.uuid, reason: 'getTodoById returned null' };
         }
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);
-        console.error(`[FileStorageManager] ❌ Error loading: ${entry.uuid} - ${reason}`);
-        console.error(`[FileStorageManager] Error details:`, {
-          uuid: entry.uuid,
-          filePath: entry.filePath,
-          error: error
-        });
-        failures.push({ uuid: entry.uuid, reason });
+        if (process.env.NODE_ENV === 'development') {
+          console.error(`[FileStorageManager] ❌ Error loading: ${entry.uuid} - ${reason}`);
+        }
+        return { success: false, uuid: entry.uuid, reason };
       }
-    }
-
-    console.log(`[FileStorageManager] 📊 getAllTodos: Completed`);
-    console.log(`[FileStorageManager] ✅ Successfully loaded: ${todos.length} todos`);
-    console.log(`[FileStorageManager] ❌ Failed to load: ${failures.length} entries`);
-
-    if (failures.length > 0) {
-      console.log('[FileStorageManager] 📋 Failure summary:');
-      failures.slice(0, 10).forEach(f => {
-        console.log(`   - ${f.uuid}: ${f.reason}`);
-      });
-      if (failures.length > 10) {
-        console.log(`   ... and ${failures.length - 10} more failures`);
-      }
-    }
-
-    console.log(`[FileStorageManager] 📋 Successfully loaded todos (first 3):`);
-    todos.slice(0, 3).forEach(todo => {
-      console.log(`   - ${todo.id}: ${todo.title || 'Untitled'}`);
     });
 
+    const results = await Promise.all(loadPromises);
+
+    results.forEach(result => {
+      if (result.success && result.todo) {
+        todos.push(result.todo);
+      } else if (!result.success && result.uuid && result.reason) {
+        failures.push({ uuid: result.uuid, reason: result.reason });
+      }
+    });
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[FileStorageManager] 📊 getAllTodos: Completed`);
+      console.log(`[FileStorageManager] ✅ Successfully loaded: ${todos.length} todos`);
+      console.log(`[FileStorageManager] ❌ Failed to load: ${failures.length} entries`);
+
+      if (failures.length > 0) {
+        console.log('[FileStorageManager] 📋 Failure summary:');
+        failures.slice(0, 10).forEach(f => {
+          console.log(`   - ${f.uuid}: ${f.reason}`);
+        });
+        if (failures.length > 10) {
+          console.log(`   ... and ${failures.length - 10} more failures`);
+        }
+      }
+
+      console.log(`[FileStorageManager] 📋 Successfully loaded todos (first 3):`);
+      todos.slice(0, 3).forEach(todo => {
+        console.log(`   - ${todo.id}: ${todo.title || 'Untitled'}`);
+      });
+    }
+
     return todos;
+  }
+
+  /**
+   * 批量获取待办（增量加载优化版本）
+   * 优先使用缓存，只从文件系统加载未缓存的待办
+   */
+  async getMultipleTodosByUuids(uuids: string[]): Promise<Todo[]> {
+    const cachedTodos: Todo[] = [];
+    const uncachedUuids: string[] = [];
+
+    // 首先检查缓存
+    for (const uuid of uuids) {
+      const cached = this.getFromCache(uuid);
+      if (cached) {
+        cachedTodos.push(cached);
+      } else {
+        uncachedUuids.push(uuid);
+      }
+    }
+
+    // 并行加载未缓存的待办
+    const uncachedTodos: Todo[] = [];
+    if (uncachedUuids.length > 0) {
+      const loadPromises = uncachedUuids.map(async (uuid) => {
+        try {
+          const todo = await this.getTodoById(uuid);
+          return todo;
+        } catch (error) {
+          if (process.env.NODE_ENV === 'development') {
+            console.error(`[FileStorageManager] Error loading todo ${uuid}:`, error);
+          }
+          return null;
+        }
+      });
+
+      const results = await Promise.all(loadPromises);
+      results.forEach(result => {
+        if (result) {
+          uncachedTodos.push(result);
+        }
+      });
+    }
+
+    return [...cachedTodos, ...uncachedTodos];
   }
 
   /**
