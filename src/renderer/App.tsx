@@ -20,7 +20,7 @@ import { toStringId, areIdsEqual } from '../shared/utils/typeUtils';
 import { optimizedMotionVariants, useConditionalAnimation, shouldReduceMotion, useMotionPerformanceMonitor } from './utils/optimizedMotionVariants';
 import { PerformanceMonitor } from './utils/performanceMonitor';
 import { useGlobalKeyboardHandler } from './hooks/useGlobalKeyboardHandler';
-import { syncParallelGroupOrders } from './utils/orderConflictResolver';
+import { syncParallelGroupOrders, computeAllFinalOrders } from './utils/orderConflictResolver';
 import dayjs from 'dayjs';
 
 const { Content } = Layout;
@@ -1022,31 +1022,16 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       // 构建并列分组映射
       const parallelGroupsMap = buildParallelGroups(newOrder, relations);
 
-      // 并行执行所有异步操作
-      const [dbResult] = await Promise.all([
-        // 数据库批量更新
-        window.electronAPI.todo.batchUpdateDisplayOrders(
-          newOrder.map((todo, index) => ({
-            uuid: todo.id,
-            tabKey: activeTab,
-            displayOrder: index,
-          }))
-        ),
-        // 并行处理并列分组同步
-        ...newOrder.map(todo => {
-          const parallelGroup = parallelGroupsMap.get(todo.id);
-          if (parallelGroup && parallelGroup.size > 1) {
-            const currentIndex = newOrder.findIndex(t => t.id === todo.id);
-            return syncParallelGroupOrders({
-              groupId: parallelGroup,
-              currentTodoId: todo.id,
-              newOrder: currentIndex,
-              activeTab
-            });
-          }
-          return Promise.resolve();
-        })
-      ]);
+      // Phase 2 优化：完整预计算（包括并列分组同步和批量冲突解决）
+      const allUpdates = computeAllFinalOrders({
+        newOrder,
+        activeTab,
+        parallelGroupsMap,
+        allTodos: todos
+      });
+
+      // 单次批量更新（替代原来的Promise.all多调用）
+      await window.electronAPI.todo.batchUpdateDisplayOrders(allUpdates);
 
       hide();
       message.success('排序已保存');

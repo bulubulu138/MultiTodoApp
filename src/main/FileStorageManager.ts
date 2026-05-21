@@ -529,31 +529,55 @@ export class FileStorageManager {
    */
   async batchUpdateDisplayOrders(
     updates: Array<{uuid: string; tabKey: string; displayOrder: number}>
-  ): Promise<void> {
-    // 按待办分组更新
-    const groupedUpdates = new Map<string, Array<{tabKey: string; displayOrder: number}>>();
+  ): Promise<{ success: boolean; updated: number; failed: number }> {
+    try {
+      // 按待办分组更新
+      const groupedUpdates = new Map<string, Array<{tabKey: string; displayOrder: number}>>();
 
-    for (const update of updates) {
-      if (!groupedUpdates.has(update.uuid)) {
-        groupedUpdates.set(update.uuid, []);
-      }
-      groupedUpdates.get(update.uuid)!.push({
-        tabKey: update.tabKey,
-        displayOrder: update.displayOrder
-      });
-    }
-
-    // 批量更新
-    for (const [uuid, displayOrders] of groupedUpdates) {
-      const todo = await this.getTodoById(uuid);
-      if (todo) {
-        const newDisplayOrders = todo.displayOrders || {};
-        displayOrders.forEach(({ tabKey, displayOrder }) => {
-          newDisplayOrders[tabKey] = displayOrder;
+      for (const update of updates) {
+        if (!groupedUpdates.has(update.uuid)) {
+          groupedUpdates.set(update.uuid, []);
+        }
+        groupedUpdates.get(update.uuid)!.push({
+          tabKey: update.tabKey,
+          displayOrder: update.displayOrder
         });
-
-        await this.updateTodo(uuid, { displayOrders: newDisplayOrders });
       }
+
+      // Phase 3 优化：批量查询所有待办，减少重复数据库查询
+      let updated = 0;
+      let failed = 0;
+
+      const todoIds = Array.from(groupedUpdates.keys());
+      const todos = await Promise.all(
+        todoIds.map(id => this.getTodoById(id))
+      );
+
+      // 批量更新
+      for (let i = 0; i < todoIds.length; i++) {
+        const uuid = todoIds[i];
+        const todo = todos[i];
+
+        if (todo) {
+          const newDisplayOrders = todo.displayOrders || {};
+          const displayOrders = groupedUpdates.get(uuid)!;
+          displayOrders.forEach(({ tabKey, displayOrder }) => {
+            newDisplayOrders[tabKey] = displayOrder;
+          });
+
+          await this.updateTodo(uuid, { displayOrders: newDisplayOrders });
+          updated++;
+        } else {
+          failed++;
+          console.warn(`[batchUpdateDisplayOrders] Todo not found: ${uuid}`);
+        }
+      }
+
+      return { success: true, updated, failed };
+
+    } catch (error) {
+      console.error('[batchUpdateDisplayOrders] Batch display order update failed:', error);
+      return { success: false, updated: 0, failed: updates.length };
     }
   }
 
