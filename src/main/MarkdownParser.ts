@@ -6,7 +6,8 @@ import {
   normalizeFileProtocolPath,
   isValidFileProtocolPath,
   repairCorruptedPath,
-  normalizeImagePath
+  normalizeImagePath,
+  isDataURL
 } from './utils/pathNormalizer';
 
 /**
@@ -325,6 +326,12 @@ export class MarkdownParser {
     // 但跳过已经转换为file://、http://、https://的路径
     return content.replace(/<img\s([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi, (match, beforeSrc, srcValue, afterSrc) => {
       console.log(`[MarkdownParser] Processing image src: ${srcValue}`);
+
+      // 如果是 data: 协议（base64编码的图片），直接返回，不进行任何转换
+      if (isDataURL(srcValue)) {
+        console.log(`[MarkdownParser] Preserving data URL unchanged: ${srcValue.substring(0, 50)}...`);
+        return match;
+      }
 
       // 如果已经是file://协议，进行标准化处理
       if (srcValue.startsWith('file://')) {

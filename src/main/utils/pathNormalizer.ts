@@ -6,6 +6,25 @@ import * as path from 'path';
  */
 
 /**
+ * URL协议类型常量
+ */
+export const URL_PROTOCOLS = {
+  HTTP: 'http://',
+  HTTPS: 'https://',
+  FILE: 'file://',
+  DATA: 'data:',
+} as const;
+
+/**
+ * 检查是否为data URL
+ * @param url - 待检查的URL
+ * @returns 是否为data URL
+ */
+export function isDataURL(url: string): boolean {
+  return url.startsWith(URL_PROTOCOLS.DATA);
+}
+
+/**
  * 标准化 file:// 协议路径
  * 处理多种可能的格式变体：
  * - file://D:/path
@@ -179,6 +198,12 @@ export function normalizeImagePath(imagePath: string, storagePath?: string): str
   }
 
   console.log(`[PathNormalizer] Normalizing image path: ${imagePath}`);
+
+  // 如果是 data: 协议（base64编码的图片），直接返回，不进行任何转换
+  if (isDataURL(imagePath)) {
+    console.log(`[PathNormalizer] Preserving data URL unchanged: ${imagePath.substring(0, 50)}...`);
+    return imagePath;
+  }
 
   // 如果是 http:// 或 https://，直接返回
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
