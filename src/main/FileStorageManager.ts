@@ -21,6 +21,11 @@ export class FileStorageManager {
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5分钟缓存
   private readonly MAX_CACHE_SIZE = 100;
 
+  // ✅ 新增：全量缓存系统，用于优化大量待办场景下的性能
+  private todosCache: Map<string, Todo> = new Map();
+  private cacheInitialized: boolean = false;
+  private cacheDirty: boolean = false;
+
   constructor(storagePath?: string) {
     this.storagePath = storagePath || path.join(app.getPath('userData'), 'todos');
     this.markdownParser = new MarkdownParser();
@@ -76,6 +81,10 @@ export class FileStorageManager {
         }
       }
     }
+
+    // ✅ 新增：预加载缓存以提升性能
+    console.log('[FileStorageManager] 🚀 Preloading cache for performance optimization...');
+    await this.preloadCache();
 
     console.log('[FileStorageManager] 🎉 Storage initialization completed');
   }
@@ -175,15 +184,21 @@ export class FileStorageManager {
     position: 'top' | 'bottom' = 'top'
   ): Promise<Todo> {
     console.log(`[createTodoWithDisplayOrder] Creating todo at ${position} for tab: ${tabKey}`);
+    const startTime = Date.now();
 
-    // 1. 获取当前Tab下所有待办的排序号
-    const allTodos = await this.getAllTodos();
-    const currentTabTodos = allTodos.filter(t =>
+    // ✅ 性能优化：确保缓存已初始化，直接使用缓存避免文件读取
+    if (!this.cacheInitialized) {
+      console.log(`[createTodoWithDisplayOrder] 🚀 Cache not initialized, preloading...`);
+      await this.preloadCache();
+    }
+
+    // 1. 从缓存中获取当前Tab下所有待办的排序号（O(n) but in-memory）
+    const currentTabTodos = Array.from(this.todosCache.values()).filter(t =>
       t.displayOrders &&
       t.displayOrders[tabKey] != null
     );
 
-    console.log(`[createTodoWithDisplayOrder] Found ${currentTabTodos.length} todos with display orders in tab ${tabKey}`);
+    console.log(`[createTodoWithDisplayOrder] ✅ Found ${currentTabTodos.length} todos with display orders in tab ${tabKey} (from cache)`);
 
     // 2. 为新待办分配排序号
     let newTodoOrder: number;
@@ -237,6 +252,9 @@ export class FileStorageManager {
         console.log(`[createTodoWithDisplayOrder] Successfully updated ${batchUpdates.length} todos' display orders`);
       }
     }
+
+    const duration = Date.now() - startTime;
+    console.log(`[createTodoWithDisplayOrder] 🎉 Completed in ${duration}ms`);
 
     return newTodo;
   }
@@ -302,6 +320,23 @@ export class FileStorageManager {
    * 获取所有待办（性能优化版本）
    */
   async getAllTodos(): Promise<Todo[]> {
+    // ✅ 性能优化：优先使用全量缓存
+    if (this.cacheInitialized && this.todosCache.size > 0) {
+      console.log(`[getAllTodos] ✅ Using cache: ${this.todosCache.size} todos (O(1) operation)`);
+      return Array.from(this.todosCache.values());
+    }
+
+    // 缓存未初始化，先加载缓存
+    console.log(`[getAllTodos] 🚀 Cache not initialized, loading from files...`);
+    await this.preloadCache();
+
+    if (this.cacheInitialized && this.todosCache.size > 0) {
+      console.log(`[getAllTodos] ✅ Cache loaded: ${this.todosCache.size} todos`);
+      return Array.from(this.todosCache.values());
+    }
+
+    // Fallback: 如果缓存加载失败，使用原有的文件读取逻辑
+    console.warn(`[getAllTodos] ⚠️ Cache load failed, falling back to file reading`);
     const entries = await this.fileIndexer.getAllTodos();
     const todos: Todo[] = [];
     const failures: Array<{ uuid: string; reason: string }> = [];
@@ -502,6 +537,9 @@ export class FileStorageManager {
 
     // 从缓存中删除
     this.cache.delete(uuid);
+
+    // ✅ 新增：从全量缓存中删除
+    this.deleteFromCache(uuid);
   }
 
   // ==================== 批量操作 ====================
@@ -525,11 +563,14 @@ export class FileStorageManager {
   }
 
   /**
-   * 批量更新显示顺序
+   * 批量更新显示顺序（性能优化版本）
    */
   async batchUpdateDisplayOrders(
     updates: Array<{uuid: string; tabKey: string; displayOrder: number}>
   ): Promise<{ success: boolean; updated: number; failed: number }> {
+    console.log(`[batchUpdateDisplayOrders] 🚀 Starting batch update for ${updates.length} updates`);
+    const startTime = Date.now();
+
     try {
       // 按待办分组更新
       const groupedUpdates = new Map<string, Array<{tabKey: string; displayOrder: number}>>();
@@ -544,39 +585,87 @@ export class FileStorageManager {
         });
       }
 
-      // Phase 3 优化：批量查询所有待办，减少重复数据库查询
       let updated = 0;
       let failed = 0;
+      const updatedTodos: Todo[] = [];
 
+      // ✅ 性能优化：从缓存中批量获取待办（避免文件读取）
       const todoIds = Array.from(groupedUpdates.keys());
-      const todos = await Promise.all(
-        todoIds.map(id => this.getTodoById(id))
-      );
+      const todos: Todo[] = [];
 
-      // 批量更新
-      for (let i = 0; i < todoIds.length; i++) {
-        const uuid = todoIds[i];
-        const todo = todos[i];
-
+      console.log(`[batchUpdateDisplayOrders] 📊 Fetching ${todoIds.length} todos from cache...`);
+      for (const uuid of todoIds) {
+        const todo = this.todosCache.get(uuid);
         if (todo) {
-          const newDisplayOrders = todo.displayOrders || {};
-          const displayOrders = groupedUpdates.get(uuid)!;
-          displayOrders.forEach(({ tabKey, displayOrder }) => {
-            newDisplayOrders[tabKey] = displayOrder;
-          });
-
-          await this.updateTodo(uuid, { displayOrders: newDisplayOrders });
-          updated++;
+          todos.push(todo);
         } else {
-          failed++;
-          console.warn(`[batchUpdateDisplayOrders] Todo not found: ${uuid}`);
+          // Fallback: 如果缓存中没有，从文件读取
+          console.warn(`[batchUpdateDisplayOrders] ⚠️ Todo ${uuid} not in cache, loading from file`);
+          try {
+            const fileTodo = await this.getTodoById(uuid);
+            if (fileTodo) {
+              todos.push(fileTodo);
+            } else {
+              failed++;
+              console.warn(`[batchUpdateDisplayOrders] ❌ Todo not found: ${uuid}`);
+            }
+          } catch (error) {
+            failed++;
+            console.error(`[batchUpdateDisplayOrders] ❌ Error loading todo ${uuid}:`, error);
+          }
         }
       }
+
+      // ✅ 性能优化：批量准备更新数据（不触发单个 updateTodo）
+      console.log(`[batchUpdateDisplayOrders] 📝 Preparing ${todos.length} todo updates...`);
+      for (let i = 0; i < todos.length; i++) {
+        const uuid = todos[i].id;
+        const displayOrders = groupedUpdates.get(uuid)!;
+
+        const newDisplayOrders = { ...todos[i].displayOrders };
+        displayOrders.forEach(({ tabKey, displayOrder }) => {
+          newDisplayOrders[tabKey] = displayOrder;
+        });
+
+        const updatedTodo: Todo = {
+          ...todos[i],
+          displayOrders: newDisplayOrders,
+          updatedAt: new Date().toISOString()
+        };
+
+        updatedTodos.push(updatedTodo);
+        updated++;
+
+        // 同步更新缓存
+        this.updateCache(uuid, updatedTodo);
+      }
+
+      // ✅ 性能优化：批量写入文件（并行执行）
+      console.log(`[batchUpdateDisplayOrders] 💾 Writing ${updatedTodos.length} files in parallel...`);
+      const writePromises = updatedTodos.map(async (todo) => {
+        const fileName = await this.getFileNameByUuid(todo.id);
+        if (!fileName) {
+          throw new Error(`File name not found for todo: ${todo.id}`);
+        }
+        const todoPath = path.join(this.storagePath, fileName);
+        const markdown = await this.markdownParser.generateTodo(todo, [], [], this.storagePath, fileName);
+        await this.atomicWrite(todoPath, markdown);
+      });
+
+      await Promise.all(writePromises);
+      console.log(`[batchUpdateDisplayOrders] ✅ All files written successfully`);
+
+      // ✅ 性能优化：批量更新索引（一次性操作）
+      console.log(`[batchUpdateDisplayOrders] 📊 Batch updating index for ${updatedTodos.length} todos...`);
+      await this.fileIndexer.batchUpdateTodos(updatedTodos);
+
+      const duration = Date.now() - startTime;
+      console.log(`[batchUpdateDisplayOrders] 🎉 Batch update completed: ${updated} updated, ${failed} failed in ${duration}ms`);
 
       return { success: true, updated, failed };
 
     } catch (error) {
-      console.error('[batchUpdateDisplayOrders] Batch display order update failed:', error);
+      console.error('[batchUpdateDisplayOrders] ❌ Batch display order update failed:', error);
       return { success: false, updated: 0, failed: updates.length };
     }
   }
@@ -962,7 +1051,7 @@ export class FileStorageManager {
             }
 
             const uuid = String(todo.id);
-            this.updateCache(uuid, todo);
+            this.updateCache(uuid, todo); // 这会同时更新旧的缓存和新的全量缓存
             await this.fileIndexer.updateTodo(todo);
           } catch (error) {
             console.error(`[startFileWatcher] Error processing file change ${filePath}:`, error);
@@ -1119,6 +1208,75 @@ export class FileStorageManager {
       todo,
       timestamp: Date.now()
     });
+
+    // ✅ 同步更新全量缓存
+    this.todosCache.set(uuid, todo);
+  }
+
+  /**
+   * ✅ 新增：预加载全量缓存
+   * 在初始化时加载所有待办到内存，避免重复文件读取
+   */
+  private async preloadCache(): Promise<void> {
+    if (this.cacheInitialized) {
+      console.log(`[Cache] ✅ Cache already initialized with ${this.todosCache.size} todos`);
+      return;
+    }
+
+    console.log(`[Cache] 🚀 Starting to preload cache...`);
+    const startTime = Date.now();
+
+    try {
+      const entries = await this.fileIndexer.getAllTodos();
+      console.log(`[Cache] 📊 Found ${entries.length} entries in index`);
+
+      let loaded = 0;
+      let failed = 0;
+
+      // 并行加载所有待办
+      const loadPromises = entries.map(async (entry) => {
+        try {
+          const todo = await this.getTodoById(entry.uuid);
+          if (todo) {
+            this.todosCache.set(entry.uuid, todo);
+            loaded++;
+          } else {
+            failed++;
+          }
+        } catch (error) {
+          failed++;
+          console.error(`[Cache] ❌ Failed to load todo ${entry.uuid}:`, error);
+        }
+      });
+
+      await Promise.all(loadPromises);
+
+      this.cacheInitialized = true;
+      const duration = Date.now() - startTime;
+
+      console.log(`[Cache] ✅ Preload completed: ${loaded} todos loaded, ${failed} failed in ${duration}ms`);
+      console.log(`[Cache] 📈 Cache size: ${this.todosCache.size} todos`);
+    } catch (error) {
+      console.error(`[Cache] ❌ Preload failed:`, error);
+      this.cacheInitialized = false;
+    }
+  }
+
+  /**
+   * ✅ 新增：使缓存失效
+   */
+  private invalidateCache(): void {
+    console.log(`[Cache] 🗑️ Invalidating cache (${this.todosCache.size} todos cleared)`);
+    this.todosCache.clear();
+    this.cacheInitialized = false;
+    this.cacheDirty = false;
+  }
+
+  /**
+   * ✅ 新增：从缓存中删除待办
+   */
+  private deleteFromCache(uuid: string): void {
+    this.todosCache.delete(uuid);
   }
 
   private getFromCache(uuid: string): Todo | null {

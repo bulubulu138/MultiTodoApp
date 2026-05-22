@@ -254,6 +254,47 @@ export class FileIndexer {
   }
 
   /**
+   * ✅ 新增：批量更新待办索引
+   * 将多次索引更新合并为一次操作，大幅提升性能
+   */
+  async batchUpdateTodos(todos: Todo[]): Promise<void> {
+    console.log(`[FileIndexer] 🔄 Batch updating ${todos.length} todos`);
+    const startTime = Date.now();
+
+    try {
+      // 批量删除旧的索引条目
+      todos.forEach(todo => {
+        this.removeTodoSilently(String(todo.id));
+      });
+
+      // 批量添加新的索引条目
+      todos.forEach(todo => {
+        this.addToIndex({
+          uuid: String(todo.id),
+          title: todo.title,
+          contentPreview: this.generateContentPreview(todo.content),
+          status: todo.status,
+          priority: todo.priority,
+          tags: this.parseTags(todo.tags),
+          keywords: todo.keywords || [],
+          createdAt: todo.createdAt,
+          updatedAt: todo.updatedAt,
+          filePath: '' // Obsidian 风格不需要特定路径
+        });
+      });
+
+      // 一次性保存索引
+      await this.saveIndex();
+
+      const duration = Date.now() - startTime;
+      console.log(`[FileIndexer] ✅ Batch update completed in ${duration}ms (${todos.length} todos)`);
+    } catch (error) {
+      console.error(`[FileIndexer] ❌ Batch update failed:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * 静默删除待办（不抛出异常）
    */
   private removeTodoSilently(uuid: string): void {
