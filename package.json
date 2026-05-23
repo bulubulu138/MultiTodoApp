@@ -156,6 +156,8 @@
       "icon": "assets/icon.icns",
       "category": "public.app-category.productivity",
       "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "identity": null,
+      "hardenedRuntime": false,
       "gatekeeperAssess": false
     },
     "dmg": {
@@ -175,6 +177,6 @@
       "icon": "assets/icon_512x512.png",
       "format": "ULFO"
     },
-    "electronVersion": "27.0.0"
+    "electronVersion": "27.3.11"
   }
 }

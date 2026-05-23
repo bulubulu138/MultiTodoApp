@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-健壮的 macOS 图标生成脚本
-支持多种图标处理方法，具备全面的错误处理和自动修复功能
+Robust macOS icon generation script
+Supports multiple icon processing methods with comprehensive error handling
 """
 
 import os
@@ -28,13 +29,13 @@ class IconGenerator:
         self.detected_issues = []
 
     def log(self, message, level="INFO"):
-        """日志输出"""
+        """Log output"""
         prefix = {
-            "INFO": "✅",
-            "WARNING": "⚠️",
-            "ERROR": "❌",
-            "DEBUG": "🔍"
-        }.get(level, "📝")
+            "INFO": "[OK]",
+            "WARNING": "[WARN]",
+            "ERROR": "[ERROR]",
+            "DEBUG": "[DEBUG]"
+        }.get(level, "[LOG]")
         print(f"{prefix} {message}")
 
     def check_environment(self):
@@ -430,19 +431,19 @@ class IconGenerator:
 
 
 def main():
-    """主函数"""
+    """Main function"""
     print("=" * 60)
-    print("🍎 macOS 图标生成器")
+    print("macOS Icon Generator")
     print("=" * 60)
 
     generator = IconGenerator()
     success = generator.run()
 
     if success:
-        print("\n✅ 图标生成成功完成！")
+        print("\n[OK] Icon generation completed successfully!")
         sys.exit(0)
     else:
-        print("\n❌ 图标生成失败！")
+        print("\n[ERROR] Icon generation failed!")
         sys.exit(1)
 
 

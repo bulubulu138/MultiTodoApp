@@ -69,53 +69,66 @@ jobs:
           echo "✅ Architecture verification passed - pure JavaScript implementation"
         shell: bash
 
-      - name: Create macOS icons
+      - name: Create macOS icons with fallback
         if: matrix.platform == 'mac'
         run: |
           echo "Creating macOS .icns file from PNG icons..."
           cd assets
 
-          # 显示可用图标文件
-          echo "Available icon files:"
-          ls -la icon_*.png || echo "No icon files found"
-
-          # 运行图标生成脚本
-          python3 create_icns.py
-
-          # 检查结果
-          if [ -f "icon.icns" ]; then
-            echo "✅ icon.icns created successfully"
-            ls -la icon.icns
-
-            # 增强验证
-            file icon.icns
-            echo "icon.icns file size: $(stat -f%z icon.icns) bytes"
-
-            # 验证它是有效的ICNS文件
-            if file icon.icns | grep -q "data"; then
-              echo "✅ .icns file format validation passed"
-            else
-              echo "⚠️ .icns file format may be invalid"
+          # Verify required icon files
+          echo "Verifying required icon files..."
+          REQUIRED_SIZES=(512 256)
+          for size in "${REQUIRED_SIZES[@]}"; do
+            if [ ! -f "icon_${size}x${size}.png" ]; then
+              echo "ERROR: Required icon_${size}x${size}.png missing"
+              exit 1
             fi
+          done
+          echo "OK: All required icon files present"
 
-            # 显示生成报告（如果存在）
-            if [ -f "icon_generation_report.json" ]; then
-              echo "📊 Generation report:"
-              cat icon_generation_report.json
-            fi
+          # Attempt Python icon generation first
+          echo "Attempting Python icon generation..."
+          if python3 create_icns.py 2>/dev/null && [ -f "icon.icns" ]; then
+            echo "OK: Python script succeeded"
           else
-            echo "❌ Failed to create icon.icns"
-            echo "Available files in assets:"
-            ls -la
+            echo "WARN: Python script failed, using direct iconutil fallback"
 
-            # 显示生成报告用于调试
-            if [ -f "icon_generation_report.json" ]; then
-              echo "📊 Generation report:"
-              cat icon_generation_report.json
-            fi
+            # Create iconset directory
+            mkdir -p MultiTodo.iconset
 
+            # Copy icon files with proper naming
+            cp icon_16x16.png MultiTodo.iconset/icon_16x16.png
+            cp icon_32x32.png MultiTodo.iconset/icon_16x16@2x.png
+            cp icon_32x32.png MultiTodo.iconset/icon_32x32.png
+            cp icon_64x64.png MultiTodo.iconset/icon_32x32@2x.png
+            cp icon_128x128.png MultiTodo.iconset/icon_128x128.png
+            cp icon_256x256.png MultiTodo.iconset/icon_128x128@2x.png
+            cp icon_256x256.png MultiTodo.iconset/icon_256x256.png
+            cp icon_512x512.png MultiTodo.iconset/icon_256x256@2x.png
+            cp icon_512x512.png MultiTodo.iconset/icon_512x512.png
+            cp icon_512x512.png MultiTodo.iconset/icon_512x512@2x.png
+
+            # Convert to .icns
+            iconutil -c icns MultiTodo.iconset -o icon.icns
+
+            # Cleanup
+            rm -rf MultiTodo.iconset
+          fi
+
+          # Validate generated file
+          if [ ! -f "icon.icns" ]; then
+            echo "ERROR: icon.icns generation failed"
             exit 1
           fi
+
+          FILE_SIZE=$(stat -f%z icon.icns)
+          if [ "$FILE_SIZE" -lt 1000 ]; then
+            echo "ERROR: icon.icns too small (${FILE_SIZE} bytes), likely corrupted"
+            exit 1
+          fi
+
+          echo "OK: icon.icns generated successfully (${FILE_SIZE} bytes)"
+          file icon.icns
         shell: bash
 
       - name: Build application
