@@ -310,8 +310,8 @@ export class MarkdownParser {
 
   /**
    * 保留HTML中的图片引用，确保向后兼容
-   * 将相对路径图片引用转换为file://协议供UI显示
-   * 使用增强的路径标准化逻辑处理多种格式变体
+   * For Obsidian-style storage: Keep only relative paths, remove file:// protocol
+   * Convert file:// and data: URLs to relative paths for consistency
    */
   private preserveImageReferences(content: string): string {
     if (!this.storagePath) {
@@ -321,33 +321,34 @@ export class MarkdownParser {
 
     console.log(`[MarkdownParser] preserveImageReferences: Processing content of length ${content.length}`);
 
-    // 匹配HTML中的img标签的src属性，只处理相对路径
-    // 支持: ./xxx.png, xxx.png, ../xxx.png 等格式
-    // 但跳过已经转换为file://、http://、https://的路径
+    // 匹配HTML中的img标签的src属性，处理各种路径格式
+    // For Obsidian-style: convert everything to relative paths
     return content.replace(/<img\s([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi, (match, beforeSrc, srcValue, afterSrc) => {
       console.log(`[MarkdownParser] Processing image src: ${srcValue}`);
 
-      // 如果是 data: 协议（base64编码的图片），直接返回，不进行任何转换
+      // 如果是 data: 协议（base64编码的图片），保持原样，但不存储
+      // These should be extracted to files by the ImageExtractor before calling this
       if (isDataURL(srcValue)) {
-        console.log(`[MarkdownParser] Preserving data URL unchanged: ${srcValue.substring(0, 50)}...`);
-        return match;
+        console.log(`[MarkdownParser] Found data URL (should be extracted to file): ${srcValue.substring(0, 50)}...`);
+        return match; // Keep as-is, will be extracted separately
       }
 
-      // 如果已经是file://协议，进行标准化处理
+      // 如果是file://协议，转换为相对路径
       if (srcValue.startsWith('file://')) {
-        // 尝试修复和标准化现有的 file:// 路径
-        const repairedPath = repairCorruptedPath(srcValue);
-        if (repairedPath) {
-          const normalizedPath = normalizeFileProtocolPath(repairedPath);
-          if (normalizedPath !== srcValue) {
-            console.log(`[MarkdownParser] Normalized existing file:// path from ${srcValue} to ${normalizedPath}`);
-            return `<img${beforeSrc}src="${normalizedPath}"${afterSrc}>`;
-          }
+        try {
+          // 提取文件路径并转换为相对路径
+          const filePath = srcValue.replace(/^file:\/\/\/?/, '');
+          const fileName = path.basename(filePath);
+          const relativePath = `./${fileName}`;
+          console.log(`[MarkdownParser] Converted file:// to relative: ${srcValue} -> ${relativePath}`);
+          return `<img${beforeSrc}src="${relativePath}"${afterSrc}>`;
+        } catch (error) {
+          console.error(`[MarkdownParser] Error converting file:// path: ${error}`);
+          return match;
         }
-        return match;
       }
 
-      // 如果是http://或https://协议，直接返回
+      // 如果是http://或https://协议，保持原样
       if (srcValue.startsWith('http://') || srcValue.startsWith('https://')) {
         return match;
       }
@@ -359,10 +360,14 @@ export class MarkdownParser {
         return '';
       }
 
-      // 处理相对路径
+      // 已经是相对路径，标准化格式
       try {
-        const normalizedPath = normalizeImagePath(srcValue, this.storagePath);
-        console.log(`[MarkdownParser] Converted relative path ${srcValue} to ${normalizedPath}`);
+        let normalizedPath = srcValue;
+        // 确保相对路径以 ./ 开头
+        if (!srcValue.startsWith('./') && !srcValue.startsWith('../')) {
+          normalizedPath = `./${srcValue}`;
+        }
+        console.log(`[MarkdownParser] Standardized relative path: ${srcValue} -> ${normalizedPath}`);
         return `<img${beforeSrc}src="${normalizedPath}"${afterSrc}>`;
       } catch (error) {
         console.error(`[MarkdownParser] Error processing path ${srcValue}:`, error);

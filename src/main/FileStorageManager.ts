@@ -7,6 +7,7 @@ import MiniSearch from 'minisearch';
 import { Todo, TodoRelation, Settings } from '../shared/types';
 import { MarkdownParser } from './MarkdownParser';
 import { FileIndexer, TodoIndexEntry } from './FileIndexer';
+import { ImageManager } from './utils/ImageManager';
 
 /**
  * 文件存储管理器
@@ -518,15 +519,18 @@ export class FileStorageManager {
     }
 
     // 删除相关附件（与 md 文件同级的图片文件）
-    const baseName = fileName.replace('.md', '');
-    const files = await fs.promises.readdir(this.storagePath);
-    for (const file of files) {
-      if (file.startsWith(baseName) && file !== fileName) {
-        const filePath = path.join(this.storagePath, file);
-        await fs.promises.unlink(filePath).catch(() => {
-          console.warn(`[deleteTodo] Failed to delete attachment: ${filePath}`);
-        });
-      }
+    // Using enhanced ImageManager utilities
+    const imageManager = new ImageManager();
+    const relatedImages = imageManager.findImagesForMarkdownFile(fileName, this.storagePath);
+
+    console.log(`[deleteTodo] Found ${relatedImages.length} related images to delete for ${fileName}`);
+
+    for (const imagePath of relatedImages) {
+      const fileName = imagePath.replace('./', '');
+      const filePath = path.join(this.storagePath, fileName);
+      await fs.promises.unlink(filePath).catch(() => {
+        console.warn(`[deleteTodo] Failed to delete attachment: ${filePath}`);
+      });
     }
 
     // 从 UUID 映射中删除
@@ -971,29 +975,25 @@ export class FileStorageManager {
   }
 
   /**
-   * 重命名附件文件
+   * 重命名附件文件（使用增强的 ImageManager）
    */
   private async renameAttachments(oldFileName: string, newFileName: string): Promise<void> {
-    const oldBaseName = oldFileName.replace('.md', '');
-    const newBaseName = newFileName.replace('.md', '');
-    const files = await fs.promises.readdir(this.storagePath);
+    console.log(`[renameAttachments] Starting rename operation: ${oldFileName} -> ${newFileName}`);
 
-    for (const file of files) {
-      // 匹配附件文件：与旧文件同名但扩展名不是.md
-      if (file.startsWith(oldBaseName) && file !== oldFileName) {
-        const extension = path.extname(file);
-        const oldAttachmentPath = path.join(this.storagePath, file);
-        const newAttachmentName = `${newBaseName}${extension}`;
-        const newAttachmentPath = path.join(this.storagePath, newAttachmentName);
+    try {
+      const imageManager = new ImageManager();
+      const result = imageManager.renameImagesForMarkdownFile(oldFileName, newFileName, this.storagePath);
 
-        try {
-          await fs.promises.rename(oldAttachmentPath, newAttachmentPath);
-          console.log(`[renameAttachments] ✅ Renamed attachment: ${file} -> ${newAttachmentName}`);
-        } catch (error) {
-          console.warn(`[renameAttachments] ⚠️ Failed to rename attachment ${file}:`, error);
-          // 附件重命名失败不是致命错误，继续处理其他附件
-        }
+      if (result.renamed > 0) {
+        console.log(`[renameAttachments] ✅ Successfully renamed ${result.renamed} images`);
       }
+
+      if (result.errors.length > 0) {
+        console.warn(`[renameAttachments] ⚠️ Encountered ${result.errors.length} errors during rename:`, result.errors);
+      }
+    } catch (error) {
+      console.error(`[renameAttachments] ❌ Failed to rename attachments:`, error);
+      // 附件重命名失败不是致命错误，继续处理
     }
   }
 
@@ -1431,7 +1431,9 @@ export class FileStorageManager {
   }
 
   /**
-   * 保存单个附件
+   * 保存单个附件（Obsidian 风格：总是提取 base64 图片到文件）
+   * For new content: Always extract base64 images to separate files
+   * Legacy support: Handle existing file paths
    */
   private async saveAttachment(
     imageData: string,

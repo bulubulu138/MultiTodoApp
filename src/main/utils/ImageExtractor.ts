@@ -113,13 +113,14 @@ export class ImageExtractor {
         imageData.fileName = fileName;
         images.push(imageData);
 
-        // 使用新的路径标准化函数生成 file:// 协议路径
-        const fileProtocolPath = normalizeImagePath(src, storagePath);
+        // For Obsidian-style storage, use only relative paths in markdown
+        // Don't use file:// protocol - keep only relative paths like ./filename.ext
+        const relativePath = `./${fileName}`;
 
-        console.log(`[ImageExtractor] Replacing ${src.substring(0, 50)}... -> ${fileProtocolPath}`);
+        console.log(`[ImageExtractor] Replacing ${src.substring(0, 50)}... -> ${relativePath}`);
 
         // 收集替换映射（存储完整的 <img> 标签，避免部分字符串替换）
-        replacements.push({ originalImgTag: fullMatch, newSrc: fileProtocolPath });
+        replacements.push({ originalImgTag: fullMatch, newSrc: relativePath });
         imageIndex++;
       } else if (imageData.type === 'relative') {
         // 对于相对路径，使用新的路径标准化函数
@@ -333,6 +334,7 @@ export class ImageExtractor {
 
       console.log(`[ImageExtractor] Saved Base64 image: ${adjustedFileName} (${buffer.length} bytes)`);
 
+      // Return only relative path for Obsidian-style storage
       return {
         relativePath: `./${adjustedFileName}`,
         fileName: adjustedFileName,

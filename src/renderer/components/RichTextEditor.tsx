@@ -40,6 +40,16 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
   const originalScrollTopRef = useRef(0);
   const isScrollLockedRef = useRef(false);
 
+  // 🔥 新增：将相对路径转换为 file:// 协议用于显示
+  // Note: For now, keep relative paths as-is. The file:// protocol conversion will be handled by the backend
+  const convertRelativePathsToFileProtocol = useCallback((html: string): string => {
+    if (!html) return html;
+
+    // For Obsidian-style storage, we keep relative paths in the editor
+    // The backend will handle file:// protocol conversion when needed
+    return html;
+  }, []);
+
   // 🔥 新增：MutationObserver 引用和锁定定时器
   const mutationObserverRef = useRef<MutationObserver | null>(null);
   const scrollLockTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -233,7 +243,9 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
           }
 
           // 🔥 关键修复：内容替换后重新覆盖 scrollSelectionIntoView，确保始终有效
-          editorInstanceRef.current.clipboard.dangerouslyPasteHTML(value);
+          // Convert relative paths to file:// protocol for display
+          const displayHtml = convertRelativePathsToFileProtocol(value);
+          editorInstanceRef.current.clipboard.dangerouslyPasteHTML(displayHtml);
 
           // 🔥 确保滚动覆盖在内容替换后仍然有效
           editorInstanceRef.current.scrollSelectionIntoView = function() {
@@ -806,8 +818,21 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       if (imagePath) {
         const range = editor.getSelection(true);
         if (range) {
-          const safePath = imagePath.replace(/\\/g, '/');
-          editor.insertEmbed(range.index, 'image', `file://${safePath}`);
+          // For Obsidian-style storage, use relative paths in content
+          // Convert file:// paths to relative paths for storage
+          let imageSrc = imagePath;
+          if (imageSrc.startsWith('file://')) {
+            // Extract filename and create relative path
+            const fileName = imageSrc.replace(/^file:\/\/.*[\/\\]/, '');
+            imageSrc = `./${fileName}`;
+          } else {
+            // Normalize path separators and ensure relative format
+            const safePath = imagePath.replace(/\\/g, '/');
+            const fileName = safePath.replace(/^.*[\/\\]/, '');
+            imageSrc = `./${fileName}`;
+          }
+
+          editor.insertEmbed(range.index, 'image', imageSrc);
 
           setTimeout(() => {
             try {
