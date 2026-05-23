@@ -300,10 +300,10 @@ export const getRefinedAnimationConfig = (): RefinedAnimationConfig => {
     dragShadow: '0 20px 40px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1)',
     dragBlur: 2,
 
-    // 更长的动画时间，更丝滑的效果
-    dragStartDuration: 200,
-    dragEndDuration: 350,
-    reorderDuration: 280,
+    // 适度优化的动画时间，平衡流畅度和视觉效果
+    dragStartDuration: 150,
+    dragEndDuration: 250,
+    reorderDuration: 200,
 
     // 使用更高级的缓动函数
     dragStartEasing: RefinedEasing.easeOutExpo,
@@ -314,6 +314,54 @@ export const getRefinedAnimationConfig = (): RefinedAnimationConfig => {
     snapThreshold: 50,
     snapStrength: 0.8
   };
+};
+
+/**
+ * 配置验证函数
+ */
+const validateAnimationConfig = (config: RefinedAnimationConfig): RefinedAnimationConfig => {
+  if (config.dragStartDuration < 0 || config.dragEndDuration < 0 || config.reorderDuration < 0) {
+    console.warn('Invalid animation duration detected, using fallback values');
+    return getRefinedAnimationConfig();
+  }
+  return config;
+};
+
+/**
+ * 获取紧凑模式动画配置
+ * 专为紧凑视图优化，减少动画时长，提升响应速度
+ */
+export const getCompactAnimationConfig = (): RefinedAnimationConfig => {
+  const reduced = shouldReduceMotion();
+
+  if (reduced) {
+    return getRefinedAnimationConfig(); // 复用现有的简化配置
+  }
+
+  const config: RefinedAnimationConfig = {
+    // 紧凑模式优化：更快的动画，更轻量的视觉效果
+    dragScale: 1.05,
+    dragOpacity: 0.95,
+    dragRotation: 2,
+    dragShadow: '0 12px 24px rgba(0, 0, 0, 0.2)',
+    dragBlur: 1,
+
+    // 核心优化：大幅减少动画时长
+    dragStartDuration: 80,
+    dragEndDuration: 120,
+    reorderDuration: 100,
+
+    // 使用更快速的缓动函数
+    dragStartEasing: RefinedEasing.easeOutCubic,
+    dragEndEasing: RefinedEasing.easeOutCubic,
+    reorderEasing: RefinedEasing.smoothDrag,
+
+    // 更灵敏的磁吸效果
+    snapThreshold: 30,
+    snapStrength: 0.9
+  };
+
+  return validateAnimationConfig(config);
 };
 
 /**

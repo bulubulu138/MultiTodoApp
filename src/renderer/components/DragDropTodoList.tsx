@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -19,6 +19,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Todo } from '../../shared/types';
 import { shouldReduceMotion, getAnimationConfig } from '../utils/dragAnimations';
+import { getCompactAnimationConfig } from '../utils/refinedDragAnimations';
 import { dragStartFeedback, dragEndFeedback } from '../utils/hapticFeedback';
 import { dragPerformanceMonitor, getAnimationConfigByPerformance, PerformanceLevel } from '../utils/dragPerformanceMonitor';
 
@@ -28,6 +29,7 @@ interface DragDropTodoListProps {
   onDragEnd: (newOrder: Todo[]) => void;
   renderTodoItem: (todo: Todo, isDragging?: boolean, dragHandleProps?: any) => React.ReactNode;
   isTodoDraggable?: (todo: Todo) => boolean;
+  useCompactAnimation?: boolean;
 }
 
 // 位置指示器组件
@@ -106,10 +108,58 @@ export const DragDropTodoList: React.FC<DragDropTodoListProps> = ({
   onDragEnd,
   renderTodoItem,
   isTodoDraggable,
+  useCompactAnimation = false,
 }) => {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [indicatorPosition, setIndicatorPosition] = useState<number | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
+
+  // 开发模式检测
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
+  // 简单节流函数实现（避免引入lodash依赖）
+  const createThrottle = useCallback(() => {
+    let lastCall = 0;
+    return (fn: Function, delay: number) => {
+      return (...args: any[]) => {
+        const now = Date.now();
+        if (now - lastCall >= delay) {
+          lastCall = now;
+          fn(...args);
+        }
+      };
+    };
+  }, []);
+
+  // 位置更新节流
+  const throttledSetIndicatorPosition = useMemo(
+    () => {
+      const throttle = createThrottle();
+      return throttle((position: number | null) => {
+        setIndicatorPosition(position);
+      }, 16); // 约60fps
+    },
+    [createThrottle]
+  );
+
+  // 位置计算逻辑优化
+  const calculatePosition = useMemo(() => {
+    return (overRect: any, activeRect: any, containerRect: any): number | null => {
+      if (!activeRect || !overRect || !containerRect) return null;
+
+      const activeRectTop = activeRect.translated?.top ?? activeRect.initial?.top ?? 0;
+      const activeRectHeight = activeRect.translated?.height ?? activeRect.initial?.height ?? 0;
+
+      const centerY = overRect.top + overRect.height / 2;
+      const activeCenterY = activeRectTop + activeRectHeight / 2;
+
+      if (activeCenterY < centerY) {
+        return overRect.top - containerRect.top;
+      } else {
+        return overRect.bottom - containerRect.top;
+      }
+    };
+  }, []);
 
   // 配置拖拽传感器 - 移除距离限制，实现立即响应
   const sensors = useSensors(
@@ -130,8 +180,10 @@ export const DragDropTodoList: React.FC<DragDropTodoListProps> = ({
     // 触感反馈
     dragStartFeedback();
 
-    // 开始性能监控
-    dragPerformanceMonitor.startMonitoring();
+    // 仅在开发模式启用性能监控
+    if (isDevelopment) {
+      dragPerformanceMonitor.startMonitoring();
+    }
 
     // 改变光标状态
     document.body.style.cursor = 'grabbing';
@@ -140,42 +192,33 @@ export const DragDropTodoList: React.FC<DragDropTodoListProps> = ({
   const handleDragMove = (event: DragMoveEvent) => {
     const { over } = event;
     if (over && over.rect && containerRef.current) {
-      // 计算放置位置指示线
-      const overRect = over.rect;
       const activeRect = event.active.rect.current;
       const containerRect = containerRef.current.getBoundingClientRect();
 
       if (activeRect) {
-        // 提取 activeRect 属性，兼容 @dnd-kit/sortable v10 的新结构
-        // activeRect 现在是 { initial: ClientRect | null; translated: ClientRect | null; }
-        const activeRectTop = activeRect.translated?.top ?? activeRect.initial?.top ?? 0;
-        const activeRectHeight = activeRect.translated?.height ?? activeRect.initial?.height ?? 0;
-
-        // 判断是在目标元素的上半部分还是下半部分
-        const centerY = overRect.top + overRect.height / 2;
-        const activeCenterY = activeRectTop + activeRectHeight / 2;
-
-        let targetPosition: number;
-        if (activeCenterY < centerY) {
-          // 在上半部分，显示在目标元素上方
-          targetPosition = overRect.top;
-        } else {
-          // 在下半部分，显示在目标元素下方
-          targetPosition = overRect.bottom;
-        }
-
-        // 关键修复：转换为相对于容器的坐标
-        const relativePosition = targetPosition - containerRect.top;
-        setIndicatorPosition(relativePosition);
+        // 使用优化后的位置计算
+        const targetPosition = calculatePosition(over.rect, activeRect, containerRect);
+        // 使用节流更新
+        throttledSetIndicatorPosition(targetPosition);
       }
     }
   };
 
+  // 添加清理函数
+  useEffect(() => {
+    return () => {
+      // 组件卸载时恢复光标状态
+      document.body.style.cursor = 'default';
+    };
+  }, []);
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
-    // 停止性能监控
-    dragPerformanceMonitor.stopMonitoring();
+    // 仅在开发模式停止性能监控
+    if (isDevelopment) {
+      dragPerformanceMonitor.stopMonitoring();
+    }
 
     // 恢复光标状态
     document.body.style.cursor = 'default';
@@ -203,6 +246,18 @@ export const DragDropTodoList: React.FC<DragDropTodoListProps> = ({
   };
 
   const activeTodo = todos.find((todo) => todo.id === activeId);
+
+  // 根据紧凑模式选择动画配置
+  const useCompact = useCompactAnimation;
+  const compactConfig = {
+    opacity: 0.95,
+    scale: 1.05,
+    rotate: 2,
+    shadow: '0 12px 24px rgba(0, 0, 0, 0.2)',
+    duration: 80,
+  };
+
+  const standardConfig = getAnimationConfig();
 
   return (
     <DndContext
@@ -241,10 +296,10 @@ export const DragDropTodoList: React.FC<DragDropTodoListProps> = ({
           <div
             className="drag-overlay"
             style={{
-              opacity: 0.85,
-              transform: `scale(${getAnimationConfig().scale}) rotate(${getAnimationConfig().rotate}deg)`,
-              boxShadow: getAnimationConfig().shadow,
-              transition: `transform ${getAnimationConfig().transitionDuration}ms ease-out, box-shadow ${getAnimationConfig().transitionDuration}ms ease-out`,
+              opacity: useCompact ? compactConfig.opacity : standardConfig.opacity,
+              transform: `scale(${useCompact ? compactConfig.scale : standardConfig.scale}) rotate(${useCompact ? compactConfig.rotate : standardConfig.rotate}deg)`,
+              boxShadow: useCompact ? compactConfig.shadow : standardConfig.shadow,
+              transition: `transform ${useCompact ? compactConfig.duration : standardConfig.transitionDuration}ms ease-out, box-shadow ${useCompact ? compactConfig.duration : standardConfig.transitionDuration}ms ease-out`,
               cursor: 'grabbing',
             }}
           >

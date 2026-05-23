@@ -213,6 +213,7 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
       onDragEnd={onDragEnd || (() => {})}
       renderTodoItem={renderTodoItem}
       isTodoDraggable={(todo) => todo.status !== 'today_completed'}
+      useCompactAnimation={true}
     />
   );
 };

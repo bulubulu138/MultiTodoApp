@@ -988,28 +988,90 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     return dragDropOrder[activeTab] || null;
   }, [dragDropOrder, activeTab, getCurrentTabSettings]);
 
-  // 辅助函数：更新待办事项的 displayOrders
+  // 辅助函数：更新待办事项的 displayOrders（增量更新版本）
   const updateTodosWithNewDisplayOrders = (todos: Todo[], newOrder: Todo[], tabKey: string): Todo[] => {
-    const newOrderMap = new Map(newOrder.map((todo, index) => [todo.id, index]));
-    return todos.map(todo => {
-      const newDisplayOrder = newOrderMap.get(todo.id);
-      if (newDisplayOrder !== undefined) {
-        return {
-          ...todo,
-          displayOrders: {
-            ...(todo.displayOrders || {}),
-            [tabKey]: newDisplayOrder
-          },
-          updatedAt: new Date().toISOString()
-        };
+    // 防御性检查：验证输入数据
+    if (!Array.isArray(todos) || !Array.isArray(newOrder) || !tabKey) {
+      console.error('Invalid inputs to updateTodosWithNewDisplayOrders:', { todos, newOrder, tabKey });
+      return todos; // 返回原数据，避免崩溃
+    }
+
+    try {
+      // 创建需要更新的 todo 的 ID 集合（用于快速查找）
+      const changedTodoIds = new Set(newOrder.map(todo => {
+        if (!todo || !todo.id) {
+          console.warn('Invalid todo in newOrder:', todo);
+          return null;
+        }
+        return todo.id;
+      }).filter(Boolean)); // 过滤掉无效ID
+
+      if (changedTodoIds.size === 0) {
+        console.warn('No valid todos to update');
+        return todos;
       }
-      return todo;
-    });
+
+      const newOrderMap = new Map(
+        newOrder
+          .map((todo, index) => ({ todo, index }))
+          .filter(({ todo }) => todo && todo.id)
+          .map(({ todo, index }) => [todo.id, index] as [string, number])
+      );
+
+      let updateCount = 0;
+
+      const updatedTodos = todos.map(todo => {
+        // 防御性检查：验证 todo 对象
+        if (!todo || !todo.id) {
+          console.warn('Invalid todo in todos array:', todo);
+          return todo;
+        }
+
+        // 只处理在 newOrder 中的 todo
+        if (changedTodoIds.has(todo.id)) {
+          const newDisplayOrder = newOrderMap.get(todo.id);
+          const currentDisplayOrder = todo.displayOrders?.[tabKey];
+
+          // 只有当 displayOrder 实际发生变化时才更新
+          if (newDisplayOrder !== undefined && newDisplayOrder !== currentDisplayOrder) {
+            updateCount++;
+            return {
+              ...todo,
+              displayOrders: {
+                ...(todo.displayOrders || {}),
+                [tabKey]: newDisplayOrder
+              } as { [tabKey: string]: number },
+              // 只在 displayOrder 实际变化时更新 updatedAt
+              updatedAt: new Date().toISOString()
+            };
+          }
+        }
+        // 其他 todo 保持不变，避免不必要的对象重建
+        return todo;
+      });
+
+      // 性能日志（可选，用于调试）
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[拖拽优化] 更新了 ${updateCount} 个todo对象 (共 ${todos.length} 个)`);
+      }
+
+      return updatedTodos;
+
+    } catch (error) {
+      console.error('Error in updateTodosWithNewDisplayOrders:', error);
+      return todos; // 出错时返回原数据
+    }
   };
 
   // 拖拽结束处理
   const handleDragEnd = async (newOrder: Todo[]) => {
-    // 乐观更新本地状态（立即生效）
+    // 防御性检查：验证输入数据
+    if (!Array.isArray(newOrder) || newOrder.length === 0) {
+      console.warn('Invalid newOrder data in handleDragEnd:', newOrder);
+      return;
+    }
+
+    // 乐观更新本地状态（立即生效，确保视觉反馈）
     setDragDropOrder((prev) => ({
       ...prev,
       [activeTab]: newOrder.map((todo) => todo.id),
@@ -1030,15 +1092,39 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         allTodos: todos
       });
 
+      // 防御性检查：验证更新数据
+      if (!Array.isArray(allUpdates) || allUpdates.length === 0) {
+        console.warn('No updates computed in handleDragEnd');
+        hide();
+        return;
+      }
+
       // 单次批量更新（替代原来的Promise.all多调用）
       await window.electronAPI.todo.batchUpdateDisplayOrders(allUpdates);
 
       hide();
       message.success('排序已保存');
 
-      // 更新本地 todos 状态，包含最新的 displayOrders
-      setTodos(prevTodos => {
-        return updateTodosWithNewDisplayOrders(prevTodos, newOrder, activeTab);
+      // 延迟更新 todos 状态，避免阻塞 UI 渲染
+      // 给浏览器时间先渲染拖拽的视觉反馈，然后再更新数据
+      // 使用 requestAnimationFrame 确保在浏览器下一次重绘之前执行
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          try {
+            setTodos(prevTodos => {
+              // 防御性检查：确保 prevTodos 有效
+              if (!Array.isArray(prevTodos) || prevTodos.length === 0) {
+                console.warn('Invalid prevTodos in setTodos callback');
+                return prevTodos;
+              }
+              return updateTodosWithNewDisplayOrders(prevTodos, newOrder, activeTab);
+            });
+          } catch (error) {
+            console.error('Error in delayed todos update:', error);
+            // 如果延迟更新失败，立即尝试全量更新作为fallback
+            loadTodos();
+          }
+        }, 100); // 100ms 延迟，足够 UI 渲染拖拽效果
       });
 
     } catch (error) {
@@ -1047,7 +1133,12 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       console.error('Failed to update drag order:', error);
 
       // 回滚到之前的状态
-      await loadTodos();
+      try {
+        await loadTodos();
+      } catch (rollbackError) {
+        console.error('Failed to rollback after drag error:', rollbackError);
+        message.error('数据同步失败，请刷新页面');
+      }
     }
   };
 

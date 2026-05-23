@@ -256,14 +256,19 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
 
 // 为 CompactTodoItem 添加记忆化，优化性能并确保数据变化时能重新渲染
 const MemoizedCompactTodoItem = React.memo(CompactTodoItem, (prevProps, nextProps) => {
-  // 自定义比较函数，只在关键 props 改变时重新渲染
+  // 优化的比较函数：移除对 updatedAt 的依赖（避免拖拽时频繁重新渲染）
+  // 只比较真正影响UI的关键字段
   return (
     prevProps.todo.id === nextProps.todo.id &&
     prevProps.todo.status === nextProps.todo.status &&
-    prevProps.todo.updatedAt === nextProps.todo.updatedAt &&
     prevProps.todo.title === nextProps.todo.title &&
     prevProps.currentDisplayOrder === nextProps.currentDisplayOrder &&
-    prevProps.savingOrder === nextProps.savingOrder
+    prevProps.editingOrder === nextProps.editingOrder &&
+    prevProps.savingOrder === nextProps.savingOrder &&
+    prevProps.isInGroup === nextProps.isInGroup &&
+    prevProps.isGroupStart === nextProps.isGroupStart
+    // 注意：不再比较 updatedAt，因为拖拽操作会频繁更新它
+    // 注意：不再比较 displayOrders，因为拖拽排序已经通过 currentDisplayOrder 处理
   );
 });
 
