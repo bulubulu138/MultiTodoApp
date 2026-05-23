@@ -6,7 +6,8 @@ import { App } from 'antd';
 import CompactTodoItem from './CompactTodoItem';
 import { sortTodosWithTodayCompleted } from '../utils/sortUtils';
 import DragDropTodoList from './DragDropTodoList';
-import { resolveOrderConflicts, syncParallelGroupOrders } from '../utils/orderConflictResolver';
+import { resolveOrderConflicts, syncParallelGroupOrders, computeAllFinalOrders } from '../utils/orderConflictResolver';
+import { buildParallelGroups } from '../utils/sortWithGroups';
 
 interface CompactTodoViewProps {
   todos: Todo[];
@@ -35,6 +36,9 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
 }) => {
   const colors = useThemeColors();
   const { message } = App.useApp();
+
+  // 拖动状态管理 - 乐观更新
+  const [dragDropOrder, setDragDropOrder] = useState<Record<string, string[]>>({});
 
   // 序号编辑状态
   const [editingOrders, setEditingOrders] = useState<Record<string, number>>({});
@@ -83,11 +87,25 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
 
   // 排序后的待办列表
   const sortedTodos = useMemo(() => {
+    // 优先使用本地 dragDropOrder 状态（拖动时）
+    const currentDragOrder = dragDropOrder[activeTab];
+
+    if (currentDragOrder && currentDragOrder.length > 0) {
+      // 如果有拖动状态，按照拖动顺序排序
+      const orderMap = new Map(currentDragOrder.map((id, index) => [id, index]));
+      return [...todos].sort((a, b) => {
+        const aIndex = orderMap.get(a.id) ?? 999999;
+        const bIndex = orderMap.get(b.id) ?? 999999;
+        return aIndex - bIndex;
+      });
+    }
+
+    // 否则使用原有排序逻辑
     return sortTodosWithTodayCompleted(todos, {
       activeTab,
       sortOption,
     });
-  }, [todos, activeTab, sortOption]);
+  }, [todos, activeTab, sortOption, dragDropOrder]);
 
   // 处理今日完成状态切换
   const handleToggleTodayCompleted = async (todo: Todo) => {
@@ -165,6 +183,75 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
     }
   }, [allTodos, activeTab, message]);
 
+  // 处理紧凑模式拖动结束
+  const handleCompactDragEnd = useCallback(async (newOrder: Todo[]) => {
+    // 防御性检查：验证输入数据
+    if (!Array.isArray(newOrder) || newOrder.length === 0) {
+      console.warn('Invalid newOrder in handleCompactDragEnd:', newOrder);
+      return;
+    }
+
+    // Phase 1: 乐观更新本地状态（立即生效，确保视觉反馈）
+    setDragDropOrder((prev) => ({
+      ...prev,
+      [activeTab]: newOrder.map((todo) => todo.id),
+    }));
+
+    // Phase 2: 构建并列分组映射
+    const parallelGroupsMap = buildParallelGroups(newOrder, relations);
+
+    // Phase 3: 完整预计算（包括并列分组同步和批量冲突解决）
+    const allUpdates = computeAllFinalOrders({
+      newOrder,
+      activeTab,
+      parallelGroupsMap,
+      allTodos: todos
+    });
+
+    if (!allUpdates || allUpdates.length === 0) {
+      console.warn('No updates computed in handleCompactDragEnd');
+      // 清除本地状态，使用原始数据
+      setDragDropOrder((prev) => {
+        const newState = { ...prev };
+        delete newState[activeTab];
+        return newState;
+      });
+      return;
+    }
+
+    // Phase 4: 单次批量更新（替代原来的Promise.all多调用）
+    try {
+      await window.electronAPI.todo.batchUpdateDisplayOrders(allUpdates);
+
+      // Phase 5: 延迟同步到主状态
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          // 清除本地拖动状态，让数据重新从数据库加载
+          setDragDropOrder((prev) => {
+            const newState = { ...prev };
+            delete newState[activeTab];
+            return newState;
+          });
+
+          // 触发父组件的状态更新（如果提供了回调）
+          if (onDragEnd) {
+            onDragEnd(newOrder);
+          }
+        }, 100);
+      });
+    } catch (error) {
+      console.error('Failed to update display orders:', error);
+      message.error('更新排序失败');
+
+      // 回滚本地状态
+      setDragDropOrder((prev) => {
+        const newState = { ...prev };
+        delete newState[activeTab];
+        return newState;
+      });
+    }
+  }, [activeTab, relations, todos, onDragEnd, message]);
+
   // 渲染单个待办项
   const renderTodoItem = useCallback((todo: Todo, isDragging?: boolean, dragHandleProps?: any) => {
     const canDrag = todo.status !== 'today_completed';
@@ -210,7 +297,7 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
     <DragDropTodoList
       todos={sortedTodos}
       activeTab={activeTab}
-      onDragEnd={onDragEnd || (() => {})}
+      onDragEnd={handleCompactDragEnd}
       renderTodoItem={renderTodoItem}
       isTodoDraggable={(todo) => todo.status !== 'today_completed'}
       useCompactAnimation={true}

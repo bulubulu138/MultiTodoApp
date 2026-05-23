@@ -169,7 +169,7 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    cursor: canDrag ? 'grab' : 'not-allowed',
+    cursor: canDrag ? 'grab' : 'default',
     userSelect: 'none',
     opacity: canDrag ? (isHoveringDragHandle ? 0.9 : 0.6) : 0.2, // 仅透明度变化
     fontSize: '14px', // 增大字体以提高可见性
@@ -217,8 +217,8 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
       {enableDrag && (
         <div
           style={dragHandleStyle}
-          {...(canDrag ? dragHandleProps?.attributes : {})}
-          {...(canDrag ? dragHandleProps?.listeners : {})}
+          {...dragHandleProps?.attributes}
+          {...dragHandleProps?.listeners}
           {...(!canDrag ? { title: '今日已完成的项目不可拖拽' } : {})}
           onMouseEnter={() => setIsHoveringDragHandle(true)}
           onMouseLeave={() => setIsHoveringDragHandle(false)}

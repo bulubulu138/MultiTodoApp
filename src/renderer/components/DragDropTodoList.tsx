@@ -73,9 +73,9 @@ const SortableTodoItem: React.FC<{
   } = useSortable({
     id: todo.id,
     disabled: !isDraggable,
-    // 完全禁用 @dnd-kit 默认动画
-    animateLayoutChanges: () => false,
-    transition: null,
+    // 启用默认动画以防止回弹
+    animateLayoutChanges: () => true,
+    transition: undefined,
   });
 
   // 获取动画配置
@@ -83,7 +83,9 @@ const SortableTodoItem: React.FC<{
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition: isDragging ? 'none' : transition, // 拖拽时禁用过渡以提高性能
+    transition: isDragging
+      ? 'none'  // 拖拽时禁用过渡
+      : 'transform 150ms cubic-bezier(0.2, 0, 0, 1)',  // 释放时使用平滑过渡
     opacity: isDragging ? animationConfig.opacity : 1,
     scale: isDragging ? 1.02 : 1,
     boxShadow: isDragging ? animationConfig.shadow : 'none',
