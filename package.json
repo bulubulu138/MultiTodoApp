@@ -14,7 +14,7 @@
     "predist": "npm run build",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
-    "dist:mac": "electron-builder --mac --x64",
+    "dist:mac": "electron-builder --mac",
     "dist:mac:local": "CI=false electron-builder --mac --x64 --config.compression=store",
     "dist:local": "node build-local.js",
     "postinstall": "electron-builder install-app-deps"

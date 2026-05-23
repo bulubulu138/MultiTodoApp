@@ -218,7 +218,7 @@ jobs:
 
       - name: Package application (macOS x64)
         if: matrix.platform == 'mac' && matrix.arch == 'x64'
-        run: npm run dist:mac -- --x64
+        run: npm run dist:mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -228,7 +228,7 @@ jobs:
 
       - name: Package application (macOS ARM64)
         if: matrix.platform == 'mac' && matrix.arch == 'arm64'
-        run: npm run dist:mac -- --arm64
+        run: npm run dist:mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
