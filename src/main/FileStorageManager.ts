@@ -22,6 +22,10 @@ export class FileStorageManager {
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5分钟缓存
   private readonly MAX_CACHE_SIZE = 100;
 
+  // ✅ Phase 3: Track recently written files to prevent immediate reprocessing
+  private recentWrites: Map<string, number> = new Map();
+  private readonly WRITE_COOLDOWN = 1000; // 1秒冷却时间
+
   // ✅ 新增：全量缓存系统，用于优化大量待办场景下的性能
   private todosCache: Map<string, Todo> = new Map();
   private cacheInitialized: boolean = false;
@@ -1040,8 +1044,29 @@ export class FileStorageManager {
 
         console.log(`[startFileWatcher] Processing ${changes.length} file changes`);
 
+        // ✅ Phase 3: Clean up old entries from recentWrites periodically
+        const currentTime = Date.now();
+        for (const [path, writeTime] of this.recentWrites.entries()) {
+          if (currentTime - writeTime > this.WRITE_COOLDOWN * 10) { // 10x cooldown for cleanup
+            this.recentWrites.delete(path);
+          }
+        }
+
         for (const filePath of changes) {
           try {
+            // ✅ Phase 3: Skip recently written files to prevent redundant reprocessing
+            const lastWriteTime = this.recentWrites.get(filePath);
+            const currentTime = Date.now();
+            if (lastWriteTime && (currentTime - lastWriteTime) < this.WRITE_COOLDOWN) {
+              console.log(`[startFileWatcher] Skipping ${filePath} - written ${currentTime - lastWriteTime}ms ago (within cooldown)`);
+              continue;
+            }
+
+            // Clean up old entries from recentWrites
+            if (lastWriteTime && (currentTime - lastWriteTime) >= this.WRITE_COOLDOWN) {
+              this.recentWrites.delete(filePath);
+            }
+
             const markdown = await fs.promises.readFile(filePath, 'utf-8');
             const todo = this.markdownParser.parseTodo(markdown);
 
@@ -1147,6 +1172,9 @@ export class FileStorageManager {
         await new Promise(resolve => setTimeout(resolve, 10));
 
         await fs.promises.rename(tempPath, filePath);
+
+        // ✅ Phase 3: Track write timestamp to prevent immediate reprocessing
+        this.recentWrites.set(filePath, Date.now());
         console.log(`[atomicWrite] Successfully wrote: ${filePath} (attempt ${attempt + 1}/${maxRetries})`);
         return; // 成功则退出
 
