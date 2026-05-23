@@ -473,32 +473,66 @@ export class MarkdownParser {
    * 检查内容是否已经处理过（包含file://协议路径）
    * 避免重复处理导致路径损坏
    */
+  /**
+   * 检查内容是否已经处理过，避免重复提取图片
+   *
+   * 检测策略（多条件综合判断）：
+   * 1. 检查是否包含有效的 file:// 协议路径（向后兼容旧版本）
+   * 2. 检查是否包含 Obsidian 风格的相对路径图片引用（./filename.ext）
+   *
+   * 这种多条件检测可以避免：
+   * - 重复提取已保存的图片
+   * - 破坏现有的图片引用
+   * - 不必要的磁盘 I/O 操作
+   *
+   * @param content - HTML 内容字符串
+   * @returns 如果内容已处理返回 true，否则返回 false
+   */
   private isContentAlreadyProcessed(content: string): boolean {
-    // 使用更强的正则表达式匹配多种 file:// 协议格式变体
-    // 匹配：file://path, file:///path, file:/path 等
-    // 正则字面量形式，避免字符串转义混淆，提高可读性
+    console.log(`[MarkdownParser] isContentAlreadyProcessed: Starting detection (length: ${content.length})`);
+
+    // 策略 1: 检查 file:// 协议路径（向后兼容旧版本）
     const fileProtocolPattern = /<img[^>]*src=["']file:\/{1,3}([^"']+)["'][^>]*>/gi;
-    const matches = Array.from(content.matchAll(fileProtocolPattern));
+    const fileProtocolMatches = Array.from(content.matchAll(fileProtocolPattern));
 
-    console.log(`[MarkdownParser] isContentAlreadyProcessed: Found ${matches.length} file protocol images`);
+    console.log(`[MarkdownParser] isContentAlreadyProcessed: Found ${fileProtocolMatches.length} file protocol images`);
 
-    for (const match of matches) {
+    for (const match of fileProtocolMatches) {
       const filePath = match[1];
-      const fullMatch = match[0];
 
       console.log(`[MarkdownParser] Checking file protocol path: ${filePath}`);
 
-      // 使用新的路径验证函数检查有效性
+      // 使用路径验证函数检查有效性
       const isValid = isValidFileProtocolPath(`file://${filePath}`);
 
       if (isValid) {
-        console.log(`[MarkdownParser] Found valid file protocol path, skipping reprocessing`);
+        console.log(`[MarkdownParser] ✓ Found valid file protocol path, skipping reprocessing`);
         return true;
       } else {
-        console.warn(`[MarkdownParser] Found invalid file protocol path: ${filePath}, will reprocess`);
+        console.warn(`[MarkdownParser] Found invalid file protocol path: ${filePath}, will continue checking`);
       }
     }
 
+    // 策略 2: 检查 Obsidian 风格的相对路径图片引用（当前版本使用的格式）
+    // 匹配模式: <img src="./filename.ext"> 或 <img src="../filename.ext">
+    // 严格匹配图片文件扩展名，避免误判普通文本
+    const relativePathPattern = /<img[^>]*src=["']\.\.?\/[^"']+\.(png|jpg|jpeg|gif|webp|bmp|svg)["'][^>]*>/gi;
+    const relativePathMatches = Array.from(content.matchAll(relativePathPattern));
+
+    console.log(`[MarkdownParser] isContentAlreadyProcessed: Found ${relativePathMatches.length} relative path images`);
+
+    if (relativePathMatches.length > 0) {
+      // 验证至少有一个相对路径是有效的
+      for (const match of relativePathMatches) {
+        const fullMatch = match[0];
+        console.log(`[MarkdownParser] Checking relative path image: ${fullMatch.substring(0, 100)}`);
+      }
+
+      console.log(`[MarkdownParser] ✓ Found valid relative path images (Obsidian-style), skipping reprocessing`);
+      return true;
+    }
+
+    console.log(`[MarkdownParser] ✗ No processed image references found, will extract images`);
     return false;
   }
 
