@@ -1,6 +1,6 @@
 import { Todo, TodoRelation, CalendarViewSize, CustomTab } from '../shared/types';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Layout, App as AntApp, Tabs, ConfigProvider, FloatButton, Modal, Typography, Space, Tag, notification } from 'antd';
+import { Layout, App as AntApp, Tabs, ConfigProvider, FloatButton, Modal, Typography, Space, Tag, Button, notification } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { VerticalAlignTopOutlined } from '@ant-design/icons';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -9,11 +9,13 @@ import TodoForm from './components/TodoForm';
 import TodoPositionSelector, { PositionSelection } from './components/TodoPositionSelector';
 import Toolbar, { SortOption, ViewMode } from './components/Toolbar';
 import SettingsModal from './components/SettingsModal';
+import ContentMigrationModal from './components/ContentMigrationModal';
 import TodoViewDrawer from './components/TodoViewDrawer';
 import CalendarDrawer from './components/CalendarDrawer';
 import ContentFocusView, { ContentFocusViewRef } from './components/ContentFocusView';
 import CompactTodoView from './components/CompactTodoView';
 import FirstRunDialog from './components/FirstRunDialog';
+import MilkdownPOCDemo from './components/MilkdownPOCDemo';
 import { getTheme, ThemeMode, ColorTheme } from './theme/themes';
 import { buildParallelGroups, selectGroupRepresentatives, sortWithGroups, getSortComparator } from './utils/sortWithGroups';
 import { toStringId, areIdsEqual } from '../shared/utils/typeUtils';
@@ -24,6 +26,53 @@ import { syncParallelGroupOrders, computeAllFinalOrders } from './utils/orderCon
 import dayjs from 'dayjs';
 
 const { Content } = Layout;
+
+/**
+ * Error Boundary for Milkdown POC Demo
+ * Catches errors from the experimental Milkdown editor to prevent affecting the main app
+ */
+class MilkdownPOCErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('[MilkdownPOCErrorBoundary] Caught error:', error);
+    console.error('[MilkdownPOCErrorBoundary] Error info:', errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '40px', textAlign: 'center' }}>
+          <Space direction="vertical" size="middle">
+            <Typography.Title level={4} type="danger">
+              POC 加载失败
+            </Typography.Title>
+            <Typography.Text type="secondary">
+              Milkdown 编辑器初始化失败：{this.state.error?.message || '未知错误'}
+            </Typography.Text>
+            <Typography.Text type="secondary">
+              请检查浏览器控制台获取详细错误信息。这是一个实验性功能，不影响主应用使用。
+            </Typography.Text>
+            <Button type="primary" onClick={() => this.setState({ hasError: false })}>
+              重试
+            </Button>
+          </Space>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Tab 设置接口
 interface TabSettings {
@@ -50,6 +99,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showMigrationModal, setShowMigrationModal] = useState(false);
   const [showViewDrawer, setShowViewDrawer] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
@@ -61,6 +111,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const [customTabs, setCustomTabs] = useState<CustomTab[]>([]);
   const [quickCreateContent, setQuickCreateContent] = useState<string | null>(null);
   const [showHotkeyGuide, setShowHotkeyGuide] = useState(false);
+  const [showPOCDemo, setShowPOCDemo] = useState(false); // POC Demo modal
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearchText, setDebouncedSearchText] = useState<string>('');
   const [showPositionSelector, setShowPositionSelector] = useState(false);
@@ -139,6 +190,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     loadRelations();
     checkFirstRun(); // ✅ 新增：检查首次运行
 
+    // 检查是否需要内容迁移
+    checkMigrationNeeded();
+
     // 记录初始加载完成时间
     if (process.env.NODE_ENV === 'development') {
       setTimeout(() => {
@@ -150,19 +204,18 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   // 监听快速创建待办事件
   useEffect(() => {
     const handleQuickCreate = (data: { content: string }) => {
-      // 打开创建表单
-      setShowForm(true);
-      setEditingTodo(null); // 确保是创建模式
-      
-      // 设置初始内容
+      console.log('[App] Quick create triggered:', data.content.substring(0, 50) + '...');
+
+      // 🔧 简化逻辑：直接设置所有状态
+      setEditingTodo(null);
       setQuickCreateContent(data.content);
-      
-      // 显示提示消息
+      setShowForm(true);
+
       message.success('已从剪贴板获取内容，请补充其他信息');
     };
-    
+
     window.electronAPI.onQuickCreateTodo(handleQuickCreate);
-    
+
     return () => {
       window.electronAPI.removeQuickCreateListener();
     };
@@ -451,6 +504,20 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     } catch (error) {
       console.error('[App] Error completing first run setup:', error);
       message.error('设置失败，请重试');
+    }
+  };
+
+  // 检查是否需要内容迁移
+  const checkMigrationNeeded = async () => {
+    try {
+      if (window.electronAPI && (window.electronAPI as any).migration?.needsMigration) {
+        const needs = await (window.electronAPI as any).migration.needsMigration();
+        if (needs) {
+          setShowMigrationModal(true);
+        }
+      }
+    } catch (error) {
+      console.error('[App] Migration check failed:', error);
     }
   };
 
@@ -1613,6 +1680,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
           onAddTodo={() => setShowPositionSelector(true)}
         onShowSettings={() => setShowSettings(true)}
         onShowCalendar={() => setShowCalendar(true)}
+        onShowPOCDemo={() => setShowPOCDemo(true)}
         sortOption={currentTabSettings.sortOption}
         onSortChange={handleSortChange}
         viewMode={currentTabSettings.viewMode}
@@ -1665,6 +1733,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
                   relations={relations}
                   sortOption={currentTabSettings.sortOption}
                   onDragEnd={handleDragEnd}
+                  dragDropOrder={dragDropOrder}
                 />
               ) : (
                 <TodoList
@@ -1734,6 +1803,11 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         existingTags={existingTags}
         colorTheme={colorTheme}
         onColorThemeChange={onColorThemeChange}
+      />
+
+      <ContentMigrationModal
+        visible={showMigrationModal}
+        onComplete={() => setShowMigrationModal(false)}
       />
 
       <TodoViewDrawer
@@ -1820,6 +1894,27 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         onComplete={handleFirstRunComplete}
         onCancel={() => setShowFirstRunDialog(false)}
       />
+
+      {/* 🔬 POC Demo: Milkdown Editor Testing */}
+      <Modal
+        title="🔬 Milkdown Editor POC Demo"
+        open={showPOCDemo}
+        onOk={() => setShowPOCDemo(false)}
+        onCancel={() => setShowPOCDemo(false)}
+        okText="关闭"
+        cancelText="关闭"
+        width={1200}
+        style={{ top: 20 }}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setShowPOCDemo(false)}>
+            关闭 POC Demo
+          </Button>,
+        ]}
+      >
+        <MilkdownPOCErrorBoundary>
+          <MilkdownPOCDemo />
+        </MilkdownPOCErrorBoundary>
+      </Modal>
       </Layout>
   );
 };

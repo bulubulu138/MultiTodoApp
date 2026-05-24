@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import { Todo, TodoRelation } from '../../shared/types';
 import { SortOption } from './Toolbar';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -6,8 +6,7 @@ import { App } from 'antd';
 import CompactTodoItem from './CompactTodoItem';
 import { sortTodosWithTodayCompleted } from '../utils/sortUtils';
 import DragDropTodoList from './DragDropTodoList';
-import { resolveOrderConflicts, syncParallelGroupOrders, computeAllFinalOrders } from '../utils/orderConflictResolver';
-import { buildParallelGroups } from '../utils/sortWithGroups';
+import { resolveOrderConflicts, syncParallelGroupOrders } from '../utils/orderConflictResolver';
 
 interface CompactTodoViewProps {
   todos: Todo[];
@@ -18,6 +17,7 @@ interface CompactTodoViewProps {
   relations: TodoRelation[];
   sortOption?: SortOption;
   onDragEnd?: (newOrder: Todo[]) => void;
+  dragDropOrder?: Record<string, string[]>; // 从父组件传入的拖拽状态
 }
 
 /**
@@ -33,12 +33,10 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
   relations,
   sortOption = 'manual',
   onDragEnd,
+  dragDropOrder: propDragDropOrder = {}, // 从父组件传入的拖拽状态
 }) => {
   const colors = useThemeColors();
   const { message } = App.useApp();
-
-  // 拖动状态管理 - 乐观更新
-  const [dragDropOrder, setDragDropOrder] = useState<Record<string, string[]>>({});
 
   // 序号编辑状态
   const [editingOrders, setEditingOrders] = useState<Record<string, number>>({});
@@ -87,8 +85,8 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
 
   // 排序后的待办列表
   const sortedTodos = useMemo(() => {
-    // 优先使用本地 dragDropOrder 状态（拖动时）
-    const currentDragOrder = dragDropOrder[activeTab];
+    // 优先使用父组件传入的 dragDropOrder 状态（拖动时）
+    const currentDragOrder = propDragDropOrder[activeTab];
 
     if (currentDragOrder && currentDragOrder.length > 0) {
       // 如果有拖动状态，按照拖动顺序排序
@@ -105,7 +103,7 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
       activeTab,
       sortOption,
     });
-  }, [todos, activeTab, sortOption, dragDropOrder]);
+  }, [todos, activeTab, sortOption, propDragDropOrder]);
 
   // 处理今日完成状态切换
   const handleToggleTodayCompleted = async (todo: Todo) => {
@@ -152,12 +150,15 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
 
       // 3. 同步并列分组
       if (parallelGroup && parallelGroup.size > 1) {
-        await syncParallelGroupOrders({
+        const groupUpdates = syncParallelGroupOrders({
           groupId: parallelGroup,
           currentTodoId: todoId,
           newOrder,
           activeTab
         });
+        if (groupUpdates.length > 0) {
+          await window.electronAPI.todo.batchUpdateDisplayOrders(groupUpdates);
+        }
       }
 
       message.success('序号已保存');
@@ -191,66 +192,16 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
       return;
     }
 
-    // Phase 1: 乐观更新本地状态（立即生效，确保视觉反馈）
-    setDragDropOrder((prev) => ({
-      ...prev,
-      [activeTab]: newOrder.map((todo) => todo.id),
-    }));
-
-    // Phase 2: 构建并列分组映射
-    const parallelGroupsMap = buildParallelGroups(newOrder, relations);
-
-    // Phase 3: 完整预计算（包括并列分组同步和批量冲突解决）
-    const allUpdates = computeAllFinalOrders({
-      newOrder,
-      activeTab,
-      parallelGroupsMap,
-      allTodos: todos
-    });
-
-    if (!allUpdates || allUpdates.length === 0) {
-      console.warn('No updates computed in handleCompactDragEnd');
-      // 清除本地状态，使用原始数据
-      setDragDropOrder((prev) => {
-        const newState = { ...prev };
-        delete newState[activeTab];
-        return newState;
-      });
-      return;
+    // 拖拽状态管理完全委托给父组件（通过 onDragEnd 回调）
+    // 父组件会：
+    // 1. 设置 App.dragDropOrder 状态（乐观更新）
+    // 2. 保存到数据库
+    // 3. 延迟更新 todos 状态
+    // CompactTodoView 通过 propDragDropOrder prop 接收更新后的状态
+    if (onDragEnd) {
+      await onDragEnd(newOrder);
     }
-
-    // Phase 4: 单次批量更新（替代原来的Promise.all多调用）
-    try {
-      await window.electronAPI.todo.batchUpdateDisplayOrders(allUpdates);
-
-      // Phase 5: 延迟同步到主状态
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          // 清除本地拖动状态，让数据重新从数据库加载
-          setDragDropOrder((prev) => {
-            const newState = { ...prev };
-            delete newState[activeTab];
-            return newState;
-          });
-
-          // 触发父组件的状态更新（如果提供了回调）
-          if (onDragEnd) {
-            onDragEnd(newOrder);
-          }
-        }, 100);
-      });
-    } catch (error) {
-      console.error('Failed to update display orders:', error);
-      message.error('更新排序失败');
-
-      // 回滚本地状态
-      setDragDropOrder((prev) => {
-        const newState = { ...prev };
-        delete newState[activeTab];
-        return newState;
-      });
-    }
-  }, [activeTab, relations, todos, onDragEnd, message]);
+  }, [onDragEnd]);
 
   // 渲染单个待办项
   const renderTodoItem = useCallback((todo: Todo, isDragging?: boolean, dragHandleProps?: any) => {
