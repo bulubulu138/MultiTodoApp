@@ -150,7 +150,7 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
 
       // 3. 同步并列分组
       if (parallelGroup && parallelGroup.size > 1) {
-        const groupUpdates = syncParallelGroupOrders({
+        const groupUpdates = await syncParallelGroupOrders({
           groupId: parallelGroup,
           currentTodoId: todoId,
           newOrder,
