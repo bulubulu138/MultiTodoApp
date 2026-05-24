@@ -81,27 +81,22 @@ interface ParallelGroupSyncConfig {
  * @deprecated 使用 computeParallelGroupFinalOrders 替代
  * 保留此函数以维持向后兼容性
  * @param config 分组同步配置
+ * @returns 需要更新的待办列表，由调用方负责执行 IPC
  */
-export async function syncParallelGroupOrders(
+export function syncParallelGroupOrders(
   config: ParallelGroupSyncConfig
-): Promise<void> {
-  console.warn('[syncParallelGroupOrders] 已废弃，请使用 computeParallelGroupFinalOrders');
-
+): Array<{uuid: string, tabKey: string, displayOrder: number}> {
   const { groupId, currentTodoId, newOrder, activeTab } = config;
 
-  if (groupId.size <= 1) return; // 单个待办无需同步
+  if (groupId.size <= 1) return [];
 
-  const groupUpdates = Array.from(groupId)
+  return Array.from(groupId)
     .filter(id => id !== currentTodoId)
     .map(id => ({
       uuid: String(id),
       tabKey: activeTab,
       displayOrder: newOrder
     }));
-
-  if (groupUpdates.length > 0) {
-    await window.electronAPI.todo.batchUpdateDisplayOrders(groupUpdates);
-  }
 }
 
 interface ComputeOrdersConfig {
