@@ -1,4 +1,4 @@
-import React, { useRef, forwardRef, useImperativeHandle, useEffect } from 'react';
+import React, { useRef, forwardRef, useImperativeHandle, useEffect, useState, Component } from 'react';
 import { Editor, rootCtx, defaultValueCtx, editorViewCtx, editorViewOptionsCtx } from '@milkdown/core';
 import { commonmark } from '@milkdown/preset-commonmark';
 import { gfm } from '@milkdown/preset-gfm';
@@ -68,6 +68,56 @@ function buildUploader(schema: Schema) {
   };
 }
 
+// ErrorBoundary组件：捕获子组件中的JavaScript错误
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
+}
+
+class MilkdownEditorErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('[MilkdownEditorErrorBoundary] ❌ Component error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || (
+        <div
+          style={{
+            border: '1px solid #ff4d4f',
+            borderRadius: '6px',
+            backgroundColor: '#fff2f0',
+            padding: '16px',
+            textAlign: 'center',
+            color: '#ff4d4f',
+          }}
+        >
+          <p style={{ margin: 0, fontWeight: 'bold' }}>⚠️ 编辑器发生错误</p>
+          <p style={{ margin: '8px 0 0 0', fontSize: '14px', color: '#666' }}>
+            {this.state.error?.message || '未知错误'}
+          </p>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
   ({ value = '', onChange, readOnly = false, style, minHeight = '200px' }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -78,8 +128,25 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
     // 防止 React Strict Mode 第一次 mount 的回调污染第二次 mount
     const activeInstanceIdRef = useRef<number>(0);
 
+    // 状态管理：初始化状态和错误信息
+    const [initStatus, setInitStatus] = useState<'loading' | 'success' | 'error'>('loading');
+    const [initError, setInitError] = useState<string | null>(null);
+
     // 始终指向最新 onChange，避免闭包陷阱
     onChangeRef.current = onChange;
+
+    // 超时检测：如果编辑器在5秒内没有初始化完成，显示错误提示
+    useEffect(() => {
+      const timeoutId = setTimeout(() => {
+        if (initStatus === 'loading') {
+          setInitStatus('error');
+          setInitError('编辑器初始化超时，请刷新页面重试');
+          console.error('[MilkdownEditor] ❌ Initialization timeout (5s)');
+        }
+      }, 5000);
+
+      return () => clearTimeout(timeoutId);
+    }, [initStatus]);
 
     useEffect(() => {
       const container = containerRef.current;
@@ -139,9 +206,12 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
           // 确保 markdownUpdated 的首次回调（值等于 initialValue）被正确过滤
           contentRef.current = initialValue;
           console.log('[MilkdownEditor] ✅ Initialization completed - onChange now active');
+          setInitStatus('success');
 
         } catch (error) {
           console.error('[MilkdownEditor] ❌ Init error:', error);
+          setInitStatus('error');
+          setInitError(error instanceof Error ? error.message : '编辑器初始化失败');
         }
       };
 
@@ -156,6 +226,10 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
           editor.destroy().catch(() => {});
         }
         editorRef.current = null;
+
+        // 重置状态，避免状态残留
+        setInitStatus('loading');
+        setInitError(null);
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [readOnly]);
@@ -193,6 +267,72 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
       },
     }), []);
 
+    // 渲染加载状态
+    if (initStatus === 'loading') {
+      return (
+        <div style={{ position: 'relative', minHeight, ...style }}>
+          <div
+            className="milkdown-editor-container"
+            style={{
+              minHeight,
+              border: '1px solid #d9d9d9',
+              borderRadius: '6px',
+              backgroundColor: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#999',
+              fontSize: '14px',
+            }}
+          >
+            编辑器加载中...
+          </div>
+        </div>
+      );
+    }
+
+    // 渲染错误状态
+    if (initStatus === 'error') {
+      return (
+        <div style={{ position: 'relative', minHeight, ...style }}>
+          <div
+            className="milkdown-editor-error"
+            style={{
+              minHeight,
+              border: '1px solid #ff4d4f',
+              borderRadius: '6px',
+              backgroundColor: '#fff2f0',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+            }}
+          >
+            <p style={{ margin: 0, color: '#ff4d4f', fontWeight: 'bold' }}>⚠️ 编辑器加载失败</p>
+            <p style={{ margin: 0, color: '#666', fontSize: '14px', textAlign: 'center' }}>
+              {initError || '未知错误'}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: '#1890ff',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              刷新页面
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div style={{ position: 'relative', minHeight, ...style }}>
         <div
@@ -212,4 +352,53 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
 );
 
 MilkdownEditor.displayName = 'MilkdownEditor';
-export default MilkdownEditor;
+
+// 包裹组件：提供ErrorBoundary和降级方案
+interface MilkdownEditorWrapperProps extends MilkdownEditorProps {
+  fallback?: React.ReactNode;
+}
+
+const MilkdownEditorWrapper = forwardRef<MilkdownEditorRef, MilkdownEditorWrapperProps>(({
+  fallback,
+  ...props
+}, ref) => {
+  const defaultFallback = (
+    <div
+      style={{
+        border: '1px solid #d9d9d9',
+        borderRadius: '6px',
+        backgroundColor: '#f5f5f5',
+        padding: '8px',
+      }}
+    >
+      <textarea
+        value={props.value || ''}
+        onChange={(e) => props.onChange?.(e.target.value)}
+        placeholder="编辑器加载失败，请刷新页面。您可以在上述文本框中临时编辑内容。"
+        style={{
+          width: '100%',
+          minHeight: props.minHeight || '200px',
+          border: 'none',
+          outline: 'none',
+          resize: 'vertical',
+          backgroundColor: 'transparent',
+          fontFamily: 'inherit',
+          fontSize: '14px',
+          lineHeight: '1.5',
+        }}
+      />
+    </div>
+  );
+
+  return (
+    <MilkdownEditorErrorBoundary fallback={fallback || defaultFallback}>
+      <MilkdownEditor {...props} ref={ref} />
+    </MilkdownEditorErrorBoundary>
+  );
+});
+
+MilkdownEditorWrapper.displayName = 'MilkdownEditorWrapper';
+
+// 导出原始组件（用于测试）和包裹组件（用于生产）
+export { MilkdownEditor as MilkdownEditorRaw };
+export default MilkdownEditorWrapper;

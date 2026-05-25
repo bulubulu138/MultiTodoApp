@@ -2,7 +2,7 @@ import { Todo } from '../../shared/types';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Input, Select, Button, Space, Divider, message, Spin, Tag, Modal } from 'antd';
 import { SaveOutlined, CloseOutlined, CheckOutlined, LoadingOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import RichTextEditor, { RichTextEditorRef } from './RichTextEditor';
+import MilkdownEditorWrapper, { MilkdownEditorRef } from './MilkdownEditor';
 import dayjs from 'dayjs';
 
 const { Option } = Select;
@@ -39,7 +39,7 @@ const InlineEditPanel: React.FC<InlineEditPanelProps> = ({
   const [editedContent, setEditedContent] = useState(todo.content || '');
   const [inputTag, setInputTag] = useState('');
 
-  const richEditorRef = useRef<RichTextEditorRef>(null);
+  const richEditorRef = useRef<MilkdownEditorRef>(null);
   const isComposingRef = useRef(false);
 
   // 🔧 新增：未保存状态追踪
@@ -387,15 +387,12 @@ const InlineEditPanel: React.FC<InlineEditPanelProps> = ({
 
       {/* 富文本编辑器 */}
       <div className="content-editor">
-        <RichTextEditor
+        <MilkdownEditorWrapper
           ref={richEditorRef}
           value={editedContent}
           onChange={handleContentChange}
-          placeholder="在此输入待办内容..."
           style={{
             height: 400,
-            border: '1px solid #d9d9d9',
-            borderRadius: 4
           }}
         />
       </div>

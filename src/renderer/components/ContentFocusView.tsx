@@ -2,7 +2,7 @@ import { Todo, TodoRelation } from '../../shared/types';
 import React, { useState, useMemo, useCallback, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { Divider, Button, Checkbox, Space, Spin, Empty, App, Input, InputNumber, Tag, Tooltip } from 'antd';
 import { SaveOutlined, EyeOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import RichTextEditor, { RichTextEditorRef } from './RichTextEditor';
+import MilkdownEditorWrapper, { MilkdownEditorRef } from './MilkdownEditor';
 import RelationIndicators from './RelationIndicators';
 import { formatCompletedTime } from '../utils/timeFormatter';
 import { ColorTheme } from '../theme/themes';
@@ -69,7 +69,7 @@ const ContentFocusItem = React.memo(
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const titleSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const isComposingRef = useRef(false); // 追踪输入法状态
-    const editorRef = useRef<RichTextEditorRef>(null);
+    const editorRef = useRef<MilkdownEditorRef>(null);
     const editorFocusedRef = useRef(false); // 🔥 新增：追踪编辑器焦点状态
     const editorReadyRef = useRef(false); // 🔥 新增：追踪编辑器初始化状态，防止在初始化过程中触发同步
 
@@ -152,7 +152,7 @@ const ContentFocusItem = React.memo(
     }, [todo.title, isSavingTitle, editedTitle]);
 
     const getLatestContent = useCallback(() => {
-      return editorRef.current?.getLatestHtml() ?? editedContent;
+      return editorRef.current?.getMarkdown() ?? editedContent;
     }, [editedContent]);
 
     // 检查内容是否被修改
@@ -296,7 +296,7 @@ const ContentFocusItem = React.memo(
         }
 
         // 保存内容（同步，不等待）
-        const currentContent = editorRef.current?.getLatestHtml() ?? lastSavedContentRef.current;
+        const currentContent = editorRef.current?.getMarkdown() ?? lastSavedContentRef.current;
         const currentTodoId = latestTodoIdRef.current;
         if (currentContent !== lastSavedContentRef.current && currentTodoId) {
           onUpdate(currentTodoId, { content: currentContent });
@@ -637,11 +637,10 @@ const ContentFocusItem = React.memo(
               tabIndex={-1}
               style={{ cursor: 'text' }}
             >
-            <RichTextEditor
+            <MilkdownEditorWrapper
               ref={editorRef}
               value={editedContent}
               onChange={handleContentChange}
-              placeholder="编辑待办内容..."
               style={{ minHeight: '150px' }}
             />
             </div>

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Modal, Form, Input, Select, Button, App, Tag, Space, DatePicker, InputNumber, Typography } from 'antd';
 const { Text } = Typography;
 import { CopyOutlined } from '@ant-design/icons';
-import RichTextEditor, { RichTextEditorRef } from './RichTextEditor';
+import MilkdownEditorWrapper, { MilkdownEditorRef } from './MilkdownEditor';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import dayjs from 'dayjs';
 // import TipTapEditor from './TipTapEditor'; // Temporarily disabled until dependencies are installed
@@ -37,8 +37,9 @@ const TodoForm: React.FC<TodoFormProps> = ({
   const [richContent, setRichContent] = useState<string>('');
   const [isEditorReady, setIsEditorReady] = useState(false);
   const [editorError, setEditorError] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // 🔧 新增：防止重复提交
 
-  const richEditorRef = React.useRef<RichTextEditorRef>(null);
+  const richEditorRef = React.useRef<MilkdownEditorRef>(null);
 
   // 添加编辑器焦点状态追踪
   const editorHasFocusRef = React.useRef(false);
@@ -50,6 +51,15 @@ const TodoForm: React.FC<TodoFormProps> = ({
   const handleContentChange = useCallback((content: string) => {
     setRichContent(content);
   }, []);
+
+  // 当 Modal 打开或切换 todo 时，把初始内容同步进已挂载的编辑器实例
+  useEffect(() => {
+    if (!visible) return;
+    if (richEditorRef.current) {
+      richEditorRef.current.setMarkdown(richContent);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, todo?.id]);
 
   // 提取所有历史标签并按使用频率排序
   const historyTags = useMemo(() => {
@@ -97,13 +107,11 @@ const TodoForm: React.FC<TodoFormProps> = ({
         form.setFieldsValue({
           startTime: dayjs(),
         });
-        // 如果有快速创建内容，使用它；否则清空
+        // 🔧 简化逻辑：直接设置内容，避免复杂的状态检查
         setRichContent(quickCreateContent || '');
         setTags([]);
       }
 
-      // 优化：直接标记编辑器准备就绪，依赖编辑器自身的初始化
-      // 移除不必要的延迟，避免状态不同步
       setIsEditorReady(true);
     } else {
       // Modal 关闭时重置编辑器状态
@@ -138,15 +146,31 @@ const TodoForm: React.FC<TodoFormProps> = ({
   };
 
   const handleSubmit = async () => {
+    // 🔧 防止重复提交
+    if (isSubmitting) {
+      console.log('[TodoForm] ⚠️ Already submitting, ignoring duplicate submit');
+      return;
+    }
+
     try {
+      setIsSubmitting(true); // 标记为正在提交
       const values = await form.validateFields();
 
-      const submitContent = richEditorRef.current?.getLatestHtml() ?? richContent;
+      // 🔧 修复：优先使用编辑器的 getMarkdown，确保获取最新内容
+      let submitContent = '';
+      if (richEditorRef.current && typeof richEditorRef.current.getMarkdown === 'function') {
+        submitContent = richEditorRef.current.getMarkdown();
+        console.log('[TodoForm] Using content from editor ref:', submitContent.substring(0, 50) + '...');
+      } else {
+        submitContent = richContent;
+        console.log('[TodoForm] Using content from state:', submitContent.substring(0, 50) + '...');
+      }
 
       if (process.env.NODE_ENV === 'development') {
         console.log('[TodoForm] Submit content snapshot', {
           length: submitContent.length,
           hasFlowchart: /<flowchart-preview\b|data-flowchart=/i.test(submitContent),
+          contentPreview: submitContent.substring(0, 100) + '...',
         });
       }
 
@@ -186,14 +210,26 @@ const TodoForm: React.FC<TodoFormProps> = ({
           okText: '继续',
           cancelText: '取消',
           onOk: async () => {
-            onSubmit(todoData);
+            try {
+              await onSubmit(todoData);
+            } finally {
+              setIsSubmitting(false); // 重置提交状态
+            }
+          },
+          onCancel: () => {
+            setIsSubmitting(false); // 用户取消时也要重置状态
           },
         });
       } else {
-        onSubmit(todoData);
+        try {
+          await onSubmit(todoData);
+        } finally {
+          setIsSubmitting(false); // 重置提交状态
+        }
       }
     } catch (error) {
       console.error('Form validation failed:', error);
+      setIsSubmitting(false); // 发生错误时也要重置状态
     }
   };
 
@@ -256,38 +292,12 @@ const TodoForm: React.FC<TodoFormProps> = ({
         </Form.Item>
 
         <Form.Item label="内容描述">
-          {isEditorReady ? (
-            <div
-              onCompositionStart={() => {
-                console.log('[TodoForm] 输入法开始');
-                isComposingRef.current = true;
-              }}
-              onCompositionEnd={() => {
-                console.log('[TodoForm] 输入法结束');
-                isComposingRef.current = false;
-              }}
-            >
-              <RichTextEditor
-                ref={richEditorRef}
-                value={richContent}
-                onChange={handleContentChange}
-                placeholder="输入内容，支持格式化文本、粘贴图片等..."
-              />
-            </div>
-          ) : (
-            <div style={{
-              minHeight: '250px',
-              padding: '10px',
-              border: '1px solid #d9d9d9',
-              borderRadius: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#999'
-            }}>
-              正在加载编辑器...
-            </div>
-          )}
+          <MilkdownEditorWrapper
+            ref={richEditorRef}
+            value={richContent}
+            onChange={handleContentChange}
+            minHeight="250px"
+          />
         </Form.Item>
 
         <Form.Item
