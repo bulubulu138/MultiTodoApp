@@ -11,6 +11,7 @@ import { useURLTitles } from '../hooks/useURLTitles';
 import { embedUrlTitleInContent } from '../utils/urlTitleStorage';
 import ReadOnlyMarkdown from './ReadOnlyMarkdown';
 import InlineEditPanel from './InlineEditPanel';
+import { convertRelativePathsToFileProtocol } from '../utils/PathResolver';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -67,6 +68,9 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   // 批量授权进度状态
   const [batchAuthProgress, setBatchAuthProgress] = useState<BatchAuthorizationProgress | null>(null);
 
+  // 🔥 新增：存储路径状态，用于图片路径转换
+  const [storagePath, setStoragePath] = useState<string | null>(null);
+
   // URL标题获取
   const { titles: urlTitles, refresh: refreshUrlTitles } = useURLTitles(todo);
 
@@ -122,6 +126,42 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
       window.electronAPI.urlAuth.removeBatchListeners();
     };
   }, [todo, refreshUrlTitles]);
+
+  // 🔥 新增：获取存储路径用于图片转换，带路径验证
+  useEffect(() => {
+    const fetchStoragePath = async () => {
+      try {
+        if (window.electronAPI?.storage?.getStoragePath) {
+          const path = await window.electronAPI.storage.getStoragePath();
+
+          // 防御性检查：验证路径是否有效
+          if (path && path.length > 0) {
+            // 检查是否是默认路径（可能是错误的）
+            const defaultPathPattern = /Roaming\/Electron\/todos$/;
+            const isDefaultPath = defaultPathPattern.test(path);
+
+            if (isDefaultPath) {
+              console.warn('[TodoViewDrawer] ⚠️ Detected default storage path, may be incorrect:', path);
+              console.log('[TodoViewDrawer] Will attempt to use path anyway for compatibility');
+            }
+
+            console.log('[TodoViewDrawer] Storage path loaded:', path);
+            setStoragePath(path);
+          } else {
+            console.warn('[TodoViewDrawer] ⚠️ Empty or invalid storage path received');
+            setStoragePath(null); // 明确设置为 null，触发降级处理
+          }
+        }
+      } catch (error) {
+        console.error('[TodoViewDrawer] ❌ Failed to load storage path:', error);
+        setStoragePath(null); // 出错时设置为 null
+      }
+    };
+
+    fetchStoragePath();
+  }, []);
+
+  // 提取内容中的所有URL
 
   // 提取内容中的所有URL
   const extractedUrls = useMemo(() => {
@@ -547,9 +587,13 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
     // UNC 网络路径: \\server\share\file.ext
     const uncPathRegex = /\\\\[^\s\\/:*?"<>|\r\n]+\\[^\s\\/:*?"<>|\r\n]+(?:\\[^\\/:*?"<>|\r\n\s]+)*\.[a-zA-Z0-9]+/g;
 
-    // 创建临时 DOM 来解析 HTML
+    // 🔥 修复：创建临时 DOM 来解析 HTML，使用路径转换后的内容
     const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = todo.content;
+    // 如果有存储路径，转换相对路径为 file:// 协议
+    const contentToRender = storagePath
+      ? convertRelativePathsToFileProtocol(todo.content || '', storagePath)
+      : todo.content || '';
+    tempDiv.innerHTML = contentToRender;
 
     // 遍历所有文本节点，将 URL 和文件路径转换为链接
     const processTextNodes = (node: Node) => {

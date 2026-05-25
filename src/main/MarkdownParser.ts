@@ -321,7 +321,7 @@ export class MarkdownParser {
    * For Obsidian-style storage: Keep only relative paths, remove file:// protocol
    * Convert file:// and data: URLs to relative paths for consistency
    *
-   * ✅ Phase 2 Enhanced: Added defensive checks to prevent content corruption
+   * ✅ Phase 3 Enhanced: Improved robustness to prevent content corruption
    */
   private preserveImageReferences(content: string): string {
     // ✅ Phase 2 Defensive: Check for empty or invalid content
@@ -341,68 +341,97 @@ export class MarkdownParser {
       console.warn(`[MarkdownParser] preserveImageReferences: Content too large (${content.length} chars), skipping processing to avoid performance issues`);
       return content;
     }
-    if (!this.storagePath) {
-      // 如果没有设置存储路径，保持原样
-      return content;
-    }
 
     console.log(`[MarkdownParser] preserveImageReferences: Processing content of length ${content.length}`);
 
     try {
-      // 匹配HTML中的img标签的src属性，处理各种路径格式
-      // For Obsidian-style: convert everything to relative paths
-      return content.replace(/<img\s([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi, (match, beforeSrc, srcValue, afterSrc) => {
-      console.log(`[MarkdownParser] Processing image src: ${srcValue}`);
+      // ✅ Phase 3 Enhanced: Improved regex pattern to handle various img tag formats
+      // This pattern now handles:
+      // - img tags with/without spaces
+      // - Single and double quotes
+      // - Self-closing tags
+      // - Various attribute orderings
+      const imgPattern = /<img([^>]*?)\s+src\s*=\s*["']([^"']+)["']([^>]*?)>/gi;
 
-      // 如果是 data: 协议（base64编码的图片），保持原样，但不存储
-      // These should be extracted to files by the ImageExtractor before calling this
-      if (isDataURL(srcValue)) {
-        console.log(`[MarkdownParser] Found data URL (should be extracted to file): ${srcValue.substring(0, 50)}...`);
-        return match; // Keep as-is, will be extracted separately
-      }
+      let matchCount = 0;
+      let preservedCount = 0;
 
-      // 如果是file://协议，转换为相对路径
-      if (srcValue.startsWith('file://')) {
-        try {
-          // 提取文件路径并转换为相对路径
-          const filePath = srcValue.replace(/^file:\/\/\/?/, '');
-          const fileName = path.basename(filePath);
-          const relativePath = `./${fileName}`;
-          console.log(`[MarkdownParser] Converted file:// to relative: ${srcValue} -> ${relativePath}`);
-          return `<img${beforeSrc}src="${relativePath}"${afterSrc}>`;
-        } catch (error) {
-          console.error(`[MarkdownParser] Error converting file:// path: ${error}`);
+      const result = content.replace(imgPattern, (match, beforeSrc, srcValue, afterSrc) => {
+        matchCount++;
+        console.log(`[MarkdownParser] Processing image ${matchCount}: src="${srcValue}"`);
+
+        // 如果是 data: 协议（base64编码的图片），保持原样，但不存储
+        // These should be extracted to files by the ImageExtractor before calling this
+        if (isDataURL(srcValue)) {
+          console.log(`[MarkdownParser] Image ${matchCount}: data URL detected, preserving as-is`);
+          preservedCount++;
           return match;
         }
-      }
 
-      // 如果是http://或https://协议，保持原样
-      if (srcValue.startsWith('http://') || srcValue.startsWith('https://')) {
-        return match;
-      }
-
-      // 检查是否是已损坏的路径或特殊协议
-      if (srcValue.startsWith('://') || srcValue === '//:0' || srcValue === '/') {
-        console.warn(`[MarkdownParser] preserveImageReferences found corrupted path: "${srcValue}", removing img tag`);
-        // 移除损坏的图片标签
-        return '';
-      }
-
-      // 已经是相对路径，标准化格式
-      try {
-        let normalizedPath = srcValue;
-        // 确保相对路径以 ./ 开头
-        if (!srcValue.startsWith('./') && !srcValue.startsWith('../')) {
-          normalizedPath = `./${srcValue}`;
+        // 如果是file://协议，转换为相对路径
+        if (srcValue.startsWith('file://')) {
+          try {
+            // 提取文件路径并转换为相对路径
+            const filePath = srcValue.replace(/^file:\/\/\/?/, '');
+            const fileName = path.basename(filePath);
+            const relativePath = `./${fileName}`;
+            console.log(`[MarkdownParser] Image ${matchCount}: Converted file:// to relative: ${srcValue} -> ${relativePath}`);
+            preservedCount++;
+            return `<img${beforeSrc} src="${relativePath}"${afterSrc}>`;
+          } catch (error) {
+            console.error(`[MarkdownParser] Image ${matchCount}: Error converting file:// path: ${error}`);
+            console.warn(`[MarkdownParser] Image ${matchCount}: Preserving original due to error`);
+            preservedCount++;
+            return match;
+          }
         }
-        console.log(`[MarkdownParser] Standardized relative path: ${srcValue} -> ${normalizedPath}`);
-        return `<img${beforeSrc}src="${normalizedPath}"${afterSrc}>`;
-      } catch (error) {
-        console.error(`[MarkdownParser] Error processing path ${srcValue}:`, error);
-        // 如果处理出错，保持原样
-        return match;
-      }
-    });
+
+        // 如果是http://或https://协议，保持原样
+        if (srcValue.startsWith('http://') || srcValue.startsWith('https://')) {
+          console.log(`[MarkdownParser] Image ${matchCount}: HTTP URL detected, preserving as-is`);
+          preservedCount++;
+          return match;
+        }
+
+        // 检查是否是已损坏的路径或特殊协议
+        if (srcValue.startsWith('://') || srcValue === '//:0' || srcValue === '/') {
+          console.warn(`[MarkdownParser] Image ${matchCount}: Corrupted path detected: "${srcValue}", removing img tag`);
+          return '';
+        }
+
+        // ✅ Phase 3 Enhanced: More robust relative path handling
+        try {
+          let normalizedPath = srcValue;
+
+          // Check if it's a valid relative path or filename
+          const isValidRelativePath = srcValue.startsWith('./') ||
+                                     srcValue.startsWith('../') ||
+                                     /^[^/\\:*?"<>|]+\.[a-zA-Z0-9]+$/.test(srcValue); // filename with extension
+
+          if (isValidRelativePath) {
+            // Ensure relative path format is consistent
+            if (!srcValue.startsWith('./') && !srcValue.startsWith('../')) {
+              normalizedPath = `./${srcValue}`;
+            }
+            console.log(`[MarkdownParser] Image ${matchCount}: Standardized relative path: ${srcValue} -> ${normalizedPath}`);
+            preservedCount++;
+            return `<img${beforeSrc} src="${normalizedPath}"${afterSrc}>`;
+          } else {
+            // Unknown format, preserve as-is to avoid data loss
+            console.warn(`[MarkdownParser] Image ${matchCount}: Unknown path format: "${srcValue}", preserving as-is`);
+            preservedCount++;
+            return match;
+          }
+        } catch (error) {
+          console.error(`[MarkdownParser] Image ${matchCount}: Error processing path ${srcValue}:`, error);
+          console.warn(`[MarkdownParser] Image ${matchCount}: Preserving original due to error`);
+          preservedCount++;
+          return match;
+        }
+      });
+
+      console.log(`[MarkdownParser] preserveImageReferences: Processed ${matchCount} images, preserved ${preservedCount} images`);
+      return result;
     } catch (error) {
       console.error(`[MarkdownParser] ❌ Error in preserveImageReferences processing:`, error);
       // ✅ Phase 2 Defensive: If processing fails, return original content to avoid corruption
@@ -510,13 +539,13 @@ export class MarkdownParser {
   /**
    * 检查内容是否已经处理过，避免重复提取图片
    *
-   * ✅ Phase 1 Enhanced: Multi-layer detection strategy with "any match = true" conservative approach
+   * ✅ Phase 3 Enhanced: Improved multi-layer detection strategy to prevent false negatives
    *
    * 检测策略（按优先级排序，任一通过即返回 true）：
    * 0. 检查 frontmatter 中的 images_extracted: true 标记（最可靠）
    * 1. 检查 frontmatter 中的 attachments 字段（说明已处理过）
    * 2. 检查是否包含有效的 file:// 协议路径（向后兼容旧版本）
-   * 3. 检查是否包含 Obsidian 风格的相对路径图片引用（./filename.ext）- 放宽匹配
+   * 3. 检查是否包含任何图片标签（相对路径、HTTP、或任何其他格式）
    *
    * 这种保守的多条件检测可以避免：
    * - 重复提取已保存的图片
@@ -524,7 +553,7 @@ export class MarkdownParser {
    * - 不必要的磁盘 I/O 操作
    * - False negatives 导致的图片丢失问题
    *
-   * @param content - HTML 内容字符串
+   * @param content - Markdown 文件内容（包括 frontmatter）
    * @returns 如果内容已处理返回 true，否则返回 false
    */
   private isContentAlreadyProcessed(content: string): boolean {
@@ -571,24 +600,40 @@ export class MarkdownParser {
       }
       console.log(`[MarkdownParser] Strategy 2: No valid file protocol paths found`);
 
-      // ✅ Phase 1 Strategy 3 Enhanced: Check for relative path images with relaxed pattern
-      // 放宽匹配：允许更多格式，大小写不敏感，支持更多扩展名
-      const relativePathPattern = /<img[^>]*src=["']\.?[^"']+\.(png|jpg|jpeg|gif|webp|bmp|svg|PNG|JPG|JPEG|GIF|WEBP|BMP|SVG)["'][^>]*>/gi;
-      const relativePathMatches = Array.from(content.matchAll(relativePathPattern));
+      // ✅ Phase 3 Enhanced Strategy 3: Check for processed image formats
+      // Exclude base64 images - they NEED extraction!
+      const processedImgPattern = /<img[^>]*src\s*=\s*["'](?![^"']*data:image)[^"']+["'][^>]*>/gi;
+      const processedImgMatches = content.match(processedImgPattern);
 
-      console.log(`[MarkdownParser] isContentAlreadyProcessed: Found ${relativePathMatches.length} relative path images`);
+      console.log(`[MarkdownParser] isContentAlreadyProcessed: Found ${processedImgMatches ? processedImgMatches.length : 0} processed img tags (excluding base64)`);
 
-      if (relativePathMatches.length > 0) {
-        // 验证至少有一个相对路径是有效的
-        for (const match of relativePathMatches) {
-          const fullMatch = match[0];
-          console.log(`[MarkdownParser] Checking relative path image: ${fullMatch.substring(0, 100)}`);
+      if (processedImgMatches && processedImgMatches.length > 0) {
+        console.log(`[MarkdownParser] ✓ Strategy 3: Found ${processedImgMatches.length} processed img tag(s), assuming already processed`);
+        // Log first few img tags for debugging
+        processedImgMatches.slice(0, 3).forEach((imgTag, index) => {
+          console.log(`[MarkdownParser]   Img ${index + 1}: ${imgTag.substring(0, 80)}...`);
+        });
+        if (processedImgMatches.length > 3) {
+          console.log(`[MarkdownParser]   ... and ${processedImgMatches.length - 3} more`);
         }
-
-        console.log(`[MarkdownParser] ✓ Strategy 3: Found valid relative path images (Obsidian-style), skipping reprocessing`);
         return true;
       }
-      console.log(`[MarkdownParser] Strategy 3: No relative path images found`);
+      console.log(`[MarkdownParser] Strategy 3: No processed img tags found in content`);
+
+      // Check for base64 images that need extraction
+      const base64ImgPattern = /<img[^>]*src\s*=\s*["'][^"']*data:image[^"']*["'][^>]*>/gi;
+      const base64ImgMatches = content.match(base64ImgPattern);
+      if (base64ImgMatches && base64ImgMatches.length > 0) {
+        console.log(`[MarkdownParser] ✓ Found ${base64ImgMatches.length} base64 image(s) that need extraction`);
+        base64ImgMatches.slice(0, 2).forEach((imgTag, index) => {
+          const srcMatch = imgTag.match(/src\s*=\s*["']([^"']+)["']/);
+          if (srcMatch && srcMatch[1]) {
+            const src = srcMatch[1];
+            const preview = src.length > 50 ? src.substring(0, 50) + '...' : src;
+            console.log(`[MarkdownParser]   Base64 img ${index + 1}: ${preview}`);
+          }
+        });
+      }
 
       console.log(`[MarkdownParser] ✗ No processed image references found, will extract images`);
       return false;

@@ -237,20 +237,35 @@ export class FileIndexer {
   }
 
   /**
-   * 更新待办索引
+   * 更新待办索引（增强版：添加并发控制和幂等性）
    */
   async updateTodo(todo: Todo): Promise<void> {
     const uuid = String(todo.id);
+    const updateKey = `${uuid}_${todo.updatedAt}`; // 使用UUID和更新时间作为唯一键
 
-    console.log(`[FileIndexer] 🔄 Updating index for todo: ${uuid}`);
+    console.log(`[FileIndexer] 🔄 Updating index for todo: ${uuid} (version: ${todo.updatedAt})`);
 
-    // 先删除旧的索引条目（解决MiniSearch重复ID问题）
-    this.removeTodoSilently(uuid);
+    // 🔧 防御性编程：检查是否已经在更新队列中
+    if (this.updateQueue.has(updateKey)) {
+      console.log(`[FileIndexer] ⚠️ Update already in queue for ${updateKey}, skipping`);
+      return;
+    }
 
-    // 再添加新的索引条目
-    await this.addTodo(todo);
+    // 添加到更新队列
+    this.updateQueue.add(updateKey);
 
-    console.log(`[FileIndexer] ✅ Successfully updated index for todo: ${uuid}`);
+    try {
+      // 先删除旧的索引条目（解决MiniSearch重复ID问题）
+      this.removeTodoSilently(uuid);
+
+      // 再添加新的索引条目
+      await this.addTodo(todo);
+
+      console.log(`[FileIndexer] ✅ Successfully updated index for todo: ${uuid}`);
+    } finally {
+      // 确保从队列中移除，即使操作失败
+      this.updateQueue.delete(updateKey);
+    }
   }
 
   /**

@@ -1,7 +1,8 @@
-import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo, useImperativeHandle, forwardRef } from 'react';
 import Quill from 'quill';
 import ReactQuill from 'react-quill-new';
 import 'quill/dist/quill.snow.css';
+import { convertRelativePathsToFileProtocol as convertPaths, extractRelativePathFromFileProtocol } from '../utils/PathResolver';
 
 export interface RichTextEditorRef {
   getLatestHtml: () => string;
@@ -15,6 +16,7 @@ interface RichTextEditorProps {
   onChange: (value: string) => void;
   placeholder?: string;
   style?: React.CSSProperties;
+  mode?: 'edit' | 'view'; // 新增：编辑/查看模式，用于路径处理策略
 }
 
 const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
@@ -22,6 +24,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
   onChange,
   placeholder = '输入内容...',
   style,
+  mode = 'edit', // 默认编辑模式
 }, ref) => {
   const quillRef = useRef<ReactQuill>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -35,20 +38,59 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
   const isFocusedRef = useRef(false);
   const scrollBlockRef = useRef<(() => void) | null>(null);
 
+  // 🔥 新增：存储路径状态，用于图片路径转换
+  const [storagePath, setStoragePath] = useState<string | null>(null);
+
+  // 🔥 修复：移除processedContent，避免数据损坏
+  // 原因：processedContent会破坏ReactQuill受控组件契约，导致file:// URL被保存到数据库
+  // 新方案：保持原始相对路径，在getLatestHtml时进行反向转换
+
+  // 🔥 新增：内容清理函数，确保不保存file:// URL防止数据损坏
+  const sanitizeContentForSave = useCallback((content: string): string => {
+    if (!content) return content;
+
+    try {
+      // 将所有file:// URL转换回相对路径
+      return content.replace(/<img([^>]*?)\s+src\s*=\s*["'](file:\/\/[^"']+)["']([^>]*?)>/gi,
+        (match, beforeSrc, fileUrl, afterSrc) => {
+          const relativePath = extractRelativePathFromFileProtocol(fileUrl);
+          if (relativePath && relativePath.startsWith('./')) {
+            console.log(`[RichTextEditor] Sanitizing: ${fileUrl} -> ${relativePath}`);
+            return `<img${beforeSrc} src="${relativePath}"${afterSrc}>`;
+          }
+          return match; // 无法转换时保持原样
+        }
+      );
+    } catch (error) {
+      console.error('[RichTextEditor] Error sanitizing content:', error);
+      return content; // 清理失败时返回原始内容
+    }
+  }, []);
+
   // 🔥 新增：外部滚动容器的滚动锁定
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const originalScrollTopRef = useRef(0);
   const isScrollLockedRef = useRef(false);
 
   // 🔥 新增：将相对路径转换为 file:// 协议用于显示
-  // Note: For now, keep relative paths as-is. The file:// protocol conversion will be handled by the backend
+  // Use PathResolver to convert relative paths to file:// protocol
   const convertRelativePathsToFileProtocol = useCallback((html: string): string => {
     if (!html) return html;
 
-    // For Obsidian-style storage, we keep relative paths in the editor
-    // The backend will handle file:// protocol conversion when needed
+    // If we have a storage path, convert relative paths to file:// protocol
+    if (storagePath) {
+      try {
+        return convertPaths(html, storagePath);
+      } catch (error) {
+        console.error('[RichTextEditor] Error converting paths:', error);
+        return html;
+      }
+    }
+
+    // Fallback: keep relative paths as-is (they won't display correctly)
+    console.warn('[RichTextEditor] No storage path available, keeping relative paths');
     return html;
-  }, []);
+  }, [storagePath]);
 
   // 🔥 新增：MutationObserver 引用和锁定定时器
   const mutationObserverRef = useRef<MutationObserver | null>(null);
@@ -215,6 +257,25 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
     };
   }, [unlockScrollContainer]);
 
+  // 🔥 新增：获取存储路径用于图片转换
+  useEffect(() => {
+    const fetchStoragePath = async () => {
+      try {
+        if (window.electronAPI?.storage?.getStoragePath) {
+          const path = await window.electronAPI.storage.getStoragePath();
+          if (path) {
+            console.log('[RichTextEditor] Storage path loaded:', path);
+            setStoragePath(path);
+          }
+        }
+      } catch (error) {
+        console.warn('[RichTextEditor] Failed to load storage path:', error);
+      }
+    };
+
+    fetchStoragePath();
+  }, []);
+
   useEffect(() => {
     if (isReady && editorInstanceRef.current && value !== editorInstanceRef.current.root.innerHTML) {
       try {
@@ -242,10 +303,9 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
             console.warn('Failed to clear history:', error);
           }
 
-          // 🔥 关键修复：内容替换后重新覆盖 scrollSelectionIntoView，确保始终有效
-          // Convert relative paths to file:// protocol for display
-          const displayHtml = convertRelativePathsToFileProtocol(value);
-          editorInstanceRef.current.clipboard.dangerouslyPasteHTML(displayHtml);
+          // 🔥 修复：直接使用原始value，不在useEffect中进行路径转换
+          // 路径转换显示问题将通过其他方式解决
+          editorInstanceRef.current.clipboard.dangerouslyPasteHTML(value);
 
           // 🔥 确保滚动覆盖在内容替换后仍然有效
           editorInstanceRef.current.scrollSelectionIntoView = function() {
@@ -510,8 +570,10 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
 
   const getLatestHtml = useCallback(() => {
     const editor = getEditorSafely();
-    return editor?.root?.innerHTML ?? value;
-  }, [getEditorSafely, value]);
+    const rawHtml = editor?.root?.innerHTML ?? value;
+    // 🔥 关键修复：确保返回的内容不包含file:// URL，防止数据损坏
+    return sanitizeContentForSave(rawHtml);
+  }, [getEditorSafely, value, sanitizeContentForSave]);
 
   useImperativeHandle(ref, () => ({
     getLatestHtml,
@@ -818,11 +880,16 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       if (imagePath) {
         const range = editor.getSelection(true);
         if (range) {
-          // For Obsidian-style storage, use relative paths in content
-          // Convert file:// paths to relative paths for storage
           let imageSrc = imagePath;
-          if (imageSrc.startsWith('file://')) {
-            // Extract filename and create relative path
+
+          // For Obsidian-style storage, preserve base64 data for extraction
+          // Only convert file paths to relative paths
+          if (imageSrc.startsWith('data:image')) {
+            // Keep base64 data as-is for MarkdownParser to extract
+            // This allows the extraction process to work properly
+            console.log('[RichTextEditor] Preserving base64 image for extraction');
+          } else if (imageSrc.startsWith('file://')) {
+            // Extract filename and create relative path for file-based images
             const fileName = imageSrc.replace(/^file:\/\/.*[\/\\]/, '');
             imageSrc = `./${fileName}`;
           } else {
@@ -937,6 +1004,23 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
     return <div style={{ ...style, minHeight: '250px', padding: '10px' }}>加载编辑器...</div>;
   }
 
+  // 🔥 查看模式使用HTML渲染器进行路径转换显示
+  if (mode === 'view' && storagePath) {
+    const displayContent = convertPaths(value, storagePath);
+    return (
+      <div
+        ref={containerRef}
+        style={{
+          ...style,
+          minHeight: '250px',
+          padding: '10px',
+          overflow: 'auto'
+        }}
+        dangerouslySetInnerHTML={{ __html: displayContent }}
+      />
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -955,7 +1039,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       <ReactQuill
         ref={quillRef}
         theme="snow"
-        value={value}
+        value={value} // 🔥 修复：使用原始value，避免数据损坏
         onChange={(content) => {
           try {
             if (isComposingRef.current) {
@@ -968,7 +1052,9 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
               lockScrollContainer(200); // 较短的锁定时间
             }
 
-            onChange(content);
+            // 🔥 关键修复：确保不保存file:// URL，防止数据损坏
+            const sanitizedContent = sanitizeContentForSave(content);
+            onChange(sanitizedContent);
           } catch (error) {
             console.warn('Content change handling failed:', error);
             setHasError(true);

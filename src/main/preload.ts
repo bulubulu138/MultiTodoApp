@@ -73,6 +73,7 @@ export interface ElectronAPI {
   storage: {
     getMode: () => Promise<{mode: 'database' | 'file'; path: string | null}>;
     setMode: (mode: 'database' | 'file', storagePath?: string) => Promise<{success: boolean; error?: string}>;
+    getStoragePath: () => Promise<string | null>;
   };
   
   // 图片API
@@ -80,6 +81,7 @@ export interface ElectronAPI {
     upload: () => Promise<string | null>;
     delete: (filepath: string) => Promise<boolean>;
     readLocalFile: (filepath: string) => Promise<ArrayBuffer>;
+    saveBase64: (base64Data: string, originalName: string) => Promise<string | null>;
   };
   
   // 文件API
@@ -325,6 +327,12 @@ export interface ElectronAPI {
     invalidateCache: () => Promise<void>;
   };
 
+  // 内容迁移API
+  migration: {
+    needsMigration: () => Promise<boolean>;
+    runMigration: () => Promise<any>;
+  };
+
   // 混合存储事件API
   hybridStorageEvents: {
     onConfigChange: (callback: () => void) => () => void;
@@ -379,11 +387,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getMode: () => ipcRenderer.invoke('storage:getMode'),
     setMode: (mode: 'database' | 'file', storagePath?: string) =>
       ipcRenderer.invoke('storage:setMode', mode, storagePath),
+    getStoragePath: () => ipcRenderer.invoke('storage:getStoragePath'),
   },
   image: {
     upload: () => ipcRenderer.invoke('image:upload'),
     delete: (filepath: string) => ipcRenderer.invoke('image:delete', filepath),
     readLocalFile: (filepath: string) => ipcRenderer.invoke('image:readLocalFile', filepath),
+    saveBase64: (base64Data: string, originalName: string) => ipcRenderer.invoke('image:saveBase64', base64Data, originalName),
   },
   file: {
     exists: (filepath: string) => ipcRenderer.invoke('file:exists', filepath),
@@ -531,6 +541,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   removeTodayCompletedListeners: () => {
     ipcRenderer.removeAllListeners('today-completed:midnight-conversion');
+  },
+
+  // 内容迁移
+  migration: {
+    needsMigration: () => ipcRenderer.invoke('migration:needsMigration'),
+    runMigration: () => ipcRenderer.invoke('migration:runMigration'),
   },
 
   // 调试工具

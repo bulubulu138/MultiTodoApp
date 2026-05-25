@@ -4,6 +4,7 @@ import { app } from 'electron';
 import { v4 as uuidv4 } from 'uuid';
 import * as chokidar from 'chokidar';
 import MiniSearch from 'minisearch';
+import matter from 'gray-matter';
 import { Todo, TodoRelation, Settings } from '../shared/types';
 import { MarkdownParser } from './MarkdownParser';
 import { FileIndexer, TodoIndexEntry } from './FileIndexer';
@@ -118,6 +119,10 @@ export class FileStorageManager {
       fileName = await this.generateFileName(newTodo.title, uuid);
       todoPath = path.join(this.storagePath, fileName);
       console.log(`[createTodo] 📝 Generated filename: ${fileName}`);
+
+      // 🔧 修复：在文件写入前预先标记为recent write，防止文件监听器重复处理
+      this.recentWrites.set(todoPath, Date.now());
+      console.log(`[createTodo] 🛡️ Pre-marked file as recent write to prevent duplicate processing: ${todoPath}`);
 
       // 步骤 2: 处理附件
       attachments = await this.processAttachments(newTodo, this.storagePath, fileName);
@@ -493,8 +498,44 @@ export class FileStorageManager {
       }
     }
 
+    // ✅ Phase 3 Enhanced: Preserve existing attachments from markdown file
     const todoPath = path.join(this.storagePath, fileName);
-    const markdown = await this.markdownParser.generateTodo(updatedTodo, [], [], this.storagePath, fileName);
+
+    // Read existing markdown file to preserve attachments
+    let existingAttachments: string[] = [];
+    let existingRelations: TodoRelation[] = [];
+
+    try {
+      const existingMarkdown = await fs.promises.readFile(todoPath, 'utf-8');
+      const { data } = matter(existingMarkdown);
+
+      // Preserve existing attachments
+      if (data.attachments && Array.isArray(data.attachments)) {
+        existingAttachments = data.attachments;
+        console.log(`[updateTodo] Preserving ${existingAttachments.length} existing attachments`);
+      }
+
+      // Note: Relations are stored separately, not in the markdown file
+      // We'll fetch them separately if needed
+    } catch (error) {
+      console.warn(`[updateTodo] Could not read existing markdown file: ${error}`);
+    }
+
+    // Fetch relations if they exist
+    try {
+      existingRelations = await this.getRelationsByTodoId(uuid);
+      console.log(`[updateTodo] Found ${existingRelations.length} existing relations`);
+    } catch (error) {
+      console.warn(`[updateTodo] Could not fetch relations: ${error}`);
+    }
+
+    const markdown = await this.markdownParser.generateTodo(
+      updatedTodo,
+      existingRelations,
+      existingAttachments,
+      this.storagePath,
+      fileName
+    );
 
     await this.atomicWrite(todoPath, markdown);
 
@@ -1218,17 +1259,27 @@ export class FileStorageManager {
   }
 
   /**
-   * 缓存管理
+   * 缓存管理（修复版本：统一两套缓存系统，避免重复数据）
    */
   private updateCache(uuid: string, todo: Todo): void {
     // 清理过期缓存
     this.cleanExpiredCache();
 
-    // 限制缓存大小
+    // 限制缓存大小 - 同时应用于两套缓存
     if (this.cache.size >= this.MAX_CACHE_SIZE) {
       const oldestKey = this.cache.keys().next().value;
       if (oldestKey) {
         this.cache.delete(oldestKey);
+        this.todosCache.delete(oldestKey); // 🔧 同步删除全量缓存中的对应项
+      }
+    }
+
+    // 🔧 防御性编程：确保不会设置重复数据
+    if (this.cache.has(uuid) && this.todosCache.has(uuid)) {
+      const cachedTodo = this.cache.get(uuid)?.todo;
+      if (cachedTodo && cachedTodo.updatedAt === todo.updatedAt) {
+        console.log(`[updateCache] ⚠️ Same version of todo ${uuid} already cached, skipping update`);
+        return;
       }
     }
 
@@ -1239,6 +1290,8 @@ export class FileStorageManager {
 
     // ✅ 同步更新全量缓存
     this.todosCache.set(uuid, todo);
+
+    console.log(`[updateCache] ✅ Updated caches for todo ${uuid} (${todo.title})`);
   }
 
   /**
@@ -1266,6 +1319,11 @@ export class FileStorageManager {
         try {
           const todo = await this.getTodoById(entry.uuid);
           if (todo) {
+            // 🔧 修复：使用统一的updateCache方法，确保两套缓存同步
+            this.cache.set(entry.uuid, {
+              todo,
+              timestamp: Date.now()
+            });
             this.todosCache.set(entry.uuid, todo);
             loaded++;
           } else {
@@ -1559,6 +1617,12 @@ export class FileStorageManager {
               // 如果文件损坏，重新开始
               uuidMap = {};
             }
+          }
+
+          // 🔧 防御性编程：检查映射是否已经存在且相同（幂等性）
+          if (uuidMap[uuid] === fileName) {
+            console.log(`[updateUuidToFileMap] ℹ️ Mapping already exists: ${uuid} -> ${fileName}, skipping update`);
+            return; // 映射已存在且正确，无需更新
           }
 
           // 更新映射

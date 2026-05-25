@@ -20,7 +20,8 @@ import { appConfigManager } from './config/AppConfig';
 class Application {
   private mainWindow: BrowserWindow | null = null;
   private settingsManager: SettingsManager; // 用于设置
-  private fileStorageManager: FileStorageManager; // 用于主要业务数据
+  private fileStorageManager: FileStorageManager | null = null; // 用于主要业务数据
+  private useFileStorage: boolean = false; // 文件存储模式标志
   private flowchartFileManager: FlowchartFileManager;
   private flowchartTodoAssociationManager: FlowchartTodoAssociationManager;
   private imageManager: ImageManager;
@@ -40,7 +41,7 @@ class Application {
 
   constructor() {
     this.settingsManager = new SettingsManager(); // 用于设置
-    this.fileStorageManager = new FileStorageManager(); // 用于主要业务数据
+    this.fileStorageManager = null; // 将在 initializeFileStorage 中正确初始化
     this.flowchartFileManager = new FlowchartFileManager();
     this.flowchartTodoAssociationManager = new FlowchartTodoAssociationManager();
     this.imageManager = new ImageManager();
@@ -224,11 +225,18 @@ class Application {
   }
 
   /**
+   * Initialize file storage manager with the correct path from app config
+   */
+  private async initializeFileStorage(): Promise<void> {
     try {
-      // 从设置中获取存储模式
-      const settings = await this.settingsManager.getSettings();
-      const storageMode = settings.storageMode || 'database';
-      const storagePath = settings.storagePath;
+      // 修复：使用正确的配置源 - appConfigManager 而不是 settingsManager
+      const storageLocation = appConfigManager.getStorageLocation();
+
+      // 确定存储模式（如果有自定义路径则使用文件存储）
+      const storageMode = storageLocation?.type === 'custom' ? 'file' : 'database';
+
+      // 从存储位置配置中提取路径
+      const storagePath = storageLocation?.customPath;
 
       console.log(`[initializeFileStorage] Current storage mode: '${storageMode}'`);
       console.log(`[initializeFileStorage] Storage path: ${storagePath || 'not configured'}`);
@@ -512,8 +520,24 @@ class Application {
     });
 
     ipcMain.handle('todo:findDuplicate', async (_, contentHash: string, excludeUuid?: string) => {
-      // 简化实现：直接返回null，让前端处理重复检查
-      return null;
+      try {
+        const storageManager = this.databaseManager.getStorageManager();
+        const allTodos = await storageManager.getAllTodos();
+
+        // 查找具有相同内容哈希的待办
+        const duplicate = allTodos.find(todo => {
+          // 排除当前正在编辑的待办
+          if (excludeUuid && todo.id === excludeUuid) {
+            return false;
+          }
+          return todo.contentHash === contentHash;
+        });
+
+        return duplicate || null;
+      } catch (error) {
+        console.error('Error finding duplicate:', error);
+        return null;
+      }
     });
 
     ipcMain.handle('todo:batchUpdateDisplayOrder', async (_, updates: {uuid: string, displayOrder: number}[]) => {
@@ -606,6 +630,19 @@ class Application {
       return await this.settingsManager.updateSettings(settings);
     });
 
+    // 内容迁移相关
+    ipcMain.handle('migration:needsMigration', async () => {
+      const { ContentMigrator } = require('./utils/ContentMigration');
+      const migrator = new ContentMigrator();
+      return migrator.needsMigration();
+    });
+
+    ipcMain.handle('migration:runMigration', async () => {
+      const { ContentMigrator } = require('./utils/ContentMigration');
+      const migrator = new ContentMigrator();
+      return migrator.migrateAllContent();
+    });
+
     // 图片相关
     ipcMain.handle('image:upload', async () => {
       const result = await dialog.showOpenDialog(this.mainWindow!, {
@@ -628,6 +665,26 @@ class Application {
       return await this.imageManager.deleteImage(filepath);
     });
 
+    ipcMain.handle('image:saveBase64', async (_, base64Data: string, originalName: string) => {
+      try {
+        // Strip data URL prefix: "data:image/png;base64,..."
+        const matches = base64Data.match(/^data:image\/(\w+);base64,(.+)$/);
+        if (!matches) return null;
+
+        const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+        const buffer = Buffer.from(matches[2], 'base64');
+        const safeName = originalName.replace(/[^a-zA-Z0-9._-]/g, '_') || `image.${ext}`;
+        const savedPath = await this.imageManager.saveImage(buffer, safeName);
+
+        // Return as file:// URL so renderer can embed it directly in Markdown
+        const fileUrl = `file://${savedPath.replace(/\\/g, '/')}`;
+        return fileUrl;
+      } catch (err) {
+        console.error('[main] image:saveBase64 error:', err);
+        return null;
+      }
+    });
+
     ipcMain.handle('image:readLocalFile', async (_, filepath: string) => {
       const fs = require('fs');
       // 移除 file:// 前缀并处理 URL 编码
@@ -638,10 +695,23 @@ class Application {
       }
       // 解码URL编码的路径
       cleanPath = decodeURIComponent(cleanPath);
-      
+
       console.log('Reading local file:', cleanPath);
       const buffer = fs.readFileSync(cleanPath);
       return buffer.buffer;
+    });
+
+    // 获取待办存储路径
+    ipcMain.handle('storage:getStoragePath', async () => {
+      if (this.fileStorageManager) {
+        return this.fileStorageManager.getStoragePath();
+      }
+      if (this.databaseManager) {
+        // 数据库模式：返回图片存储路径
+        const userDataPath = app.getPath('userData');
+        return path.join(userDataPath, 'images');
+      }
+      return null;
     });
 
     // 文件存在性检查
@@ -1713,6 +1783,10 @@ class Application {
       console.log('Running file storage compatibility check...');
       await this.checkFileStorageCompatibility();
 
+      // === 初始化文件存储 ===
+      console.log('Initializing file storage...');
+      await this.initializeFileStorage();
+
       // ✅ 新增：加载应用配置
       console.log('Loading app configuration...');
       await this.loadAppConfig();
@@ -1765,10 +1839,14 @@ class Application {
       } catch (dbError) {
         console.error('Database manager initialization failed:', dbError);
         // 降级为简单的备份管理器
-        const storagePath = this.databaseManager.getStorageManager().getStoragePath();
-        this.backupManager = new BackupManager(storagePath, this.fileStorageManager);
-        this.backupManager.startAutoBackup();
-        console.log('Fallback backup manager initialized');
+        if (this.fileStorageManager) {
+          const storagePath = this.databaseManager.getStorageManager().getStoragePath();
+          this.backupManager = new BackupManager(storagePath, this.fileStorageManager);
+          this.backupManager.startAutoBackup();
+          console.log('Fallback backup manager initialized');
+        } else {
+          console.warn('Skipping backup manager initialization - no file storage manager available');
+        }
       }
 
 
