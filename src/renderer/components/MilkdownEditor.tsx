@@ -131,27 +131,17 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
     // 状态管理：初始化状态和错误信息
     const [initStatus, setInitStatus] = useState<'loading' | 'success' | 'error'>('loading');
     const [initError, setInitError] = useState<string | null>(null);
+    // ref 跟踪内部初始化是否完成，避免超时检测与 state 形成循环依赖
+    const isInitializedRef = useRef<boolean>(false);
 
     // 始终指向最新 onChange，避免闭包陷阱
     onChangeRef.current = onChange;
-
-    // 超时检测：如果编辑器在5秒内没有初始化完成，显示错误提示
-    useEffect(() => {
-      const timeoutId = setTimeout(() => {
-        if (initStatus === 'loading') {
-          setInitStatus('error');
-          setInitError('编辑器初始化超时，请刷新页面重试');
-          console.error('[MilkdownEditor] ❌ Initialization timeout (5s)');
-        }
-      }, 5000);
-
-      return () => clearTimeout(timeoutId);
-    }, [initStatus]);
 
     useEffect(() => {
       const container = containerRef.current;
       if (!container) return;
 
+      isInitializedRef.current = false;
       let editor: Editor | null = null;
       // 为本次 mount 分配唯一 ID
       const instanceId = Date.now() + Math.random();
@@ -159,7 +149,19 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
       // 捕获本次 mount 的初始值（不受后续 prop 变化影响）
       const initialValue = value;
 
+      // 超时检测：只在本次 effect 生命周期内生效，不依赖 state
+      const isDev = process.env.NODE_ENV === 'development';
+      const timeoutMs = isDev ? 15000 : 10000;
+      const timeoutId = setTimeout(() => {
+        if (!isInitializedRef.current) {
+          console.error(`[MilkdownEditor] ❌ Initialization timeout (${timeoutMs / 1000}s)`);
+          setInitStatus('error');
+          setInitError(`编辑器初始化超时（${timeoutMs / 1000}秒），请刷新页面重试`);
+        }
+      }, timeoutMs);
+
       const initEditor = async () => {
+        const t0 = performance.now();
         try {
           editor = await Editor.make()
             .config((ctx: Ctx) => {
@@ -178,7 +180,6 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
                   return;
                 }
 
-                console.log('[MilkdownEditor] ✅ Content changed - triggering onChange');
                 contentRef.current = markdown;
                 onChangeRef.current?.(markdown);
               });
@@ -205,10 +206,12 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
           // 初始化完成时，将 contentRef 对齐为初始值，
           // 确保 markdownUpdated 的首次回调（值等于 initialValue）被正确过滤
           contentRef.current = initialValue;
-          console.log('[MilkdownEditor] ✅ Initialization completed - onChange now active');
+          isInitializedRef.current = true;
+          console.log(`[MilkdownEditor] ✅ Initialization completed in ${(performance.now() - t0).toFixed(0)}ms`);
           setInitStatus('success');
 
         } catch (error) {
+          isInitializedRef.current = true; // 标记已处理，防止超时再次触发
           console.error('[MilkdownEditor] ❌ Init error:', error);
           setInitStatus('error');
           setInitError(error instanceof Error ? error.message : '编辑器初始化失败');
@@ -218,7 +221,7 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
       initEditor();
 
       return () => {
-        console.log('[MilkdownEditor] 🔧 Cleanup - destroying editor');
+        clearTimeout(timeoutId);
         // 令本实例 ID 失效，所有未完成的异步回调将被忽略
         activeInstanceIdRef.current = 0;
 
@@ -226,10 +229,6 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
           editor.destroy().catch(() => {});
         }
         editorRef.current = null;
-
-        // 重置状态，避免状态残留
-        setInitStatus('loading');
-        setInitError(null);
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [readOnly]);
