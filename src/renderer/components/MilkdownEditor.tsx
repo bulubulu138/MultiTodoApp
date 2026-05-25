@@ -266,13 +266,31 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
       },
     }), []);
 
-    // 渲染加载状态
-    if (initStatus === 'loading') {
-      return (
-        <div style={{ position: 'relative', minHeight, ...style }}>
+    // 始终渲染编辑器容器以保证 containerRef 在 useEffect 触发时已挂载到 DOM。
+    // loading/error 状态通过绝对定位覆盖层呈现，不再条件性地替换容器节点。
+    return (
+      <div style={{ position: 'relative', minHeight, ...style }}>
+        {/* 编辑器挂载容器：始终存在，containerRef 始终有效 */}
+        <div
+          ref={containerRef}
+          className="milkdown-editor-container"
+          style={{
+            minHeight,
+            border: '1px solid #d9d9d9',
+            borderRadius: '6px',
+            backgroundColor: '#ffffff',
+            overflowY: 'auto',
+            // 初始化完成前对用户不可见，但节点必须存在于 DOM
+            visibility: initStatus === 'success' ? 'visible' : 'hidden',
+          }}
+        />
+
+        {/* loading 覆盖层 */}
+        {initStatus === 'loading' && (
           <div
-            className="milkdown-editor-container"
             style={{
+              position: 'absolute',
+              inset: 0,
               minHeight,
               border: '1px solid #d9d9d9',
               borderRadius: '6px',
@@ -286,17 +304,15 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
           >
             编辑器加载中...
           </div>
-        </div>
-      );
-    }
+        )}
 
-    // 渲染错误状态
-    if (initStatus === 'error') {
-      return (
-        <div style={{ position: 'relative', minHeight, ...style }}>
+        {/* error 覆盖层 */}
+        {initStatus === 'error' && (
           <div
             className="milkdown-editor-error"
             style={{
+              position: 'absolute',
+              inset: 0,
               minHeight,
               border: '1px solid #ff4d4f',
               borderRadius: '6px',
@@ -328,23 +344,7 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
               刷新页面
             </button>
           </div>
-        </div>
-      );
-    }
-
-    return (
-      <div style={{ position: 'relative', minHeight, ...style }}>
-        <div
-          ref={containerRef}
-          className="milkdown-editor-container"
-          style={{
-            minHeight,
-            border: '1px solid #d9d9d9',
-            borderRadius: '6px',
-            backgroundColor: '#ffffff',
-            overflowY: 'auto',
-          }}
-        />
+        )}
       </div>
     );
   }
