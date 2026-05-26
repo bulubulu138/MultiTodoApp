@@ -1,4 +1,4 @@
-import React, { useRef, forwardRef, useImperativeHandle, useEffect, useState, Component } from 'react';
+import React, { useRef, forwardRef, useImperativeHandle, useEffect, useState, Component, useCallback } from 'react';
 import { Editor, rootCtx, defaultValueCtx, editorViewCtx, editorViewOptionsCtx } from '@milkdown/core';
 import { commonmark } from '@milkdown/preset-commonmark';
 import { gfm } from '@milkdown/preset-gfm';
@@ -8,13 +8,19 @@ import { upload, uploadConfig } from '@milkdown/plugin-upload';
 import { replaceAll } from '@milkdown/utils';
 import type { Ctx } from '@milkdown/ctx';
 import type { Schema, Node, Fragment } from '@milkdown/prose/model';
+import { DOMParser } from '@milkdown/prose/model';
+import type { EditorState, Transaction, Selection } from '@milkdown/prose/state';
+import { TextSelection } from '@milkdown/prose/state';
+import type { EditorView } from '@milkdown/prose/view';
 import '@milkdown/theme-nord/style.css';
+import MarkdownToolbar from './MarkdownToolbar';
 
 export interface MilkdownEditorRef {
   getMarkdown: () => string;
   setMarkdown: (markdown: string) => void;
   focus: () => void;
   blur: () => void;
+  insertMarkdown: (type: 'bold' | 'italic' | 'strike' | 'underline' | 'link', value?: string) => void;
 }
 
 export interface MilkdownEditorProps {
@@ -134,6 +140,9 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
     // ref 跟踪内部初始化是否完成，避免超时检测与 state 形成循环依赖
     const isInitializedRef = useRef<boolean>(false);
 
+    // 添加一个 ref 来存储 insertMarkdown 方法
+    const insertMarkdownRef = useRef<((type: 'bold' | 'italic' | 'strike' | 'underline' | 'link', value?: string) => void) | null>(null);
+
     // 始终指向最新 onChange，避免闭包陷阱
     onChangeRef.current = onChange;
 
@@ -233,6 +242,152 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [readOnly]);
 
+    // 创建 insertMarkdown 方法
+    const insertMarkdown = useCallback((type: 'bold' | 'italic' | 'strike' | 'underline' | 'link', value?: string) => {
+      if (!editorRef.current) return;
+
+      try {
+        editorRef.current.action((ctx: Ctx) => {
+          const view = ctx.get(editorViewCtx);
+          const { state, dispatch } = view;
+
+          // 获取当前选中的文本
+          const { from, to } = state.selection;
+          const selectedText = state.doc.textBetween(from, to);
+
+          switch (type) {
+            case 'bold': {
+              const markType = state.schema.marks['strong'];
+              if (!markType) return;
+
+              const tr = state.tr;
+              if (selectedText) {
+                tr.addMark(from, to, markType.create());
+              } else {
+                tr.setStoredMarks([markType.create()]);
+              }
+              dispatch(tr);
+              view.focus();
+              break;
+            }
+
+            case 'italic': {
+              const markType = state.schema.marks['emphasis'];
+              if (!markType) return;
+
+              const tr = state.tr;
+              if (selectedText) {
+                tr.addMark(from, to, markType.create());
+              } else {
+                tr.setStoredMarks([markType.create()]);
+              }
+              dispatch(tr);
+              view.focus();
+              break;
+            }
+
+            case 'strike': {
+              const markType = state.schema.marks['strike_through'];
+              if (!markType) return;
+
+              const tr = state.tr;
+              if (selectedText) {
+                tr.addMark(from, to, markType.create());
+              } else {
+                tr.setStoredMarks([markType.create()]);
+              }
+              dispatch(tr);
+              view.focus();
+              break;
+            }
+
+            case 'underline': {
+              // 下划线需要使用 HTML 标签，使用 DOMParser
+              const underlineHTML = selectedText ? `<ins>${selectedText}</ins>` : '<ins> </ins>';
+
+              try {
+                const dom = document.createElement('div');
+                dom.innerHTML = underlineHTML;
+
+                const domParser = DOMParser.fromSchema(state.schema);
+                const slice = domParser.parseSlice(dom.firstChild!);
+                let tr = state.tr.replaceSelectionWith(slice.content.firstChild!);
+
+                // 如果没有选中文本，定位光标到标签内部
+                if (!selectedText) {
+                  const insertPos = from + 5; // <ins> 长度为 5
+                  tr = tr.setSelection(
+                    TextSelection.create(tr.doc, insertPos, insertPos)
+                  );
+                }
+
+                dispatch(tr);
+                view.focus();
+              } catch (error) {
+                console.warn('[MilkdownEditor] Failed to insert underline, falling back to text:', error);
+                // 降级到纯文本插入
+                const fallbackText = selectedText ? `<ins>${selectedText}</ins>` : '<ins></ins>';
+                let tr = state.tr.replaceSelectionWith(state.schema.text(fallbackText));
+                if (!selectedText) {
+                  const insertPos = from + 5;
+                  tr = tr.setSelection(TextSelection.create(tr.doc, insertPos, insertPos));
+                }
+                dispatch(tr);
+                view.focus();
+              }
+              break;
+            }
+
+            case 'link': {
+              const markType = state.schema.marks['link'];
+              if (!markType) return;
+
+              if (value) {
+                if (selectedText) {
+                  const tr = state.tr.addMark(from, to, markType.create({ href: value }));
+                  dispatch(tr);
+                } else {
+                  const linkText = '链接文本';
+                  const textNode = state.schema.text(linkText);
+                  let tr = state.tr.replaceSelectionWith(textNode);
+                  const startPos = tr.selection.from - linkText.length;
+                  tr = tr.addMark(startPos, tr.selection.from, markType.create({ href: value }));
+                  dispatch(tr);
+                }
+              } else {
+                // 无 URL：插入 Markdown 链接模板
+                const template = selectedText ? `[${selectedText}]()` : `[]()`;
+                const textNode = state.schema.text(template);
+                let tr = state.tr.replaceSelectionWith(textNode);
+
+                // 定位光标到括号中间
+                if (!selectedText) {
+                  const insertPos = tr.selection.from - template.length + 1;
+                  tr = tr.setSelection(TextSelection.create(tr.doc, insertPos, insertPos));
+                } else {
+                  const insertPos = tr.selection.from - template.length + selectedText.length + 3;
+                  tr = tr.setSelection(TextSelection.create(tr.doc, insertPos, insertPos));
+                }
+
+                dispatch(tr);
+              }
+
+              view.focus();
+              break;
+            }
+
+            default:
+              return;
+          }
+        });
+      } catch (error) {
+        console.error('[MilkdownEditor] Failed to insert markdown:', error);
+      }
+    }, []);
+
+    // 存储 insertMarkdown 方法到 ref 中，供工具栏使用
+    insertMarkdownRef.current = insertMarkdown;
+
     useImperativeHandle(ref, () => ({
       getMarkdown: () => {
         return contentRef.current || '';
@@ -264,12 +419,25 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
       blur: () => {
         containerRef.current?.querySelector<HTMLElement>('[contenteditable="true"]')?.blur();
       },
-    }), []);
+      insertMarkdown,
+    }), [insertMarkdown]);
 
     // 始终渲染编辑器容器以保证 containerRef 在 useEffect 触发时已挂载到 DOM。
     // loading/error 状态通过绝对定位覆盖层呈现，不再条件性地替换容器节点。
     return (
-      <div style={{ position: 'relative', minHeight, ...style }}>
+      <div style={{ position: 'relative', ...style }}>
+        {/* Markdown 工具栏 */}
+        {!readOnly && (
+          <MarkdownToolbar
+            onInsertMarkdown={(type, value) => {
+              if (insertMarkdownRef.current) {
+                insertMarkdownRef.current(type, value);
+              }
+            }}
+            disabled={initStatus !== 'success'}
+          />
+        )}
+
         {/* 编辑器挂载容器：始终存在，containerRef 始终有效 */}
         <div
           ref={containerRef}
@@ -277,7 +445,7 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
           style={{
             minHeight,
             border: '1px solid #d9d9d9',
-            borderRadius: '6px',
+            borderRadius: readOnly ? '6px' : '0 0 6px 6px',
             backgroundColor: '#ffffff',
             overflowY: 'auto',
             // 初始化完成前对用户不可见，但节点必须存在于 DOM
