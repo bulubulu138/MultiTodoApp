@@ -1,6 +1,6 @@
 import { Todo } from '../../shared/types';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Input, Select, Button, Space, Divider, message, Spin, Tag, Modal } from 'antd';
+import { Input, Select, Button, Space, Divider, message, Spin, Tag, Modal, DatePicker } from 'antd';
 import { SaveOutlined, CloseOutlined, CheckOutlined, LoadingOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import MilkdownEditorWrapper, { MilkdownEditorRef } from './MilkdownEditor';
 import dayjs from 'dayjs';
@@ -37,6 +37,12 @@ const InlineEditPanel: React.FC<InlineEditPanelProps> = ({
     todo.tags ? todo.tags.split(',').filter(tag => tag.trim()) : []
   );
   const [editedContent, setEditedContent] = useState(todo.content || '');
+  const [editedStartTime, setEditedStartTime] = useState<dayjs.Dayjs | null>(
+    todo.startTime ? dayjs(todo.startTime) : null
+  );
+  const [editedDeadline, setEditedDeadline] = useState<dayjs.Dayjs | null>(
+    todo.deadline ? dayjs(todo.deadline) : null
+  );
   const [inputTag, setInputTag] = useState('');
 
   const richEditorRef = useRef<MilkdownEditorRef>(null);
@@ -55,7 +61,9 @@ const InlineEditPanel: React.FC<InlineEditPanelProps> = ({
       editedStatus !== todo.status ||
       editedPriority !== todo.priority ||
       editedTags.join(',') !== (todo.tags || '') ||
-      editedContent !== (todo.content || '');
+      editedContent !== (todo.content || '') ||
+      (editedStartTime?.toISOString() ?? undefined) !== todo.startTime ||
+      (editedDeadline?.toISOString() ?? undefined) !== todo.deadline;
 
     setHasUnsavedChanges(hasChanges);
 
@@ -65,7 +73,7 @@ const InlineEditPanel: React.FC<InlineEditPanelProps> = ({
     }
 
     return hasChanges;
-  }, [editedTitle, editedStatus, editedPriority, editedTags, editedContent, todo, onUnsavedChange]);
+  }, [editedTitle, editedStatus, editedPriority, editedTags, editedContent, editedStartTime, editedDeadline, todo, onUnsavedChange]);
 
   // 🔧 新增：内容变化时更新未保存状态
   const handleContentChange = useCallback((content: string) => {
@@ -128,6 +136,8 @@ const InlineEditPanel: React.FC<InlineEditPanelProps> = ({
         status: editedStatus,
         priority: editedPriority,
         tags: editedTags.join(','),
+        startTime: editedStartTime ? editedStartTime.toISOString() : undefined,
+        deadline: editedDeadline ? editedDeadline.toISOString() : undefined,
         updatedAt: new Date().toISOString()
       };
 
@@ -182,6 +192,8 @@ const InlineEditPanel: React.FC<InlineEditPanelProps> = ({
     setEditedPriority(todo.priority);
     setEditedTags(todo.tags ? todo.tags.split(',').filter(tag => tag.trim()) : []);
     setEditedContent(todo.content || '');
+    setEditedStartTime(todo.startTime ? dayjs(todo.startTime) : null);
+    setEditedDeadline(todo.deadline ? dayjs(todo.deadline) : null);
 
     // 重置未保存状态
     setHasUnsavedChanges(false);
@@ -323,6 +335,50 @@ const InlineEditPanel: React.FC<InlineEditPanelProps> = ({
           <Option value="medium">中优先级</Option>
           <Option value="high">高优先级</Option>
         </Select>
+      </div>
+
+      {/* 时间编辑 */}
+      <div style={{ marginBottom: 16, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>开始时间</div>
+          <DatePicker
+            showTime
+            format="YYYY-MM-DD HH:mm"
+            value={editedStartTime}
+            onChange={(date) => {
+              if (date && editedDeadline && date.isAfter(editedDeadline)) {
+                message.warning('开始时间不能晚于截止时间');
+                return;
+              }
+              setEditedStartTime(date);
+              setHasUnsavedChanges(true);
+              setSaveStatus('unsaved');
+            }}
+            placeholder="选择开始时间"
+            style={{ width: 180 }}
+            allowClear
+          />
+        </div>
+        <div>
+          <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>截止时间</div>
+          <DatePicker
+            showTime
+            format="YYYY-MM-DD HH:mm"
+            value={editedDeadline}
+            onChange={(date) => {
+              if (date && editedStartTime && date.isBefore(editedStartTime)) {
+                message.warning('截止时间不能早于开始时间');
+                return;
+              }
+              setEditedDeadline(date);
+              setHasUnsavedChanges(true);
+              setSaveStatus('unsaved');
+            }}
+            placeholder="选择截止时间"
+            style={{ width: 180 }}
+            allowClear
+          />
+        </div>
       </div>
 
       {/* 标签编辑 */}

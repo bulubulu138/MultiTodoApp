@@ -1,12 +1,13 @@
 import { Todo, TodoRelation } from '../../shared/types';
 import React, { useState, useMemo, useCallback, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { Divider, Button, Checkbox, Space, Spin, Empty, App, Input, InputNumber, Tag, Tooltip } from 'antd';
-import { SaveOutlined, EyeOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { SaveOutlined, EyeOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import MilkdownEditorWrapper, { MilkdownEditorRef } from './MilkdownEditor';
 import RelationIndicators from './RelationIndicators';
 import { formatCompletedTime } from '../utils/timeFormatter';
 import { ColorTheme } from '../theme/themes';
 import { useOrderEdit } from '../hooks/useOrderEdit';
+import dayjs from 'dayjs';
 
 interface ContentFocusViewProps {
   todos: Todo[];
@@ -526,6 +527,11 @@ const ContentFocusItem = React.memo(
                 onViewRelations={handleViewDetails}
               />
             )}
+
+            {/* 时间编辑器 */}
+            <TimeDisplay
+              todo={todo}
+            />
           </Space>
 
           {/* 右侧：排序序号 + 保存状态 */}
@@ -778,6 +784,35 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
 });
 
 ContentFocusView.displayName = 'ContentFocusView';
+
+// 时间只读展示组件
+interface TimeDisplayProps {
+  todo: Todo;
+}
+
+const TimeDisplay: React.FC<TimeDisplayProps> = React.memo(({ todo }) => {
+  const formatTime = (isoString?: string) => {
+    if (!isoString) return null;
+    return dayjs(isoString).format('MM-DD HH:mm');
+  };
+
+  if (!todo.startTime && !todo.deadline) return null;
+
+  return (
+    <Space size={8} wrap>
+      {todo.startTime && (
+        <Tag icon={<ClockCircleOutlined />} color="blue" style={{ margin: 0 }}>
+          {formatTime(todo.startTime)}
+        </Tag>
+      )}
+      {todo.deadline && (
+        <Tag icon={<ClockCircleOutlined />} color="red" style={{ margin: 0 }}>
+          {formatTime(todo.deadline)}
+        </Tag>
+      )}
+    </Space>
+  );
+});
 
 export default ContentFocusView;
 

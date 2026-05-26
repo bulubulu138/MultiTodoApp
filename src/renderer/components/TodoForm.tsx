@@ -331,18 +331,43 @@ const TodoForm: React.FC<TodoFormProps> = ({
             format="YYYY-MM-DD HH:mm"
             placeholder="选择开始时间"
             style={{ width: '100%' }}
+            onChange={() => {
+              // 当开始时间变化时，重新验证截止时间
+              const deadline = form.getFieldValue('deadline');
+              if (deadline) {
+                form.validateFields(['deadline']);
+              }
+            }}
           />
         </Form.Item>
 
         <Form.Item
           name="deadline"
           label="截止时间"
+          rules={[
+            ({ getFieldValue }) => ({
+              validator(_, value) {
+                const startTime = getFieldValue('startTime');
+                if (startTime && value && startTime.isAfter(value)) {
+                  return Promise.reject(new Error('截止时间不能早于开始时间'));
+                }
+                return Promise.resolve();
+              },
+            }),
+          ]}
         >
           <DatePicker
             showTime
             format="YYYY-MM-DD HH:mm"
             placeholder="选择截止时间"
             style={{ width: '100%' }}
+            onChange={() => {
+              // 当截止时间变化时，重新验证开始时间
+              const startTime = form.getFieldValue('startTime');
+              if (startTime) {
+                form.validateFields(['startTime']);
+              }
+            }}
           />
         </Form.Item>
 
