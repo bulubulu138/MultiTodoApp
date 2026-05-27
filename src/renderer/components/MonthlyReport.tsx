@@ -16,18 +16,18 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
 
   const getPriorityColor = (priority: string): string => {
     switch (priority) {
-      case 'high': return 'red';
-      case 'medium': return 'orange';
-      case 'low': return 'green';
+      case 'mental': return 'blue';
+      case 'communication': return 'orange';
+      case 'trivial': return 'default';
       default: return 'default';
     }
   };
 
   const getPriorityText = (priority: string): string => {
     switch (priority) {
-      case 'high': return '高';
-      case 'medium': return '中';
-      case 'low': return '低';
+      case 'mental': return '脑力劳动';
+      case 'communication': return '沟通对齐';
+      case 'trivial': return '临时小活';
       default: return priority;
     }
   };
@@ -72,18 +72,18 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
     </List.Item>
   );
 
-  const totalPriority = stats.priorityDistribution.high + 
-                        stats.priorityDistribution.medium + 
-                        stats.priorityDistribution.low;
+  const totalPriority = stats.priorityDistribution.mental +
+                        stats.priorityDistribution.communication +
+                        stats.priorityDistribution.trivial;
 
-  const highPercent = totalPriority > 0 
-    ? Math.round(stats.priorityDistribution.high / totalPriority * 100) 
+  const highPercent = totalPriority > 0
+    ? Math.round(stats.priorityDistribution.mental / totalPriority * 100)
     : 0;
-  const mediumPercent = totalPriority > 0 
-    ? Math.round(stats.priorityDistribution.medium / totalPriority * 100) 
+  const mediumPercent = totalPriority > 0
+    ? Math.round(stats.priorityDistribution.communication / totalPriority * 100)
     : 0;
-  const lowPercent = totalPriority > 0 
-    ? Math.round(stats.priorityDistribution.low / totalPriority * 100) 
+  const lowPercent = totalPriority > 0
+    ? Math.round(stats.priorityDistribution.trivial / totalPriority * 100)
     : 0;
 
   return (
@@ -231,34 +231,34 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
             <Space direction="vertical" size={16} style={{ width: '100%' }}>
               <div>
                 <Space style={{ marginBottom: 8, width: '100%', justifyContent: 'space-between' }}>
-                  <Text>高优先级</Text>
-                  <Text strong>{stats.priorityDistribution.high}个 ({highPercent}%)</Text>
+                  <Text>脑力劳动</Text>
+                  <Text strong>{stats.priorityDistribution.mental}个 ({highPercent}%)</Text>
                 </Space>
-                <Progress 
-                  percent={highPercent} 
-                  strokeColor="#ff4d4f" 
+                <Progress
+                  percent={highPercent}
+                  strokeColor="#1677ff"
                   showInfo={false}
                 />
               </div>
               <div>
                 <Space style={{ marginBottom: 8, width: '100%', justifyContent: 'space-between' }}>
-                  <Text>中优先级</Text>
-                  <Text strong>{stats.priorityDistribution.medium}个 ({mediumPercent}%)</Text>
+                  <Text>沟通对齐</Text>
+                  <Text strong>{stats.priorityDistribution.communication}个 ({mediumPercent}%)</Text>
                 </Space>
-                <Progress 
-                  percent={mediumPercent} 
-                  strokeColor="#faad14" 
+                <Progress
+                  percent={mediumPercent}
+                  strokeColor="#faad14"
                   showInfo={false}
                 />
               </div>
               <div>
                 <Space style={{ marginBottom: 8, width: '100%', justifyContent: 'space-between' }}>
-                  <Text>低优先级</Text>
-                  <Text strong>{stats.priorityDistribution.low}个 ({lowPercent}%)</Text>
+                  <Text>临时小活</Text>
+                  <Text strong>{stats.priorityDistribution.trivial}个 ({lowPercent}%)</Text>
                 </Space>
-                <Progress 
-                  percent={lowPercent} 
-                  strokeColor="#52c41a" 
+                <Progress
+                  percent={lowPercent}
+                  strokeColor="#8c8c8c"
                   showInfo={false}
                 />
               </div>

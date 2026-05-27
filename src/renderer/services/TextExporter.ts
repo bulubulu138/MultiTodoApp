@@ -267,9 +267,9 @@ export class TextExporter {
    */
   private static getTodoPriorityName(priority: string): string {
     const priorityNames: Record<string, string> = {
-      'high': '高',
-      'medium': '中',
-      'low': '低'
+      'mental': '脑力劳动',
+      'communication': '沟通对齐',
+      'trivial': '临时小活'
     };
 
     return priorityNames[priority] || priority;

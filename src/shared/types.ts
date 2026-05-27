@@ -9,7 +9,7 @@ export interface Todo {
   title: string;
   content: string;
   status: 'pending' | 'in_progress' | 'completed' | 'paused' | 'today_completed';
-  priority: 'low' | 'medium' | 'high';
+  priority: 'mental' | 'communication' | 'trivial';
   tags: string;
   imageUrl?: string;
   images?: string; // JSON string of image array
@@ -63,7 +63,7 @@ export interface TreeRelationData {
 export interface TodoFormData {
   title: string;
   content: string;
-  priority: 'low' | 'medium' | 'high';
+  priority: 'mental' | 'communication' | 'trivial';
   tags: string;
   imageUrl?: string;
 }

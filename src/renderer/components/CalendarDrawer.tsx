@@ -66,19 +66,18 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
   // 获取优先级颜色
   const getPriorityColor = (priority: string): string => {
     switch (priority) {
-      case 'high': return '#ff4d4f';
-      case 'medium': return '#faad14';
-      case 'low': return '#52c41a';
-      default: return '#1890ff';
+      case 'mental': return '#1677ff';
+      case 'communication': return '#faad14';
+      case 'trivial': return '#8c8c8c';
+      default: return '#8c8c8c';
     }
   };
 
-  // 获取优先级文本
   const getPriorityText = (priority: string): string => {
     switch (priority) {
-      case 'high': return '高';
-      case 'medium': return '中';
-      case 'low': return '低';
+      case 'mental': return '脑力劳动';
+      case 'communication': return '沟通对齐';
+      case 'trivial': return '临时小活';
       default: return priority;
     }
   };

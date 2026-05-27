@@ -331,9 +331,9 @@ const InlineEditPanel: React.FC<InlineEditPanelProps> = ({
           onChange={handlePriorityChange}
           style={{ width: 120 }}
         >
-          <Option value="low">低优先级</Option>
-          <Option value="medium">中优先级</Option>
-          <Option value="high">高优先级</Option>
+          <Option value="mental">脑力劳动</Option>
+          <Option value="communication">沟通对齐</Option>
+          <Option value="trivial">临时小活</Option>
         </Select>
       </div>
 

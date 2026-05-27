@@ -6,10 +6,11 @@ import {
   StrikethroughOutlined,
   UnderlineOutlined,
   LinkOutlined,
+  CheckSquareOutlined,
 } from '@ant-design/icons';
 
 interface MarkdownToolbarProps {
-  onInsertMarkdown: (type: 'bold' | 'italic' | 'strike' | 'underline' | 'link', value?: string) => void;
+  onInsertMarkdown: (type: 'bold' | 'italic' | 'strike' | 'underline' | 'link' | 'checkbox', value?: string) => void;
   disabled?: boolean;
 }
 
@@ -61,6 +62,12 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({ onInsertMarkdown, dis
       tooltip: '链接',
       type: 'link' as const,
       customHandler: handleLinkClick,
+    },
+    {
+      key: 'checkbox',
+      icon: <CheckSquareOutlined />,
+      tooltip: '插入待办事项',
+      type: 'checkbox' as const,
     },
   ];
 

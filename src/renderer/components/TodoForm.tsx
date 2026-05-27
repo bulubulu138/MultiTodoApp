@@ -196,7 +196,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
         status: values.status || 'pending',
         startTime: values.startTime ? values.startTime.toISOString() : new Date().toISOString(),
         deadline: values.deadline ? values.deadline.toISOString() : undefined,
-        priority: values.priority || 'medium',
+        priority: values.priority || 'trivial',
         tags: tags.join(','),
         images: '', // 图片现在嵌入在富文本中
         contentHash: contentHash,
@@ -280,7 +280,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
         layout="vertical"
         initialValues={{
           status: 'pending',
-          priority: 'medium'
+          priority: 'trivial'
         }}
       >
         <Form.Item
@@ -302,12 +302,12 @@ const TodoForm: React.FC<TodoFormProps> = ({
 
         <Form.Item
           name="priority"
-          label="优先级"
+          label="描述"
         >
           <Select>
-            <Option value="low">低</Option>
-            <Option value="medium">中</Option>
-            <Option value="high">高</Option>
+            <Option value="mental">脑力劳动</Option>
+            <Option value="communication">沟通对齐</Option>
+            <Option value="trivial">临时小活</Option>
           </Select>
         </Form.Item>
 

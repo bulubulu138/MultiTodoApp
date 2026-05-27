@@ -169,9 +169,9 @@ export class MermaidExporter {
    */
   private static getTodoPriorityText(priority: string): string {
     const texts: Record<string, string> = {
-      'high': '高优先级',
-      'medium': '中优先级',
-      'low': '低优先级'
+      'mental': '脑力劳动',
+      'communication': '沟通对齐',
+      'trivial': '临时小活'
     };
 
     return texts[priority] || priority;

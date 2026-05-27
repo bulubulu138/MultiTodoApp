@@ -11,16 +11,87 @@ import type { Schema, Node, Fragment } from '@milkdown/prose/model';
 import { DOMParser } from '@milkdown/prose/model';
 import type { EditorState, Transaction, Selection } from '@milkdown/prose/state';
 import { TextSelection } from '@milkdown/prose/state';
-import type { EditorView } from '@milkdown/prose/view';
+import type { EditorView, NodeViewConstructor } from '@milkdown/prose/view';
 import '@milkdown/theme-nord/style.css';
 import MarkdownToolbar from './MarkdownToolbar';
+
+// 纯ProseMirror NodeView：渲染带可点击checkbox的list_item节点
+function createTaskListItemNodeView(): NodeViewConstructor {
+  return (node, view, getPos) => {
+    const isTask = node.attrs.checked != null;
+
+    const dom = document.createElement('li');
+    dom.style.listStyle = 'none';
+    dom.style.display = 'flex';
+    dom.style.alignItems = 'flex-start';
+    dom.style.gap = '6px';
+    dom.style.margin = '2px 0';
+
+    const labelWrapper = document.createElement('span');
+    labelWrapper.contentEditable = 'false';
+    labelWrapper.style.flexShrink = '0';
+    labelWrapper.style.userSelect = 'none';
+    labelWrapper.style.cursor = isTask ? 'pointer' : 'default';
+    labelWrapper.style.marginTop = '2px';
+
+    const updateLabel = (n: Node) => {
+      const checked = n.attrs.checked;
+      if (checked != null) {
+        // checkbox样式：类似Obsidian
+        labelWrapper.innerHTML = checked
+          ? '<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:2px solid #1677ff;border-radius:3px;background:#1677ff;color:#fff;font-size:11px;line-height:1;">✓</span>'
+          : '<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:2px solid #bfbfbf;border-radius:3px;background:#fff;font-size:11px;line-height:1;"></span>';
+      } else {
+        labelWrapper.innerHTML = '<span style="color:#595959;">•</span>';
+      }
+    };
+
+    updateLabel(node);
+
+    labelWrapper.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const checked = currentNode.attrs.checked;  // 读取最新节点，避免闭包旧值
+      if (checked == null) return;
+      if (!view.editable) return;
+      const pos = getPos();
+      if (pos == null) return;
+      view.dispatch(view.state.tr.setNodeAttribute(pos, 'checked', !checked));
+    });
+
+    const contentDOM = document.createElement('span');
+    contentDOM.style.flex = '1';
+    contentDOM.style.minWidth = '0';
+
+    dom.appendChild(labelWrapper);
+    dom.appendChild(contentDOM);
+
+    let currentNode = node;
+
+    return {
+      dom,
+      contentDOM,
+      update: (updatedNode) => {
+        if (updatedNode.type !== currentNode.type) return false;
+        currentNode = updatedNode;
+        updateLabel(updatedNode);
+        return true;
+      },
+      ignoreMutation: (mutation) => {
+        if ((mutation.type as string) === 'selection') return false;
+        if (contentDOM.contains(mutation.target)) return false;
+        return true;
+      },
+    };
+  };
+}
 
 export interface MilkdownEditorRef {
   getMarkdown: () => string;
   setMarkdown: (markdown: string) => void;
   focus: () => void;
   blur: () => void;
-  insertMarkdown: (type: 'bold' | 'italic' | 'strike' | 'underline' | 'link', value?: string) => void;
+  insertMarkdown: (type: 'bold' | 'italic' | 'strike' | 'underline' | 'link' | 'checkbox', value?: string) => void;
 }
 
 export interface MilkdownEditorProps {
@@ -141,7 +212,7 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
     const isInitializedRef = useRef<boolean>(false);
 
     // 添加一个 ref 来存储 insertMarkdown 方法
-    const insertMarkdownRef = useRef<((type: 'bold' | 'italic' | 'strike' | 'underline' | 'link', value?: string) => void) | null>(null);
+    const insertMarkdownRef = useRef<((type: 'bold' | 'italic' | 'strike' | 'underline' | 'link' | 'checkbox', value?: string) => void) | null>(null);
 
     // 始终指向最新 onChange，避免闭包陷阱
     onChangeRef.current = onChange;
@@ -176,7 +247,12 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
             .config((ctx: Ctx) => {
               ctx.set(rootCtx, container);
               ctx.set(defaultValueCtx, initialValue);
-              ctx.set(editorViewOptionsCtx, { editable: () => !readOnly });
+              ctx.set(editorViewOptionsCtx, {
+                editable: () => !readOnly,
+                nodeViews: {
+                  list_item: createTaskListItemNodeView(),
+                },
+              });
 
               ctx.get(listenerCtx).markdownUpdated((_, markdown) => {
                 // 若当前实例已被 cleanup 失效，直接忽略所有回调
@@ -243,7 +319,7 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
     }, [readOnly]);
 
     // 创建 insertMarkdown 方法
-    const insertMarkdown = useCallback((type: 'bold' | 'italic' | 'strike' | 'underline' | 'link', value?: string) => {
+    const insertMarkdown = useCallback((type: 'bold' | 'italic' | 'strike' | 'underline' | 'link' | 'checkbox', value?: string) => {
       if (!editorRef.current) return;
 
       try {
@@ -372,6 +448,36 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
                 dispatch(tr);
               }
 
+              view.focus();
+              break;
+            }
+
+            case 'checkbox': {
+              const listItemType = state.schema.nodes['list_item'];
+              const bulletListType = state.schema.nodes['bullet_list'];
+              const paragraphType = state.schema.nodes['paragraph'];
+
+              if (!listItemType || !bulletListType || !paragraphType) break;
+
+              // 先收缩选区到 from 位置，避免 replaceSelectionWith 删除选中内容
+              const paragraph = paragraphType.create();
+              const listItem = listItemType.create(
+                { checked: false, listType: 'bullet', label: '•' },
+                paragraph
+              );
+              const bulletList = bulletListType.create(null, listItem);
+
+              // 将光标收缩到选区起点后再插入，不覆盖已选文本
+              let tr = state.tr.setSelection(TextSelection.create(state.doc, from, from));
+              tr = tr.replaceSelectionWith(bulletList);
+
+              // 光标定位到新插入的 paragraph 内部（from偏移+3: ul起点+li起点+p起点）
+              try {
+                const cursorPos = tr.doc.resolve(Math.min(from + 3, tr.doc.content.size - 1));
+                dispatch(tr.setSelection(TextSelection.near(cursorPos)));
+              } catch {
+                dispatch(tr);
+              }
               view.focus();
               break;
             }

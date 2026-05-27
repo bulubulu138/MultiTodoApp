@@ -85,9 +85,9 @@ export const NodeEditPanel: React.FC<NodeEditPanelProps> = ({
   // 获取优先级标签
   const getPriorityTag = (priority: Todo['priority']) => {
     const priorityMap = {
-      low: { color: 'blue', text: '低' },
-      medium: { color: 'orange', text: '中' },
-      high: { color: 'red', text: '高' }
+      mental: { color: 'blue', text: '脑力劳动' },
+      communication: { color: 'orange', text: '沟通对齐' },
+      trivial: { color: 'default', text: '临时小活' }
     };
     const config = priorityMap[priority];
     return <Tag color={config.color}>{config.text}</Tag>;

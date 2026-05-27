@@ -72,15 +72,15 @@ export const TodoNode: React.FC<NodeProps<RuntimeNodeData>> = ({ id, data, selec
     if (!resolvedTodo) return null;
 
     const priorityColors = {
-      high: '#ff4d4f',
-      medium: '#faad14',
-      low: '#52c41a'
+      mental: '#1677ff',
+      communication: '#faad14',
+      trivial: '#8c8c8c'
     };
 
     const priorityLabels = {
-      high: '高',
-      medium: '中',
-      low: '低'
+      mental: '脑力',
+      communication: '沟通',
+      trivial: '小活'
     };
 
     return (

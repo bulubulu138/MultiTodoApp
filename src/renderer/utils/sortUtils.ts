@@ -51,8 +51,8 @@ function sortOtherTodos(todos: Todo[], activeTab: string, sortOption: string): T
 
     // 如果没有 displayOrder，按其他逻辑排序
     if (sortOption === 'priority') {
-      const priorityOrder = { high: 0, medium: 1, low: 2 };
-      return priorityOrder[a.priority] - priorityOrder[b.priority];
+      const priorityOrder = { mental: 0, communication: 1, trivial: 2 };
+      return (priorityOrder[a.priority as keyof typeof priorityOrder] ?? 2) - (priorityOrder[b.priority as keyof typeof priorityOrder] ?? 2);
     } else if (sortOption === 'deadline') {
       if (!a.deadline && !b.deadline) return 0;
       if (!a.deadline) return 1;
