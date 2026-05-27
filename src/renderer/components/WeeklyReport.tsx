@@ -18,18 +18,18 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
 
   const getPriorityColor = (priority: string): string => {
     switch (priority) {
-      case 'high': return 'red';
-      case 'medium': return 'orange';
-      case 'low': return 'green';
+      case 'mental': return 'blue';
+      case 'communication': return 'orange';
+      case 'trivial': return 'default';
       default: return 'default';
     }
   };
 
   const getPriorityText = (priority: string): string => {
     switch (priority) {
-      case 'high': return '高';
-      case 'medium': return '中';
-      case 'low': return '低';
+      case 'mental': return '脑力劳动';
+      case 'communication': return '沟通对齐';
+      case 'trivial': return '临时小活';
       default: return priority;
     }
   };
@@ -37,8 +37,8 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
   const getStatusText = (status: string): string => {
     switch (status) {
       case 'completed': return '已完成';
-      case 'in_progress': return '进行中';
-      case 'pending': return '待办';
+      case 'in_progress': return '今日事';
+      case 'pending': return '待办池';
       default: return status;
     }
   };
@@ -207,7 +207,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
   );
 
   const highPriorityPending = [...stats.inProgress, ...stats.pending]
-    .filter(todo => todo.priority === 'high' || todo.priority === 'medium')
+    .filter(todo => todo.priority === 'mental' || todo.priority === 'communication')
     .slice(0, 5);
 
   return (
@@ -422,9 +422,9 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
       >
         <Space direction="vertical" size={12}>
           <Text>
-            • 重点关注 <Text strong style={{ color: '#ff4d4f' }}>
-              {stats.pending.filter(t => t.priority === 'high').length}
-            </Text> 个高优先级待办
+            • 重点关注 <Text strong style={{ color: '#1677ff' }}>
+              {stats.pending.filter(t => t.priority === 'mental').length}
+            </Text> 个脑力劳动待办
           </Text>
           <Text>
             • 需要跟进 <Text strong style={{ color: '#1890ff' }}>

@@ -1,7 +1,7 @@
 import { Todo, TodoRelation } from '../../shared/types';
 import React, { useState, useMemo, useCallback, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { Divider, Button, Checkbox, Space, Spin, Empty, App, Input, InputNumber, Tag, Tooltip } from 'antd';
-import { SaveOutlined, EyeOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { SaveOutlined, EyeOutlined, CheckCircleOutlined, ClockCircleOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import MilkdownEditorWrapper, { MilkdownEditorRef } from './MilkdownEditor';
 import RelationIndicators from './RelationIndicators';
 import { formatCompletedTime } from '../utils/timeFormatter';
@@ -277,6 +277,32 @@ const ContentFocusItem = React.memo(
       },
     }), [handleSave]);
 
+    // 注入"开始"按钮的CSS样式
+    useEffect(() => {
+      const styles = `
+        .start-task-button {
+          cursor: pointer;
+        }
+
+        .start-task-button:active {
+          transform: scale(0.95) !important;
+        }
+
+        .start-task-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+      `;
+
+      const styleElement = document.createElement('style');
+      styleElement.textContent = styles;
+      document.head.appendChild(styleElement);
+
+      return () => {
+        document.head.removeChild(styleElement);
+      };
+    }, []);
+
     // 组件卸载时保存未保存的更改
     useEffect(() => {
       return () => {
@@ -327,6 +353,24 @@ const ContentFocusItem = React.memo(
       } catch (error) {
         message.error('更新状态失败');
         console.error('Status update error:', error);
+      }
+    }, [todo.id, onUpdate, message]);
+
+    // 开始任务（从待办池到今日事）
+    const handleStartTask = useCallback(async () => {
+      if (!todo.id || todo.status !== 'pending') return;
+
+      try {
+        // 更新状态为"进行中"（今日事）
+        await onUpdate(todo.id, { status: 'in_progress' });
+
+        // 显示Toast提示
+        message.success('🎯 任务已进入"今日事"');
+
+        // 不自动切换tab，保持当前视图
+      } catch (error) {
+        message.error('启动任务失败');
+        console.error('Start task error:', error);
       }
     }, [todo.id, onUpdate, message]);
 
@@ -610,12 +654,44 @@ const ContentFocusItem = React.memo(
 
         {/* 主内容区：复选框 + 标题输入框 + 编辑器 */}
         <div className="content-focus-item-main">
-          {/* 完成状态复选框 */}
-          <Checkbox
-            className="content-focus-checkbox"
-            checked={todo.status === 'completed'}
-            onChange={(e) => handleToggleComplete(e.target.checked)}
-          />
+          {/* 完成状态复选框或开始按钮 */}
+          {activeTab === 'pending' && todo.status === 'pending' ? (
+            // 待办池中的pending任务显示"开始"按钮
+            <Button
+              className="start-task-button"
+              shape="circle"
+              icon={<PlayCircleOutlined />}
+              onClick={handleStartTask}
+              style={{
+                width: 32,
+                height: 32,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                border: 'none',
+                color: 'white',
+                boxShadow: '0 2px 8px rgba(102, 126, 234, 0.4)',
+                transition: 'all 0.3s ease',
+                flexShrink: 0
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.1)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.6)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.4)';
+              }}
+            />
+          ) : (
+            // 其他情况显示原有checkbox
+            <Checkbox
+              className="content-focus-checkbox"
+              checked={todo.status === 'completed'}
+              onChange={(e) => handleToggleComplete(e.target.checked)}
+            />
+          )}
 
           {/* 标题和内容区域 */}
           <div className="content-focus-item-content">

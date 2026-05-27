@@ -54,6 +54,14 @@ export interface ElectronAPI {
       success: boolean;
       error?: string;
     }>;  // 今日完成状态切换
+    backflow: {
+      checkAndBackflow: () => Promise<{
+        success: boolean;
+        backflowCount: number;
+        lastBackflowDate: string | null;
+        error?: string;
+      }>;
+    };  // 任务回流
   };
   
   // 关键词和推荐API
@@ -372,6 +380,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     importAll: (data: any) => ipcRenderer.invoke('todo:importAll', data),  // 导入数据
     toggleTodayCompleted: (uuid: string, currentState: string) =>
       ipcRenderer.invoke('todo:toggleTodayCompleted', uuid, currentState),  // 今日完成状态切换
+    backflow: {
+      checkAndBackflow: () => ipcRenderer.invoke('todo-backflow:check-and-backflow'),
+    },
   },
   keywords: {
     getRecommendations: (title: string, content: string, excludeId?: number) => 

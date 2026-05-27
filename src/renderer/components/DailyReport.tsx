@@ -17,18 +17,18 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
 
   const getPriorityColor = (priority: string): string => {
     switch (priority) {
-      case 'high': return 'red';
-      case 'medium': return 'orange';
-      case 'low': return 'green';
+      case 'mental': return 'blue';
+      case 'communication': return 'orange';
+      case 'trivial': return 'default';
       default: return 'default';
     }
   };
 
   const getPriorityText = (priority: string): string => {
     switch (priority) {
-      case 'high': return '高';
-      case 'medium': return '中';
-      case 'low': return '低';
+      case 'mental': return '脑力劳动';
+      case 'communication': return '沟通对齐';
+      case 'trivial': return '临时小活';
       default: return priority;
     }
   };
@@ -45,8 +45,8 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
   const getStatusText = (status: string): string => {
     switch (status) {
       case 'completed': return '已完成';
-      case 'in_progress': return '进行中';
-      case 'pending': return '待办';
+      case 'in_progress': return '今日事';
+      case 'pending': return '待办池';
       default: return status;
     }
   };

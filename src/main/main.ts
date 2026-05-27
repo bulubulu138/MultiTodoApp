@@ -26,6 +26,7 @@ class Application {
   private flowchartTodoAssociationManager: FlowchartTodoAssociationManager;
   private imageManager: ImageManager;
   private backupManager: BackupManager | null = null;
+  private backflowManager: any = null; // 任务回流管理器
   private tray: Tray | null = null;
   private isQuitting: boolean = false;
   private hasShownTrayNotification: boolean = false;
@@ -477,6 +478,38 @@ class Application {
     return this.databaseManager.getTodayCompletedManager();
   }
 
+  private getBackflowManager(): any {
+    if (!this.backflowManager) {
+      const { TodoBackflowManager } = require('./services/TodoBackflowManager');
+      this.backflowManager = new TodoBackflowManager(
+        this.databaseManager,
+        this.settingsManager
+      );
+    }
+    return this.backflowManager;
+  }
+
+  /**
+   * 执行任务回流检查
+   */
+  private async executeBackflowCheck(): Promise<void> {
+    try {
+      const backflowManager = this.getBackflowManager();
+      const { backflowCount } = await backflowManager.checkAndBackflowTodos();
+
+      if (backflowCount > 0) {
+        console.log(`[Application] 已将 ${backflowCount} 个"今日事"任务回流到待办池`);
+        // 通知renderer进程（可选）
+        if (this.mainWindow) {
+          this.mainWindow.webContents.send('todo-backflow:completed', { backflowCount });
+        }
+      }
+    } catch (error) {
+      console.error('[Application] 任务回流检查失败:', error);
+      // 降级处理：不阻塞应用启动
+    }
+  }
+
   /**
    * 安全地获取Prompt模板（带降级处理）
    * @param templateId 模板ID
@@ -618,6 +651,18 @@ class Application {
       } catch (error) {
         console.error('[IPC] Failed to toggle today_completed:', error);
         return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    });
+
+    // 任务回流相关handler
+    ipcMain.handle('todo-backflow:check-and-backflow', async () => {
+      try {
+        const backflowManager = this.getBackflowManager();
+        const result = await backflowManager.checkAndBackflowTodos();
+        return { success: true, ...result };
+      } catch (error) {
+        console.error('IPC: todo-backflow check failed:', error);
+        return { success: false, backflowCount: 0, lastBackflowDate: null, error: String(error) };
       }
     });
 
@@ -1882,6 +1927,9 @@ class Application {
       console.log('Creating main window...');
       this.createWindow();
       console.log('Main window created successfully');
+
+      // 执行任务回流检查
+      await this.executeBackflowCheck();
 
       // 设置主窗口引用到URLAuthService（用于发送批量授权事件）
       if (this.mainWindow && this.urlAuthService) {

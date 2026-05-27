@@ -65,19 +65,28 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
   // 性能优化：使用useCallback缓存函数
   const getPriorityColor = useCallback((priority: string) => {
     switch (priority) {
-      case 'high': return 'red';
-      case 'medium': return 'orange';
-      case 'low': return 'green';
+      case 'mental': return 'blue';
+      case 'communication': return 'orange';
+      case 'trivial': return 'default';
       default: return 'default';
     }
   }, []);
 
   const getPriorityText = useCallback((priority: string) => {
     switch (priority) {
-      case 'high': return '高';
-      case 'medium': return '中';
-      case 'low': return '低';
+      case 'mental': return '脑力劳动';
+      case 'communication': return '沟通对齐';
+      case 'trivial': return '临时小活';
       default: return priority;
+    }
+  }, []);
+
+  const getStatusText = useCallback((status: string) => {
+    switch (status) {
+      case 'pending': return '待办池';
+      case 'in_progress': return '今日事';
+      case 'completed': return '已完成';
+      default: return status;
     }
   }, []);
 

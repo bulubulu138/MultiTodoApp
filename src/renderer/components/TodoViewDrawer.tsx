@@ -699,8 +699,8 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'pending': return '待办';
-      case 'in_progress': return '进行中';
+      case 'pending': return '待办池';
+      case 'in_progress': return '今日事';
       case 'completed': return '已完成';
       default: return status;
     }
@@ -708,18 +708,18 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'red';
-      case 'medium': return 'orange';
-      case 'low': return 'green';
+      case 'mental': return 'blue';
+      case 'communication': return 'orange';
+      case 'trivial': return 'default';
       default: return 'default';
     }
   };
 
   const getPriorityText = (priority: string) => {
     switch (priority) {
-      case 'high': return '高';
-      case 'medium': return '中';
-      case 'low': return '低';
+      case 'mental': return '脑力劳动';
+      case 'communication': return '沟通对齐';
+      case 'trivial': return '临时小活';
       default: return priority;
     }
   };

@@ -131,8 +131,8 @@ function htmlToPlainText(html: string): string {
 // 获取状态文本
 function getStatusText(status: string): string {
   const statusMap: Record<string, string> = {
-    pending: '待办',
-    in_progress: '进行中',
+    pending: '待办池',
+    in_progress: '今日事',
     completed: '已完成'
   };
   return statusMap[status] || status;
@@ -141,9 +141,9 @@ function getStatusText(status: string): string {
 // 获取优先级文本
 function getPriorityText(priority: string): string {
   const priorityMap: Record<string, string> = {
-    high: '高',
-    medium: '中',
-    low: '低'
+    mental: '脑力劳动',
+    communication: '沟通对齐',
+    trivial: '临时小活'
   };
   return priorityMap[priority] || priority;
 }

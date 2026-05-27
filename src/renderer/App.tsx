@@ -144,6 +144,23 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     // 检查是否需要内容迁移
     checkMigrationNeeded();
 
+    // 应用启动时检查回流
+    const checkBackflow = async () => {
+      try {
+        if (window.electronAPI.todo?.backflow?.checkAndBackflow) {
+          const result = await window.electronAPI.todo.backflow.checkAndBackflow();
+          if (result.success && result.backflowCount > 0) {
+            message.info(`📥 已将 ${result.backflowCount} 个"今日事"任务回流到待办池`);
+            await loadTodos();
+          }
+        }
+      } catch (error) {
+        console.error('Backflow check failed:', error);
+      }
+    };
+
+    checkBackflow();
+
     // 记录初始加载完成时间
     if (process.env.NODE_ENV === 'development') {
       setTimeout(() => {
@@ -1559,11 +1576,11 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     },
     {
       key: 'pending',
-      label: `待办 (${statusCounts.pending})`,
+      label: `待办池 (${statusCounts.pending})`,
     },
     {
       key: 'in_progress',
-      label: `进行中 (${statusCounts.in_progress})`,
+      label: `今日事 (${statusCounts.in_progress})`,
     },
     {
       key: 'completed',

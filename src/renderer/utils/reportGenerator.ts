@@ -66,9 +66,9 @@ export interface MonthlyStats {
   }[];
   highPriorityCompleted: Todo[];
   priorityDistribution: {
-    high: number;
-    medium: number;
-    low: number;
+    mental: number;
+    communication: number;
+    trivial: number;
   };
   avgDailyCompleted: number;
   longestStreak: number;
@@ -138,8 +138,8 @@ export function generateDailyReport(todos: Todo[], date: Dayjs): DailyStats {
 function calculateTaskQuality(todo: Todo): number {
   let score = 0;
 
-  // 优先级权重：高优先级=3分，中=2分，低=1分
-  const priorityScores = { high: 3, medium: 2, low: 1 };
+  // 优先级权重：脑力劳动=3分，沟通对齐=2分，临时小活=1分
+  const priorityScores = { mental: 3, communication: 2, trivial: 1 };
   score += priorityScores[todo.priority as keyof typeof priorityScores] || 1;
 
   // 是否有内容（详细程度）：有内容+2分
@@ -253,8 +253,8 @@ export function generateWeeklyReport(todos: Todo[], weekStart: Dayjs): WeeklySta
     };
   }
 
-  // 高优先级完成项
-  const highPriorityCompleted = completed.filter(todo => todo.priority === 'high');
+  // 高优先级完成项（脑力劳动）
+  const highPriorityCompleted = completed.filter(todo => todo.priority === 'mental');
 
   const completionRate = created.length > 0
     ? Math.round((completed.length / created.length) * 100)
@@ -339,14 +339,14 @@ export function generateMonthlyReport(todos: Todo[], month: Dayjs): MonthlyStats
     weekNum++;
   }
 
-  // 高优先级完成项
-  const highPriorityCompleted = completed.filter(todo => todo.priority === 'high');
+  // 高优先级完成项（脑力劳动）
+  const highPriorityCompleted = completed.filter(todo => todo.priority === 'mental');
 
   // 优先级分布
   const priorityDistribution = {
-    high: completed.filter(todo => todo.priority === 'high').length,
-    medium: completed.filter(todo => todo.priority === 'medium').length,
-    low: completed.filter(todo => todo.priority === 'low').length,
+    mental: completed.filter(todo => todo.priority === 'mental').length,
+    communication: completed.filter(todo => todo.priority === 'communication').length,
+    trivial: completed.filter(todo => todo.priority === 'trivial').length,
   };
 
   const completionRate = created.length > 0 
@@ -529,7 +529,7 @@ export function formatWeeklyReportAsMarkdown(stats: WeeklyStats): string {
 
   // 待处理事项
   const pendingHighPriority = [...stats.inProgress, ...stats.pending]
-    .filter(todo => todo.priority === 'high' || todo.priority === 'medium')
+    .filter(todo => todo.priority === 'mental' || todo.priority === 'communication')
     .slice(0, 5);
 
   if (pendingHighPriority.length > 0) {
@@ -543,9 +543,9 @@ export function formatWeeklyReportAsMarkdown(stats: WeeklyStats): string {
   }
 
   // 下周计划
-  const highPriorityPending = stats.pending.filter(todo => todo.priority === 'high');
+  const highPriorityPending = stats.pending.filter(todo => todo.priority === 'mental');
   lines.push(`**下周计划**`);
-  lines.push(`- 重点关注 ${highPriorityPending.length} 个高优先级待办`);
+  lines.push(`- 重点关注 ${highPriorityPending.length} 个脑力劳动待办`);
   lines.push(`- 需要跟进 ${stats.inProgress.length} 个进行中任务`);
   lines.push(`- 目标质量评分：8分以上`);
 
@@ -613,20 +613,20 @@ export function formatMonthlyReportAsMarkdown(stats: MonthlyStats): string {
   
   // 月度亮点
   lines.push(`**月度亮点** ✨`);
-  lines.push(`1. 完成 ${stats.highPriorityCompleted.length} 个高优先级任务`);
+  lines.push(`1. 完成 ${stats.highPriorityCompleted.length} 个脑力劳动任务`);
   lines.push(`2. 平均每日完成 ${stats.avgDailyCompleted} 个待办`);
   lines.push(`3. ${stats.longestStreak} 天连续完成任务\n`);
-  
+
   // 优先级分布
-  const total = stats.priorityDistribution.high + 
-                stats.priorityDistribution.medium + 
-                stats.priorityDistribution.low;
-  
+  const total = stats.priorityDistribution.mental +
+                stats.priorityDistribution.communication +
+                stats.priorityDistribution.trivial;
+
   if (total > 0) {
-    lines.push(`**优先级分布**`);
-    lines.push(`- 高优先级：${stats.priorityDistribution.high}个（${Math.round(stats.priorityDistribution.high / total * 100)}%）`);
-    lines.push(`- 中优先级：${stats.priorityDistribution.medium}个（${Math.round(stats.priorityDistribution.medium / total * 100)}%）`);
-    lines.push(`- 低优先级：${stats.priorityDistribution.low}个（${Math.round(stats.priorityDistribution.low / total * 100)}%）\n`);
+    lines.push(`**描述分布**`);
+    lines.push(`- 脑力劳动：${stats.priorityDistribution.mental}个（${Math.round(stats.priorityDistribution.mental / total * 100)}%）`);
+    lines.push(`- 沟通对齐：${stats.priorityDistribution.communication}个（${Math.round(stats.priorityDistribution.communication / total * 100)}%）`);
+    lines.push(`- 临时小活：${stats.priorityDistribution.trivial}个（${Math.round(stats.priorityDistribution.trivial / total * 100)}%）\n`);
   }
   
   // 下月目标建议
@@ -640,17 +640,17 @@ export function formatMonthlyReportAsMarkdown(stats: MonthlyStats): string {
 // 辅助函数
 function getPriorityText(priority: string): string {
   switch (priority) {
-    case 'high': return '高';
-    case 'medium': return '中';
-    case 'low': return '低';
+    case 'mental': return '脑力劳动';
+    case 'communication': return '沟通对齐';
+    case 'trivial': return '临时小活';
     default: return priority;
   }
 }
 
 function getStatusText(status: string): string {
   switch (status) {
-    case 'pending': return '待办';
-    case 'in_progress': return '进行中';
+    case 'pending': return '待办池';
+    case 'in_progress': return '今日事';
     case 'completed': return '已完成';
     default: return status;
   }
