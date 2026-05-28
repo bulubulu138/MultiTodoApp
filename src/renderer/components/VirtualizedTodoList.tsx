@@ -24,7 +24,7 @@ interface VirtualizedTodoListProps {
   onEdit: (todo: Todo) => void;
   onDelete: (id: string) => void;
   onStatusChange: (id: string, updates: Partial<Todo>) => void;
-  onView: (todo: Todo) => void;
+  onView: (todo: Todo) => void | Promise<void>;
   relations?: TodoRelation[];
   onRelationsChange?: () => Promise<void>;
   sortOption?: SortOption;
@@ -51,7 +51,7 @@ interface VirtualizedTodoItemProps {
   onEdit: (todo: Todo) => void;
   onDelete: (id: string) => void;
   onStatusChange: (id: string, updates: Partial<Todo>) => void;
-  onView: (todo: Todo) => void;
+  onView: (todo: Todo) => void | Promise<void>;
   onRelationsChange?: () => Promise<void>;
   onUpdateDisplayOrder?: (id: string, tabKey: string, order: number | null) => Promise<void>;
   urlTitles?: Map<string, string>;
@@ -408,7 +408,7 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
     onEdit: (todo: Todo) => void;
     onDelete: (id: string) => void;
     onStatusChange: (id: string, updates: Partial<Todo>) => void;
-    onView: (todo: Todo) => void;
+    onView: (todo: Todo) => void | Promise<void>;
     onRelationsChange?: () => Promise<void>;
     onUpdateDisplayOrder?: (id: string, tabKey: string, order: number | null) => Promise<void>;
     getUrlTitlesForTodo?: (todoId: string) => Map<string, string>;

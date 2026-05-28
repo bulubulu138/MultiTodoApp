@@ -752,6 +752,55 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     }
   }, [viewingTodo]);
 
+  const convertTodayCompletedTodos = useCallback(async (): Promise<Map<string, Todo>> => {
+    const now = new Date().toISOString();
+    const todayCompletedTodos = todos.filter(todo => todo.status === 'today_completed');
+
+    if (todayCompletedTodos.length === 0) {
+      return new Map();
+    }
+
+    const convertedTodos = new Map<string, Todo>();
+    const bulkUpdates = todayCompletedTodos.map(todo => {
+      const convertedTodo: Todo = {
+        ...todo,
+        status: 'completed',
+        completedAt: todo.todayCompletedAt || now,
+        todayCompletedAt: undefined,
+        updatedAt: now
+      };
+
+      convertedTodos.set(todo.id, convertedTodo);
+
+      return {
+        uuid: String(todo.id),
+        updates: {
+          status: convertedTodo.status,
+          completedAt: convertedTodo.completedAt,
+          todayCompletedAt: convertedTodo.todayCompletedAt,
+          updatedAt: convertedTodo.updatedAt
+        }
+      };
+    });
+
+    try {
+      await window.electronAPI.todo.bulkUpdateTodos(bulkUpdates);
+
+      setTodos(prevTodos => prevTodos.map(todo => convertedTodos.get(todo.id) || todo));
+      setViewingTodo(prevViewingTodo => {
+        if (!prevViewingTodo) return prevViewingTodo;
+        return convertedTodos.get(prevViewingTodo.id) || prevViewingTodo;
+      });
+
+      console.log(`[App] Converted ${convertedTodos.size} today_completed todos to completed`);
+      return convertedTodos;
+    } catch (error) {
+      console.error('[App] Failed to convert today_completed todos:', error);
+      message.error('今日完成状态转换失败');
+      return new Map();
+    }
+  }, [todos, message]);
+
   // 🔧 新增：增量刷新机制 - 从文件系统重新加载单个待办
   const handleRefreshTodo = useCallback(async (todoId: string) => {
     try {
@@ -950,11 +999,21 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     setQuickCreateContent(null); // 清空快速创建内容
   };
 
-  const handleViewTodo = useCallback((todo: Todo) => {
+  const handleViewTodo = useCallback(async (todo: Todo) => {
+    const convertedTodos = await convertTodayCompletedTodos();
+
     // 🔧 修复：从最新的todos列表中查找待办，确保数据同步
     const latestTodo = todos.find(t => t.id === todo.id);
+    const convertedTodo = convertedTodos.get(todo.id);
 
-    if (latestTodo) {
+    if (convertedTodo) {
+      console.log('[App] handleViewTodo: Using converted today_completed todo', {
+        todoId: todo.id,
+        convertedStatus: convertedTodo.status,
+        completedAt: convertedTodo.completedAt
+      });
+      setViewingTodo(convertedTodo);
+    } else if (latestTodo) {
       console.log('[App] handleViewTodo: Found latest todo from list', {
         todoId: todo.id,
         hasUpdate: JSON.stringify(latestTodo) !== JSON.stringify(todo),
@@ -971,7 +1030,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     }
 
     setShowViewDrawer(true);
-  }, [todos]);
+  }, [todos, convertTodayCompletedTodos]);
 
   // 新增：详情页关闭处理函数
   const handleCloseViewDrawer = useCallback(async () => {

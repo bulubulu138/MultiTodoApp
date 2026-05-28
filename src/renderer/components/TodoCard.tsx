@@ -24,7 +24,7 @@ interface TodoCardProps {
   onEdit: (todo: Todo) => void;
   onDelete: (id: string) => void;
   onStatusChange: (id: string, updates: Partial<Todo>) => void;
-  onView: (todo: Todo) => void;
+  onView: (todo: Todo) => void | Promise<void>;
   onShowRelations: (todo: Todo) => void;
   onUpdateDisplayOrder?: (id: string, tabKey: string, order: number | null) => Promise<void>;
   onNavigateToFlowchart?: (flowchartId: string, nodeId: string) => void;

@@ -12,7 +12,7 @@ interface CompactTodoViewProps {
   todos: Todo[];
   allTodos?: Todo[];
   onUpdate: (id: string, updates: any) => Promise<void>;
-  onView: (todo: Todo) => void;
+  onView: (todo: Todo) => void | Promise<void>;
   activeTab: string;
   relations: TodoRelation[];
   sortOption?: SortOption;

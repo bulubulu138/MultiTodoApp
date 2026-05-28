@@ -27,7 +27,7 @@ interface TodoListProps {
   onEdit: (todo: Todo) => void;
   onDelete: (id: string) => void;
   onStatusChange: (id: string, updates: Partial<Todo>) => void;
-  onView: (todo: Todo) => void;
+  onView: (todo: Todo) => void | Promise<void>;
   relations?: TodoRelation[];
   onRelationsChange?: () => Promise<void>; // Callback to refresh global relations
   sortOption?: SortOption; // 当前排序选项

@@ -7,7 +7,7 @@ import { useCompactTodoEdit } from '../hooks/useCompactTodoEdit';
 interface CompactTodoItemProps {
   todo: Todo;
   onUpdate: (id: string, updates: any) => Promise<void>;
-  onView: (todo: Todo) => void;
+  onView: (todo: Todo) => void | Promise<void>;
   onToggleTodayCompleted: (todo: Todo) => void;
   colors?: any;
   enableDrag?: boolean;

@@ -13,7 +13,7 @@ interface ContentFocusViewProps {
   todos: Todo[];
   allTodos?: Todo[];
   onUpdate: (id: string, updates: Partial<Todo>) => void;
-  onView: (todo: Todo) => void;
+  onView: (todo: Todo) => void | Promise<void>;
   loading: boolean;
   activeTab: string;
   relations: TodoRelation[];
@@ -31,7 +31,7 @@ export interface ContentFocusViewRef {
 interface ContentFocusItemProps {
   todo: Todo;
   onUpdate: (id: string, updates: Partial<Todo>) => void;
-  onView: (todo: Todo) => void;
+  onView: (todo: Todo) => void | Promise<void>;
   isLast: boolean;
   activeTab: string;
   allTodos: Todo[];
