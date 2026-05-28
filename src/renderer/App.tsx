@@ -85,9 +85,37 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   // 保存状态追踪（用于专注模式的乐观更新）
   const savingTodosRef = useRef<Set<string>>(new Set());
   const pendingSavesRef = useRef<Map<string, Promise<void>>>(new Map());
+  const persistDebounceTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   
   // ContentFocusView 的 ref，用于切换视图时保存
   const contentFocusRef = useRef<ContentFocusViewRef>(null);
+
+  const scheduleTodoPersist = useCallback((id: string, updates: Partial<Todo>, onError?: () => void) => {
+    const idString = String(id);
+    const previousTimer = persistDebounceTimersRef.current.get(idString);
+    if (previousTimer) {
+      clearTimeout(previousTimer);
+    }
+
+    const timer = setTimeout(async () => {
+      persistDebounceTimersRef.current.delete(idString);
+      try {
+        await window.electronAPI.todo.update(idString, updates);
+      } catch (error) {
+        console.error('Debounced todo persist failed:', error);
+        onError?.();
+      }
+    }, 300);
+
+    persistDebounceTimersRef.current.set(idString, timer);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      persistDebounceTimersRef.current.forEach((timer) => clearTimeout(timer));
+      persistDebounceTimersRef.current.clear();
+    };
+  }, []);
 
   // 启用全局键盘处理 - 防止中文输入法的空格/退格键滚动
   useGlobalKeyboardHandler();
@@ -652,34 +680,22 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
 
   const handleUpdateTodo = async (id: string, updates: Partial<Todo>) => {
     PerformanceMonitor.start('save');
-    let duration = 0;
+    const previousTodos = todos;
 
-    try {
-      await window.electronAPI.todo.update(String(id), updates);
+    setTodos(prev => prev.map(todo => {
+      if (todo.id !== id) return todo;
+      return { ...todo, ...updates, updatedAt: new Date().toISOString() };
+    }));
+    setEditingTodo(null);
 
-      // 乐观更新：直接更新本地状态而不是重新加载所有待办
-      setTodos(prev => {
-        return prev.map(todo => {
-          if (todo.id === id) {
-            return { ...todo, ...updates, updatedAt: new Date().toISOString() };
-          }
-          return todo;
-        });
-      });
+    scheduleTodoPersist(id, updates, () => {
+      setTodos(previousTodos);
+      message.error('更新待办事项失败，已恢复');
+    });
 
-      setEditingTodo(null);
-      message.success('待办事项更新成功');
-    } catch (error) {
-      // 失败时回滚：重新加载确保数据一致性
-      await loadTodos();
-      message.error('更新待办事项失败');
-      console.error('Error updating todo:', error);
-    } finally {
-      duration = PerformanceMonitor.end('save');
-
-      if (process.env.NODE_ENV === 'development' && duration > 100) {
-        console.warn(`[Performance] Save operation took ${duration.toFixed(2)}ms (threshold: 100ms)`);
-      }
+    const duration = PerformanceMonitor.end('save');
+    if (process.env.NODE_ENV === 'development' && duration > 16) {
+      console.warn(`[Performance] Optimistic update took ${duration.toFixed(2)}ms (target: 16ms)`);
     }
   };
 
@@ -866,12 +882,20 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   }, [message]);
 
   const handleDeleteTodo = async (id: string) => {
+    const previousTodos = todos;
+    setTodos(prev => prev.map(todo =>
+      todo.id === id ? { ...todo, isDeleting: true } : todo
+    ));
+
     try {
       await window.electronAPI.todo.delete(id);
-      setTodos(prev => prev.filter(todo => todo.id !== id));
+      window.setTimeout(() => {
+        setTodos(prev => prev.filter(todo => todo.id !== id));
+      }, 260);
       message.success('待办事项删除成功');
     } catch (error) {
-      message.error('删除待办事项失败');
+      setTodos(previousTodos);
+      message.error('删除待办事项失败，已恢复');
       console.error('Error deleting todo:', error);
     }
   };
@@ -1213,19 +1237,22 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         newDisplayOrders[tabKey] = displayOrder;
       }
 
-      await window.electronAPI.todo.update(id, { displayOrders: newDisplayOrders });
-
-      // 乐观更新：直接更新本地状态而不是重新加载所有待办
+      const previousTodos = todos;
       setTodos(prev => prev.map(t =>
         t.id === id ? { ...t, displayOrders: newDisplayOrders, updatedAt: new Date().toISOString() } : t
       ));
 
-      message.success('排序已更新');
+      try {
+        await window.electronAPI.todo.update(id, { displayOrders: newDisplayOrders });
+        message.success('排序已更新');
+      } catch (error) {
+        setTodos(previousTodos);
+        message.error('更新排序失败，已恢复');
+        console.error('Error updating display order:', error);
+        throw error;
+      }
     } catch (error) {
-      // 失败时回滚：重新加载确保数据一致性
-      await loadTodos();
-      message.error('更新排序失败');
-      console.error('Error updating display order:', error);
+      console.error('Error preparing display order update:', error);
       throw error;
     }
   };

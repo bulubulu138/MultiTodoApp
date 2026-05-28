@@ -178,9 +178,16 @@ body {
   border-radius: 8px;
   box-shadow: none;
   /* 移除全局will-change，仅在hover时动态添加 */
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease-in;
   /* 明确移除底部边框 */
   border-bottom: none !important;
+}
+
+.todo-card.is-deleting {
+  opacity: 0;
+  transform: scale(0.85) translateX(20px);
+  pointer-events: none;
+  will-change: transform, opacity;
 }
 
 /* 同时确保 Ant Design Card 的边框也被移除 */

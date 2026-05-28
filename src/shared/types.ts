@@ -21,6 +21,7 @@ export interface Todo {
   keywords?: string[]; // 关键词数组
   completedAt?: string; // 完成时间，准确记录待办完成的时间点
   todayCompletedAt?: string; // 今日完成时间，标记何时进入今日已完成状态
+  isDeleting?: boolean; // 前端运行态：用于退出动画，不写入数据库
   createdAt: string;
   updatedAt: string;
 }

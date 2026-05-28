@@ -70,7 +70,7 @@
   color: inherit;
   padding: 0 2px; /* 减少内边距 */
   outline: none;
-  transition: all 0.2s;
+  transition: color 0.2s, background-color 0.2s;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

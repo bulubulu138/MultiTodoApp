@@ -9,7 +9,13 @@
       "Bash(find:*)",
       "Bash(dir:*)",
       "Bash(node:*)",
-      "Bash(gh run list:*)"
+      "Bash(gh run list:*)",
+      "Bash(npm run *)",
+      "Bash(pkill *)",
+      "Bash(mkdir -p \"/c/Users/李汉文/.claude/plans/\")",
+      "Read(//c/Users/李汉文/.claude/plans//**)",
+      "Bash(netstat -ano)",
+      "Bash(curl -s http://localhost:3000)"
     ],
     "deny": [],
     "ask": []

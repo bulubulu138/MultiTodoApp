@@ -195,12 +195,13 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
       style={style}
     >
       <Card
-        className="todo-card"
+        className={`todo-card ${todo.isDeleting ? 'is-deleting' : ''}`}
         style={{
           height: '100%',
           borderLeft: todo.id && relations.some(r => r.relation_type === 'parallel' &&
             (r.source_id === todo.id || r.target_id === todo.id)) ? '4px solid #fa8c16' : undefined,
           backgroundColor: todo.status === 'completed' ? colors.completedBg : undefined,
+          pointerEvents: todo.isDeleting ? 'none' : undefined,
         }}
         styles={{ body: { padding: '12px', height: '100%' } }}
         variant="borderless"
