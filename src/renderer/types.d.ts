@@ -56,6 +56,14 @@ interface ElectronAPI {
       success: boolean;
       error?: string;
     }>;
+    backflow: {
+      checkAndBackflow: () => Promise<{
+        success: boolean;
+        backflowCount: number;
+        lastBackflowDate: string | null;
+        error?: string;
+      }>;
+    };  // 任务回流
   };
 
   // 关键词和推荐API

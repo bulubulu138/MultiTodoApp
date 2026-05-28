@@ -40,7 +40,7 @@ export class MarkdownParser {
       title: data.title as string || '',
       content: processedContent,
       status: data.status as Todo['status'] || 'pending',
-      priority: data.priority as Todo['priority'] || 'medium',
+      priority: data.priority as Todo['priority'] || 'trivial',
       tags: this.parseTags(data.tags),
       imageUrl: data.imageUrl as string | undefined,
       images: data.images as string | undefined,
@@ -247,7 +247,7 @@ export class MarkdownParser {
 
       if (!data.priority) {
         errors.push('Missing required field: priority');
-      } else if (!['low', 'medium', 'high'].includes(data.priority)) {
+      } else if (!['mental', 'communication', 'trivial'].includes(data.priority)) {
         errors.push(`Invalid priority value: ${data.priority}`);
       }
 
