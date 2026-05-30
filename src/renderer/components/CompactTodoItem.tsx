@@ -57,6 +57,8 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
     handleBlur,
     handleKeyDown,
     handleClick,
+    handleCompositionStart,
+    handleCompositionEnd,
   } = useCompactTodoEdit({
     todoId: todo.id,
     initialTitle: todo.title,
@@ -269,6 +271,8 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         onClick={handleClick}
+        onCompositionStart={handleCompositionStart}
+        onCompositionEnd={handleCompositionEnd}
         style={titleInputStyle}
         disabled={isSaving}
         placeholder="输入待办标题..."
