@@ -3,6 +3,7 @@ import { Checkbox, CheckboxChangeEvent, InputNumber, Tooltip } from 'antd';
 import { Todo } from '../../shared/types';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useCompactTodoEdit } from '../hooks/useCompactTodoEdit';
+import { getDeadlineDisplay } from '../utils/deadlineFormatter';
 
 interface CompactTodoItemProps {
   todo: Todo;
@@ -124,6 +125,9 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
     );
   };
 
+  // 计算截止时间显示
+  const deadlineInfo = todo.deadline ? getDeadlineDisplay(todo.deadline) : null;
+
   // 样式定义 - 优化为更紧凑的布局
   const containerStyle: React.CSSProperties = {
     display: 'flex',
@@ -131,11 +135,13 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
     height: '36px', // 稍微减小高度以更紧凑
     padding: '0 4px', // 减少内边距
     margin: '1px 0', // 减少外边距
-    backgroundColor: 'transparent',
+    backgroundColor: deadlineInfo?.isOverdue ? '#fff1f0' : 'transparent', // 已过期待办的浅红色背景
+    borderLeft: deadlineInfo?.isOverdue ? '3px solid #ff4d4f' : undefined, // 已过期待办的红色左边框
     borderRadius: '3px', // 稍微减小圆角
     transition: 'background-color 0.2s, opacity 0.2s',
     cursor: canDrag ? 'move' : 'pointer',
     opacity: isTodayCompleted ? 0.4 : 1,
+    position: 'relative', // 为绝对定位的截止时间提供定位上下文
   };
 
   const checkboxStyle: React.CSSProperties = {
@@ -152,12 +158,29 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
     fontSize: '13px', // 稍微减小字体
     color: 'inherit',
     padding: '0 2px', // 减少内边距
+    paddingRight: deadlineInfo ? '90px' : '2px', // 如果有截止时间，为右侧留出空间
     outline: 'none',
     textDecoration: isTodayCompleted ? 'line-through' : 'none',
     cursor: isEditing ? 'text' : 'pointer',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+  };
+
+  const deadlineBadgeStyle: React.CSSProperties = {
+    position: 'absolute',
+    right: '12px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    fontSize: '11px',
+    whiteSpace: 'nowrap',
+    padding: '2px 6px',
+    borderRadius: '3px',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    color: deadlineInfo?.color,
+    fontWeight: 500,
+    pointerEvents: 'none', // 不阻止点击事件
+    boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
   };
 
   const dragHandleStyle: React.CSSProperties = {
@@ -250,6 +273,13 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
         disabled={isSaving}
         placeholder="输入待办标题..."
       />
+
+      {/* 截止时间显示 */}
+      {deadlineInfo && (
+        <div style={deadlineBadgeStyle}>
+          {deadlineInfo.text}
+        </div>
+      )}
     </div>
   );
 };
