@@ -7,6 +7,7 @@ import RelationIndicators from './RelationIndicators';
 import { formatCompletedTime } from '../utils/timeFormatter';
 import { ColorTheme } from '../theme/themes';
 import { useOrderEdit } from '../hooks/useOrderEdit';
+import { getDeadlineDisplay } from '../utils/deadlineFormatter';
 import dayjs from 'dayjs';
 
 interface ContentFocusViewProps {
@@ -723,7 +724,7 @@ const ContentFocusItem = React.memo(
               ref={editorRef}
               value={editedContent}
               onChange={handleContentChange}
-              style={{ minHeight: '150px' }}
+              minHeight="3em"
             />
             </div>
           </div>
@@ -867,26 +868,23 @@ interface TimeDisplayProps {
 }
 
 const TimeDisplay: React.FC<TimeDisplayProps> = React.memo(({ todo }) => {
-  const formatTime = (isoString?: string) => {
-    if (!isoString) return null;
-    return dayjs(isoString).format('MM-DD HH:mm');
-  };
+  // 只显示截止时间，使用相对时间格式
+  if (!todo.deadline) return null;
 
-  if (!todo.startTime && !todo.deadline) return null;
+  const deadlineInfo = getDeadlineDisplay(todo.deadline);
 
   return (
-    <Space size={8} wrap>
-      {todo.startTime && (
-        <Tag icon={<ClockCircleOutlined />} color="blue" style={{ margin: 0 }}>
-          {formatTime(todo.startTime)}
-        </Tag>
-      )}
-      {todo.deadline && (
-        <Tag icon={<ClockCircleOutlined />} color="red" style={{ margin: 0 }}>
-          {formatTime(todo.deadline)}
-        </Tag>
-      )}
-    </Space>
+    <Tag
+      icon={<ClockCircleOutlined />}
+      style={{
+        margin: 0,
+        color: deadlineInfo.color,
+        borderColor: deadlineInfo.color,
+        backgroundColor: deadlineInfo.isOverdue ? '#fff1f0' : 'transparent'
+      }}
+    >
+      {deadlineInfo.text}
+    </Tag>
   );
 });
 
