@@ -21,7 +21,7 @@ export class TodoBackflowManager {
    */
   async checkAndBackflowTodos(): Promise<BackflowResult> {
     try {
-      const lastBackflowDate = await this.getLastBackflowDate();
+      const lastBackflowDate = this.getLastBackflowDate();
       const today = new Date().toDateString();
 
       // 如果今天已经回流过，跳过
@@ -38,7 +38,7 @@ export class TodoBackflowManager {
 
       if (inProgressTodos.length === 0) {
         console.log('[TodoBackflow] 没有"今日事"任务需要回流');
-        await this.setLastBackflowDate(today);
+        this.setLastBackflowDate(today);
         return { backflowCount: 0, lastBackflowDate: today };
       }
 
@@ -61,7 +61,7 @@ export class TodoBackflowManager {
       await this.databaseManager.getStorageManager().bulkUpdateTodos(updates);
 
       // 记录回流日期
-      await this.setLastBackflowDate(today);
+      this.setLastBackflowDate(today);
 
       console.log(`[TodoBackflow] 成功回流 ${sortedTodos.length} 个任务到待办池`);
 
@@ -77,7 +77,7 @@ export class TodoBackflowManager {
   /**
    * 获取上次回流日期
    */
-  private async getLastBackflowDate(): Promise<string | null> {
+  private getLastBackflowDate(): string | null {
     try {
       const settings = this.settingsManager.getSettings();
       return settings.lastBackflowDate || null;
@@ -90,7 +90,7 @@ export class TodoBackflowManager {
   /**
    * 设置回流日期
    */
-  private async setLastBackflowDate(date: string): Promise<void> {
+  private setLastBackflowDate(date: string): void {
     try {
       this.settingsManager.updateSettings({ lastBackflowDate: date });
     } catch (error) {
