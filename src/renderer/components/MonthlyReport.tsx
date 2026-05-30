@@ -301,7 +301,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
           <Text>
             • 关注 <Text strong style={{ color: '#1890ff' }}>
               {stats.inProgress.length}
-            </Text> 个进行中任务
+            </Text> 个今日事任务
           </Text>
           <Text>
             • 计划处理 <Text strong style={{ color: '#faad14' }}>

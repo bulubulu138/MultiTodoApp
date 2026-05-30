@@ -333,7 +333,7 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
               style={{ minWidth: 90 }}
             >
               <Option value="pending">待办</Option>
-              <Option value="in_progress">进行中</Option>
+              <Option value="in_progress">今日事</Option>
               <Option value="completed">已完成</Option>
             </Select>
           </Space>

@@ -255,7 +255,7 @@ export class TextExporter {
   private static getTodoStatusName(status: string): string {
     const statusNames: Record<string, string> = {
       'pending': '待办',
-      'in_progress': '进行中',
+      'in_progress': '今日事',
       'completed': '已完成'
     };
 

@@ -591,6 +591,84 @@ export class FileStorageManager {
     this.deleteFromCache(uuid);
   }
 
+  /**
+   * 删除待办并重新编号（保持序号连续）
+   * 删除指定待办后，自动重新计算该标签页下所有待办的 displayOrder，保持 0, 1, 2, 3... 的连续性
+   */
+  async deleteTodoAndReorder(uuid: string, tabKey: string): Promise<void> {
+    console.log(`[deleteTodoAndReorder] Deleting todo ${uuid} and reordering tab ${tabKey}`);
+    const startTime = Date.now();
+
+    // 1. 确保缓存已初始化
+    if (!this.cacheInitialized) {
+      console.log(`[deleteTodoAndReorder] 🚀 Cache not initialized, preloading...`);
+      await this.preloadCache();
+    }
+
+    // 2. 获取待删除的待办信息（用于确定其在当前标签页的序号）
+    const todoToDelete = this.todosCache.get(uuid);
+    if (!todoToDelete) {
+      console.warn(`[deleteTodoAndReorder] ⚠️ Todo ${uuid} not found in cache, proceeding with deletion only`);
+      await this.deleteTodo(uuid);
+      return;
+    }
+
+    // 3. 执行删除操作
+    await this.deleteTodo(uuid);
+    console.log(`[deleteTodoAndReorder] ✅ Todo ${uuid} deleted`);
+
+    // 4. 获取当前标签页下所有剩余的待办（从缓存中）
+    const remainingTodos = Array.from(this.todosCache.values()).filter(t =>
+      t.displayOrders &&
+      t.displayOrders[tabKey] != null
+    );
+
+    console.log(`[deleteTodoAndReorder] 📊 Found ${remainingTodos.length} remaining todos in tab ${tabKey}`);
+
+    // 5. 如果没有剩余待办，无需重新编号
+    if (remainingTodos.length === 0) {
+      console.log(`[deleteTodoAndReorder] ℹ️ No remaining todos, skipping reorder`);
+      const duration = Date.now() - startTime;
+      console.log(`[deleteTodoAndReorder] 🎉 Completed in ${duration}ms`);
+      return;
+    }
+
+    // 6. 按当前 displayOrder 排序
+    remainingTodos.sort((a, b) => {
+      const orderA = a.displayOrders![tabKey]!;
+      const orderB = b.displayOrders![tabKey]!;
+      return orderA - orderB;
+    });
+
+    // 7. 重新编号：0, 1, 2, 3...
+    const batchUpdates: Array<{ uuid: string; tabKey: string; displayOrder: number }> = [];
+    remainingTodos.forEach((todo, index) => {
+      const currentOrder = todo.displayOrders![tabKey]!;
+      const newOrder = index; // 从 0 开始连续编号
+
+      // 只更新序号发生变化的待办
+      if (currentOrder !== newOrder) {
+        batchUpdates.push({
+          uuid: todo.id,
+          tabKey: tabKey,
+          displayOrder: newOrder
+        });
+        console.log(`[deleteTodoAndReorder] Todo ${todo.id}: ${currentOrder} -> ${newOrder}`);
+      }
+    });
+
+    // 8. 批量更新序号
+    if (batchUpdates.length > 0) {
+      await this.batchUpdateDisplayOrders(batchUpdates);
+      console.log(`[deleteTodoAndReorder] ✅ Successfully reordered ${batchUpdates.length} todos`);
+    } else {
+      console.log(`[deleteTodoAndReorder] ℹ️ No reordering needed, all todos already in correct order`);
+    }
+
+    const duration = Date.now() - startTime;
+    console.log(`[deleteTodoAndReorder] 🎉 Completed in ${duration}ms`);
+  }
+
   // ==================== 批量操作 ====================
 
   /**

@@ -429,7 +429,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
           <Text>
             • 需要跟进 <Text strong style={{ color: '#1890ff' }}>
               {stats.inProgress.length}
-            </Text> 个进行中任务
+            </Text> 个今日事任务
           </Text>
           <Text>
             • 本周完成率 <Text strong style={{ 

@@ -361,7 +361,7 @@ const ContentFocusItem = React.memo(
       if (!todo.id || todo.status !== 'pending') return;
 
       try {
-        // 更新状态为"进行中"（今日事）
+        // 更新状态为"今日事"
         await onUpdate(todo.id, { status: 'in_progress' });
 
         // 显示Toast提示

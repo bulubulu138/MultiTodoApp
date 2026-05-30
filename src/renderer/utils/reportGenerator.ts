@@ -101,9 +101,9 @@ export function generateDailyReport(todos: Todo[], date: Dayjs): DailyStats {
            (deadline.isSame(targetDate, 'day') && deadline.isBefore(dayjs()));
   });
 
-  // 当天的进行中待办
+  // 当天的今日事待办
   const inProgress = todos.filter(todo => {
-    return todo.status === 'in_progress' && 
+    return todo.status === 'in_progress' &&
            dayjs(todo.createdAt).isBefore(nextDate);
   });
 
@@ -214,7 +214,7 @@ export function generateWeeklyReport(todos: Todo[], weekStart: Dayjs): WeeklySta
   const avgQualityScore = completed.length > 0 ? Math.round(totalQualityScore / completed.length * 10) / 10 : 0;
   const highQualityCount = completedWithQuality.filter(todo => todo.qualityScore >= 8).length;
 
-  // 当前进行中的待办
+  // 当前今日事的待办
   const inProgress = todos.filter(todo => todo.status === 'in_progress');
 
   // 当前待办
@@ -305,7 +305,7 @@ export function generateMonthlyReport(todos: Todo[], month: Dayjs): MonthlyStats
            completedDate.isBefore(monthEnd.add(1, 'second'));
   });
 
-  // 当前进行中和待办
+  // 当前今日事和待办
   const inProgress = todos.filter(todo => todo.status === 'in_progress');
   const pending = todos.filter(todo => todo.status === 'pending');
 
@@ -445,10 +445,10 @@ export function formatDailyReportAsMarkdown(stats: DailyStats): string {
     });
     lines.push('');
   }
-  
-  // 进行中的待办
+
+  // 今日事的待办
   if (stats.inProgress.length > 0) {
-    lines.push(`**进行中的待办**`);
+    lines.push(`**今日事的待办**`);
     stats.inProgress.forEach((todo, index) => {
       const priority = getPriorityText(todo.priority);
       lines.push(`${index + 1}. [${priority}] ${todo.title}`);
@@ -470,7 +470,7 @@ export function formatWeeklyReportAsMarkdown(stats: WeeklyStats): string {
   lines.push(`- 创建待办：${stats.created.length}个`);
   lines.push(`- 完成待办：${stats.completed.length}个`);
   lines.push(`- 完成率：${stats.completionRate}%`);
-  lines.push(`- 进行中：${stats.inProgress.length}个`);
+  lines.push(`- 今日事：${stats.inProgress.length}个`);
   lines.push(`- 平均每日完成：${stats.avgDailyCompleted}个`);
   lines.push(`- 平均质量评分：${stats.qualityMetrics.avgQualityScore}分`);
   lines.push(`- 高质量任务：${stats.qualityMetrics.highQualityCount}个\n`);
@@ -546,7 +546,7 @@ export function formatWeeklyReportAsMarkdown(stats: WeeklyStats): string {
   const highPriorityPending = stats.pending.filter(todo => todo.priority === 'mental');
   lines.push(`**下周计划**`);
   lines.push(`- 重点关注 ${highPriorityPending.length} 个脑力劳动待办`);
-  lines.push(`- 需要跟进 ${stats.inProgress.length} 个进行中任务`);
+  lines.push(`- 需要跟进 ${stats.inProgress.length} 个今日事任务`);
   lines.push(`- 目标质量评分：8分以上`);
 
   return lines.join('\n');
@@ -631,7 +631,7 @@ export function formatMonthlyReportAsMarkdown(stats: MonthlyStats): string {
   
   // 下月目标建议
   lines.push(`**下月目标建议**`);
-  lines.push(`- 关注 ${stats.inProgress.length} 个进行中任务`);
+  lines.push(`- 关注 ${stats.inProgress.length} 个今日事任务`);
   lines.push(`- 计划处理 ${stats.pending.length} 个待办任务`);
   
   return lines.join('\n');

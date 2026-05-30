@@ -937,7 +937,16 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     ));
 
     try {
-      await window.electronAPI.todo.delete(id);
+      // 获取当前tab的排序设置
+      const currentSettings = getCurrentTabSettings();
+
+      // 如果是手动排序模式，使用删除并重新编号接口
+      if (currentSettings.sortOption === 'manual') {
+        await window.electronAPI.todo.deleteAndReorder(id, activeTab);
+      } else {
+        await window.electronAPI.todo.delete(id);
+      }
+
       window.setTimeout(() => {
         setTodos(prev => prev.filter(todo => todo.id !== id));
       }, 260);

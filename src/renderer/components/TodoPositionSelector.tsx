@@ -171,7 +171,7 @@ const TodoPositionSelector: React.FC<TodoPositionSelectorProps> = ({
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'pending': return '待办';
-      case 'in_progress': return '进行中';
+      case 'in_progress': return '今日事';
       case 'completed': return '已完成';
       default: return status;
     }

@@ -548,6 +548,10 @@ class Application {
       await this.databaseManager.getStorageManager().deleteTodo(uuid);
     });
 
+    ipcMain.handle('todo:deleteAndReorder', async (_, uuid: string, tabKey: string) => {
+      await this.databaseManager.getStorageManager().deleteTodoAndReorder(uuid, tabKey);
+    });
+
     ipcMain.handle('todo:generateHash', async (_, title: string, content: string) => {
       return generateContentHash(title, content);
     });
@@ -1192,6 +1196,28 @@ class Application {
 
     ipcMain.handle('backup:create', async () => {
       return await this.backupManager?.createBackup();
+    });
+
+    ipcMain.handle('backup:restore', async (_event, backupPath: string) => {
+      try {
+        if (!this.backupManager) {
+          return { success: false, error: 'Backup manager not initialized' };
+        }
+
+        await this.backupManager.restoreBackup(backupPath);
+
+        // 恢复成功后重启应用
+        app.relaunch();
+        app.exit(0);
+
+        return { success: true };
+      } catch (error) {
+        console.error('[IPC] Backup restore failed:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        };
+      }
     });
 
     ipcMain.handle('backup:getCurrentBackupStatus', async () => {
@@ -1885,8 +1911,7 @@ class Application {
         console.error('Database manager initialization failed:', dbError);
         // 降级为简单的备份管理器
         if (this.fileStorageManager) {
-          const storagePath = this.databaseManager.getStorageManager().getStoragePath();
-          this.backupManager = new BackupManager(storagePath, this.fileStorageManager);
+          this.backupManager = new BackupManager(this.fileStorageManager);
           this.backupManager.startAutoBackup();
           console.log('Fallback backup manager initialized');
         } else {

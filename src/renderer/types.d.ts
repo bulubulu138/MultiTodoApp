@@ -44,6 +44,7 @@ interface ElectronAPI {
     createManualAtTop: (todo: any, tabKey: string) => Promise<any>;
     update: (uuid: string, updates: any) => Promise<any>;
     delete: (uuid: string) => Promise<boolean>;
+    deleteAndReorder: (uuid: string, tabKey: string) => Promise<void>;  // 删除并重新编号
     generateHash: (title: string, content: string) => Promise<string>;
     findDuplicate: (contentHash: string, excludeUuid?: string) => Promise<any | null>;
     batchUpdateDisplayOrder: (updates: {uuid: string, displayOrder: number}[]) => Promise<void>;
@@ -118,6 +119,7 @@ interface ElectronAPI {
   backup: {
     list: () => Promise<any[]>;
     create: () => Promise<any>;
+    restore: (backupPath: string) => Promise<{success: boolean; error?: string}>;
     getCurrentBackupStatus: () => Promise<{
       lastBackupTime: string;
       nextBackupTime: string;

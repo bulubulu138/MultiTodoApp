@@ -42,6 +42,7 @@ export interface ElectronAPI {
     createManualAtTop: (todo: any, tabKey: string) => Promise<any>;
     update: (uuid: string, updates: any) => Promise<any>;  // 修复：uuid 参数类型为 string
     delete: (uuid: string) => Promise<boolean>;  // 修复：uuid 参数类型为 string
+    deleteAndReorder: (uuid: string, tabKey: string) => Promise<void>;  // 删除并重新编号
     generateHash: (title: string, content: string) => Promise<string>;
     findDuplicate: (contentHash: string, excludeUuid?: string) => Promise<any | null>;  // 修复：excludeUuid 参数类型为 string
     batchUpdateDisplayOrder: (updates: {uuid: string, displayOrder: number}[]) => Promise<void>;  // 修复：uuid 参数类型为 string
@@ -116,6 +117,7 @@ export interface ElectronAPI {
   backup: {
     list: () => Promise<any[]>;
     create: () => Promise<any>;
+    restore: (backupPath: string) => Promise<{success: boolean; error?: string}>;
     getCurrentBackupStatus: () => Promise<{
       lastBackupTime: string;
       nextBackupTime: string;
@@ -370,6 +372,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     createManualAtTop: (todo: any, tabKey: string) => ipcRenderer.invoke('todo:createManualAtTop', todo, tabKey),
     update: (uuid: string, updates: any) => ipcRenderer.invoke('todo:update', uuid, updates),  // 修复：uuid 参数类型为 string
     delete: (uuid: string) => ipcRenderer.invoke('todo:delete', uuid),  // 修复：uuid 参数类型为 string
+    deleteAndReorder: (uuid: string, tabKey: string) => ipcRenderer.invoke('todo:deleteAndReorder', uuid, tabKey),  // 删除并重新编号
     generateHash: (title: string, content: string) => ipcRenderer.invoke('todo:generateHash', title, content),
     findDuplicate: (contentHash: string, excludeUuid?: string) => ipcRenderer.invoke('todo:findDuplicate', contentHash, excludeUuid),  // 修复：excludeUuid 参数类型为 string
     batchUpdateDisplayOrder: (updates: {uuid: string, displayOrder: number}[]) => ipcRenderer.invoke('todo:batchUpdateDisplayOrder', updates),  // 修复：uuid 参数类型为 string
@@ -427,6 +430,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   backup: {
     list: () => ipcRenderer.invoke('backup:list'),
     create: () => ipcRenderer.invoke('backup:create'),
+    restore: (backupPath: string) => ipcRenderer.invoke('backup:restore', backupPath),
     getCurrentBackupStatus: () => ipcRenderer.invoke('backup:getCurrentBackupStatus'),
   },
   flowchart: {

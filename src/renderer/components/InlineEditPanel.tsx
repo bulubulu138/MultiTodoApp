@@ -321,7 +321,7 @@ const InlineEditPanel: React.FC<InlineEditPanelProps> = ({
           style={{ width: 120 }}
         >
           <Option value="pending">待办</Option>
-          <Option value="in_progress">进行中</Option>
+          <Option value="in_progress">今日事</Option>
           <Option value="completed">已完成</Option>
           <Option value="paused">暂停</Option>
         </Select>

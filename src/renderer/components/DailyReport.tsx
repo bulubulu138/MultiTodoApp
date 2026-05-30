@@ -206,11 +206,11 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
         </>
       )}
 
-      {/* 进行中的待办 */}
+      {/* 今日事的待办 */}
       {stats.inProgress.length > 0 && (
         <>
           <Title level={5} style={{ color: colors.textPrimary }}>
-            🔄 进行中的待办 ({stats.inProgress.length})
+            🔄 今日事的待办 ({stats.inProgress.length})
           </Title>
           <Card 
             variant="borderless" 

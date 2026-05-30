@@ -143,7 +143,7 @@ export class DatabaseManager {
       this.currentDatabasePath = dbPath;
 
       // 5. 创建新的备份管理器
-      this.currentBackupManager = new BackupManager(dbPath, this.currentStorageManager);
+      this.currentBackupManager = new BackupManager(this.currentStorageManager);
       this.currentBackupManager.startAutoBackup();
 
       // 6. 创建新的今日完成调度器

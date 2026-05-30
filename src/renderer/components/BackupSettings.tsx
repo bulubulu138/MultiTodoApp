@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Space, message, Typography, Tag, Card, Statistic, Row, Col } from 'antd';
-import { ReloadOutlined, SaveOutlined, ClockCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { Table, Button, Space, message, Typography, Tag, Card, Statistic, Row, Col, Modal } from 'antd';
+import { ReloadOutlined, SaveOutlined, ClockCircleOutlined, CheckCircleOutlined, RollbackOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { BackupInfo } from '../../shared/types';
 import dayjs from 'dayjs';
 
@@ -65,7 +65,46 @@ const BackupSettings: React.FC = () => {
       setLoading(false);
     }
   };
-  
+
+  // 恢复备份
+  const handleRestoreBackup = async (backupPath: string) => {
+    Modal.confirm({
+      title: '确认恢复备份',
+      icon: <ExclamationCircleOutlined />,
+      content: (
+        <div>
+          <Paragraph>
+            恢复备份将会：
+          </Paragraph>
+          <ul>
+            <li>删除当前所有待办数据</li>
+            <li>从备份文件中恢复数据</li>
+            <li>恢复完成后自动重启应用</li>
+          </ul>
+          <Paragraph type="danger" strong>
+            ⚠️ 当前数据将被覆盖，此操作不可撤销！
+          </Paragraph>
+        </div>
+      ),
+      okText: '确认恢复',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const result = await window.electronAPI.backup.restore(backupPath);
+          if (result.success) {
+            message.success('备份恢复成功，应用即将重启...');
+          } else {
+            message.error(`备份恢复失败: ${result.error}`);
+          }
+        } catch (error) {
+          message.error('备份恢复失败');
+          console.error('Restore backup error:', error);
+        }
+      },
+    });
+  };
+
   const columns = [
     {
       title: '备份时间',
@@ -90,13 +129,27 @@ const BackupSettings: React.FC = () => {
       dataIndex: 'filepath',
       key: 'filepath',
       render: (path: string) => (
-        <Paragraph 
-          copyable={{ text: path }} 
+        <Paragraph
+          copyable={{ text: path }}
           style={{ margin: 0, fontSize: 12 }}
           ellipsis={{ rows: 1, expandable: true }}
         >
           {path}
         </Paragraph>
+      ),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      render: (_: any, record: BackupInfo) => (
+        <Button
+          type="link"
+          icon={<RollbackOutlined />}
+          onClick={() => handleRestoreBackup(record.filepath)}
+          size="small"
+        >
+          恢复
+        </Button>
       ),
     },
   ];
@@ -137,13 +190,13 @@ const BackupSettings: React.FC = () => {
         {/* 备份设置说明 */}
         <Card title="自动备份设置" size="small">
           <Paragraph type="secondary">
-            系统每6小时自动备份一次数据库，备份保存为 Markdown 格式，仅保留最新的一个备份版本。
-            备份文件存储在当前数据库文件夹的 <code>.backup</code> 子文件夹中。
+            系统每1小时自动备份一次数据，备份保存为 ZIP 压缩包（包含 Markdown 文件和图片），保留最近3个备份版本。
+            备份文件存储在应用数据目录的 <code>backups</code> 文件夹中。
           </Paragraph>
           <Space>
-            <Tag color="blue">备份频率: 6小时</Tag>
-            <Tag color="green">备份格式: Markdown</Tag>
-            <Tag color="orange">保留策略: 仅保留最新版本</Tag>
+            <Tag color="blue">备份频率: 1小时</Tag>
+            <Tag color="green">备份格式: ZIP (Markdown + 图片)</Tag>
+            <Tag color="orange">保留策略: 最近3个版本</Tag>
           </Space>
         </Card>
 
