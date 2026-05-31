@@ -82,13 +82,34 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const searchCacheRef = useRef<Map<string, Todo[]>>(new Map());
   const searchInputTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // 性能优化：排序结果缓存 - 避免重复计算
+  const sortingCacheRef = useRef<Map<string, Todo[]>>(new Map());
+
+  const buildDisplayOrderSignature = useCallback((todos: Todo[], tabKey: string) => {
+    return todos
+      .map(todo => `${todo.id}:${todo.displayOrders?.[tabKey] ?? 'null'}`)
+      .join('|');
+  }, []);
+
+  // 性能优化：并列关系分组缓存 - 避免重复计算
+  const parallelGroupsCacheRef = useRef<{
+    relationsHash: string;
+    todoIds: string;
+    groups: Map<string, Set<string>>;
+  } | null>(null);
+
   // 保存状态追踪（用于专注模式的乐观更新）
   const savingTodosRef = useRef<Set<string>>(new Set());
   const pendingSavesRef = useRef<Map<string, Promise<void>>>(new Map());
   const persistDebounceTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
-  
+
   // ContentFocusView 的 ref，用于切换视图时保存
   const contentFocusRef = useRef<ContentFocusViewRef>(null);
+
+  // 追踪是否有未保存的更改（用于 beforeunload 保护）
+  const hasPendingChanges = useCallback(() => {
+    return persistDebounceTimersRef.current.size > 0 || pendingSavesRef.current.size > 0;
+  }, []);
 
   const scheduleTodoPersist = useCallback((id: string, updates: Partial<Todo>, onError?: () => void) => {
     const idString = String(id);
@@ -273,10 +294,17 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     }, 5 * 60 * 1000); // 每5分钟清理一次
 
     // 页面卸载时清理
-    const handleBeforeUnload = () => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       clearInterval(cleanupInterval);
       searchCacheRef.current.clear();
       console.log('[内存管理] 页面卸载，清理所有缓存');
+
+      // 检查是否有未保存的更改
+      if (hasPendingChanges()) {
+        e.preventDefault();
+        e.returnValue = ''; // Chrome 需要设置 returnValue
+        return '正在保存更改，请稍候...';
+      }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -397,20 +425,35 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     let duration = 0;
 
     try {
+      // 立即显示加载状态（不阻塞 UI）
       setLoading(true);
+
+      // 首批快速加载 50 个 todos
       const todoList = await window.electronAPI.todo.getAll();
-      // 过滤空值，确保数据完整性
-      setTodos(todoList.filter(todo => todo && todo.id));
+      const validTodos = todoList.filter(todo => todo && todo.id);
 
-      // 重置分页状态
+      // 立即显示首批数据
+      const firstBatch = validTodos.slice(0, 50);
+      setTodos(firstBatch);
+      setLoading(false);
       setDisplayCount(50);
-      setHasMoreData(todoList.length > 50);
+      setHasMoreData(validTodos.length > 50);
 
-      console.log(`[App] ✅ Successfully loaded ${todoList.length} todos`);
-      console.log(`[App] Initial display: 50 todos, has more: ${todoList.length > 50}`);
+      console.log(`[App] ✅ First batch loaded: ${firstBatch.length} todos`);
+
+      // 后台分批加载剩余数据
+      if (validTodos.length > 50) {
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            setTodos(validTodos);
+            setHasMoreData(validTodos.length > 50);
+            console.log(`[App] ✅ All todos loaded: ${validTodos.length} total`);
+          }, 100);
+        });
+      }
 
       // 🔍 自动诊断：如果加载的待办数量异常，自动运行诊断
-      if (todoList.length < 20 && window.electronAPI.debug) {
+      if (validTodos.length < 20 && window.electronAPI.debug) {
         console.warn('[App] ⚠️ Loaded fewer than 20 todos, running automatic diagnostic...');
         try {
           const diagnosticResult = await window.electronAPI.debug.quickDiagnostic();
@@ -1204,81 +1247,63 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       [activeTab]: newOrder.map((todo) => todo.id),
     }));
 
-    // 显示保存中状态
-    const hide = message.loading('保存中...', 0);
+    // 立即更新 todos 状态，无需等待保存
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        try {
+          setTodos(prevTodos => {
+            if (!Array.isArray(prevTodos) || prevTodos.length === 0) {
+              console.warn('Invalid prevTodos in setTodos callback');
+              return prevTodos;
+            }
+            return updateTodosWithNewDisplayOrders(prevTodos, newOrder, activeTab);
+          });
+        } catch (error) {
+          console.error('Error in delayed todos update:', error);
+          loadTodos();
+        }
+      }, 100);
+    });
 
-    try {
-      // 构建并列分组映射
-      const parallelGroupsMap = buildParallelGroups(newOrder, relations);
-
-      // Phase 2 优化：完整预计算（包括并列分组同步和批量冲突解决）
-      const allUpdates = computeAllFinalOrders({
-        newOrder,
-        activeTab,
-        parallelGroupsMap,
-        allTodos: todos
-      });
-
-      // 防御性检查：验证更新数据
-      if (!Array.isArray(allUpdates) || allUpdates.length === 0) {
-        console.warn('No updates computed in handleDragEnd');
-        hide();
-        return;
-      }
-
-      // 单次批量更新（替代原来的Promise.all多调用）
-      await window.electronAPI.todo.batchUpdateDisplayOrders(allUpdates);
-
-      hide();
-      message.success('排序已保存');
-
-      // 延迟更新 todos 状态，避免阻塞 UI 渲染
-      // 给浏览器时间先渲染拖拽的视觉反馈，然后再更新数据
-      // 使用 requestAnimationFrame 确保在浏览器下一次重绘之前执行
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          try {
-            setTodos(prevTodos => {
-              // 防御性检查：确保 prevTodos 有效
-              if (!Array.isArray(prevTodos) || prevTodos.length === 0) {
-                console.warn('Invalid prevTodos in setTodos callback');
-                return prevTodos;
-              }
-              return updateTodosWithNewDisplayOrders(prevTodos, newOrder, activeTab);
-            });
-          } catch (error) {
-            console.error('Error in delayed todos update:', error);
-            // 如果延迟更新失败，立即尝试全量更新作为fallback
-            loadTodos();
-          }
-        }, 100); // 100ms 延迟，足够 UI 渲染拖拽效果
-      });
-
-    } catch (error) {
-      hide();
-      message.error('保存失败');
-      console.error('Failed to update drag order:', error);
-
-      // 回滚到之前的状态
+    // 后台异步保存，不阻塞 UI
+    (async () => {
       try {
-        await loadTodos();
-      } catch (rollbackError) {
-        console.error('Failed to rollback after drag error:', rollbackError);
-        message.error('数据同步失败，请刷新页面');
+        const parallelGroupsMap = buildParallelGroups(newOrder, relations);
+        const allUpdates = computeAllFinalOrders({
+          newOrder,
+          activeTab,
+          parallelGroupsMap,
+          allTodos: todos
+        });
+
+        if (!Array.isArray(allUpdates) || allUpdates.length === 0) {
+          console.warn('No updates computed in handleDragEnd');
+          return;
+        }
+
+        await window.electronAPI.todo.batchUpdateDisplayOrders(allUpdates);
+      } catch (error) {
+        console.error('Failed to save drag order:', error);
+        message.error('保存失败，已回滚');
+
+        // 回滚到之前的状态
+        try {
+          await loadTodos();
+        } catch (rollbackError) {
+          console.error('Failed to rollback after drag error:', rollbackError);
+          message.error('数据同步失败，请刷新页面');
+        }
       }
-    }
+    })();
   };
 
-  const handleViewModeChange = async (mode: ViewMode) => {
-    // 如果从专注模式切换出去，先保存所有未保存的内容
+  const handleViewModeChange = (mode: ViewMode) => {
+    // 如果从专注模式切换出去，后台保存所有未保存的内容（不阻塞切换）
     if (currentTabSettings.viewMode === 'content-focus' && mode !== 'content-focus') {
-      try {
-        await contentFocusRef.current?.saveAll();
-      } catch (error) {
+      contentFocusRef.current?.saveAll().catch(error => {
         console.error('Error saving before view change:', error);
         message.error('保存失败，请稍后重试');
-        return;
-      }
+      });
     }
 
     // 紧凑模式强制使用手动排序
@@ -1299,16 +1324,34 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
 
       // 更新指定 tab 的序号
       const newDisplayOrders = { ...(todo.displayOrders || {}) };
+      const previousDisplayOrder = todo.displayOrders?.[tabKey] ?? null;
       if (displayOrder === null) {
         delete newDisplayOrders[tabKey];
       } else {
         newDisplayOrders[tabKey] = displayOrder;
       }
 
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[序号更新] 准备保存', {
+          id,
+          tabKey,
+          previousDisplayOrder,
+          nextDisplayOrder: displayOrder,
+        });
+      }
+
       const previousTodos = todos;
       setTodos(prev => prev.map(t =>
         t.id === id ? { ...t, displayOrders: newDisplayOrders, updatedAt: new Date().toISOString() } : t
       ));
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[序号更新] 本地状态已写入', {
+          id,
+          tabKey,
+          nextDisplayOrder: displayOrder,
+        });
+      }
 
       try {
         await window.electronAPI.todo.update(id, { displayOrders: newDisplayOrders });
@@ -1487,10 +1530,14 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     const searchLower = debouncedSearchText.toLowerCase();
     const currentSettings = getCurrentTabSettings();
     const sortOption = currentSettings.sortOption;
-    const cacheKey = `${activeTab}-${sortOption}-${searchLower}`;
+    const searchScopeKey = buildDisplayOrderSignature(baseFilteredTodos, activeTab);
+    const cacheKey = `${activeTab}-${sortOption}-${searchLower}-${searchScopeKey}`;
 
     // 检查缓存
     if (searchCacheRef.current.has(cacheKey)) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[性能优化] 搜索缓存命中', { activeTab, sortOption, searchLower, searchScopeKey });
+      }
       return searchCacheRef.current.get(cacheKey)!;
     }
 
@@ -1511,7 +1558,12 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     const duration = PerformanceMonitor.end('search');
     
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[搜索] 搜索耗时: ${duration.toFixed(2)}ms, 结果数量: ${filtered.length}`);
+      console.log(`[搜索] 搜索耗时: ${duration.toFixed(2)}ms, 结果数量: ${filtered.length}`, {
+        activeTab,
+        sortOption,
+        searchLower,
+        searchScopeKey,
+      });
     }
 
     // 性能优化：改进缓存策略，LRU缓存
@@ -1527,19 +1579,60 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     return filtered;
   }, [baseFilteredTodos, debouncedSearchText, activeTab, getCurrentTabSettings]);
 
-  // 第三层：构建并列关系分组
+  // 第三层：构建并列关系分组（优化：添加缓存）
   const parallelGroups = useMemo(() => {
-    return buildParallelGroups(searchedTodos, relations);
+    // 创建稳定的 relations hash
+    const relationsHash = relations
+      .map(r => `${r.source_id}-${r.target_id}-${r.relation_type}`)
+      .sort()
+      .join('|');
+    const todoIds = searchedTodos.map(t => t.id).join(',');
+
+    // 检查缓存
+    const cache = parallelGroupsCacheRef.current;
+    if (cache && cache.relationsHash === relationsHash && cache.todoIds === todoIds) {
+      return cache.groups;
+    }
+
+    // 缓存未命中 - 计算分组
+    const groups = buildParallelGroups(searchedTodos, relations);
+    parallelGroupsCacheRef.current = { relationsHash, todoIds, groups };
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[性能优化] 并列关系分组缓存未命中，重新计算');
+    }
+
+    return groups;
   }, [searchedTodos, relations]);
 
-  // 第四层：最终排序结果
+  // 第四层：最终排序结果（优化：添加缓存）
   const filteredTodos = useMemo(() => {
     const currentSettings = getCurrentTabSettings();
     const sortOption = currentSettings.sortOption;
 
+    // 性能优化：缓存 key 包含所有影响排序的因素
+    const dragOrder = getCurrentDragOrder();
+    const dragOrderKey = dragOrder ? dragOrder.join(',') : 'none';
+    const displayOrderKey = buildDisplayOrderSignature(searchedTodos, activeTab);
+    const cacheKey = `${activeTab}-${sortOption}-${searchedTodos.length}-${dragOrderKey}-${displayOrderKey}`;
+
+    // 检查缓存
+    if (sortingCacheRef.current.has(cacheKey)) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[性能优化] 排序缓存命中', { activeTab, sortOption, displayOrderKey });
+      }
+      return sortingCacheRef.current.get(cacheKey)!;
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[性能优化] 排序缓存未命中，重新计算', { activeTab, sortOption, displayOrderKey });
+    }
+
+    // 缓存未命中 - 执行排序逻辑
+    let result: Todo[];
+
     // 拖拽排序模式
     if (sortOption === 'drag') {
-      const dragOrder = getCurrentDragOrder();
       if (!dragOrder || dragOrder.length === 0) {
         // 如果没有拖拽排序，使用 displayOrders 作为默认顺序
         const withOrder = searchedTodos.filter(todo =>
@@ -1577,29 +1670,28 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
           return bTime - aTime;
         });
 
-        return [...sorted, ...sortedWithoutOrder];
+        result = [...sorted, ...sortedWithoutOrder];
+      } else {
+        // 按照拖拽排序排列
+        const todoMap = new Map(searchedTodos.map((todo) => [todo.id, todo]));
+        const sorted: Todo[] = [];
+
+        dragOrder.forEach((id) => {
+          const todo = todoMap.get(id);
+          if (todo) {
+            sorted.push(todo);
+            todoMap.delete(id);
+          }
+        });
+
+        // 添加不在拖拽排序中的任务
+        todoMap.forEach((todo) => sorted.push(todo));
+
+        result = sorted;
       }
-
-      // 按照拖拽排序排列
-      const todoMap = new Map(searchedTodos.map((todo) => [todo.id, todo]));
-      const sorted: Todo[] = [];
-
-      dragOrder.forEach((id) => {
-        const todo = todoMap.get(id);
-        if (todo) {
-          sorted.push(todo);
-          todoMap.delete(id);
-        }
-      });
-
-      // 添加不在拖拽排序中的任务
-      todoMap.forEach((todo) => sorted.push(todo));
-
-      return sorted;
     }
-
     // 手动排序模式
-    if (sortOption === 'manual') {
+    else if (sortOption === 'manual') {
       // 分为有序号和无序号两组
       const withOrder = searchedTodos.filter(todo =>
         todo.displayOrders && todo.displayOrders[activeTab] != null
@@ -1637,13 +1729,25 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         return bTime - aTime;
       });
 
-      return [...sorted, ...sortedWithoutOrder];
+      result = [...sorted, ...sortedWithoutOrder];
+    }
+    // 其他排序模式
+    else {
+      const comparator = getSortComparator(sortOption);
+      const groupRepresentatives = selectGroupRepresentatives(parallelGroups, searchedTodos, comparator);
+      result = sortWithGroups(searchedTodos, parallelGroups, groupRepresentatives, comparator);
     }
 
-    // 其他排序模式
-    const comparator = getSortComparator(sortOption);
-    const groupRepresentatives = selectGroupRepresentatives(parallelGroups, searchedTodos, comparator);
-    return sortWithGroups(searchedTodos, parallelGroups, groupRepresentatives, comparator);
+    // LRU 缓存管理（保留最近 10 个结果）
+    if (sortingCacheRef.current.size >= 10) {
+      const firstKey = sortingCacheRef.current.keys().next().value;
+      if (firstKey !== undefined) {
+        sortingCacheRef.current.delete(firstKey);
+      }
+    }
+    sortingCacheRef.current.set(cacheKey, result);
+
+    return result;
   }, [searchedTodos, parallelGroups, activeTab, getCurrentTabSettings, getCurrentDragOrder]);
 
   // 第五层：应用分页限制
@@ -1719,25 +1823,45 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     };
   }, [activeTab, tabSettings]);
 
-  // Tab 切换处理（带自动保存）
-  const handleTabChange = useCallback(async (newTab: string) => {
-    // 如果当前在专注模式，先保存所有未保存的内容
-    if (currentTabSettings.viewMode === 'content-focus') {
-      try {
-        await contentFocusRef.current?.saveAll();
-      } catch (error) {
-        console.error('Error saving before tab change:', error);
-        // 保存失败也允许切换，避免阻塞用户操作
-      }
-    }
+  // Tab 切换处理（优化：非阻塞切换 + 性能监控）
+  const handleTabChange = useCallback((newTab: string) => {
+    // 性能监控：开始计时
+    PerformanceMonitor.start('tab-switch');
+
+    // 立即切换 tab（乐观更新）
     setActiveTab(newTab);
-  }, [currentTabSettings.viewMode]);
+
+    // 如果当前在专注模式，后台保存所有未保存的内容（非阻塞）
+    if (currentTabSettings.viewMode === 'content-focus') {
+      contentFocusRef.current?.saveAll().catch(error => {
+        console.error('Background save failed:', error);
+        message.warning('保存失败，部分更改可能未保存');
+      });
+    }
+
+    // 性能监控：在下一帧测量切换时间
+    requestAnimationFrame(() => {
+      const duration = PerformanceMonitor.end('tab-switch');
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[性能监控] Tab 切换耗时: ${duration.toFixed(2)}ms`);
+        if (duration > 100) {
+          console.warn(`⚠️ Tab 切换超过目标时间 (${duration.toFixed(2)}ms > 100ms)`);
+        } else {
+          console.log(`✅ Tab 切换性能达标 (${duration.toFixed(2)}ms < 100ms)`);
+        }
+      }
+    });
+  }, [currentTabSettings.viewMode, message]);
 
   return (
     <Layout
-      style={{ height: '100vh' }}
+      style={{
+        height: '100vh',
+        background: themeMode === 'dark' ? 'var(--content-bg)' : '#F2F2F7'
+      }}
       data-theme={themeMode}
       data-color-theme={colorTheme}
+      className="app-shell"
     >
         <Toolbar
           onAddTodo={() => setShowPositionSelector(true)}
@@ -1751,7 +1875,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         onSearchChange={setSearchText}
       />
         
-        <Content className="content-area">
+        <Content className="content-area" style={{ background: 'var(--content-bg)' }}>
+        <div className="content-card-shell" style={{ background: 'var(--color-bg-elevated, #ffffff)' }}>
         <Tabs
           activeKey={activeTab}
           onChange={handleTabChange}
@@ -1759,70 +1884,91 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
           className="status-tabs"
           size="large"
         />
-        <div style={{ marginTop: 16, position: 'relative' }}>
-          <AnimatePresence mode="sync">
-            <motion.div
-              key={`${activeTab}-${currentTabSettings.viewMode}`}
-              variants={shouldReduceMotion() ? {} : optimizedMotionVariants.pageTransition}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              style={currentTabSettings.viewMode === 'content-focus' ? {
-                height: 'calc(100vh - 73px - 64px - 32px)',
-                overflow: 'hidden'
-              } : {}}
-            >
-              {currentTabSettings.viewMode === 'content-focus' ? (
-                <ContentFocusView
-                  ref={contentFocusRef}
-                  todos={filteredTodos}
-                  allTodos={todos}
-                  loading={loading}
-                  onUpdate={handleUpdateTodoInPlace}
-                  onView={handleViewTodo}
-                  activeTab={activeTab}
-                  relations={relations}
-                  onUpdateDisplayOrder={handleUpdateDisplayOrder}
-                  colorTheme={colorTheme}
-                />
-              ) : currentTabSettings.viewMode === 'compact' ? (
-                <CompactTodoView
-                  todos={filteredTodos}
-                  allTodos={todos}
-                  onUpdate={handleUpdateTodoInPlace}
-                  onView={handleViewTodo}
-                  activeTab={activeTab}
-                  relations={relations}
-                  sortOption={currentTabSettings.sortOption}
-                  onDragEnd={handleDragEnd}
-                  dragDropOrder={dragDropOrder}
-                />
-              ) : (
-                <TodoList
-                  todos={paginatedTodos}
-                  allTodos={todos}
-                  loading={loading}
-                  onEdit={handleEditTodo}
-                  onView={handleViewTodo}
-                  onDelete={handleDeleteTodo}
-                  onStatusChange={handleUpdateTodo}
-                  onUpdateInPlace={handleUpdateTodoInPlace}
-                  relations={relations}
-                  onRelationsChange={loadRelations}
-                  sortOption={currentTabSettings.sortOption}
-                  activeTab={activeTab}
-                  onUpdateDisplayOrder={handleUpdateDisplayOrder}
-                  viewMode={currentTabSettings.viewMode}
-                  enableVirtualScroll={false}
-                  hasMoreData={hasMoreData}
-                  onLoadMore={loadMore}
-                  totalCount={filteredTodos.length}
-                  colorTheme={colorTheme}
-                  onDragEnd={handleDragEnd}
-                />
+        <div className="todo-view-stage" style={{ position: 'relative' }}>
+          <motion.div key="todo-view-container">
+            <AnimatePresence mode="wait">
+              {currentTabSettings.viewMode === 'content-focus' && (
+                <motion.div
+                  key="content-focus"
+                  variants={shouldReduceMotion() ? {} : optimizedMotionVariants.pageTransition}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  style={{
+                    height: 'calc(100vh - 73px - 64px - 64px)',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <ContentFocusView
+                    ref={contentFocusRef}
+                    todos={filteredTodos}
+                    allTodos={todos}
+                    loading={loading}
+                    onUpdate={handleUpdateTodoInPlace}
+                    onView={handleViewTodo}
+                    activeTab={activeTab}
+                    relations={relations}
+                    onUpdateDisplayOrder={handleUpdateDisplayOrder}
+                    colorTheme={colorTheme}
+                  />
+                </motion.div>
               )}
-            </motion.div>
-          </AnimatePresence>
+              {currentTabSettings.viewMode === 'compact' && (
+                <motion.div
+                  key="compact"
+                  variants={shouldReduceMotion() ? {} : optimizedMotionVariants.pageTransition}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                >
+                  <CompactTodoView
+                    todos={filteredTodos}
+                    allTodos={todos}
+                    onUpdate={handleUpdateTodoInPlace}
+                    onView={handleViewTodo}
+                    activeTab={activeTab}
+                    relations={relations}
+                    sortOption={currentTabSettings.sortOption}
+                    onDragEnd={handleDragEnd}
+                    dragDropOrder={dragDropOrder}
+                  />
+                </motion.div>
+              )}
+              {currentTabSettings.viewMode === 'card' && (
+                <motion.div
+                  key="card"
+                  variants={shouldReduceMotion() ? {} : optimizedMotionVariants.pageTransition}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                >
+                  <TodoList
+                    todos={paginatedTodos}
+                    allTodos={todos}
+                    loading={loading}
+                    onEdit={handleEditTodo}
+                    onView={handleViewTodo}
+                    onDelete={handleDeleteTodo}
+                    onStatusChange={handleUpdateTodo}
+                    onUpdateInPlace={handleUpdateTodoInPlace}
+                    relations={relations}
+                    onRelationsChange={loadRelations}
+                    sortOption={currentTabSettings.sortOption}
+                    activeTab={activeTab}
+                    onUpdateDisplayOrder={handleUpdateDisplayOrder}
+                    viewMode={currentTabSettings.viewMode}
+                    enableVirtualScroll={false}
+                    hasMoreData={hasMoreData}
+                    onLoadMore={loadMore}
+                    totalCount={filteredTodos.length}
+                    colorTheme={colorTheme}
+                    onDragEnd={handleDragEnd}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </div>
         </div>
       </Content>
 
@@ -1863,6 +2009,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         customTabs={customTabs}
         onSaveCustomTabs={handleSaveCustomTabs}
         existingTags={existingTags}
+        themeMode={themeMode}
+        onThemeModeChange={onThemeChange}
         colorTheme={colorTheme}
         onColorThemeChange={onColorThemeChange}
       />

@@ -12,7 +12,7 @@ const AnimatedDrawer: React.FC<DrawerProps> = (props) => {
       // 优化性能设置
       destroyOnClose={props.destroyOnClose ?? true}
       // 使用 GPU 加速的抽屉动画
-      rootClassName={`animated-drawer ${props.rootClassName || ''}`}
+      rootClassName={`animated-drawer ios-modal ios-drawer ${props.rootClassName || ''}`}
     />
   );
 };

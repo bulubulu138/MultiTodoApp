@@ -3,6 +3,7 @@ import Quill from 'quill';
 import ReactQuill from 'react-quill-new';
 import 'quill/dist/quill.snow.css';
 import { convertRelativePathsToFileProtocol as convertPaths, extractRelativePathFromFileProtocol } from '../utils/PathResolver';
+import { useThemeColors } from '../hooks/useThemeColors';
 
 export interface RichTextEditorRef {
   getLatestHtml: () => string;
@@ -32,6 +33,7 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
   const [isMounted, setIsMounted] = useState(false);
   const editorInstanceRef = useRef<any>(null);
   const [hasError, setHasError] = useState(false);
+  const colors = useThemeColors();
 
   // 添加输入状态和焦点状态追踪
   const isComposingRef = useRef(false);
@@ -976,18 +978,18 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
       <div style={{ ...style, minHeight: '250px' }}>
         <div style={{
           padding: '20px',
-          border: '1px solid #ff4d4f',
+          border: `1px solid ${colors.errorBorder}`,
           borderRadius: '6px',
-          backgroundColor: '#fff2f0',
+          backgroundColor: colors.errorBg,
           textAlign: 'center'
         }}>
-          <p style={{ color: '#ff4d4f', marginBottom: '10px' }}>富文本编辑器加载失败</p>
+          <p style={{ color: colors.errorText, marginBottom: '10px' }}>富文本编辑器加载失败</p>
           <textarea
             style={{
               width: '100%',
               minHeight: '200px',
               padding: '10px',
-              border: '1px solid #d9d9d9',
+              border: `1px solid ${colors.controlBorder}`,
               borderRadius: '4px',
               resize: 'vertical'
             }}

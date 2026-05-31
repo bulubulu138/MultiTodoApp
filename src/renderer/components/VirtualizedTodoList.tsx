@@ -199,7 +199,7 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
         style={{
           height: '100%',
           borderLeft: todo.id && relations.some(r => r.relation_type === 'parallel' &&
-            (r.source_id === todo.id || r.target_id === todo.id)) ? '4px solid #fa8c16' : undefined,
+            (r.source_id === todo.id || r.target_id === todo.id)) ? `4px solid ${colors.warningColor}` : undefined,
           backgroundColor: todo.status === 'completed' ? colors.completedBg : undefined,
           pointerEvents: todo.isDeleting ? 'none' : undefined,
         }}
@@ -233,8 +233,8 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.color = todo.status === 'completed'
-                    ? (document.documentElement.dataset.theme === 'dark' ? '#40a9ff' : '#1890ff')
-                    : '#40a9ff';
+                    ? colors.infoColor
+                    : colors.infoColor;
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.color = todo.status === 'completed'
@@ -340,18 +340,18 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
 
           <div style={{
             fontSize: 11,
-            color: todo.status === 'completed' ? colors.completedText : '#999',
+            color: todo.status === 'completed' ? colors.completedText : colors.textMuted,
             whiteSpace: 'nowrap',
             lineHeight: '16px'
           }}>
             <Space size={8} split={<span>|</span>}>
               {todo.startTime && (
-                <span style={{ color: '#52c41a' }}>
+                <span style={{ color: colors.successColor }}>
                   <PlayCircleOutlined /> 开始: {formatCompactTime(todo.startTime)}
                 </span>
               )}
               {todo.deadline && (
-                <span style={{ color: '#ff4d4f' }}>
+                <span style={{ color: colors.dangerColor }}>
                   <ClockCircleOutlined /> 截止: {formatCompactTime(todo.deadline)}
                 </span>
               )}
@@ -497,7 +497,15 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
     // 检查关键元素是否变化
     const sampleSize = Math.min(5, prevProps.todos.length); // 检查前5个元素
     for (let i = 0; i < sampleSize; i++) {
-      if (prevProps.todos[i].updatedAt !== nextProps.todos[i].updatedAt) {
+      const prevTodo = prevProps.todos[i];
+      const nextTodo = nextProps.todos[i];
+      if (!prevTodo || !nextTodo || prevTodo.id !== nextTodo.id) {
+        return false;
+      }
+
+      const prevDisplayOrder = prevTodo.displayOrders?.[prevProps.activeTab];
+      const nextDisplayOrder = nextTodo.displayOrders?.[nextProps.activeTab];
+      if (prevDisplayOrder !== nextDisplayOrder || prevTodo.updatedAt !== nextTodo.updatedAt) {
         return false; // 有变化，需要重新渲染
       }
     }

@@ -22,6 +22,7 @@ import { shouldReduceMotion, getAnimationConfig } from '../utils/dragAnimations'
 import { getCompactAnimationConfig } from '../utils/refinedDragAnimations';
 import { dragStartFeedback, dragEndFeedback } from '../utils/hapticFeedback';
 import { dragPerformanceMonitor, getAnimationConfigByPerformance, PerformanceLevel } from '../utils/dragPerformanceMonitor';
+import { useFLIPAnimation } from '../hooks/useFLIPAnimation';
 
 interface DragDropTodoListProps {
   todos: Todo[];
@@ -97,6 +98,7 @@ const SortableTodoItem: React.FC<{
       ref={setNodeRef}
       style={style}
       className={`todo-item-sortable ${isDragging ? 'dragging' : ''}`}
+      data-flip-id={todo.id}
     >
       {renderItem(todo, isDragging, { attributes, listeners })}
     </div>
@@ -115,6 +117,14 @@ export const DragDropTodoList: React.FC<DragDropTodoListProps> = ({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [indicatorPosition, setIndicatorPosition] = useState<number | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
+
+  // FLIP 动画 hook - 用于流畅的列表重排序
+  const { capturePositions, animate } = useFLIPAnimation({
+    duration: 250,
+    easing: 'cubic-bezier(0.2, 0, 0, 1)',
+    maxItems: 100,
+    enabled: !shouldReduceMotion()
+  });
 
   // 开发模式检测
   const isDevelopment = process.env.NODE_ENV === 'development';
@@ -179,6 +189,11 @@ export const DragDropTodoList: React.FC<DragDropTodoListProps> = ({
   const handleDragStart = (event: any) => {
     setActiveId(event.active.id as string);
 
+    // 捕获所有元素的初始位置（FLIP 第一步）
+    if (containerRef.current) {
+      capturePositions(containerRef.current);
+    }
+
     // 触感反馈
     dragStartFeedback();
 
@@ -237,6 +252,13 @@ export const DragDropTodoList: React.FC<DragDropTodoListProps> = ({
 
         // 立即触发数据更新，不等待动画
         onDragEnd(newTodos);
+
+        // 触发 FLIP 动画（FLIP 第二、三、四步）
+        if (containerRef.current) {
+          requestAnimationFrame(() => {
+            animate(containerRef.current!);
+          });
+        }
 
         // 成功拖拽反馈
         dragEndFeedback();

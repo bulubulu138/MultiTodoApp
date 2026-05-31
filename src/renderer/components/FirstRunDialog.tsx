@@ -193,6 +193,7 @@ const FirstRunDialog: React.FC<FirstRunDialogProps> = ({ visible, onComplete, on
 
   return (
     <Modal
+      rootClassName="ios-modal"
       title={null}
       open={visible}
       onCancel={handleCancel}

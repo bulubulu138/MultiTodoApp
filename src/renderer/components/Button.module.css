@@ -1,0 +1,343 @@
+/* Button 现代化样式 */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-body);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  user-select: none;
+  white-space: nowrap;
+  position: relative;
+  overflow: hidden;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* 按钮尺寸 */
+.small {
+  height: 32px;
+  padding: 0 var(--spacing-md);
+  font-size: var(--font-size-sm);
+}
+
+.medium {
+  height: 40px;
+  padding: 0 var(--spacing-lg);
+  font-size: var(--font-size-md);
+}
+
+.large {
+  height: 48px;
+  padding: 0 var(--spacing-xl);
+  font-size: var(--font-size-lg);
+}
+
+/* Primary 按钮 */
+.primary {
+  background: var(--color-primary);
+  color: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.primary:hover {
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.primary:active {
+  background: var(--color-primary-active);
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Secondary 按钮 */
+.secondary {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+}
+
+.secondary:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
+}
+
+.secondary:active {
+  background: var(--color-surface-active);
+}
+
+/* Ghost 按钮 */
+.ghost {
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.ghost:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.ghost:active {
+  background: var(--color-surface-active);
+}
+
+/* Danger 按钮 */
+.danger {
+  background: var(--color-error);
+  color: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.danger:hover {
+  background: var(--color-error-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.danger:active {
+  background: var(--color-error-active);
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Success 按钮 */
+.success {
+  background: var(--color-success);
+  color: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.success:hover {
+  background: var(--color-success-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.success:active {
+  background: var(--color-success-active);
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Warning 按钮 */
+.warning {
+  background: var(--color-warning);
+  color: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.warning:hover {
+  background: var(--color-warning-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.warning:active {
+  background: var(--color-warning-active);
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Icon Only 按钮 */
+.iconOnly {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: var(--radius-md);
+}
+
+.iconOnly.small {
+  width: 32px;
+  height: 32px;
+}
+
+.iconOnly.large {
+  width: 48px;
+  height: 48px;
+}
+
+/* 图标 */
+.icon {
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconLeft {
+  margin-right: calc(var(--spacing-xs) * -1);
+}
+
+.iconRight {
+  margin-left: calc(var(--spacing-xs) * -1);
+}
+
+/* 加载状态 */
+.loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.loading .buttonContent {
+  opacity: 0;
+}
+
+.loadingSpinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: spin var(--duration-slow) linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* 按钮组 */
+.buttonGroup {
+  display: inline-flex;
+  gap: var(--spacing-xs);
+}
+
+.buttonGroup .button {
+  margin: 0;
+}
+
+/* Segmented Control 样式 */
+.segmented {
+  display: inline-flex;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: 4px;
+  gap: 4px;
+}
+
+.segmented .button {
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  box-shadow: none;
+  padding: 0 var(--spacing-md);
+  height: 32px;
+}
+
+.segmented .button:hover {
+  color: var(--color-text-primary);
+  transform: none;
+  box-shadow: none;
+}
+
+.segmented .button.active {
+  background: var(--color-primary);
+  color: white;
+  box-shadow: var(--shadow-sm);
+}
+
+/* 全宽按钮 */
+.fullWidth {
+  width: 100%;
+}
+
+/* 涟漪效果 */
+.button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width var(--transition-base), height var(--transition-base);
+}
+
+.button:active::before {
+  width: 200%;
+  height: 200%;
+}
+
+/* 深色主题 */
+[data-theme='dark'] .secondary {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+[data-theme='dark'] .secondary:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
+}
+
+[data-theme='dark'] .ghost:hover {
+  background: var(--color-surface-hover);
+}
+
+[data-theme='dark'] .segmented {
+  background: var(--color-surface);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .button {
+    padding: 0 var(--spacing-md);
+    font-size: var(--font-size-base);
+  }
+
+  .small {
+    height: 28px;
+    padding: 0 var(--spacing-sm);
+    font-size: var(--font-size-xs);
+  }
+
+  .medium {
+    height: 36px;
+    padding: 0 var(--spacing-md);
+    font-size: var(--font-size-base);
+  }
+
+  .large {
+    height: 44px;
+    padding: 0 var(--spacing-lg);
+    font-size: var(--font-size-md);
+  }
+
+  .iconOnly {
+    width: 36px;
+    height: 36px;
+  }
+
+  .iconOnly.small {
+    width: 28px;
+    height: 28px;
+  }
+
+  .iconOnly.large {
+    width: 44px;
+    height: 44px;
+  }
+}

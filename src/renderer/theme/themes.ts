@@ -85,63 +85,106 @@ export const createLightTheme = (colorTheme: ColorTheme = 'purple'): ThemeConfig
       colorLinkHover: hslToHex(scheme.hue, 80, 50),
       colorLinkActive: hslToHex(scheme.hue, 80, 40),
 
-      // 背景色
-      colorBgBase: '#ffffff',
-      colorBgContainer: '#ffffff',
-      colorBgElevated: '#ffffff',
-      colorBgLayout: '#fafafa',
+      // 背景色 - 使用设计token
+      colorBgBase: '#FFFFFF',
+      colorBgContainer: '#F4F4F5',
+      colorBgElevated: '#E4E4E7',
+      colorBgLayout: '#FFFFFF',
 
-      // 边框色
-      colorBorder: '#e5e5e5',
-      colorBorderSecondary: '#eeeeee',
+      // 边框色 - 使用设计token
+      colorBorder: '#E4E4E7',
+      colorBorderSecondary: '#D4D4D8',
 
-      // 文字色
-      colorText: '#1a1a1a',
-      colorTextSecondary: '#666666',
-      colorTextTertiary: '#999999',
-      colorTextQuaternary: '#cccccc',
+      // 文字色 - 使用设计token
+      colorText: '#18181B',
+      colorTextSecondary: '#71717A',
+      colorTextTertiary: '#A1A1AA',
+      colorTextQuaternary: '#D4D4D8',
+
+      // 圆角系统 - 更大的圆角
+      borderRadius: 24,
+      borderRadiusLG: 28,
+      borderRadiusSM: 20,
+      borderRadiusXS: 14,
+
+      // 字体系统
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      fontSize: 14,
+      fontSizeHeading1: 34,
+      fontSizeHeading2: 28,
+      fontSizeHeading3: 24,
+      fontSizeHeading4: 20,
+      fontSizeHeading5: 18,
+
+      // 间距
+      padding: 16,
+      paddingLG: 24,
+      paddingMD: 16,
+      paddingSM: 12,
+      paddingXS: 8,
+      paddingXXS: 4,
+
+      // 阴影 - 更柔和
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+      boxShadowSecondary: '0 4px 16px rgba(0, 0, 0, 0.08)',
     },
     components: {
       Card: {
-        colorBgContainer: '#ffffff',
-        colorBorder: '#e5e5e5',
-        colorBorderSecondary: '#eeeeee',
+        colorBgContainer: '#F4F4F5',
+        colorBorder: '#E4E4E7',
+        colorBorderSecondary: '#D4D4D8',
+        borderRadiusLG: 24,
+        paddingLG: 24,
+        boxShadowTertiary: '0 2px 8px rgba(0, 0, 0, 0.06)',
       },
       Modal: {
-        contentBg: '#ffffff',
-        headerBg: '#ffffff',
+        contentBg: '#FFFFFF',
+        headerBg: '#FFFFFF',
+        borderRadiusLG: 24,
       },
       Drawer: {
-        colorBgElevated: '#ffffff',
+        colorBgElevated: '#FFFFFF',
       },
       Input: {
-        colorBgContainer: '#ffffff',
+        colorBgContainer: '#F4F4F5',
+        borderRadius: 24,
+        paddingBlock: 12,
+        paddingInline: 16,
       },
       Select: {
-        colorBgContainer: '#ffffff',
-        colorBgElevated: '#fafafa',
+        colorBgContainer: '#F4F4F5',
+        colorBgElevated: '#FFFFFF',
+        borderRadius: 24,
       },
       Button: {
-        colorBgContainer: '#fafafa',
+        colorBgContainer: '#F4F4F5',
+        borderRadius: 24,
+        paddingBlock: 10,
+        paddingInline: 20,
+        fontWeight: 600,
       },
       List: {
-        colorBgContainer: '#ffffff',
+        colorBgContainer: '#FFFFFF',
       },
       Tabs: {
-        colorBgContainer: '#ffffff',
+        colorBgContainer: '#FFFFFF',
+        borderRadius: 0,
       },
       Checkbox: {
-        colorBorder: '#d9d9d9',
-        colorBgContainer: '#ffffff',
+        colorBorder: '#D4D4D8',
+        colorBgContainer: '#FFFFFF',
+        borderRadiusSM: 6,
       },
       Tag: {
-        colorBgContainer: '#fafafa',
-        colorBorder: '#e5e5e5',
+        colorBgContainer: 'rgba(139, 92, 246, 0.1)',
+        colorBorder: 'transparent',
+        borderRadiusSM: 14,
       },
       Collapse: {
-        colorBgContainer: '#ffffff',
-        headerBg: '#fafafa',
-        colorBorder: '#e5e5e5',
+        colorBgContainer: '#F4F4F5',
+        headerBg: '#FFFFFF',
+        colorBorder: '#E4E4E7',
+        borderRadiusLG: 24,
       },
     },
   };
@@ -163,63 +206,110 @@ export const createDarkTheme = (colorTheme: ColorTheme = 'purple'): ThemeConfig 
       colorLinkHover: hslToHex(scheme.hue, 80, 80),
       colorLinkActive: hslToHex(scheme.hue, 80, 60),
 
-      // 背景色 - 纯黑体系
-      colorBgBase: '#0a0a0a',
-      colorBgContainer: '#141414',
-      colorBgElevated: '#1a1a1a',
-      colorBgLayout: '#0a0a0a',
+      // 背景色 - 纯黑体系（使用设计token）
+      colorBgBase: '#000000',
+      colorBgContainer: '#111111',
+      colorBgElevated: '#181818',
+      colorBgLayout: '#000000',
+      colorFillAlter: '#1c1c1c',
+      colorFillSecondary: '#232323',
+      colorFillTertiary: '#2a2a2a',
+      colorFillQuaternary: '#303030',
 
-      // 边框色
-      colorBorder: '#404040',
-      colorBorderSecondary: '#2a2a2a',
+      // 边框色（使用设计token）
+      colorBorder: '#3f3f46',
+      colorBorderSecondary: '#27272a',
 
-      // 文字色
-      colorText: '#f5f5f5',
-      colorTextSecondary: '#a0a0a0',
-      colorTextTertiary: '#666666',
-      colorTextQuaternary: '#444444',
+      // 文字色（使用设计token）
+      colorText: '#fafafa',
+      colorTextSecondary: '#d4d4d8',
+      colorTextTertiary: '#a1a1aa',
+      colorTextQuaternary: '#71717a',
+
+      // 圆角系统 - 与浅色模式一致
+      borderRadius: 24,
+      borderRadiusLG: 28,
+      borderRadiusSM: 20,
+      borderRadiusXS: 14,
+
+      // 字体系统
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      fontSize: 14,
+      fontSizeHeading1: 34,
+      fontSizeHeading2: 28,
+      fontSizeHeading3: 24,
+      fontSizeHeading4: 20,
+      fontSizeHeading5: 18,
+
+      // 间距
+      padding: 16,
+      paddingLG: 24,
+      paddingMD: 16,
+      paddingSM: 12,
+      paddingXS: 8,
+      paddingXXS: 4,
+
+      // 阴影 - 深色模式更强
+      boxShadow: '0 6px 24px rgba(0, 0, 0, 0.42)',
+      boxShadowSecondary: '0 10px 32px rgba(0, 0, 0, 0.5)',
     },
     components: {
       Card: {
-        colorBgContainer: '#141414',
-        colorBorder: '#404040',
-        colorBorderSecondary: '#2a2a2a',
+        colorBgContainer: '#111111',
+        colorBorder: '#3f3f46',
+        colorBorderSecondary: '#27272a',
+        borderRadiusLG: 24,
+        paddingLG: 24,
+        boxShadowTertiary: '0 8px 24px rgba(0, 0, 0, 0.42)',
       },
       Modal: {
-        contentBg: '#141414',
-        headerBg: '#141414',
+        contentBg: '#111111',
+        headerBg: '#111111',
+        borderRadiusLG: 24,
       },
       Drawer: {
-        colorBgElevated: '#141414',
+        colorBgElevated: '#111111',
       },
       Input: {
-        colorBgContainer: '#1a1a1a',
+        colorBgContainer: '#181818',
+        borderRadius: 24,
+        paddingBlock: 12,
+        paddingInline: 16,
       },
       Select: {
-        colorBgContainer: '#1a1a1a',
-        colorBgElevated: '#262626',
+        colorBgContainer: '#181818',
+        colorBgElevated: '#1f1f1f',
+        borderRadius: 24,
       },
       Button: {
-        colorBgContainer: '#1a1a1a',
+        colorBgContainer: '#181818',
+        borderRadius: 24,
+        paddingBlock: 10,
+        paddingInline: 20,
+        fontWeight: 600,
       },
       List: {
-        colorBgContainer: '#0a0a0a',
+        colorBgContainer: '#000000',
       },
       Tabs: {
-        colorBgContainer: '#0a0a0a',
+        colorBgContainer: '#000000',
+        borderRadius: 0,
       },
       Checkbox: {
-        colorBorder: '#505050',
-        colorBgContainer: '#262626',
+        colorBorder: '#52525b',
+        colorBgContainer: '#1f1f1f',
+        borderRadiusSM: 6,
       },
       Tag: {
-        colorBgContainer: '#262626',
-        colorBorder: '#404040',
+        colorBgContainer: 'rgba(139, 92, 246, 0.22)',
+        colorBorder: 'transparent',
+        borderRadiusSM: 14,
       },
       Collapse: {
-        colorBgContainer: '#141414',
-        headerBg: '#1a1a1a',
-        colorBorder: '#404040',
+        colorBgContainer: '#111111',
+        headerBg: '#181818',
+        colorBorder: '#3f3f46',
+        borderRadiusLG: 24,
       },
     },
   };

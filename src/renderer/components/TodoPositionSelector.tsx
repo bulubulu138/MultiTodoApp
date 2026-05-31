@@ -190,6 +190,7 @@ const TodoPositionSelector: React.FC<TodoPositionSelectorProps> = ({
 
   return (
     <Modal
+      rootClassName="ios-modal"
       title="选择新待办的位置"
       open={visible}
       onCancel={onClose}

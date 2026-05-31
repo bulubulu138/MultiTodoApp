@@ -87,6 +87,7 @@ const ContentMigrationModal: React.FC<ContentMigrationModalProps> = ({ visible, 
 
   return (
     <Modal
+      rootClassName="ios-modal"
       title={
         <Space>
           {status === 'completed' ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> : <ExclamationCircleOutlined style={{ color: '#faad14' }} />}

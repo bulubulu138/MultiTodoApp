@@ -281,6 +281,7 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
   return (
     <>
       <Modal
+      rootClassName="ios-modal"
         title={`"${todo.title}" 的关联关系`}
         open={visible}
         onCancel={onClose}

@@ -244,6 +244,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
       title={todo ? '编辑待办事项' : '新建待办事项'}
       open={visible}
       onCancel={onCancel}
+      rootClassName="ios-modal"
       width={800}
       style={{ top: 20 }}
       styles={{

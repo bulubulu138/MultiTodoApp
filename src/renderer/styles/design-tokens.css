@@ -1,0 +1,358 @@
+/**
+ * Design Tokens - 设计变量系统
+ *
+ * 设计理念："柔和生产力"
+ * - 现代极简：纯净画布，柔和卡片
+ * - 圆润友好：24px圆角，营造柔软触感
+ * - 微妙动画：流畅过渡，提升交互体验
+ * - 完整主题：支持5种颜色主题 × 明暗模式
+ */
+
+:root {
+  /* ==================== 颜色系统 ==================== */
+
+  /* 主题色 - 默认紫色 */
+  --color-primary: #8B5CF6;
+  --color-primary-hover: #7C3AED;
+  --color-primary-active: #6D28D9;
+  --color-primary-light: rgba(139, 92, 246, 0.1);
+  --color-primary-lighter: rgba(139, 92, 246, 0.05);
+
+  /* 功能色 */
+  --color-success: #14B8A6;
+  --color-success-light: rgba(20, 184, 166, 0.1);
+  --color-warning: #F59E0B;
+  --color-warning-light: rgba(245, 158, 11, 0.1);
+  --color-error: #EF4444;
+  --color-error-light: rgba(239, 68, 68, 0.1);
+  --color-info: #3B82F6;
+  --color-info-light: rgba(59, 130, 246, 0.1);
+  --color-highlight: #F472B6;
+
+  /* 浅色模式 - 背景色 */
+  --color-background: #FFFFFF;
+  --color-surface: #F4F4F5;
+  --color-surface-elevated: #E4E4E7;
+  --color-surface-hover: #FAFAFA;
+
+  /* 浅色模式 - 文字色 */
+  --color-text-primary: #18181B;
+  --color-text-secondary: #71717A;
+  --color-text-tertiary: #A1A1AA;
+  --color-text-disabled: #D4D4D8;
+  --color-text-inverse: #FFFFFF;
+
+  /* 浅色模式 - 边框色 */
+  --color-border: #E4E4E7;
+  --color-border-strong: #D4D4D8;
+  --color-border-light: #F4F4F5;
+
+  /* 浅色模式 - 阴影 */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0 12px 32px rgba(0, 0, 0, 0.16);
+
+  /* ==================== 间距系统 ==================== */
+
+  --spacing-micro: 4px;
+  --spacing-xs: 8px;
+  --spacing-sm: 12px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+  --spacing-3xl: 64px;
+
+  /* ==================== 圆角系统 ==================== */
+
+  --radius-xs: 8px;
+  --radius-sm: 14px;
+  --radius-md: 20px;
+  --radius-lg: 24px;
+  --radius-xl: 28px;
+  --radius-2xl: 32px;
+  --radius-full: 9999px;
+
+  /* ==================== 字体系统 ==================== */
+
+  --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* 字号 */
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-base: 13px;
+  --font-size-md: 14px;
+  --font-size-lg: 15px;
+  --font-size-xl: 16px;
+  --font-size-2xl: 18px;
+  --font-size-3xl: 20px;
+  --font-size-4xl: 24px;
+  --font-size-5xl: 28px;
+  --font-size-6xl: 34px;
+
+  /* 字重 */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+
+  /* 行高 */
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* ==================== 过渡动画 ==================== */
+
+  --transition-fast: 150ms ease-out;
+  --transition-base: 200ms ease-out;
+  --transition-slow: 300ms ease-out;
+  --transition-slower: 400ms ease-out;
+
+  /* 缓动函数 */
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  /* ==================== Z-index 层级 ==================== */
+
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+}
+
+/* ==================== 深色模式 ==================== */
+
+[data-theme='dark'] {
+  /* 深色模式 - 背景色 */
+  --color-background: #0a0a0a;
+  --color-surface: #141414;
+  --color-surface-elevated: #1a1a1a;
+  --color-surface-hover: #1f1f1f;
+
+  /* 深色模式 - 文字色 */
+  --color-text-primary: #f5f5f5;
+  --color-text-secondary: #a0a0a0;
+  --color-text-tertiary: #666666;
+  --color-text-disabled: #444444;
+  --color-text-inverse: #18181B;
+
+  /* 深色模式 - 边框色 */
+  --color-border: #404040;
+  --color-border-strong: #2a2a2a;
+  --color-border-light: #1a1a1a;
+
+  /* 深色模式 - 阴影（更强） */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.12);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.24);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.32);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.40);
+  --shadow-xl: 0 12px 32px rgba(0, 0, 0, 0.48);
+}
+
+/* ==================== 颜色主题变体 ==================== */
+
+/* 紫色主题（默认） */
+[data-color-theme='purple'] {
+  --color-primary: #8B5CF6;
+  --color-primary-hover: #7C3AED;
+  --color-primary-active: #6D28D9;
+  --color-primary-light: rgba(139, 92, 246, 0.1);
+  --color-primary-lighter: rgba(139, 92, 246, 0.05);
+}
+
+/* 蓝色主题 */
+[data-color-theme='blue'] {
+  --color-primary: #3B82F6;
+  --color-primary-hover: #2563EB;
+  --color-primary-active: #1D4ED8;
+  --color-primary-light: rgba(59, 130, 246, 0.1);
+  --color-primary-lighter: rgba(59, 130, 246, 0.05);
+}
+
+/* 绿色主题 */
+[data-color-theme='green'] {
+  --color-primary: #10B981;
+  --color-primary-hover: #059669;
+  --color-primary-active: #047857;
+  --color-primary-light: rgba(16, 185, 129, 0.1);
+  --color-primary-lighter: rgba(16, 185, 129, 0.05);
+}
+
+/* 橙色主题 */
+[data-color-theme='orange'] {
+  --color-primary: #F59E0B;
+  --color-primary-hover: #D97706;
+  --color-primary-active: #B45309;
+  --color-primary-light: rgba(245, 158, 11, 0.1);
+  --color-primary-lighter: rgba(245, 158, 11, 0.05);
+}
+
+/* 红色主题 */
+[data-color-theme='red'] {
+  --color-primary: #EF4444;
+  --color-primary-hover: #DC2626;
+  --color-primary-active: #B91C1C;
+  --color-primary-light: rgba(239, 68, 68, 0.1);
+  --color-primary-lighter: rgba(239, 68, 68, 0.05);
+}
+
+/* ==================== 优先级颜色 ==================== */
+
+:root {
+  --priority-brain: #3B82F6;
+  --priority-brain-light: rgba(59, 130, 246, 0.1);
+  --priority-communication: #F59E0B;
+  --priority-communication-light: rgba(245, 158, 11, 0.1);
+  --priority-trivial: #71717A;
+  --priority-trivial-light: rgba(113, 113, 122, 0.1);
+}
+
+/* ==================== 状态颜色 ==================== */
+
+:root {
+  --status-pending: #71717A;
+  --status-pending-light: rgba(113, 113, 122, 0.1);
+  --status-in-progress: #3B82F6;
+  --status-in-progress-light: rgba(59, 130, 246, 0.1);
+  --status-completed: #14B8A6;
+  --status-completed-light: rgba(20, 184, 166, 0.1);
+  --status-paused: #F59E0B;
+  --status-paused-light: rgba(245, 158, 11, 0.1);
+}
+
+/* ==================== 关系可视化颜色 ==================== */
+
+:root {
+  --relation-parallel: #F59E0B;
+  --relation-parallel-light: rgba(245, 158, 11, 0.1);
+  --relation-extends: #3B82F6;
+  --relation-extends-light: rgba(59, 130, 246, 0.1);
+  --relation-background: #8B5CF6;
+  --relation-background-light: rgba(139, 92, 246, 0.1);
+}
+
+/* ==================== 工具类 ==================== */
+
+/* 玻璃态效果 */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+[data-theme='dark'] .glass-effect {
+  background: rgba(20, 20, 20, 0.8);
+}
+
+/* 卡片样式 */
+.card-modern {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
+}
+
+.card-modern:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* 按钮样式 */
+.btn-primary {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-family: var(--font-body);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-hover);
+  transform: scale(1.02);
+}
+
+.btn-primary:active {
+  background: var(--color-primary-active);
+  transform: scale(0.98);
+}
+
+/* 标签样式 */
+.tag-modern {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  transition: all var(--transition-fast);
+}
+
+/* 输入框样式 */
+.input-modern {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-family: var(--font-body);
+  font-size: var(--font-size-lg);
+  color: var(--color-text-primary);
+  transition: all var(--transition-fast);
+}
+
+.input-modern:hover {
+  border-color: var(--color-border-strong);
+}
+
+.input-modern:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  border-width: 2px;
+  box-shadow: 0 0 0 3px var(--color-primary-lighter);
+}
+
+/* 分隔线 */
+.divider-modern {
+  height: 1px;
+  background: var(--color-border);
+  border: none;
+  margin: var(--spacing-lg) 0;
+}
+
+/* 滚动条样式 */
+.scrollbar-modern::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-modern::-webkit-scrollbar-track {
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+}
+
+.scrollbar-modern::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.scrollbar-modern::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-tertiary);
+}

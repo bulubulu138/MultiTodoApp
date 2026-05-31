@@ -185,6 +185,7 @@ const MarkdownFileBrowser: React.FC<MarkdownFileBrowserProps> = ({
 
   return (
     <Modal
+      rootClassName="ios-modal"
       title={<><FileTextOutlined /> Markdown文件浏览器</>}
       open={visible}
       onCancel={onClose}

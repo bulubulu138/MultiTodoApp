@@ -154,6 +154,7 @@ const ReportModal: React.FC<ReportModalProps> = ({
 
   return (
     <Modal
+      rootClassName="ios-modal"
       title={
         <Space>
           {reportType === 'daily' && <FileTextOutlined />}

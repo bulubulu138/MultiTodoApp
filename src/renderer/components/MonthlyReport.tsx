@@ -97,7 +97,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
               value={stats.created.length}
               prefix={<FileAddOutlined />}
               suffix="个"
-              valueStyle={{ color: '#1890ff' }}
+              valueStyle={{ color: colors.infoColor }}
             />
           </Card>
         </Col>
@@ -108,7 +108,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
               value={stats.completed.length}
               prefix={<CheckCircleOutlined />}
               suffix="个"
-              valueStyle={{ color: '#52c41a' }}
+              valueStyle={{ color: colors.successColor }}
             />
           </Card>
         </Col>
@@ -118,7 +118,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
               title="完成率"
               value={stats.completionRate}
               suffix="%"
-              valueStyle={{ color: stats.completionRate >= 60 ? '#52c41a' : '#faad14' }}
+              valueStyle={{ color: stats.completionRate >= 60 ? colors.successColor : colors.warningColor }}
             />
           </Card>
         </Col>
@@ -129,7 +129,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
               value={stats.avgDailyCompleted}
               prefix={<RiseOutlined />}
               suffix="个"
-              valueStyle={{ color: '#722ed1' }}
+              valueStyle={{ color: colors.linkColor }}
             />
           </Card>
         </Col>
@@ -177,7 +177,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
                 <div>
                   <Text type="secondary" style={{ fontSize: 12 }}>高优先级任务</Text>
                   <div>
-                    <Text strong style={{ fontSize: 20, color: '#faad14' }}>
+                    <Text strong style={{ fontSize: 20, color: colors.warningColor }}>
                       {stats.highPriorityCompleted.length}
                     </Text>
                     <Text type="secondary"> 个</Text>
@@ -187,11 +187,11 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
             </Col>
             <Col span={8}>
               <Space>
-                <RiseOutlined style={{ fontSize: 24, color: '#722ed1' }} />
+                <RiseOutlined style={{ fontSize: 24, color: colors.linkColor }} />
                 <div>
                   <Text type="secondary" style={{ fontSize: 12 }}>平均每日完成</Text>
                   <div>
-                    <Text strong style={{ fontSize: 20, color: '#722ed1' }}>
+                    <Text strong style={{ fontSize: 20, color: colors.linkColor }}>
                       {stats.avgDailyCompleted}
                     </Text>
                     <Text type="secondary"> 个</Text>
@@ -201,11 +201,11 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
             </Col>
             <Col span={8}>
               <Space>
-                <FireOutlined style={{ fontSize: 24, color: '#ff4d4f' }} />
+                <FireOutlined style={{ fontSize: 24, color: colors.dangerColor }} />
                 <div>
                   <Text type="secondary" style={{ fontSize: 12 }}>连续完成天数</Text>
                   <div>
-                    <Text strong style={{ fontSize: 20, color: '#ff4d4f' }}>
+                    <Text strong style={{ fontSize: 20, color: colors.dangerColor }}>
                       {stats.longestStreak}
                     </Text>
                     <Text type="secondary"> 天</Text>
@@ -236,7 +236,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
                 </Space>
                 <Progress
                   percent={highPercent}
-                  strokeColor="#1677ff"
+                  strokeColor={colors.infoColor}
                   showInfo={false}
                 />
               </div>
@@ -247,7 +247,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
                 </Space>
                 <Progress
                   percent={mediumPercent}
-                  strokeColor="#faad14"
+                  strokeColor={colors.warningColor}
                   showInfo={false}
                 />
               </div>
@@ -258,7 +258,7 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
                 </Space>
                 <Progress
                   percent={lowPercent}
-                  strokeColor="#8c8c8c"
+                  strokeColor={colors.textMuted}
                   showInfo={false}
                 />
               </div>
@@ -299,18 +299,18 @@ const MonthlyReport: React.FC<MonthlyReportProps> = ({ stats }) => {
       >
         <Space direction="vertical" size={12}>
           <Text>
-            • 关注 <Text strong style={{ color: '#1890ff' }}>
+            • 关注 <Text strong style={{ color: colors.infoColor }}>
               {stats.inProgress.length}
             </Text> 个今日事任务
           </Text>
           <Text>
-            • 计划处理 <Text strong style={{ color: '#faad14' }}>
+            • 计划处理 <Text strong style={{ color: colors.warningColor }}>
               {stats.pending.length}
             </Text> 个待办任务
           </Text>
           <Text>
             • 本月完成率 <Text strong style={{ 
-              color: stats.completionRate >= 60 ? '#52c41a' : '#faad14' 
+              color: stats.completionRate >= 60 ? colors.successColor : colors.warningColor 
             }}>
               {stats.completionRate}%
             </Text>，{stats.completionRate >= 60 ? '表现优秀！' : '仍有提升空间'}

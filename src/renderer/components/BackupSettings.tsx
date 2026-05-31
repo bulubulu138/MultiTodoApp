@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Table, Button, Space, message, Typography, Tag, Card, Statistic, Row, Col, Modal } from 'antd';
 import { ReloadOutlined, SaveOutlined, ClockCircleOutlined, CheckCircleOutlined, RollbackOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { BackupInfo } from '../../shared/types';
+import { useThemeColors } from '../hooks/useThemeColors';
 import dayjs from 'dayjs';
 
 const { Text, Paragraph } = Typography;
 
 const BackupSettings: React.FC = () => {
+  const colors = useThemeColors();
   const [backups, setBackups] = useState<BackupInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [backupStatus, setBackupStatus] = useState<{
@@ -181,7 +183,7 @@ const BackupSettings: React.FC = () => {
                 title="自动备份"
                 value={backupStatus.backupEnabled ? '已启用' : '未启用'}
                 prefix={<CheckCircleOutlined />}
-                valueStyle={{ fontSize: '14px', color: backupStatus.backupEnabled ? '#52c41a' : '#ff4d4f' }}
+                valueStyle={{ fontSize: '14px', color: backupStatus.backupEnabled ? colors.successColor : colors.dangerColor }}
               />
             </Col>
           </Row>

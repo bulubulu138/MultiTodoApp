@@ -9,6 +9,7 @@ const AnimatedModal: React.FC<ModalProps> = (props) => {
   return (
     <Modal
       {...props}
+      rootClassName={`ios-modal ${props.rootClassName || ''}`}
       // 优化动画性能
       transitionName="ant-fade" // 使用更快的淡入淡出
       maskTransitionName="ant-fade"

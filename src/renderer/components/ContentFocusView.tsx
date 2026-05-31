@@ -7,6 +7,7 @@ import RelationIndicators from './RelationIndicators';
 import { formatCompletedTime } from '../utils/timeFormatter';
 import { ColorTheme } from '../theme/themes';
 import { useOrderEdit } from '../hooks/useOrderEdit';
+import { useThemeColors } from '../hooks/useThemeColors';
 import { getDeadlineDisplay } from '../utils/deadlineFormatter';
 import dayjs from 'dayjs';
 
@@ -64,6 +65,7 @@ const ContentFocusItem = React.memo(
     onUpdateDisplayOrder,
   }, ref) => {
     const { message } = App.useApp();
+    const colors = useThemeColors();
     const [editedContent, setEditedContent] = useState<string>(todo.content);
     const [editedTitle, setEditedTitle] = useState<string>(todo.title);
     const [isSaving, setIsSaving] = useState(false);
@@ -533,7 +535,7 @@ const ContentFocusItem = React.memo(
           <Space>
             {/* 完成时间显示 */}
             {todo.status === 'completed' && todo.completedAt && (
-              <span style={{ fontSize: 11, color: '#52c41a' }}>
+              <span style={{ fontSize: 11, color: colors.successColor }}>
                 {formatCompletedTime(todo.completedAt)}完成
               </span>
             )}
@@ -583,7 +585,7 @@ const ContentFocusItem = React.memo(
           <Space size={8}>
             {/* 排序序号 */}
             <Space size={4} style={{ fontSize: 12 }}>
-              <span style={{ color: '#999' }}>序号:</span>
+              <span style={{ color: colors.textMuted }}>序号:</span>
               {editingOrder !== undefined ? (
                 <Tooltip title={
                   isInGroup && !isGroupStart 
@@ -621,7 +623,7 @@ const ContentFocusItem = React.memo(
                     }}
                     style={{ 
                       cursor: !!(isInGroup && !isGroupStart) ? 'not-allowed' : 'pointer', 
-                      color: currentDisplayOrder !== undefined ? '#1890ff' : '#ccc',
+                      color: currentDisplayOrder !== undefined ? colors.infoColor : colors.textMuted,
                       opacity: !!(isInGroup && !isGroupStart) ? 0.5 : 1,
                     minWidth: 20,
                     textAlign: 'center',
@@ -636,12 +638,12 @@ const ContentFocusItem = React.memo(
             
             {/* 保存状态指示器 */}
             {(isSaving || isSavingTitle) && (
-              <span style={{ fontSize: 12, color: '#1890ff' }}>
+              <span style={{ fontSize: 12, color: colors.infoColor }}>
                 <SaveOutlined /> 保存中...
               </span>
             )}
             {!isSaving && !isSavingTitle && !hasChanges && !savingOrder && (
-              <span style={{ fontSize: 12, color: '#52c41a' }}>
+              <span style={{ fontSize: 12, color: colors.successColor }}>
                 <CheckCircleOutlined /> 已保存
               </span>
             )}
@@ -671,7 +673,7 @@ const ContentFocusItem = React.memo(
                 justifyContent: 'center',
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 border: 'none',
-                color: 'white',
+                color: '#ffffff',
                 boxShadow: '0 2px 8px rgba(102, 126, 234, 0.4)',
                 transition: 'all 0.3s ease',
                 flexShrink: 0
@@ -880,7 +882,7 @@ const TimeDisplay: React.FC<TimeDisplayProps> = React.memo(({ todo }) => {
         margin: 0,
         color: deadlineInfo.color,
         borderColor: deadlineInfo.color,
-        backgroundColor: deadlineInfo.isOverdue ? '#fff1f0' : 'transparent'
+        backgroundColor: deadlineInfo.isOverdue ? (document.documentElement.dataset.theme === 'dark' ? 'rgba(248, 113, 113, 0.14)' : '#fff1f0') : 'transparent'
       }}
     >
       {deadlineInfo.text}

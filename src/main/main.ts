@@ -197,18 +197,18 @@ class Application {
     const devCSP = [
       "default-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* ws://localhost:* data: blob:",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:*",
-      "style-src 'self' 'unsafe-inline' http://localhost:*",
+      "style-src 'self' 'unsafe-inline' http://localhost:* https://fonts.googleapis.com",
       "img-src 'self' data: blob: file: http://localhost:*",
-      "font-src 'self' data:",
+      "font-src 'self' data: https://fonts.gstatic.com",
       "connect-src 'self' http://localhost:* ws://localhost:*"
     ].join('; ');
 
     const prodCSP = [
       "default-src 'self'",
       "script-src 'self'",
-      "style-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: file:",
-      "font-src 'self' data:",
+      "font-src 'self' data: https://fonts.gstatic.com",
       "connect-src 'self'"
     ].join('; ');
 

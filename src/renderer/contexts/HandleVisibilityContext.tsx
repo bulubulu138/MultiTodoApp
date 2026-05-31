@@ -1,4 +1,5 @@
 import React, { createContext, useContext, CSSProperties } from 'react';
+import { useThemeColors } from '../hooks/useThemeColors';
 
 /**
  * Handle 可见性 Context
@@ -20,14 +21,15 @@ export const HandleVisibilityProvider = HandleVisibilityContext.Provider;
  */
 export const useHandleVisibilityContext = () => {
   const context = useContext(HandleVisibilityContext);
+  const colors = useThemeColors();
   if (!context) {
     // 如果没有 Provider，返回默认实现
     return {
       getHandleStyle: () => ({
-        background: '#555',
+        background: colors.handlePreviewBg,
         width: '10px',
         height: '10px',
-        border: '2px solid #fff',
+        border: `2px solid ${colors.handlePreviewBorder}`,
         zIndex: 10
       }),
       setHoveredNode: () => {},

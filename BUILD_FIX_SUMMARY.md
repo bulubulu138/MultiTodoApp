@@ -1,9 +1,64 @@
-# macOS Build Error Fix - Summary
+# Build Error Fix - Summary
 
-## Problem Resolved
+## Latest Fix (2026-05-31): CSS Module & TypeScript Type Errors
+
+### Problem Resolved
+Fixed critical build errors preventing application compilation:
+1. **CSS Module Resolution**: `Can't resolve './design-system.css'`
+2. **TypeScript Type Errors**: Invalid `fontWeight` property in Ant Design Tag component configuration
+
+### Root Cause
+1. `global.css` referenced non-existent `design-system.css` and `animations.css` files
+2. Ant Design's `ComponentToken` type for Tag component doesn't support `fontWeight` property
+
+### Changes Applied
+
+#### 1. Created design-system.css
+**File:** `src/renderer/styles/design-system.css`
+
+Complete utility class system including:
+- Layout utilities (flex, grid, positioning)
+- Spacing utilities (padding, margin, gap)
+- Typography utilities (font sizes, weights, text alignment)
+- Color utilities (text, background)
+- Border and shadow utilities
+- Animation utilities
+- Ant Design component enhancements
+
+#### 2. Created animations.css
+**File:** `src/renderer/styles/animations.css`
+
+Animation system including:
+- 15+ keyframe animations (fadeIn, slideUp, scaleIn, bounceIn, etc.)
+- Animation utility classes with duration and delay modifiers
+- Accessibility support (prefers-reduced-motion)
+- GPU acceleration for performance
+
+#### 3. Fixed themes.ts Type Errors
+**File:** `src/renderer/theme/themes.ts`
+
+Removed invalid `fontWeight` property from Tag component configuration (lines 182 and 304).
+Font weight now controlled via CSS in `design-system.css`:
+```css
+.ant-tag {
+  font-weight: var(--font-weight-medium);
+}
+```
+
+### Verification Results
+✅ **Build**: `npm run build` - Success (no errors)
+✅ **Dev**: `npm run dev` - Success (application starts normally)
+✅ **TypeScript**: All type checks pass
+✅ **Webpack**: Bundle created successfully
+
+---
+
+## Previous Fix (2026-05-20): macOS Build Error
+
+### Problem Resolved
 Fixed the macOS build error: `Error: Cannot find module 'dmg-license'` that was preventing successful DMG creation.
 
-## Root Cause
+### Root Cause
 The electron-builder version 24.0.0 had dependency resolution issues where the internal dmg-builder module couldn't locate its required 'dmg-license' dependency.
 
 ## Changes Applied

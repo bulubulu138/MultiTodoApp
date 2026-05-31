@@ -105,7 +105,7 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
               value={stats.totalCreated}
               prefix={<FileAddOutlined />}
               suffix="个"
-              valueStyle={{ color: '#1890ff' }}
+              valueStyle={{ color: colors.infoColor }}
             />
           </Card>
         </Col>
@@ -116,7 +116,7 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
               value={stats.totalCompleted}
               prefix={<CheckCircleOutlined />}
               suffix="个"
-              valueStyle={{ color: '#52c41a' }}
+              valueStyle={{ color: colors.successColor }}
             />
           </Card>
         </Col>
@@ -126,7 +126,7 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
               title="完成率"
               value={stats.completionRate}
               suffix="%"
-              valueStyle={{ color: stats.completionRate >= 60 ? '#52c41a' : '#faad14' }}
+              valueStyle={{ color: stats.completionRate >= 60 ? colors.successColor : colors.warningColor }}
             />
           </Card>
         </Col>
@@ -137,7 +137,7 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
               value={stats.totalOverdue}
               prefix={<WarningOutlined />}
               suffix="个"
-              valueStyle={{ color: stats.totalOverdue > 0 ? '#ff4d4f' : '#52c41a' }}
+              valueStyle={{ color: stats.totalOverdue > 0 ? colors.dangerColor : colors.successColor }}
             />
           </Card>
         </Col>
@@ -188,12 +188,12 @@ const DailyReport: React.FC<DailyReportProps> = ({ stats }) => {
       {/* 逾期提醒 */}
       {stats.overdue.length > 0 && (
         <>
-          <Title level={5} style={{ color: '#ff4d4f' }}>
+          <Title level={5} style={{ color: colors.dangerColor }}>
             ⚠️ 逾期提醒 ({stats.overdue.length})
           </Title>
           <Card 
             variant="borderless" 
-            style={{ marginBottom: 16, backgroundColor: colors.cardBg, borderLeft: '3px solid #ff4d4f' }}
+            style={{ marginBottom: 16, backgroundColor: colors.cardBg, borderLeft: `3px solid ${colors.dangerColor}` }}
             styles={{ body: { padding: '12px' } }}
           >
             <List

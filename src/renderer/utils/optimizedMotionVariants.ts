@@ -105,6 +105,120 @@ export const optimizedMotionVariants = {
         duration: 0.1 // 更快的退出动画
       }
     }
+  },
+
+  // 新增：卡片悬停动画 - 柔和上移
+  cardHover: {
+    rest: {
+      y: 0,
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+      transition: {
+        duration: 0.2,
+        ease: 'easeOut'
+      }
+    },
+    hover: {
+      y: -2,
+      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
+      transition: {
+        duration: 0.2,
+        ease: 'easeOut'
+      }
+    }
+  },
+
+  // 新增：拖拽动画 - FLIP动画
+  drag: {
+    start: {
+      scale: 1.02,
+      boxShadow: '0 12px 32px rgba(0, 0, 0, 0.16)',
+      opacity: 0.9,
+      transition: {
+        duration: 0.2,
+        ease: 'easeOut'
+      }
+    },
+    end: {
+      scale: 1,
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+      opacity: 1,
+      transition: {
+        duration: 0.3,
+        ease: [0.4, 0.0, 0.2, 1] // Material Design easing
+      }
+    }
+  },
+
+  // 新增：Stagger列表动画
+  staggerContainer: {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.05,
+        delayChildren: 0.1
+      }
+    }
+  },
+
+  staggerItem: {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.3,
+        ease: 'easeOut'
+      }
+    }
+  },
+
+  // 新增：抽屉动画
+  drawer: {
+    initial: { x: '100%' },
+    animate: {
+      x: 0,
+      transition: {
+        duration: 0.25,
+        ease: 'easeOut'
+      }
+    },
+    exit: {
+      x: '100%',
+      transition: {
+        duration: 0.25,
+        ease: 'easeOut'
+      }
+    }
+  },
+
+  // 新增：淡入淡出
+  fadeInOut: {
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
+    transition: { duration: 0.2 }
+  },
+
+  // 新增：缩放淡入
+  scaleIn: {
+    initial: { opacity: 0, scale: 0.95 },
+    animate: {
+      opacity: 1,
+      scale: 1,
+      transition: {
+        duration: 0.3,
+        ease: 'easeOut'
+      }
+    },
+    exit: {
+      opacity: 0,
+      scale: 0.95,
+      transition: {
+        duration: 0.2,
+        ease: 'easeIn'
+      }
+    }
   }
 } as const;
 

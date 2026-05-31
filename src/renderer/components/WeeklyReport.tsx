@@ -221,7 +221,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
               value={stats.created.length}
               prefix={<FileAddOutlined />}
               suffix="个"
-              valueStyle={{ color: '#1890ff' }}
+              valueStyle={{ color: colors.infoColor }}
             />
           </Card>
         </Col>
@@ -232,7 +232,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
               value={stats.completed.length}
               prefix={<CheckCircleOutlined />}
               suffix="个"
-              valueStyle={{ color: '#52c41a' }}
+              valueStyle={{ color: colors.successColor }}
             />
           </Card>
         </Col>
@@ -242,7 +242,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
               title="完成率"
               value={stats.completionRate}
               suffix="%"
-              valueStyle={{ color: stats.completionRate >= 60 ? '#52c41a' : '#faad14' }}
+              valueStyle={{ color: stats.completionRate >= 60 ? colors.successColor : colors.warningColor }}
             />
           </Card>
         </Col>
@@ -253,7 +253,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
               value={stats.avgDailyCompleted}
               prefix={<RiseOutlined />}
               suffix="个"
-              valueStyle={{ color: '#722ed1' }}
+              valueStyle={{ color: colors.textPrimary }}
             />
           </Card>
         </Col>
@@ -264,7 +264,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
               value={stats.qualityMetrics.avgQualityScore}
               prefix={<TrophyOutlined />}
               suffix="分"
-              valueStyle={{ color: '#fa541c' }}
+              valueStyle={{ color: colors.warningColor }}
             />
           </Card>
         </Col>
@@ -275,7 +275,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
               value={stats.qualityMetrics.highQualityCount}
               prefix={<FireOutlined />}
               suffix="个"
-              valueStyle={{ color: '#13c2c2' }}
+              valueStyle={{ color: colors.infoColor }}
             />
           </Card>
         </Col>
@@ -353,7 +353,7 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
                 return (
                   <List.Item>
                     <Space>
-                      <Badge count={index + 1} style={{ backgroundColor: '#52c41a' }} />
+                      <Badge count={index + 1} style={{ backgroundColor: colors.successColor }} />
                       <Text strong>{todo.title}</Text>
                       <Tag color="gold">评分: {qualityScore}分</Tag>
                       <Tag color={getPriorityColor(todo.priority)}>
@@ -422,18 +422,18 @@ const WeeklyReport: React.FC<WeeklyReportProps> = ({ stats }) => {
       >
         <Space direction="vertical" size={12}>
           <Text>
-            • 重点关注 <Text strong style={{ color: '#1677ff' }}>
+            • 重点关注 <Text strong style={{ color: colors.infoColor }}>
               {stats.pending.filter(t => t.priority === 'mental').length}
             </Text> 个脑力劳动待办
           </Text>
           <Text>
-            • 需要跟进 <Text strong style={{ color: '#1890ff' }}>
+            • 需要跟进 <Text strong style={{ color: colors.infoColor }}>
               {stats.inProgress.length}
             </Text> 个今日事任务
           </Text>
           <Text>
             • 本周完成率 <Text strong style={{ 
-              color: stats.completionRate >= 60 ? '#52c41a' : '#faad14' 
+              color: stats.completionRate >= 60 ? colors.successColor : colors.warningColor 
             }}>
               {stats.completionRate}%
             </Text>，继续保持！

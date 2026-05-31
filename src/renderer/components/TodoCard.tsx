@@ -190,15 +190,15 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
   return (
     <div style={{
       width: '100%',
-      borderTop: isGroupStart && isInGroup ? '2px dashed #fa8c16' : undefined,
-      borderBottom: isGroupEnd && isInGroup ? '2px dashed #fa8c16' : undefined,
-      borderLeft: isInGroup ? '3px solid #fa8c16' : undefined,
-      borderRight: isInGroup ? '3px solid rgba(250, 140, 22, 0.3)' : undefined,
+      borderTop: isGroupStart && isInGroup ? `2px dashed ${colors.warningColor}` : undefined,
+      borderBottom: isGroupEnd && isInGroup ? `2px dashed ${colors.warningColor}` : undefined,
+      borderLeft: isInGroup ? `3px solid ${colors.warningColor}` : undefined,
+      borderRight: isInGroup ? `3px solid ${colors.groupHighlightBorder}` : undefined,
       paddingTop: isGroupStart && isInGroup ? 12 : 0,
       paddingBottom: isGroupEnd && isInGroup ? 12 : 0,
       paddingLeft: isInGroup ? 12 : 0,
       paddingRight: isInGroup ? 12 : 0,
-      backgroundColor: isInGroup ? 'rgba(250, 140, 22, 0.08)' : undefined,
+      backgroundColor: isInGroup ? colors.groupHighlightBg : undefined,
       borderRadius: isInGroup ? 6 : undefined,
       position: 'relative',
     }}>
@@ -208,8 +208,8 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
           position: 'absolute',
           top: -10,
           left: 12,
-          backgroundColor: '#fa8c16',
-          color: 'white',
+          backgroundColor: colors.warningColor,
+          color: colors.tagTextOnColor,
           padding: '2px 8px',
           borderRadius: 4,
           fontSize: 11,
@@ -250,7 +250,7 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
           className={`todo-card ${todo.isDeleting ? 'is-deleting' : ''}`}
           style={{
             flex: 1,
-            borderLeft: hasParallel ? '4px solid #fa8c16' : undefined,
+            borderLeft: hasParallel ? `4px solid ${colors.warningColor}` : undefined,
             backgroundColor: todo.status === 'completed' ? colors.completedBg : undefined,
             pointerEvents: todo.isDeleting ? 'none' : undefined
           }}
@@ -286,7 +286,7 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
                     color: todo.status === 'completed' ? colors.completedText : undefined
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.color = '#40a9ff';
+                    e.currentTarget.style.color = colors.linkHoverColor;
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.color = todo.status === 'completed'
@@ -425,14 +425,14 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
 
             <div style={{
               fontSize: 11,
-              color: todo.status === 'completed' ? colors.completedText : '#999',
+              color: todo.status === 'completed' ? colors.completedText : colors.textMuted,
               whiteSpace: 'nowrap',
               lineHeight: '16px'
             }}>
               <Space size={8} split={<span>|</span>}>
                 <span>更新: {formatCompactTime(todo.updatedAt)}</span>
                 {todo.status === 'completed' && todo.completedAt && (
-                  <span style={{ color: '#52c41a' }}>
+                  <span style={{ color: colors.successColor }}>
                     <CheckCircleOutlined /> 完成于 {formatCompletedTime(todo.completedAt)}
                   </span>
                 )}

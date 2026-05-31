@@ -618,7 +618,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
           linkedText = linkedText.replace(windowsPathRegex, (path) => {
             const fileUrl = `file:///${path.replace(/\\/g, '/')}`;
             const icon = getFileIcon(path);
-            return `<a href="${fileUrl}" class="local-file-link" title="点击打开本地文件: ${path}" style="color: #722ed1; text-decoration: none;">${icon} ${path}</a>`;
+            return `<a href="${fileUrl}" class="local-file-link" title="点击打开本地文件: ${path}" style="color: var(--todo-link-color, #722ed1); text-decoration: none;">${icon} ${path}</a>`;
           });
           hasMatch = true;
         }
@@ -628,7 +628,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
           linkedText = linkedText.replace(uncPathRegex, (path) => {
             const fileUrl = `file:${path.replace(/\\/g, '/')}`;
             const icon = getFileIcon(path);
-            return `<a href="${fileUrl}" class="local-file-link" title="点击打开网络文件: ${path}" style="color: #722ed1; text-decoration: none;">${icon} ${path}</a>`;
+            return `<a href="${fileUrl}" class="local-file-link" title="点击打开网络文件: ${path}" style="color: var(--todo-link-color, #722ed1); text-decoration: none;">${icon} ${path}</a>`;
           });
           hasMatch = true;
         }
@@ -667,7 +667,8 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
           marginTop: 8,
           padding: 16,
           backgroundColor: colors.contentBg,
-          color: '#000000',
+          color: colors.textColor,
+          ['--todo-link-color' as any]: colors.linkColor,
           borderRadius: 4,
           minHeight: 200,
           // 移除 maxHeight 和 overflowY，让内容完整展示
@@ -756,6 +757,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
 
   return (
     <Drawer
+      rootClassName="ios-modal ios-drawer"
       title={
         <Space>
           <span>待办详情</span>
@@ -846,7 +848,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
             {todo.completedAt && (
               <Descriptions.Item label="完成时间" span={2}>
                 <Space>
-                  <ClockCircleOutlined style={{ color: '#52c41a' }} />
+                  <ClockCircleOutlined style={{ color: colors.successColor }} />
                   {formatTime(todo.completedAt)}
                 </Space>
               </Descriptions.Item>
@@ -854,7 +856,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
             {todo.startTime && (
               <Descriptions.Item label="开始时间" span={2}>
                 <Space>
-                  <ClockCircleOutlined style={{ color: '#52c41a' }} />
+                  <ClockCircleOutlined style={{ color: colors.successColor }} />
                   {formatTime(todo.startTime)}
                 </Space>
               </Descriptions.Item>
@@ -862,7 +864,7 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
             {todo.deadline && (
               <Descriptions.Item label="截止时间" span={2}>
                 <Space>
-                  <ClockCircleOutlined style={{ color: '#ff4d4f' }} />
+                  <ClockCircleOutlined style={{ color: colors.dangerColor }} />
                   {formatTime(todo.deadline)}
                 </Space>
               </Descriptions.Item>

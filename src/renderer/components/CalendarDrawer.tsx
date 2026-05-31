@@ -66,10 +66,10 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
   // 获取优先级颜色
   const getPriorityColor = (priority: string): string => {
     switch (priority) {
-      case 'mental': return '#1677ff';
-      case 'communication': return '#faad14';
-      case 'trivial': return '#8c8c8c';
-      default: return '#8c8c8c';
+      case 'mental': return colors.infoColor;
+      case 'communication': return colors.warningColor;
+      case 'trivial': return colors.textMuted;
+      default: return colors.textMuted;
     }
   };
 
@@ -145,7 +145,7 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
             <Badge 
               count={overdueTodos.length}
               style={{ 
-                backgroundColor: '#ff4d4f',
+                backgroundColor: colors.dangerColor,
                 fontSize: viewSize === 'compact' ? 9 : (viewSize === 'standard' ? 10 : 11),
                 height: viewSize === 'compact' ? 14 : (viewSize === 'standard' ? 16 : 18),
                 lineHeight: viewSize === 'compact' ? '14px' : (viewSize === 'standard' ? '16px' : '18px'),
@@ -174,7 +174,7 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
             <Badge
               count={completedTodos.length}
               style={{
-                backgroundColor: '#52c41a',
+                backgroundColor: colors.successColor,
                 fontSize: viewSize === 'compact' ? 9 : (viewSize === 'standard' ? 10 : 11),
                 height: viewSize === 'compact' ? 14 : (viewSize === 'standard' ? 16 : 18),
                 lineHeight: viewSize === 'compact' ? '14px' : (viewSize === 'standard' ? '16px' : '18px'),
@@ -187,7 +187,7 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
             <Badge
               key={`created-${todo.id}`}
               status="processing"
-              color="#1890ff"
+              color={colors.infoColor}
             />
           ))}
         </div>
@@ -235,6 +235,7 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
   return (
     <>
       <Drawer
+        rootClassName="animated-drawer ios-modal ios-drawer"
         title="📅 待办日历视图"
         width="85%"
         open={visible}
@@ -283,7 +284,7 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
             <div style={{ 
               textAlign: 'center', 
               padding: 40, 
-              color: '#999',
+              color: colors.textMuted,
               marginTop: 60
             }}>
               <ClockCircleOutlined style={{ fontSize: 48, marginBottom: 16 }} />
@@ -316,29 +317,27 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
                       onSelectTodo(todo);
                       onClose();
                     }}
-                    style={{ 
+                    className="calendar-list-item calendar-list-item-overdue"
+                    style={{
                       cursor: 'pointer',
                       padding: '6px 10px',
-                      background: colors.listItemOverdueBg,
                       color: colors.textColor,
                       marginBottom: 6,
                       borderRadius: 4,
-                      border: '2px solid #ff4d4f',
+                      border: `2px solid ${colors.dangerColor}`,
                       fontSize: 13
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = colors.listItemOverdueHoverBg}
-                    onMouseLeave={(e) => e.currentTarget.style.background = colors.listItemOverdueBg}
                   >
                     <Space style={{ width: '100%', justifyContent: 'space-between' }}>
                       <Space>
-                        <Tag color="#ff4d4f">逾期 {getOverdueHours(todo)}h</Tag>
+                        <Tag color={colors.dangerColor}>逾期 {getOverdueHours(todo)}h</Tag>
                         <Tag color={getPriorityColor(todo.priority)}>
                           {getPriorityText(todo.priority)}
                         </Tag>
-                        <Text style={{ color: '#ff4d4f' }}>{todo.title}</Text>
+                        <Text style={{ color: colors.dangerColor }}>{todo.title}</Text>
                       </Space>
                       {todo.deadline && (
-                        <Text type="danger" style={{ fontSize: 12, color: '#ff4d4f' }}>
+                        <Text type="danger" style={{ fontSize: 12, color: colors.dangerColor }}>
                           {formatTime(todo.deadline)}
                         </Text>
                       )}
@@ -356,7 +355,7 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
             <>
               <div style={{ marginBottom: 12 }}>
                 <Text strong style={{ fontSize: 14, color: colors.textColor }}>
-                  <PlayCircleOutlined style={{ color: '#52c41a', marginRight: 4 }} />
+                  <PlayCircleOutlined style={{ color: colors.successColor, marginRight: 4 }} />
                   开始的待办 ({starting.length})
                 </Text>
               </div>
@@ -369,18 +368,16 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
                       onSelectTodo(todo);
                       onClose();
                     }}
-                    style={{ 
+                    className="calendar-list-item calendar-list-item-starting"
+                    style={{
                       cursor: 'pointer',
                       padding: '6px 10px',
-                      background: colors.listItemBg,
                       color: colors.textColor,
                       marginBottom: 6,
                       borderRadius: 4,
                       border: `1px solid ${colors.borderColor}`,
                       fontSize: 13
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = colors.listItemHoverBg}
-                    onMouseLeave={(e) => e.currentTarget.style.background = colors.listItemBg}
                   >
                     <Space style={{ width: '100%', justifyContent: 'space-between' }}>
                       <Space>
@@ -390,7 +387,7 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
                         <Text style={{ color: colors.textColor }}>{todo.title}</Text>
                       </Space>
                       {todo.startTime && (
-                        <Text type="secondary" style={{ fontSize: 12, color: '#666666' }}>
+                        <Text type="secondary" style={{ fontSize: 12, color: colors.textMuted }}>
                           {formatTime(todo.startTime)}
                         </Text>
                       )}
@@ -408,7 +405,7 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
               <Divider style={{ margin: '12px 0' }} />
               <div style={{ marginBottom: 12 }}>
                 <Text strong style={{ fontSize: 14, color: colors.textColor }}>
-                  <ClockCircleOutlined style={{ color: '#ff4d4f', marginRight: 4 }} />
+                  <ClockCircleOutlined style={{ color: colors.dangerColor, marginRight: 4 }} />
                   截止的待办 ({deadline.length})
                 </Text>
               </div>
@@ -423,31 +420,29 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
                         onSelectTodo(todo);
                         onClose();
                       }}
-                      style={{ 
+                      className={`calendar-list-item ${overdueFlag ? 'calendar-list-item-overdue' : 'calendar-list-item-normal'}`}
+                      style={{
                         cursor: 'pointer',
                         padding: '6px 10px',
-                        background: overdueFlag ? colors.listItemOverdueBg : colors.listItemBg,
                         color: colors.textColor,
                         marginBottom: 6,
                         borderRadius: 4,
-                        border: overdueFlag ? '1px solid #ff4d4f' : `1px solid ${colors.borderColor}`,
+                        border: overdueFlag ? `1px solid ${colors.dangerColor}` : `1px solid ${colors.borderColor}`,
                         fontSize: 13
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = overdueFlag ? colors.listItemOverdueHoverBg : colors.listItemHoverBg}
-                      onMouseLeave={(e) => e.currentTarget.style.background = overdueFlag ? colors.listItemOverdueBg : colors.listItemBg}
                     >
                       <Space style={{ width: '100%', justifyContent: 'space-between' }}>
                         <Space>
-                          {overdueFlag && <Tag color="#ff4d4f">逾期</Tag>}
+                          {overdueFlag && <Tag color={colors.dangerColor}>逾期</Tag>}
                           <Tag color={getPriorityColor(todo.priority)}>
                             {getPriorityText(todo.priority)}
                           </Tag>
-                          <Text style={{ color: overdueFlag ? '#ff4d4f' : '#000000' }}>
+                          <Text style={{ color: overdueFlag ? colors.dangerColor : colors.textColor }}>
                             {todo.title}
                           </Text>
                         </Space>
                         {todo.deadline && (
-                          <Text type={overdueFlag ? 'danger' : 'secondary'} style={{ fontSize: 12, color: overdueFlag ? '#ff4d4f' : '#666666' }}>
+                          <Text type={overdueFlag ? 'danger' : 'secondary'} style={{ fontSize: 12, color: overdueFlag ? colors.dangerColor : colors.textMuted }}>
                             {formatTime(todo.deadline)}
                           </Text>
                         )}
@@ -484,21 +479,20 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
                       color: colors.textColor,
                       marginBottom: 6,
                       borderRadius: 4,
-                      border: '1px solid #52c41a',
+                      border: `1px solid ${colors.successColor}`,
                       fontSize: 13
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(82, 196, 26, 0.2)'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(82, 196, 26, 0.1)'}
+                    className="calendar-list-item calendar-list-item-starting"
                   >
                     <Space style={{ width: '100%', justifyContent: 'space-between' }}>
                       <Space>
                         <Tag color={getPriorityColor(todo.priority)}>
                           {getPriorityText(todo.priority)}
                         </Tag>
-                        <Text style={{ color: '#52c41a' }}>{todo.title}</Text>
+                        <Text style={{ color: colors.successColor }}>{todo.title}</Text>
                       </Space>
                       {todo.completedAt && (
-                        <Text type="secondary" style={{ fontSize: 12, color: '#666666' }}>
+                        <Text type="secondary" style={{ fontSize: 12, color: colors.textMuted }}>
                           {formatTime(todo.completedAt)}
                         </Text>
                       )}
@@ -535,11 +529,10 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
                       color: colors.textColor,
                       marginBottom: 6,
                       borderRadius: 4,
-                      border: '1px solid #1890ff',
+                      border: `1px solid ${colors.infoColor}`,
                       fontSize: 13
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(24, 144, 255, 0.2)'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(24, 144, 255, 0.1)'}
+                    className="calendar-list-item calendar-list-item-deadline"
                   >
                     <Space style={{ width: '100%', justifyContent: 'space-between' }}>
                       <Space>
@@ -549,7 +542,7 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
                         <Text style={{ color: colors.textColor }}>{todo.title}</Text>
                       </Space>
                       {todo.createdAt && (
-                        <Text type="secondary" style={{ fontSize: 12, color: '#666666' }}>
+                        <Text type="secondary" style={{ fontSize: 12, color: colors.textMuted }}>
                           {formatTime(todo.createdAt)}
                         </Text>
                       )}
@@ -561,7 +554,7 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
           )}
 
               {!hasSelectedTodos && (
-                <div style={{ textAlign: 'center', padding: 20, color: '#999' }}>
+                <div style={{ textAlign: 'center', padding: 20, color: colors.textMuted }}>
                   <Text type="secondary">该日期没有安排待办事项</Text>
                 </div>
               )}
@@ -574,7 +567,7 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
           flex: '1', 
           overflowY: 'auto', 
           paddingLeft: 12, 
-          borderLeft: '1px solid var(--border-color, #f0f0f0)' 
+          borderLeft: `1px solid ${colors.borderColor}` 
         }}>
           <Calendar 
             fullscreen={false}

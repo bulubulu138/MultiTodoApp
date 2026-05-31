@@ -24,7 +24,7 @@
 [data-theme='dark'] .react-flow__node-circle,
 [data-theme='dark'] .react-flow__node-todo {
   background-color: #141414;
-  border-color: #404040;
+  border-color: #3f3f46;
   color: #ffffff;
 }
 
@@ -74,13 +74,13 @@
 /* 控件 */
 [data-theme='dark'] .react-flow__controls {
   background-color: #141414;
-  border-color: #404040;
+  border-color: #3f3f46;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 [data-theme='dark'] .react-flow__controls-button {
-  background-color: #1a1a1a;
-  border-color: #404040;
+  background-color: #181818;
+  border-color: #3f3f46;
   color: #ffffff;
 }
 
@@ -95,7 +95,7 @@
 /* 小地图 */
 [data-theme='dark'] .react-flow__minimap {
   background-color: #141414;
-  border-color: #404040;
+  border-color: #3f3f46;
 }
 
 [data-theme='dark'] .react-flow__minimap-mask {
@@ -170,7 +170,7 @@
 
 [data-theme='dark'] .node-edit-panel .ant-drawer-header {
   background-color: #141414;
-  border-bottom-color: #404040;
+  border-bottom-color: #3f3f46;
 }
 
 [data-theme='dark'] .node-edit-panel .ant-drawer-body {
@@ -208,7 +208,7 @@
 /* 流程图工具栏 - 背景由内联样式控制，这里只处理按钮和文字 */
 [data-theme='dark'] .flowchart-toolbar {
   /* 移除背景色规则，避免与内联样式冲突 */
-  border-bottom-color: #404040;
+  border-bottom-color: #3f3f46;
 }
 
 [data-theme='dark'] .flowchart-toolbar .ant-btn {
@@ -240,8 +240,8 @@
 
 /* 工具栏输入框 */
 [data-theme='dark'] .flowchart-toolbar .ant-input {
-  background-color: #1a1a1a !important;
-  border-color: #404040 !important;
+  background-color: #181818 !important;
+  border-color: #3f3f46 !important;
   color: #ffffff !important;
 }
 

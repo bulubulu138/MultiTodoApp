@@ -262,6 +262,7 @@ const CustomTabManager: React.FC<CustomTabManagerProps> = ({
   // 独立模式：使用Modal包装
   return (
     <Modal
+      rootClassName="ios-modal"
       title={
         <Space>
           <TagsOutlined />

@@ -375,6 +375,7 @@ const TagManagement: React.FC<TagManagementProps> = ({ todos, onReload }) => {
 
       {/* 重命名对话框 */}
       <Modal
+      rootClassName="ios-modal"
         title="重命名标签"
         open={showRenameModal}
         onOk={handleRenameSubmit}
@@ -389,7 +390,7 @@ const TagManagement: React.FC<TagManagementProps> = ({ todos, onReload }) => {
         <Form form={renameForm} layout="vertical">
           <Form.Item label="当前标签">
             <Tag color="blue">{currentTag?.name}</Tag>
-            <span style={{ marginLeft: 8, color: '#666' }}>
+            <span style={{ marginLeft: 8, color: 'var(--color-text-secondary)' }}>
               (使用于 {currentTag?.count} 个待办)
             </span>
           </Form.Item>
@@ -426,7 +427,7 @@ const TagManagement: React.FC<TagManagementProps> = ({ todos, onReload }) => {
                 );
               })}
             </div>
-            <div style={{ color: '#666', fontSize: 12 }}>
+            <div style={{ color: 'var(--color-text-secondary)', fontSize: 12 }}>
               影响范围：{Array.from(new Set(
                 selectedRowKeys.flatMap(tagName => 
                   tagStats.find(t => t.name === tagName)?.todoIds || []

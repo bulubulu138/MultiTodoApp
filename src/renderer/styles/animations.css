@@ -1,0 +1,397 @@
+/* ============================================
+   动画系统 - 关键帧和工具类
+   ============================================ */
+
+/* ============================================
+   动画关键帧定义
+   ============================================ */
+
+/* 淡入动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 淡出动画 */
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* 向上滑入 */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 向下滑入 */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 向左滑入 */
+@keyframes slideLeft {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 向右滑入 */
+@keyframes slideRight {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 缩放进入 */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 缩放退出 */
+@keyframes scaleOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+/* 弹跳进入 */
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 旋转进入 */
+@keyframes rotateIn {
+  from {
+    opacity: 0;
+    transform: rotate(-180deg);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(0deg);
+  }
+}
+
+/* 脉冲动画 */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* 摇晃动画 */
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-10px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(10px);
+  }
+}
+
+/* 闪烁动画 */
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* 加载旋转 */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 心跳动画 */
+@keyframes heartbeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  10%, 30% {
+    transform: scale(0.9);
+  }
+  20%, 40% {
+    transform: scale(1.1);
+  }
+}
+
+/* ============================================
+   动画工具类
+   ============================================ */
+
+/* 淡入动画类 */
+.animate-fade-in {
+  animation: fadeIn var(--transition-base) ease-out;
+}
+
+.animate-fade-out {
+  animation: fadeOut var(--transition-base) ease-out;
+}
+
+/* 滑入动画类 */
+.animate-slide-up {
+  animation: slideUp var(--transition-base) ease-out;
+}
+
+.animate-slide-down {
+  animation: slideDown var(--transition-base) ease-out;
+}
+
+.animate-slide-left {
+  animation: slideLeft var(--transition-base) ease-out;
+}
+
+.animate-slide-right {
+  animation: slideRight var(--transition-base) ease-out;
+}
+
+/* 缩放动画类 */
+.animate-scale-in {
+  animation: scaleIn var(--transition-base) ease-out;
+}
+
+.animate-scale-out {
+  animation: scaleOut var(--transition-base) ease-out;
+}
+
+/* 弹跳动画类 */
+.animate-bounce-in {
+  animation: bounceIn 0.6s ease-out;
+}
+
+/* 旋转动画类 */
+.animate-rotate-in {
+  animation: rotateIn var(--transition-base) ease-out;
+}
+
+/* 脉冲动画类 */
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* 摇晃动画类 */
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* 闪烁动画类 */
+.animate-blink {
+  animation: blink 1s step-start infinite;
+}
+
+/* 旋转加载动画类 */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* 心跳动画类 */
+.animate-heartbeat {
+  animation: heartbeat 1.5s ease-in-out infinite;
+}
+
+/* ============================================
+   动画延迟工具类
+   ============================================ */
+
+.animate-delay-100 {
+  animation-delay: 100ms;
+}
+
+.animate-delay-200 {
+  animation-delay: 200ms;
+}
+
+.animate-delay-300 {
+  animation-delay: 300ms;
+}
+
+.animate-delay-500 {
+  animation-delay: 500ms;
+}
+
+.animate-delay-1000 {
+  animation-delay: 1000ms;
+}
+
+/* ============================================
+   动画持续时间工具类
+   ============================================ */
+
+.animate-duration-fast {
+  animation-duration: var(--transition-fast);
+}
+
+.animate-duration-base {
+  animation-duration: var(--transition-base);
+}
+
+.animate-duration-slow {
+  animation-duration: var(--transition-slow);
+}
+
+/* ============================================
+   动画填充模式
+   ============================================ */
+
+.animate-fill-forwards {
+  animation-fill-mode: forwards;
+}
+
+.animate-fill-backwards {
+  animation-fill-mode: backwards;
+}
+
+.animate-fill-both {
+  animation-fill-mode: both;
+}
+
+/* ============================================
+   动画迭代次数
+   ============================================ */
+
+.animate-once {
+  animation-iteration-count: 1;
+}
+
+.animate-infinite {
+  animation-iteration-count: infinite;
+}
+
+/* ============================================
+   无障碍支持 - 尊重用户的动画偏好
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  /* 保留必要的过渡效果，但大幅缩短时间 */
+  .animate-fade-in,
+  .animate-fade-out,
+  .animate-slide-up,
+  .animate-slide-down,
+  .animate-slide-left,
+  .animate-slide-right,
+  .animate-scale-in,
+  .animate-scale-out,
+  .animate-bounce-in,
+  .animate-rotate-in {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  /* 完全禁用循环动画 */
+  .animate-pulse,
+  .animate-blink,
+  .animate-spin,
+  .animate-heartbeat {
+    animation: none !important;
+  }
+}
+
+/* ============================================
+   性能优化 - GPU 加速
+   ============================================ */
+
+.animate-fade-in,
+.animate-fade-out,
+.animate-slide-up,
+.animate-slide-down,
+.animate-slide-left,
+.animate-slide-right,
+.animate-scale-in,
+.animate-scale-out,
+.animate-bounce-in,
+.animate-rotate-in,
+.animate-spin {
+  will-change: transform, opacity;
+}
+
+/* 动画结束后移除 will-change */
+.animate-fade-in:not(:hover),
+.animate-fade-out:not(:hover),
+.animate-slide-up:not(:hover),
+.animate-slide-down:not(:hover),
+.animate-slide-left:not(:hover),
+.animate-slide-right:not(:hover),
+.animate-scale-in:not(:hover),
+.animate-scale-out:not(:hover),
+.animate-bounce-in:not(:hover),
+.animate-rotate-in:not(:hover) {
+  will-change: auto;
+}

@@ -1,31 +1,48 @@
-/* 全局样式 */
+/* ============================================
+   设计系统导入
+   ============================================ */
+@import './design-tokens.css';
+@import './design-system.css';
+
+/* ============================================
+   全局重置
+   ============================================ */
 * {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-/* 只对需要过渡的元素应用动画 - 性能优化 */
-/* 使用更精确的选择器，避免全局应用 */
+/* ============================================
+   性能优化的过渡动画
+   ============================================ */
 .ant-btn {
-  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
-              color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-              border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color var(--transition-fast),
+              color var(--transition-fast),
+              border-color var(--transition-fast),
+              transform var(--transition-fast);
 }
 
 .ant-tabs-tab {
-  transition: color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: color var(--transition-fast);
 }
 
 /* 浅色主题默认CSS变量 */
 :root {
-  --list-item-bg: #fff;
-  --list-item-hover-bg: #f5f5f5;
-  --list-item-overdue-bg: #fff1f0;
-  --list-item-overdue-hover-bg: #ffe7e6;
-  --list-item-current-bg: #f0f9ff;
-  --content-bg: #f5f5f5;
-  --border-color: #f0f0f0;
-  --group-border-color: #fa8c16;
-  --group-border-bg: rgba(250, 140, 22, 0.3);
+  --list-item-bg: #ffffff;
+  --list-item-hover-bg: #fafafc;
+  --list-item-overdue-bg: #fff4f2;
+  --list-item-overdue-hover-bg: #ffefeb;
+  --list-item-current-bg: #f2f8ff;
+  --content-bg: #F2F2F7;
+  --border-color: rgba(60, 60, 67, 0.08);
+  --group-border-color: var(--color-warning);
+  --group-border-bg: rgba(250, 140, 22, 0.12);
+  --ios-card-radius: 12px;
+  --ios-control-radius: 12px;
+  --ios-section-gap: 20px;
+  --ios-page-padding: 24px;
+  --ios-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 /* 深色主题CSS变量 */
@@ -37,20 +54,26 @@
   --list-item-current-bg: #0d1829;
   --content-bg: #141414;
   --border-color: #404040;
-  --group-border-color: #fa8c16;
+  --group-border-color: var(--color-warning);
   --group-border-bg: rgba(250, 140, 22, 0.15);
 }
 
 body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  /* 移除 background-color，由主题控制 */
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  background-color: var(--content-bg);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
   height: 100vh;
   overflow: hidden;
+  background: var(--content-bg);
 }
 
 /* 自定义滚动条 - 适配深色主题 */
@@ -113,9 +136,9 @@ body {
 
 /* 工具栏样式 - 移除硬编码背景色 */
 .toolbar {
-  /* background: white; - 移除，由主题控制 */
-  border-bottom: 1px solid var(--border-color, #f0f0f0);
-  padding: 16px;
+  background: transparent;
+  border-bottom: none;
+  padding: 20px 24px 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -148,39 +171,82 @@ body {
 .content-area {
   height: calc(100vh - 73px);
   overflow-y: auto;
-  padding: 16px;
+  padding: 0 24px 24px;
+  background: var(--content-bg);
+}
+
+.content-card-shell {
+  background: var(--color-bg-elevated, #ffffff);
+  border-radius: var(--ios-card-radius);
+  box-shadow: var(--ios-card-shadow);
+  padding: 8px 20px 20px;
+  min-height: calc(100vh - 109px);
+}
+
+[data-theme='dark'] .content-card-shell {
+  background: var(--color-bg-elevated, #111111) !important;
+}
+
+.todo-view-stage {
+  margin-top: 12px;
 }
 
 /* 状态Tab样式 - 适配主题 */
 .status-tabs {
-  /* background: white; - 移除 */
-  padding: 12px 16px 0 16px;
-  border-radius: 8px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  padding: 8px 4px 0;
+  border-radius: var(--ios-card-radius);
+  box-shadow: none;
+  background: transparent;
+}
+
+.status-tabs .ant-tabs-nav {
+  margin-bottom: 8px;
+}
+
+.status-tabs .ant-tabs-nav::before {
+  display: none;
 }
 
 .status-tabs .ant-tabs-tab {
   font-weight: 500;
-  padding: 8px 16px;
+  padding: 6px 10px;
+  min-height: 34px;
+  border-radius: 999px;
+  margin: 0 6px 8px 0;
+  background: transparent;
+}
+
+.status-tabs .ant-tabs-tab:hover {
+  background: rgba(60, 60, 67, 0.05);
 }
 
 .status-tabs .ant-tabs-tab-active {
   font-weight: 600;
+  background: rgba(0, 122, 255, 0.10);
+}
+
+.status-tabs .ant-tabs-tab-btn {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.status-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--color-primary);
 }
 
 .status-tabs .ant-tabs-ink-bar {
-  height: 3px;
+  display: none;
 }
 
 /* 卡片样式 - 由主题控制，性能优化版 */
 .todo-card {
-  margin-bottom: 6px;
-  border-radius: 8px;
-  box-shadow: none;
-  /* 移除全局will-change，仅在hover时动态添加 */
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease-in;
-  /* 明确移除底部边框 */
-  border-bottom: none !important;
+  margin-bottom: 12px;
+  border-radius: var(--ios-card-radius);
+  box-shadow: var(--ios-card-shadow);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease-in, box-shadow 0.2s ease;
+  border: none !important;
+  background: var(--color-bg-elevated, #ffffff);
 }
 
 .todo-card.is-deleting {
@@ -192,13 +258,13 @@ body {
 
 /* 同时确保 Ant Design Card 的边框也被移除 */
 .todo-card.ant-card {
-  border-bottom: none !important;
+  border: none !important;
 }
 
 .todo-card:hover {
   transform: translateY(-2px);
-  box-shadow: none;
-  will-change: transform; /* 仅在hover时启用 */
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  will-change: transform;
 }
 
 .todo-card:not(:hover) {
@@ -206,7 +272,7 @@ body {
 }
 
 .todo-card .ant-card-body {
-  padding: 8px;
+  padding: 16px;
 }
 
 /* 图片预览样式 */
@@ -1473,10 +1539,55 @@ flowchart-preview.flowchart-embedded:hover {
   contain: layout style paint;
 }
 
+/* Milkdown 编辑器自适应高度样式 */
+.content-focus-item-editor .milkdown-editor-container {
+  min-height: 3em; /* 两行文本高度（行高1.5 * 2行） */
+  max-height: none; /* 无最大高度限制 */
+  height: auto; /* 自动高度 */
+  overflow: visible; /* 允许内容完全显示 */
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.content-focus-item-editor .milkdown-editor-container:focus-within {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+/* Milkdown 编辑器内部内容区域 */
+.content-focus-item-editor .milkdown {
+  min-height: 3em;
+  height: auto;
+  overflow: visible;
+}
+
+.content-focus-item-editor .milkdown .editor {
+  min-height: 3em;
+  height: auto;
+  overflow: visible;
+  padding: 16px;
+  font-size: 15px;
+  line-height: 1.5;
+  word-break: break-all;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+/* ProseMirror 编辑器核心容器 */
+.content-focus-item-editor .ProseMirror {
+  min-height: 3em;
+  height: auto;
+  overflow: visible;
+  outline: none;
+}
+
+/* 旧的 Quill 编辑器样式（保留以防回退） */
 .content-focus-item-editor .quill {
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+  transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
               box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -1574,6 +1685,32 @@ flowchart-preview.flowchart-embedded:hover {
 }
 
 [data-theme='dark'] .content-focus-item-editor .ql-editor {
+  background: #141414;
+  color: #ffffff;
+}
+
+/* Milkdown 编辑器深色主题 */
+[data-theme='dark'] .content-focus-item-editor .milkdown-editor-container {
+  border-color: #404040;
+  background: #141414;
+}
+
+[data-theme='dark'] .content-focus-item-editor .milkdown-editor-container:focus-within {
+  border-color: #40a9ff;
+  box-shadow: 0 0 0 2px rgba(64, 169, 255, 0.2);
+}
+
+[data-theme='dark'] .content-focus-item-editor .milkdown {
+  background: #141414;
+  color: #ffffff;
+}
+
+[data-theme='dark'] .content-focus-item-editor .milkdown .editor {
+  background: #141414;
+  color: #ffffff;
+}
+
+[data-theme='dark'] .content-focus-item-editor .ProseMirror {
   background: #141414;
   color: #ffffff;
 }
@@ -1844,4 +1981,699 @@ motion.div {
 }
 
 /* 导入精致拖拽样式 */
+
+/* ============================================
+   CalendarDrawer 优化的 hover 动画
+   ============================================ */
+
+/* 日历列表项基础样式 - GPU 加速的 hover 过渡 */
+.calendar-list-item {
+  transition: background-color 150ms cubic-bezier(0.2, 0, 0, 1);
+  will-change: background-color;
+}
+
+/* 逾期项 hover */
+.calendar-list-item-overdue {
+  background: var(--list-item-overdue-bg);
+}
+
+.calendar-list-item-overdue:hover {
+  background: var(--list-item-overdue-hover-bg) !important;
+}
+
+/* 普通项 hover */
+.calendar-list-item-normal {
+  background: var(--list-item-bg);
+}
+
+.calendar-list-item-normal:hover {
+  background: var(--list-item-hover-bg) !important;
+}
+
+/* 开始项 hover (绿色) */
+.calendar-list-item-starting:hover {
+  background: rgba(82, 196, 26, 0.2) !important;
+}
+
+/* 截止项 hover (蓝色) */
+.calendar-list-item-deadline:hover {
+  background: rgba(24, 144, 255, 0.2) !important;
+}
+
+/* 移除 hover 后的 will-change 以节省内存 */
+.calendar-list-item:not(:hover) {
+  will-change: auto;
+}
+
+/* ============================================
+   增强的删除动画 - Apple 风格
+   ============================================ */
+
+@keyframes delete-out {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateX(0);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.95) translateX(-10px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.85) translateX(20px);
+  }
+}
+
+.todo-card.is-deleting {
+  animation: delete-out 300ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
 @import './refined-drag.css';
+
+
+.app-shell .ant-layout {
+  background: transparent;
+}
+
+.app-shell .ant-layout-content {
+  background: transparent;
+}
+
+.content-card-shell .ant-tabs-content-holder {
+  padding-top: 4px;
+}
+
+.content-card-shell .ant-tabs-tabpane {
+  padding-top: 4px;
+}
+
+[data-theme='dark'] .content-card-shell .ant-tabs,
+[data-theme='dark'] .content-card-shell .ant-tabs-content-holder,
+[data-theme='dark'] .content-card-shell .ant-tabs-content,
+[data-theme='dark'] .content-card-shell .ant-tabs-tabpane {
+  background: transparent !important;
+}
+
+.content-card-shell .ant-empty,
+.content-card-shell .ant-list-empty-text {
+  padding: 32px 0;
+}
+
+.content-card-shell .ant-btn,
+.content-card-shell .ant-input,
+.content-card-shell .ant-input-number,
+.content-card-shell .ant-select-selector {
+  border-radius: var(--ios-control-radius) !important;
+}
+
+.content-card-shell .ant-select-selector,
+.content-card-shell .ant-input,
+.content-card-shell .ant-input-number,
+.content-card-shell .ant-picker,
+.content-card-shell .ant-btn-default {
+  border: none !important;
+  box-shadow: none !important;
+  background: #f7f7fa !important;
+}
+
+.content-card-shell .ant-btn-primary {
+  border: none !important;
+  border-radius: var(--ios-control-radius) !important;
+  box-shadow: none !important;
+}
+
+.content-card-shell .ant-list-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.content-card-shell .ant-list-item {
+  border-block-end: none !important;
+  padding: 0 !important;
+}
+
+@media (max-width: 768px) {
+  .toolbar {
+    padding: 16px 16px 8px;
+  }
+
+  .content-area {
+    padding: 0 16px 16px;
+  }
+
+  .content-card-shell {
+    padding: 8px 14px 16px;
+    min-height: calc(100vh - 97px);
+  }
+}
+
+
+.status-tabs .ant-tabs-nav-wrap {
+  padding-right: 4px;
+}
+
+.status-tabs .ant-tabs-tab .ant-tabs-tab-btn {
+  padding: 0 1px;
+}
+
+.ios-toolbar-surface {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-radius: var(--ios-card-radius);
+  box-shadow: var(--ios-card-shadow);
+}
+
+.toolbar {
+  background: color-mix(in srgb, var(--color-bg-elevated, #ffffff) 72%, transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-bottom: none;
+  border-radius: var(--ios-card-radius);
+  box-shadow: var(--ios-card-shadow);
+  margin: 16px 24px 12px;
+}
+
+.toolbar-search .ant-input,
+.toolbar-search .ant-input-affix-wrapper,
+.toolbar-sort-select .ant-select-selector,
+.toolbar .ant-segmented,
+.toolbar .toolbar-btn-with-text,
+.toolbar .toolbar-btn-primary,
+.toolbar .toolbar-btn-settings {
+  border-radius: var(--ios-control-radius) !important;
+}
+
+.toolbar-search .ant-input-affix-wrapper,
+.toolbar-sort-select .ant-select-selector,
+.toolbar .ant-segmented,
+.toolbar .toolbar-btn-with-text,
+.toolbar .toolbar-btn-settings {
+  background: var(--color-bg-elevated, #ffffff) !important;
+  border: none !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+}
+
+.toolbar .ant-segmented {
+  padding: 4px;
+}
+
+.toolbar .ant-segmented-item {
+  border-radius: 10px;
+}
+
+.toolbar .ant-segmented-item-selected {
+  box-shadow: none !important;
+}
+
+.ios-modal .ant-modal-content,
+.ios-modal .ant-drawer-content,
+.ios-modal .ant-drawer-header {
+  border-radius: 20px !important;
+  border: none !important;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.18) !important;
+}
+
+[data-theme='dark'] .ios-modal .ant-modal-content,
+[data-theme='dark'] .ios-modal .ant-drawer-content,
+[data-theme='dark'] .ios-modal .ant-drawer-header {
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45) !important;
+}
+
+.ios-modal .ant-modal-content,
+.ios-modal .ant-drawer-content {
+  overflow: hidden;
+}
+
+.ios-modal .ant-modal-header,
+.ios-modal .ant-drawer-header {
+  background: var(--color-bg-elevated, #ffffff) !important;
+  border-bottom: none !important;
+  padding: 20px 24px 8px !important;
+}
+
+.ios-modal .ant-modal-title,
+.ios-modal .ant-drawer-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.ios-modal .ant-modal-body,
+.ios-modal .ant-drawer-body {
+  padding: 16px 24px 24px !important;
+  background: var(--color-bg-elevated, #ffffff);
+}
+
+.ios-modal .ant-modal-footer {
+  border-top: none !important;
+  padding: 8px 24px 24px !important;
+}
+
+.ios-modal .ant-card {
+  border: none !important;
+  border-radius: var(--ios-card-radius) !important;
+  box-shadow: var(--ios-card-shadow) !important;
+  background: var(--color-bg-elevated, #ffffff) !important;
+}
+
+.ios-modal .ant-card .ant-card-head {
+  border-bottom: none !important;
+}
+
+.ios-modal .ant-tabs-nav::before {
+  display: none;
+}
+
+.ios-modal .ant-form-item {
+  margin-bottom: 20px;
+}
+
+.ios-modal .ant-input,
+.ios-modal .ant-input-affix-wrapper,
+.ios-modal .ant-input-number,
+.ios-modal .ant-picker,
+.ios-modal .ant-select-selector,
+.ios-modal .ant-btn-default,
+.ios-modal .ant-radio-button-wrapper {
+  border-radius: var(--ios-control-radius) !important;
+}
+
+.ios-modal .ant-input,
+.ios-modal .ant-input-affix-wrapper,
+.ios-modal .ant-input-number,
+.ios-modal .ant-picker,
+.ios-modal .ant-select-selector,
+.ios-modal .ant-radio-button-wrapper {
+  background: var(--ios-subtle-surface) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.ios-modal .ant-radio-button-wrapper::before {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .toolbar {
+    margin: 12px 16px 8px;
+  }
+}
+
+
+.ios-subtabs .ant-tabs-nav {
+  margin-bottom: 16px;
+}
+
+.ios-subtabs .ant-tabs-nav::before {
+  display: none;
+}
+
+.ios-subtabs .ant-tabs-tab {
+  padding: 6px 10px;
+  min-height: 32px;
+  margin: 0 6px 6px 0;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.ios-subtabs .ant-tabs-tab:hover {
+  background: rgba(60, 60, 67, 0.05);
+}
+
+.ios-subtabs .ant-tabs-tab-active {
+  background: rgba(0, 122, 255, 0.08);
+}
+
+.ios-subtabs .ant-tabs-tab-btn {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.ios-subtabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.ios-subtabs .ant-tabs-ink-bar {
+  display: none;
+}
+
+.ios-drawer .ant-drawer-header {
+  padding-right: 56px !important;
+}
+
+.ios-drawer .ant-drawer-footer {
+  border-top: none !important;
+  padding: 12px 24px 24px !important;
+  background: var(--color-bg-elevated, #ffffff);
+}
+
+.ios-modal .ant-list-item {
+  border-block-end: none !important;
+  padding: 12px 0 !important;
+}
+
+.ios-modal .ant-list-item-meta {
+  align-items: flex-start;
+}
+
+.ios-modal .ant-select-selection-item,
+.ios-modal .ant-input,
+.ios-modal .ant-input-number-input,
+.ios-modal .ant-picker-input > input {
+  font-size: 14px;
+}
+
+.ios-modal .ant-form-item-label > label {
+  font-weight: 600;
+}
+
+.ios-modal .milkdown-editor-container,
+.ios-modal .ql-container,
+.ios-modal .ql-toolbar {
+  border-radius: var(--ios-card-radius) !important;
+}
+
+.ios-modal .ql-toolbar,
+.ios-modal .tiptap-toolbar {
+  border-bottom: none !important;
+  background: var(--ios-subtle-surface) !important;
+}
+
+.ios-modal .ql-container,
+.ios-modal .milkdown-editor-container,
+.ios-modal .tiptap-editor {
+  border: none !important;
+  box-shadow: none !important;
+  background: var(--ios-subtle-surface) !important;
+}
+
+.settings-modal .ant-modal-body {
+  padding-top: 12px !important;
+}
+
+
+:root {
+  --ios-text-title: var(--font-size-2xl);
+  --ios-text-body: var(--font-size-md);
+  --ios-text-caption: var(--font-size-sm);
+  --ios-button-height: 38px;
+  --ios-button-height-large: 42px;
+  --ios-list-hover: rgba(60, 60, 67, 0.04);
+  --ios-list-selected: rgba(0, 122, 255, 0.08);
+  --ios-subtle-surface: #f7f7fa;
+}
+
+[data-theme='dark'] {
+  --ios-list-hover: rgba(255, 255, 255, 0.06);
+  --ios-list-selected: rgba(96, 165, 250, 0.14);
+  --ios-subtle-surface: #181818;
+}
+
+.content-card-shell,
+.ios-modal .ant-modal-content,
+.ios-modal .ant-drawer-content {
+  color: var(--color-text-primary);
+}
+
+.content-card-shell .ant-btn,
+.toolbar .ant-btn,
+.ios-modal .ant-btn {
+  height: var(--ios-button-height);
+  padding: 0 14px;
+  font-size: var(--ios-text-body);
+  font-weight: var(--font-weight-medium);
+}
+
+.content-card-shell .ant-btn-lg,
+.toolbar .ant-btn-lg,
+.ios-modal .ant-btn-lg,
+.content-card-shell .ant-btn-primary,
+.toolbar .toolbar-btn-primary {
+  height: var(--ios-button-height-large);
+}
+
+.content-card-shell .ant-btn-primary,
+.toolbar .ant-btn-primary,
+.ios-modal .ant-btn-primary {
+  box-shadow: none !important;
+  font-weight: var(--font-weight-semibold);
+}
+
+.content-card-shell .ant-btn-default,
+.toolbar .ant-btn-default,
+.ios-modal .ant-btn-default {
+  color: var(--color-text-primary);
+}
+
+.toolbar .btn-text,
+.toolbar .btn-text-always {
+  font-size: var(--ios-text-body);
+  font-weight: var(--font-weight-medium);
+}
+
+.content-card-shell h1,
+.content-card-shell h2,
+.content-card-shell h3,
+.ios-modal .ant-modal-title,
+.ios-modal .ant-drawer-title {
+  letter-spacing: -0.01em;
+}
+
+.content-card-shell .ant-typography,
+.ios-modal .ant-typography {
+  color: var(--color-text-primary);
+}
+
+.content-card-shell .ant-typography-secondary,
+.ios-modal .ant-typography-secondary,
+.content-card-shell .secondary-text,
+.ios-modal .secondary-text {
+  color: var(--color-text-secondary) !important;
+}
+
+.content-card-shell .caption-text,
+.ios-modal .caption-text,
+.content-card-shell .ant-empty-description,
+.ios-modal .ant-empty-description {
+  color: var(--color-text-tertiary) !important;
+  font-size: var(--ios-text-caption);
+}
+
+.status-tabs .ant-tabs-tab,
+.ios-subtabs .ant-tabs-tab {
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.status-tabs .ant-tabs-tab:active,
+.ios-subtabs .ant-tabs-tab:active {
+  transform: scale(0.98);
+}
+
+.todo-card {
+  overflow: hidden;
+}
+
+.todo-card:hover {
+  background: linear-gradient(180deg, var(--color-bg-elevated, #ffffff) 0%, var(--list-item-hover-bg, #fcfcfd) 100%);
+}
+
+.content-card-shell .ant-list-item > .todo-card,
+.content-card-shell .ant-list-item .todo-card {
+  width: 100%;
+}
+
+.content-card-shell .ant-list-item:hover,
+.ios-modal .ant-list-item:hover {
+  background: transparent;
+}
+
+.content-card-shell .ant-list-item .todo-card:hover,
+.ios-modal .ant-list-item:hover {
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.content-card-shell .ant-list-item-selected,
+.ios-modal .ant-list-item-selected {
+  background: var(--ios-list-selected) !important;
+  border-radius: var(--ios-card-radius);
+}
+
+.content-card-shell .ant-empty,
+.ios-modal .ant-empty {
+  padding: 40px 12px;
+}
+
+.content-card-shell .ant-empty-image,
+.ios-modal .ant-empty-image {
+  opacity: 0.9;
+}
+
+.content-card-shell .ant-empty-description,
+.ios-modal .ant-empty-description {
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+.content-card-shell .ant-select-selector,
+.content-card-shell .ant-input,
+.content-card-shell .ant-input-number,
+.content-card-shell .ant-picker,
+.content-card-shell .ant-btn-default,
+.ios-modal .ant-select-selector,
+.ios-modal .ant-input,
+.ios-modal .ant-input-number,
+.ios-modal .ant-picker,
+.ios-modal .ant-btn-default,
+.ios-modal .ant-btn,
+.content-card-shell .ant-btn,
+.ios-modal .ant-segmented,
+.content-card-shell .ant-segmented,
+.ios-modal .ant-radio-button-wrapper,
+.content-card-shell .ant-radio-button-wrapper {
+  background: var(--ios-subtle-surface) !important;
+}
+
+.content-card-shell .ant-input::placeholder,
+.ios-modal .ant-input::placeholder,
+.content-card-shell textarea::placeholder,
+.ios-modal textarea::placeholder {
+  color: var(--color-text-tertiary) !important;
+}
+
+.content-card-shell .ant-tag,
+.ios-modal .ant-tag {
+  border: none;
+  border-radius: 999px;
+  padding-inline: 8px;
+  font-size: var(--ios-text-caption);
+}
+
+.content-card-shell .ant-statistic,
+.ios-modal .ant-statistic {
+  padding: 16px;
+  border-radius: var(--ios-card-radius);
+  background: var(--ios-subtle-surface);
+}
+
+.content-card-shell .ant-table-wrapper,
+.content-card-shell .ant-table,
+.content-card-shell .ant-table-container,
+.ios-modal .ant-table-wrapper,
+.ios-modal .ant-table,
+.ios-modal .ant-table-container,
+.content-card-shell .ant-collapse,
+.ios-modal .ant-collapse {
+  background: var(--color-bg-elevated, #ffffff) !important;
+  color: var(--color-text-primary) !important;
+}
+
+.content-card-shell .ant-table-thead > tr > th,
+.ios-modal .ant-table-thead > tr > th,
+.content-card-shell .ant-table-tbody > tr > td,
+.ios-modal .ant-table-tbody > tr > td,
+.content-card-shell .ant-collapse > .ant-collapse-item > .ant-collapse-header,
+.ios-modal .ant-collapse > .ant-collapse-item > .ant-collapse-header,
+.content-card-shell .ant-collapse-content,
+.ios-modal .ant-collapse-content {
+  background: var(--color-bg-elevated, #ffffff) !important;
+  color: var(--color-text-primary) !important;
+  border-color: var(--color-border, #e4e4e7) !important;
+}
+
+.content-card-shell .ant-statistic .ant-statistic-title,
+.ios-modal .ant-statistic .ant-statistic-title {
+  color: var(--color-text-secondary);
+  font-size: var(--ios-text-caption);
+}
+
+.content-card-shell .ant-statistic .ant-statistic-content,
+.ios-modal .ant-statistic .ant-statistic-content {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+}
+
+.content-card-shell .ant-select-dropdown,
+.ios-modal .ant-select-dropdown,
+.ant-select-dropdown,
+.ant-dropdown,
+.ant-dropdown-menu,
+.ant-picker-dropdown,
+.ant-popover .ant-popover-inner,
+.ant-tooltip .ant-tooltip-inner,
+.ant-modal-root .ant-picker-panel,
+.ant-modal-root .ant-select-dropdown,
+.ant-drawer .ant-picker-panel,
+.ant-drawer .ant-select-dropdown {
+  background: var(--color-bg-elevated, #ffffff) !important;
+  color: var(--color-text-primary) !important;
+  border-color: var(--color-border, #e4e4e7) !important;
+}
+
+.ant-select-item,
+.ant-dropdown-menu-item,
+.ant-picker-cell,
+.ant-picker-header,
+.ant-picker-content th,
+.ant-picker-content td {
+  color: var(--color-text-primary) !important;
+}
+
+.ant-select-item-option-active:not(.ant-select-item-option-disabled),
+.ant-select-item-option-selected:not(.ant-select-item-option-disabled),
+.ant-dropdown-menu-item:hover,
+.ant-dropdown-menu-submenu-title:hover {
+  background: var(--list-item-hover-bg, #f5f5f5) !important;
+}
+
+.ant-picker-cell-in-view,
+.ant-picker-header-view,
+.ant-picker-super-prev-icon,
+.ant-picker-prev-icon,
+.ant-picker-next-icon,
+.ant-picker-super-next-icon {
+  color: var(--color-text-primary) !important;
+}
+
+.ant-picker-cell-in-view.ant-picker-cell-selected .ant-picker-cell-inner,
+.ant-picker-cell-in-view.ant-picker-cell-range-start .ant-picker-cell-inner,
+.ant-picker-cell-in-view.ant-picker-cell-range-end .ant-picker-cell-inner {
+  background: var(--color-primary) !important;
+}
+
+.ios-modal .ant-btn-primary,
+.content-card-shell .ant-btn-primary,
+.toolbar .ant-btn-primary {
+  background: var(--color-primary) !important;
+  color: #ffffff !important;
+}
+
+.ios-modal .ant-btn-default,
+.content-card-shell .ant-btn-default,
+.toolbar .ant-btn-default,
+.ios-modal .ant-segmented-item,
+.content-card-shell .ant-segmented-item,
+.ios-modal .ant-radio-button-wrapper,
+.content-card-shell .ant-radio-button-wrapper {
+  color: var(--color-text-primary) !important;
+  border-color: var(--color-border, #e4e4e7) !important;
+}
+
+.ios-modal .ant-segmented-item-selected,
+.content-card-shell .ant-segmented-item-selected,
+.ios-modal .ant-radio-button-wrapper-checked,
+.content-card-shell .ant-radio-button-wrapper-checked {
+  background: var(--color-bg-elevated, #ffffff) !important;
+  color: var(--color-primary) !important;
+}
+
+@media (max-width: 768px) {
+  .content-card-shell .ant-btn,
+  .toolbar .ant-btn,
+  .ios-modal .ant-btn {
+    padding: 0 12px;
+  }
+}
+

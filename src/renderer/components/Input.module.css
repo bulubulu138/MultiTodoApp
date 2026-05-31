@@ -1,0 +1,568 @@
+/* Input/Form 现代化样式 */
+
+/* ============================================
+   表单容器
+   ============================================ */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+/* ============================================
+   标签
+   ============================================ */
+.label {
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  line-height: var(--line-height-tight);
+  margin-bottom: var(--spacing-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.required::after {
+  content: '*';
+  color: var(--color-error);
+  margin-left: 2px;
+}
+
+.optional {
+  font-weight: var(--font-weight-normal);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+/* ============================================
+   输入框基础样式
+   ============================================ */
+.input {
+  width: 100%;
+  height: 40px;
+  padding: 0 var(--spacing-md);
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-fast);
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.input:hover {
+  border-color: var(--color-border-strong);
+}
+
+.input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-lighter);
+}
+
+.input:disabled {
+  background: var(--color-surface-secondary);
+  color: var(--color-text-tertiary);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* 输入框尺寸 */
+.small {
+  height: 32px;
+  padding: 0 var(--spacing-sm);
+  font-size: var(--font-size-sm);
+}
+
+.medium {
+  height: 40px;
+  padding: 0 var(--spacing-md);
+  font-size: var(--font-size-base);
+}
+
+.large {
+  height: 48px;
+  padding: 0 var(--spacing-lg);
+  font-size: var(--font-size-lg);
+}
+
+/* ============================================
+   文本域
+   ============================================ */
+.textarea {
+  min-height: 100px;
+  padding: var(--spacing-md);
+  resize: vertical;
+  line-height: var(--line-height-relaxed);
+}
+
+.textarea.autoResize {
+  resize: none;
+  overflow: hidden;
+}
+
+/* ============================================
+   输入框状态
+   ============================================ */
+.error {
+  border-color: var(--color-error);
+}
+
+.error:focus {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 3px var(--color-error-lighter);
+}
+
+.success {
+  border-color: var(--color-success);
+}
+
+.success:focus {
+  border-color: var(--color-success);
+  box-shadow: 0 0 0 3px var(--color-success-lighter);
+}
+
+.warning {
+  border-color: var(--color-warning);
+}
+
+.warning:focus {
+  border-color: var(--color-warning);
+  box-shadow: 0 0 0 3px var(--color-warning-lighter);
+}
+
+/* ============================================
+   输入框前后缀
+   ============================================ */
+.inputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.prefix,
+.suffix {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-base);
+  pointer-events: none;
+}
+
+.prefix {
+  left: var(--spacing-md);
+}
+
+.suffix {
+  right: var(--spacing-md);
+}
+
+.inputWrapper .input.hasPrefix {
+  padding-left: calc(var(--spacing-md) * 2 + 16px);
+}
+
+.inputWrapper .input.hasSuffix {
+  padding-right: calc(var(--spacing-md) * 2 + 16px);
+}
+
+/* ============================================
+   清除按钮
+   ============================================ */
+.clearButton {
+  position: absolute;
+  right: var(--spacing-sm);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-text-tertiary);
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: all var(--transition-fast);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.inputWrapper:hover .clearButton,
+.inputWrapper:focus-within .clearButton {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.clearButton:hover {
+  background: var(--color-text-secondary);
+  transform: scale(1.1);
+}
+
+/* ============================================
+   帮助文本和错误信息
+   ============================================ */
+.helpText {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  line-height: var(--line-height-relaxed);
+  margin-top: var(--spacing-xs);
+}
+
+.errorText {
+  font-size: var(--font-size-xs);
+  color: var(--color-error);
+  line-height: var(--line-height-relaxed);
+  margin-top: var(--spacing-xs);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.successText {
+  font-size: var(--font-size-xs);
+  color: var(--color-success);
+  line-height: var(--line-height-relaxed);
+  margin-top: var(--spacing-xs);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ============================================
+   搜索框
+   ============================================ */
+.search {
+  padding-left: calc(var(--spacing-md) * 2 + 16px);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'%3E%3C/circle%3E%3Cpath d='m21 21-4.35-4.35'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: var(--spacing-md) center;
+}
+
+/* ============================================
+   密码输入框
+   ============================================ */
+.passwordToggle {
+  position: absolute;
+  right: var(--spacing-md);
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--transition-fast);
+}
+
+.passwordToggle:hover {
+  color: var(--color-text-primary);
+}
+
+/* ============================================
+   数字输入框
+   ============================================ */
+.number {
+  -moz-appearance: textfield;
+}
+
+.number::-webkit-outer-spin-button,
+.number::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.numberControls {
+  position: absolute;
+  right: 1px;
+  top: 1px;
+  bottom: 1px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  overflow: hidden;
+}
+
+.numberButton {
+  flex: 1;
+  width: 24px;
+  background: var(--color-surface-hover);
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: all var(--transition-fast);
+}
+
+.numberButton:hover {
+  background: var(--color-surface-active);
+  color: var(--color-text-primary);
+}
+
+.numberButton:active {
+  background: var(--color-primary-lighter);
+}
+
+/* ============================================
+   选择框
+   ============================================ */
+.select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--spacing-md) center;
+  padding-right: calc(var(--spacing-md) * 2 + 12px);
+  cursor: pointer;
+}
+
+/* ============================================
+   复选框和单选框
+   ============================================ */
+.checkbox,
+.radio {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkboxInput,
+.radioInput {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-border-strong);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.checkboxInput {
+  border-radius: var(--radius-sm);
+}
+
+.radioInput {
+  border-radius: 50%;
+}
+
+.checkboxInput:hover,
+.radioInput:hover {
+  border-color: var(--color-primary);
+}
+
+.checkboxInput:checked,
+.radioInput:checked {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.checkboxInput:checked::after {
+  content: '✓';
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.radioInput:checked::after {
+  content: '';
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: white;
+  margin: 3px;
+}
+
+.checkboxLabel,
+.radioLabel {
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+  line-height: var(--line-height-tight);
+}
+
+/* ============================================
+   开关
+   ============================================ */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+  user-select: none;
+}
+
+.switchTrack {
+  width: 44px;
+  height: 24px;
+  background: var(--color-border-strong);
+  border-radius: 12px;
+  position: relative;
+  transition: background var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.switchThumb {
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+}
+
+.switch input:checked + .switchTrack {
+  background: var(--color-primary);
+}
+
+.switch input:checked + .switchTrack .switchThumb {
+  transform: translateX(20px);
+}
+
+.switchLabel {
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+}
+
+/* ============================================
+   文件上传
+   ============================================ */
+.fileInput {
+  display: none;
+}
+
+.fileLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.fileLabel:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-lighter);
+}
+
+.filePreview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.fileItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+.fileRemove {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-error);
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  transition: transform var(--transition-fast);
+}
+
+.fileRemove:hover {
+  transform: scale(1.1);
+}
+
+/* ============================================
+   深色主题
+   ============================================ */
+[data-theme='dark'] .input,
+[data-theme='dark'] .textarea,
+[data-theme='dark'] .select {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+[data-theme='dark'] .input:disabled,
+[data-theme='dark'] .textarea:disabled {
+  background: var(--color-surface-secondary);
+}
+
+[data-theme='dark'] .checkboxInput,
+[data-theme='dark'] .radioInput {
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+}
+
+[data-theme='dark'] .switchTrack {
+  background: var(--color-border-strong);
+}
+
+[data-theme='dark'] .fileLabel {
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+}
+
+/* ============================================
+   响应式设计
+   ============================================ */
+@media (max-width: 768px) {
+  .formRow {
+    grid-template-columns: 1fr;
+  }
+
+  .input,
+  .textarea,
+  .select {
+    font-size: var(--font-size-base);
+  }
+
+  .large {
+    height: 44px;
+    font-size: var(--font-size-base);
+  }
+}

@@ -8,27 +8,40 @@ export interface ThemeColors {
   listItemOverdueHoverBg: string;
   listItemCurrentBg: string;
   contentBg: string;
-  panelHeaderBg: string; // 面板头部背景色
+  panelHeaderBg: string;
   borderColor: string;
   textColor: string;
   cardBg: string;
   textPrimary: string;
-  completedBg: string; // 已完成待办的背景色
-  completedText: string; // 已完成待办的文字颜色
-  dragHandleBg: string; // 拖拽手柄背景色
-  dragHandleBorder: string; // 拖拽手柄边框色
-  dragHandleText: string; // 拖拽手柄图标颜色
-  dragHandleDisabled: string; // 拖拽手柄禁用色
+  textSecondary: string;
+  completedBg: string;
+  completedText: string;
+  dragHandleBg: string;
+  dragHandleBorder: string;
+  dragHandleText: string;
+  dragHandleDisabled: string;
+  textMuted: string;
+  successColor: string;
+  warningColor: string;
+  dangerColor: string;
+  infoColor: string;
+  panelBg: string;
+  panelElevated: string;
+  groupHighlightBg: string;
+  groupHighlightBorder: string;
+  groupHighlightStrongBorder: string;
+  tagTextOnColor: string;
+  linkColor: string;
+  linkHoverColor: string;
+  errorBg: string;
+  errorBorder: string;
+  errorText: string;
+  inputBg: string;
+  controlBorder: string;
+  handlePreviewBg: string;
+  handlePreviewBorder: string;
 }
 
-/**
- * 自定义 Hook：获取当前主题的颜色配置
- * 
- * 解决问题：Ant Design 的 theme token 会覆盖内联样式中的 CSS 变量
- * 解决方案：直接返回具体的颜色值，而不是 CSS 变量
- * 
- * 监听 data-theme 属性变化，自动更新颜色
- */
 export const useThemeColors = (): ThemeColors => {
   const [isDark, setIsDark] = useState(
     document.documentElement.dataset.theme === 'dark'
@@ -38,7 +51,6 @@ export const useThemeColors = (): ThemeColors => {
   );
 
   useEffect(() => {
-    // 使用 MutationObserver 监听 data-theme 和 data-color-theme 属性变化
     const observer = new MutationObserver(() => {
       const newTheme = document.documentElement.dataset.theme;
       setIsDark(newTheme === 'dark');
@@ -53,47 +65,53 @@ export const useThemeColors = (): ThemeColors => {
 
     return () => observer.disconnect();
   }, []);
-  
-  // 根据当前主题返回对应的颜色（使用 useMemo 避免每次渲染都创建新对象）
+
   return useMemo(() => {
     const scheme = COLOR_SCHEMES[colorTheme];
+    const warningColor = isDark ? '#fb923c' : '#fa8c16';
+    const infoColor = isDark ? '#60a5fa' : '#1890ff';
+    const successColor = isDark ? '#4ade80' : '#52c41a';
+    const dangerColor = isDark ? '#f87171' : '#ff4d4f';
+
     return {
-      // 列表项背景 - 深色模式下使用浅色（关联上下文卡片用）
-      listItemBg: isDark ? '#f5f5f5' : '#fff',
-      // 列表项悬停背景
-      listItemHoverBg: isDark ? '#262626' : '#f5f5f5',
-      // 逾期待办背景
+      listItemBg: isDark ? '#111111' : '#ffffff',
+      listItemHoverBg: isDark ? '#1a1a1a' : '#f5f5f5',
       listItemOverdueBg: isDark ? '#2a1215' : '#fff1f0',
-      // 逾期待办悬停背景
       listItemOverdueHoverBg: isDark ? '#3d1a1f' : '#ffe7e6',
-      // 当前待办高亮背景 - 深色模式下使用浅蓝色（可读性优先）
-      listItemCurrentBg: isDark ? '#e6f7ff' : '#f0f9ff',
-      // 内容区域背景 - 深色模式下使用浅色（可读性优先）
-      contentBg: isDark ? '#f5f5f5' : '#f5f5f5',
-      // 面板头部背景 - 深色模式下使用深色，浅色模式使用浅色
-      panelHeaderBg: isDark ? '#1a1a1a' : '#fafafa',
-      // 边框颜色
-      borderColor: isDark ? '#404040' : '#f0f0f0',
-      // 文本颜色 - 根据主题自动调整
-      textColor: isDark ? '#ffffff' : '#000000',
-      // 卡片背景 - 用于报告等卡片组件
-      cardBg: isDark ? '#1f1f1f' : '#ffffff',
-      // 主文本颜色 - 用于标题等
-      textPrimary: isDark ? '#ffffff' : '#000000',
-      // 已完成待办的背景色 - 暗黑模式使用较亮的背景色提升对比度
-      completedBg: isDark
-        ? `hsl(${scheme.hue}, 70%, 26%)`  // 暗黑模式：提升至26%亮度，降低饱和度以避免过于鲜艳
-        : scheme.primaryLight,             // 亮色模式：保持92%亮度的浅色背景
-      // 已完成待办的文字颜色 - 暗黑模式使用纯白色文字
-      completedText: isDark
-        ? '#ffffff'                         // 暗黑模式：使用100%不透明度的纯白色
-        : '#1a1a1a',                       // 亮色模式：深色文字，与浅色背景形成对比
-      // 拖拽手柄中性色配置
+      listItemCurrentBg: isDark ? 'rgba(96, 165, 250, 0.18)' : '#f0f9ff',
+      contentBg: isDark ? '#111111' : '#f5f5f5',
+      panelHeaderBg: isDark ? '#181818' : '#fafafa',
+      borderColor: isDark ? '#3f3f46' : '#e4e4e7',
+      textColor: isDark ? '#fafafa' : '#18181b',
+      cardBg: isDark ? '#111111' : '#ffffff',
+      textPrimary: isDark ? '#fafafa' : '#18181b',
+      textSecondary: isDark ? '#d4d4d8' : '#52525b',
+      completedBg: isDark ? `hsl(${scheme.hue}, 70%, 26%)` : scheme.primaryLight,
+      completedText: isDark ? '#ffffff' : '#1a1a1a',
       dragHandleBg: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(128, 128, 128, 0.08)',
       dragHandleBorder: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(128, 128, 128, 0.15)',
       dragHandleText: isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(0, 0, 0, 0.45)',
       dragHandleDisabled: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
+      textMuted: isDark ? '#a1a1aa' : '#71717a',
+      successColor,
+      warningColor,
+      dangerColor,
+      infoColor,
+      panelBg: isDark ? '#000000' : '#ffffff',
+      panelElevated: isDark ? '#181818' : '#fafafa',
+      groupHighlightBg: isDark ? 'rgba(251, 146, 60, 0.14)' : 'rgba(250, 140, 22, 0.08)',
+      groupHighlightBorder: isDark ? 'rgba(251, 146, 60, 0.45)' : 'rgba(250, 140, 22, 0.3)',
+      groupHighlightStrongBorder: warningColor,
+      tagTextOnColor: '#ffffff',
+      linkColor: isDark ? '#8ab4ff' : '#722ed1',
+      linkHoverColor: isDark ? '#adc6ff' : '#40a9ff',
+      errorBg: isDark ? '#2a1215' : '#fff2f0',
+      errorBorder: isDark ? '#a61d24' : '#ff4d4f',
+      errorText: isDark ? '#ff9c9c' : '#cf1322',
+      inputBg: isDark ? '#181818' : '#ffffff',
+      controlBorder: isDark ? '#52525b' : '#d4d4d8',
+      handlePreviewBg: isDark ? '#555555' : '#555555',
+      handlePreviewBorder: isDark ? '#fafafa' : '#ffffff',
     };
   }, [isDark, colorTheme]);
 };
-

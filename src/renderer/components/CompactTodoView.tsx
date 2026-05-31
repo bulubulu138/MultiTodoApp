@@ -268,9 +268,40 @@ const MemoizedCompactTodoView = React.memo(CompactTodoView, (prevProps, nextProp
   // 如果基础检查失败，需要重新渲染
   if (!basicChecks) return false;
 
+  // 检查 dragDropOrder 是否变化（拖拽状态）
+  // 使用浅比较：检查当前标签页的拖拽顺序数组引用是否变化
+  const prevDragOrder = prevProps.dragDropOrder?.[prevProps.activeTab];
+  const nextDragOrder = nextProps.dragDropOrder?.[nextProps.activeTab];
+  if (prevDragOrder !== nextDragOrder) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[CompactTodoView] dragDropOrder changed, re-rendering');
+    }
+    return false;
+  }
+
   // 检查 todos 数组内容是否真正变化
   // 首先检查数组引用是否变化（最常见且重要的变化）
   if (prevProps.todos !== nextProps.todos) return false;
+
+  // 检查当前 tab 下的显示序号是否变化
+  // 序号编辑/拖拽保存后，某些场景下长度、首尾 updatedAt 都可能不足以反映 UI 变化
+  for (let index = 0; index < prevProps.todos.length; index += 1) {
+    const prevTodo = prevProps.todos[index];
+    const nextTodo = nextProps.todos[index];
+
+    if (!prevTodo || !nextTodo || prevTodo.id !== nextTodo.id) {
+      return false;
+    }
+
+    const prevDisplayOrder = prevTodo.displayOrders?.[prevProps.activeTab];
+    const nextDisplayOrder = nextTodo.displayOrders?.[nextProps.activeTab];
+    if (prevDisplayOrder !== nextDisplayOrder) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[CompactTodoView] displayOrders changed, re-rendering');
+      }
+      return false;
+    }
+  }
 
   // 如果数组引用相同，再进行内容检查（可选，因为引用变化已经处理了大多数情况）
   // 使用轻量级策略：检查首尾元素的关键属性

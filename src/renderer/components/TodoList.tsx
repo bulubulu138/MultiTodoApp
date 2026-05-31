@@ -506,7 +506,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                     {todo.content && (
                       <Paragraph
                         ellipsis={{ rows: 2 }}
-                        style={{ marginBottom: 8, color: '#666' }}
+                        style={{ marginBottom: 8, color: colors.textMuted }}
                       >
                         {extractPlainText(todo.content)}
                       </Paragraph>
@@ -655,16 +655,16 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
             {/* 分组容器 */}
             <div style={{
               width: '100%',
-              borderTop: isGroupStart && isInGroup ? '2px dashed #fa8c16' : undefined,
-              borderBottom: isGroupEnd && isInGroup ? '2px dashed #fa8c16' : undefined,
-              borderLeft: isInGroup ? '3px solid #fa8c16' : undefined,
-              borderRight: isInGroup ? '3px solid rgba(250, 140, 22, 0.3)' : undefined,
+              borderTop: isGroupStart && isInGroup ? `2px dashed ${colors.warningColor}` : undefined,
+              borderBottom: isGroupEnd && isInGroup ? `2px dashed ${colors.warningColor}` : undefined,
+              borderLeft: isInGroup ? `3px solid ${colors.warningColor}` : undefined,
+              borderRight: isInGroup ? `3px solid ${colors.groupHighlightBorder}` : undefined,
               paddingTop: isGroupStart && isInGroup ? 12 : 0,
               paddingBottom: isGroupEnd && isInGroup ? 12 : 0,
               paddingLeft: isInGroup ? 12 : 0,
               paddingRight: isInGroup ? 12 : 0,
-              backgroundColor: isInGroup ? 'rgba(250, 140, 22, 0.08)' : undefined,
-              borderRadius: isInGroup ? 6 : undefined,
+              backgroundColor: isInGroup ? colors.groupHighlightBg : undefined,
+              borderRadius: isInGroup ? 12 : undefined,
               position: 'relative',
             }}>
               {/* 分组标签 */}
@@ -673,8 +673,8 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                   position: 'absolute',
                   top: -10,
                   left: 12,
-                  backgroundColor: '#fa8c16',
-                  color: 'white',
+                  backgroundColor: colors.warningColor,
+                  color: colors.tagTextOnColor,
                   padding: '2px 8px',
                   borderRadius: 4,
                   fontSize: 11,
@@ -723,11 +723,11 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                 className={`todo-card ${todo.isDeleting ? 'is-deleting' : ''}`}
                 style={{
                   flex: 1,
-                  borderLeft: hasParallel ? '4px solid #fa8c16' : undefined,
+                  borderLeft: hasParallel ? `4px solid ${colors.warningColor}` : undefined,
                   backgroundColor: todo.status === 'completed' ? colors.completedBg : undefined,
                   pointerEvents: todo.isDeleting ? 'none' : undefined,
                 }}
-                styles={{ body: { padding: '8px' } }}
+                styles={{ body: { padding: '16px' } }}
                 variant="borderless"
               >
               {/* 标题行：标题 + 标签 + 操作按钮 */}
@@ -765,8 +765,8 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.color = todo.status === 'completed'
-                          ? (document.documentElement.dataset.theme === 'dark' ? '#40a9ff' : '#1890ff')
-                          : '#40a9ff';
+                          ? colors.infoColor
+                          : colors.infoColor;
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.color = todo.status === 'completed'
@@ -865,18 +865,18 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                 {/* 右侧：时间信息 */}
                 <div style={{
                   fontSize: 11,
-                  color: todo.status === 'completed' ? colors.completedText : '#999',
+                  color: todo.status === 'completed' ? colors.completedText : colors.textMuted,
                   whiteSpace: 'nowrap',
                   lineHeight: '16px'
                 }}>
                   <Space size={8} split={<span>|</span>}>
                     {todo.startTime && (
-                      <span style={{ color: '#52c41a' }}>
+                      <span style={{ color: colors.successColor }}>
                         <PlayCircleOutlined /> 开始: {formatCompactTime(todo.startTime)}
                       </span>
                     )}
                     {todo.deadline && (
-                      <span style={{ color: '#ff4d4f' }}>
+                      <span style={{ color: colors.dangerColor }}>
                         <ClockCircleOutlined /> 截止: {formatCompactTime(todo.deadline)}
                       </span>
                     )}
@@ -918,7 +918,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
         <div style={{ 
           marginTop: 8, 
           fontSize: 12, 
-          color: '#999' 
+          color: colors.textMuted 
         }}>
           还有 {totalCount - todos.length} 条待办未显示
         </div>
@@ -932,7 +932,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
         marginTop: 16, 
         marginBottom: 16,
         padding: '12px 0',
-        color: '#999',
+        color: colors.textMuted,
         fontSize: 12
       }}>
         已显示全部 {totalCount} 条待办
@@ -959,16 +959,20 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   // 首先检查数组引用是否变化（最常见且重要的变化）
   if (prevProps.todos !== nextProps.todos) return false;
 
-  // 如果数组引用相同，再进行内容检查（可选，因为引用变化已经处理了大多数情况）
-  // 使用轻量级策略：检查首尾元素的关键属性
-  if (prevProps.todos.length > 0 && nextProps.todos.length > 0) {
-    const firstChanged = prevProps.todos[0].id !== nextProps.todos[0].id ||
-                        prevProps.todos[0].updatedAt !== nextProps.todos[0].updatedAt;
-    const lastChanged = prevProps.todos[prevProps.todos.length - 1].id !== nextProps.todos[prevProps.todos.length - 1].id ||
-                       prevProps.todos[prevProps.todos.length - 1].updatedAt !== nextProps.todos[prevProps.todos.length - 1].updatedAt;
+  // 显示序号变化必须触发重新渲染，否则会出现“保存成功但序号不变”的假象
+  for (let index = 0; index < prevProps.todos.length; index += 1) {
+    const prevTodo = prevProps.todos[index];
+    const nextTodo = nextProps.todos[index];
 
-    // 如果首尾元素有变化，需要重新渲染
-    if (firstChanged || lastChanged) return false;
+    if (!prevTodo || !nextTodo || prevTodo.id !== nextTodo.id) {
+      return false;
+    }
+
+    const prevDisplayOrder = prevTodo.displayOrders?.[prevProps.activeTab];
+    const nextDisplayOrder = nextTodo.displayOrders?.[nextProps.activeTab];
+    if (prevDisplayOrder !== nextDisplayOrder || prevTodo.updatedAt !== nextTodo.updatedAt) {
+      return false;
+    }
   }
 
   return basicChecks;

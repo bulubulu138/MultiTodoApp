@@ -513,6 +513,7 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
   return (
     <>
       <Drawer
+        rootClassName="ios-modal ios-drawer"
         title="流程图"
         placement="right"
         width="90%"
@@ -580,6 +581,7 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
 
       {/* 模板选择对话框 */}
       <Modal
+        rootClassName="ios-modal"
         title="选择流程图模板"
         open={showTemplateModal}
         onCancel={() => {
@@ -615,6 +617,7 @@ export const FlowchartDrawer: React.FC<FlowchartDrawerProps> = ({
 
       {/* 名称输入对话框 */}
       <Modal
+        rootClassName="ios-modal"
         title="输入流程图名称"
         open={showNameInputModal}
         onOk={handleConfirmName}

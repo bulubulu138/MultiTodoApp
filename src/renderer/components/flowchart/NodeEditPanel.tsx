@@ -95,6 +95,7 @@ export const NodeEditPanel: React.FC<NodeEditPanelProps> = ({
 
   return (
     <Drawer
+      rootClassName="ios-modal ios-drawer"
       title="编辑节点"
       placement="right"
       width={360}

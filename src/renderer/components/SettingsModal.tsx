@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert, Tooltip, Collapse, Descriptions, Progress, Result, message, Spin, List } from 'antd';
+import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divider, Input, Switch, Alert, Tooltip, Collapse, Descriptions, Progress, Result, message, Spin, List, Radio } from 'antd';
 import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, LinkOutlined, BgColorsOutlined, LockOutlined, SwapOutlined, FileTextOutlined, ToolOutlined, PlusOutlined } from '@ant-design/icons';
 import { App } from 'antd';
 import { Todo, CustomTab } from '../../shared/types';
-import { ColorTheme } from '../theme/themes';
+import { ColorTheme, ThemeMode } from '../theme/themes';
 import TagManagement from './TagManagement';
 import BackupSettings from './BackupSettings';
 import CustomTabManager from './CustomTabManager';
@@ -65,6 +65,8 @@ interface SettingsModalProps {
   customTabs?: CustomTab[];
   onSaveCustomTabs?: (tabs: CustomTab[]) => void;
   existingTags?: string[];
+  themeMode?: ThemeMode;
+  onThemeModeChange?: (mode: ThemeMode) => void;
   colorTheme?: ColorTheme;
   onColorThemeChange?: (theme: ColorTheme) => void;
 }
@@ -315,6 +317,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   customTabs = [],
   onSaveCustomTabs,
   existingTags = [],
+  themeMode = 'light',
+  onThemeModeChange,
   colorTheme,
   onColorThemeChange,
 }) => {
@@ -351,6 +355,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           <Card title={<><TagOutlined /> 主题设置</>}>
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
               <div>
+                <Text strong>选择主题模式：</Text>
+                <div style={{ marginTop: 12, marginBottom: 16 }}>
+                  <Radio.Group
+                    value={themeMode}
+                    onChange={(e) => onThemeModeChange?.(e.target.value as ThemeMode)}
+                    optionType="button"
+                    buttonStyle="solid"
+                  >
+                    <Radio.Button value="light">浅色</Radio.Button>
+                    <Radio.Button value="dark">暗黑</Radio.Button>
+                  </Radio.Group>
+                </div>
+
                 <Text strong>选择主题颜色：</Text>
                 <div style={{ marginTop: 12 }}>
                   <ColorThemeSelector
@@ -403,6 +420,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       title="设置"
       open={visible}
       onCancel={onCancel}
+      rootClassName="ios-modal settings-modal"
       width={800}
       footer={[
         <Button key="cancel" onClick={onCancel}>
@@ -420,6 +438,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     >
       <Form form={form} layout="vertical">
         <Tabs
+          className="ios-subtabs"
           activeKey={activeTab}
           onChange={setActiveTab}
           items={tabItems}

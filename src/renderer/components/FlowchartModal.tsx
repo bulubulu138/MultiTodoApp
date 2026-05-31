@@ -105,6 +105,7 @@ export const FlowchartModal: React.FC<FlowchartModalProps> = ({
 
   return (
     <Modal
+      rootClassName="ios-modal"
       title={title}
       open={open}
       width="100vw"

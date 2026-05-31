@@ -112,7 +112,7 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
           onClick={canEditOrder && setEditingOrder ? () => setEditingOrder(currentDisplayOrder ?? 0) : undefined}
           style={{
             cursor: canEditOrder ? 'pointer' : 'not-allowed',
-            color: currentDisplayOrder !== undefined ? '#1890ff' : '#ccc',
+            color: currentDisplayOrder !== undefined ? colors.infoColor : colors.textMuted,
             fontSize: '11px',
             minWidth: '20px',
             textAlign: 'center',
@@ -137,8 +137,8 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
     height: '36px', // 稍微减小高度以更紧凑
     padding: '0 4px', // 减少内边距
     margin: '1px 0', // 减少外边距
-    backgroundColor: deadlineInfo?.isOverdue ? '#fff1f0' : 'transparent', // 已过期待办的浅红色背景
-    borderLeft: deadlineInfo?.isOverdue ? '3px solid #ff4d4f' : undefined, // 已过期待办的红色左边框
+    backgroundColor: deadlineInfo?.isOverdue ? (document.documentElement.dataset.theme === 'dark' ? 'rgba(248, 113, 113, 0.14)' : '#fff1f0') : 'transparent', // 已过期待办的背景
+    borderLeft: deadlineInfo?.isOverdue ? `3px solid ${colors.dangerColor}` : undefined, // 已过期待办的左边框
     borderRadius: '3px', // 稍微减小圆角
     transition: 'background-color 0.2s, opacity 0.2s',
     cursor: canDrag ? 'move' : 'pointer',
@@ -178,7 +178,7 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
     whiteSpace: 'nowrap',
     padding: '2px 6px',
     borderRadius: '3px',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: document.documentElement.dataset.theme === 'dark' ? 'rgba(255, 255, 255, 0.92)' : 'rgba(255, 255, 255, 0.95)',
     color: deadlineInfo?.color,
     fontWeight: 500,
     pointerEvents: 'none', // 不阻止点击事件
@@ -199,10 +199,10 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
     opacity: canDrag ? (isHoveringDragHandle ? 0.9 : 0.6) : 0.2, // 仅透明度变化
     fontSize: '14px', // 增大字体以提高可见性
     letterSpacing: '1px', // 增加字间距以在视觉上分隔
-    color: colors.dragHandleText, // 使用主题中性色
-    transition: 'opacity 0.2s ease', // 仅过渡透明度
-    backgroundColor: colors.dragHandleBg, // 中性灰色背景
-    border: `1px solid ${colors.dragHandleBorder}`, // 细微边框
+    color: document.documentElement.dataset.theme === 'dark' ? 'rgba(15, 23, 42, 0.9)' : colors.dragHandleText,
+    transition: 'opacity 0.2s ease',
+    backgroundColor: document.documentElement.dataset.theme === 'dark' ? 'rgba(255, 255, 255, 0.92)' : colors.dragHandleBg,
+    border: document.documentElement.dataset.theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.96)' : `1px solid ${colors.dragHandleBorder}`
   };
 
   // 处理容器双击事件

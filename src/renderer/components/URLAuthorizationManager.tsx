@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, Button, Space, Tag, Typography, Statistic, Row, Col, message, Popconfirm, Tooltip, Alert, Progress, Card, Drawer, List, Tabs } from 'antd';
 import { ReloadOutlined, DeleteOutlined, ClearOutlined, LinkOutlined, CloudDownloadOutlined, CopyOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { App } from 'antd';
+import { useThemeColors } from '../hooks/useThemeColors';
 
 const { Text } = Typography;
 
@@ -74,6 +75,7 @@ interface URLDisplayRecord {
  */
 const URLAuthorizationManager: React.FC = () => {
   const { message: messageApi } = App.useApp();
+  const colors = useThemeColors();
   const [records, setRecords] = useState<URLDisplayRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -430,27 +432,28 @@ const URLAuthorizationManager: React.FC = () => {
               <Statistic
                 title="成功"
                 value={result.succeeded}
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: colors.successColor }}
               />
             </Col>
             <Col span={6}>
               <Statistic
                 title="失败"
                 value={result.failed}
-                valueStyle={{ color: '#ff4d4f' }}
+                valueStyle={{ color: colors.dangerColor }}
               />
             </Col>
             <Col span={6}>
               <Statistic
                 title="跳过"
                 value={result.skipped}
-                valueStyle={{ color: '#8c8c8c' }}
+                valueStyle={{ color: colors.textMuted }}
               />
             </Col>
           </Row>
 
           {/* 详细列表 */}
           <Tabs
+            className="ios-subtabs"
             activeKey={activeTab}
             onChange={(key) => setActiveTab(key as 'success' | 'failed')}
             items={[
@@ -642,28 +645,28 @@ const URLAuthorizationManager: React.FC = () => {
           <Statistic
             title="已授权"
             value={stats.active}
-            valueStyle={{ color: '#52c41a', fontSize: 18 }}
+            valueStyle={{ color: colors.successColor, fontSize: 18 }}
           />
         </Col>
         <Col span={5}>
           <Statistic
             title="授权失败"
             value={stats.failed}
-            valueStyle={{ color: '#ff4d4f', fontSize: 18 }}
+            valueStyle={{ color: colors.dangerColor, fontSize: 18 }}
           />
         </Col>
         <Col span={5}>
           <Statistic
             title="未授权"
             value={stats.unauthorized}
-            valueStyle={{ color: '#faad14', fontSize: 18 }}
+            valueStyle={{ color: colors.warningColor, fontSize: 18 }}
           />
         </Col>
         <Col span={5}>
           <Statistic
             title="已过期"
             value={stats.expired}
-            valueStyle={{ color: '#8c8c8c', fontSize: 18 }}
+            valueStyle={{ color: colors.textMuted, fontSize: 18 }}
           />
         </Col>
       </Row>

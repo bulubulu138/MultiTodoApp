@@ -151,6 +151,7 @@ const FileNotFoundDialog: React.FC<FileNotFoundDialogProps> = ({
 
   return (
     <Modal
+      rootClassName="ios-modal"
       title={null}
       open={visible}
       onCancel={handleCancel}

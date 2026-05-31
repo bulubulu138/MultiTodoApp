@@ -254,6 +254,7 @@ export const FlowchartList: React.FC<FlowchartListProps> = ({
 
       {/* 重命名对话框 */}
       <Modal
+      rootClassName="ios-modal"
         title="重命名流程图"
         open={renameModalVisible}
         onOk={handleRenameConfirm}

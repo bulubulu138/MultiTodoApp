@@ -270,6 +270,7 @@ export const EdgeStylePanel: React.FC<EdgeStylePanelProps> = ({
 
   return (
     <Drawer
+      rootClassName="ios-modal ios-drawer"
       title="编辑连接线样式"
       placement="right"
       width={360}
