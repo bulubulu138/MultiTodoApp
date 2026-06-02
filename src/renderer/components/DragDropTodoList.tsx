@@ -75,8 +75,8 @@ const SortableTodoItem: React.FC<{
   } = useSortable({
     id: todo.id,
     disabled: !isDraggable,
-    // 启用默认动画以防止回弹
-    animateLayoutChanges: () => true,
+    // 紧凑模式松手后直接落位，不播放布局补间动画
+    animateLayoutChanges: () => !useCompactAnimation,
     transition: undefined,
   });
 
@@ -85,7 +85,7 @@ const SortableTodoItem: React.FC<{
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition: isDragging
+    transition: useCompactAnimation || isDragging
       ? 'none'  // 拖拽时禁用过渡
       : 'transform 150ms cubic-bezier(0.2, 0, 0, 1)',  // 释放时使用平滑过渡
     opacity: isDragging && !useCompactAnimation ? animationConfig.opacity : 1,
@@ -124,7 +124,7 @@ export const DragDropTodoList: React.FC<DragDropTodoListProps> = ({
     duration: 250,
     easing: 'cubic-bezier(0.2, 0, 0, 1)',
     maxItems: 100,
-    enabled: !shouldReduceMotion()
+    enabled: !useCompactAnimation && !shouldReduceMotion()
   });
 
   // 开发模式检测
@@ -190,8 +190,8 @@ export const DragDropTodoList: React.FC<DragDropTodoListProps> = ({
   const handleDragStart = (event: any) => {
     setActiveId(event.active.id as string);
 
-    // 捕获所有元素的初始位置（FLIP 第一步）
-    if (containerRef.current) {
+    // 捕获所有元素的初始位置（FLIP 第一步）；紧凑模式不做松手动画
+    if (!useCompactAnimation && containerRef.current) {
       capturePositions(containerRef.current);
     }
 
@@ -254,8 +254,8 @@ export const DragDropTodoList: React.FC<DragDropTodoListProps> = ({
         // 立即触发数据更新，不等待动画
         onDragEnd(newTodos);
 
-        // 触发 FLIP 动画（FLIP 第二、三、四步）
-        if (containerRef.current) {
+        // 触发 FLIP 动画（FLIP 第二、三、四步）；紧凑模式直接落位
+        if (!useCompactAnimation && containerRef.current) {
           requestAnimationFrame(() => {
             animate(containerRef.current!);
           });
