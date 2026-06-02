@@ -1,5 +1,6 @@
 {
   "enabledPlugins": {
-    "claude-api@anthropic-agent-skills": true
+    "claude-api@anthropic-agent-skills": true,
+    "superpowers@claude-plugins-official": true
   }
 }

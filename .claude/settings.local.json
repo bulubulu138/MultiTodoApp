@@ -15,7 +15,10 @@
       "Bash(mkdir -p \"/c/Users/李汉文/.claude/plans/\")",
       "Read(//c/Users/李汉文/.claude/plans//**)",
       "Bash(netstat -ano)",
-      "Bash(curl -s http://localhost:3000)"
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(npm uninstall *)",
+      "Bash(tasklist)",
+      "mcp__pencil__get_editor_state"
     ],
     "deny": [],
     "ask": []

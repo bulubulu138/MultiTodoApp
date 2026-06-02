@@ -352,7 +352,9 @@ class Application {
         },
         {
           label: '快速创建待办 (Ctrl+Shift+T)',
-          enabled: false
+          click: () => {
+            this.handleQuickCreateTodo();
+          }
         },
         { type: 'separator' },
         {
@@ -1964,14 +1966,12 @@ class Application {
 
       // 创建系统托盘
       console.log('Creating system tray...');
-      // TODO: createTray方法调用暂时禁用
-      // this.createTray();
+      this.createTray();
       console.log('System tray created successfully');
 
       // 注册全局快捷键
       console.log('Registering global shortcuts...');
-      // TODO: registerGlobalShortcuts方法调用暂时禁用
-      // this.registerGlobalShortcuts();
+      this.registerGlobalShortcuts();
       console.log('Global shortcuts registered successfully');
 
     } catch (error) {

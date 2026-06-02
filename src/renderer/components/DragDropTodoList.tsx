@@ -63,7 +63,8 @@ const SortableTodoItem: React.FC<{
   todo: Todo;
   renderItem: (todo: Todo, isDragging?: boolean, dragHandleProps?: any) => React.ReactNode;
   isDraggable?: boolean;
-}> = ({ todo, renderItem, isDraggable = true }) => {
+  useCompactAnimation?: boolean;
+}> = ({ todo, renderItem, isDraggable = true, useCompactAnimation = false }) => {
   const {
     attributes,
     listeners,
@@ -87,9 +88,9 @@ const SortableTodoItem: React.FC<{
     transition: isDragging
       ? 'none'  // 拖拽时禁用过渡
       : 'transform 150ms cubic-bezier(0.2, 0, 0, 1)',  // 释放时使用平滑过渡
-    opacity: isDragging ? animationConfig.opacity : 1,
-    scale: isDragging ? 1.02 : 1,
-    boxShadow: isDragging ? animationConfig.shadow : 'none',
+    opacity: isDragging && !useCompactAnimation ? animationConfig.opacity : 1,
+    scale: isDragging && !useCompactAnimation ? 1.02 : 1,
+    boxShadow: isDragging && !useCompactAnimation ? animationConfig.shadow : 'none',
     cursor: isDragging ? 'grabbing' : 'grab',
   };
 
@@ -271,16 +272,6 @@ export const DragDropTodoList: React.FC<DragDropTodoListProps> = ({
 
   const activeTodo = todos.find((todo) => todo.id === activeId);
 
-  // 根据紧凑模式选择动画配置
-  const useCompact = useCompactAnimation;
-  const compactConfig = {
-    opacity: 0.95,
-    scale: 1.05,
-    rotate: 2,
-    shadow: '0 12px 24px rgba(0, 0, 0, 0.2)',
-    duration: 80,
-  };
-
   const standardConfig = getAnimationConfig();
 
   return (
@@ -310,27 +301,30 @@ export const DragDropTodoList: React.FC<DragDropTodoListProps> = ({
               todo={todo}
               renderItem={renderTodoItem}
               isDraggable={isTodoDraggable ? isTodoDraggable(todo) : true}
+              useCompactAnimation={useCompactAnimation}
             />
           ))}
         </div>
       </SortableContext>
 
-      <DragOverlay>
-        {activeTodo ? (
-          <div
-            className="drag-overlay"
-            style={{
-              opacity: useCompact ? compactConfig.opacity : standardConfig.opacity,
-              transform: `scale(${useCompact ? compactConfig.scale : standardConfig.scale}) rotate(${useCompact ? compactConfig.rotate : standardConfig.rotate}deg)`,
-              boxShadow: useCompact ? compactConfig.shadow : standardConfig.shadow,
-              transition: `transform ${useCompact ? compactConfig.duration : standardConfig.transitionDuration}ms ease-out, box-shadow ${useCompact ? compactConfig.duration : standardConfig.transitionDuration}ms ease-out`,
-              cursor: 'grabbing',
-            }}
-          >
-            {renderTodoItem(activeTodo, true, null)}
-          </div>
-        ) : null}
-      </DragOverlay>
+      {!useCompactAnimation && (
+        <DragOverlay>
+          {activeTodo ? (
+            <div
+              className="drag-overlay"
+              style={{
+                opacity: standardConfig.opacity,
+                transform: `scale(${standardConfig.scale}) rotate(${standardConfig.rotate}deg)`,
+                boxShadow: standardConfig.shadow,
+                transition: `transform ${standardConfig.transitionDuration}ms ease-out, box-shadow ${standardConfig.transitionDuration}ms ease-out`,
+                cursor: 'grabbing',
+              }}
+            >
+              {renderTodoItem(activeTodo, true, null)}
+            </div>
+          ) : null}
+        </DragOverlay>
+      )}
     </DndContext>
   );
 };
