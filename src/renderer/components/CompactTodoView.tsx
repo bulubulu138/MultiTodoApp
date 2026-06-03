@@ -219,6 +219,7 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
         onUpdate={onUpdate}
         onView={onView}
         onToggleTodayCompleted={handleToggleTodayCompleted}
+        activeTab={activeTab}
         colors={colors}
         enableDrag={canDrag}
         dragHandleProps={dragHandleProps}

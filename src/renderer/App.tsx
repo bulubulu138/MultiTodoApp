@@ -71,10 +71,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   // ✅ 新增：首次运行状态
   const [showFirstRunDialog, setShowFirstRunDialog] = useState(false);
   const [storageLocationConfig, setStorageLocationConfig] = useState<any>(null);
-  // 分页状态管理
-  const [displayCount, setDisplayCount] = useState<number>(50); // 初始显示50条
-  const [hasMoreData, setHasMoreData] = useState<boolean>(true); // 是否还有更多数据
-
   // 拖拽排序状态管理
   const [dragDropOrder, setDragDropOrder] = useState<{ [tabKey: string]: string[] }>({});
 
@@ -428,29 +424,14 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       // 立即显示加载状态（不阻塞 UI）
       setLoading(true);
 
-      // 首批快速加载 50 个 todos
       const todoList = await window.electronAPI.todo.getAll();
       const validTodos = todoList.filter(todo => todo && todo.id);
 
-      // 立即显示首批数据
-      const firstBatch = validTodos.slice(0, 50);
-      setTodos(firstBatch);
+      // Always keep the renderer state in sync with the complete storage result.
+      // Rendering performance for large lists is handled by VirtualizedTodoList.
+      setTodos(validTodos);
       setLoading(false);
-      setDisplayCount(50);
-      setHasMoreData(validTodos.length > 50);
-
-      console.log(`[App] ✅ First batch loaded: ${firstBatch.length} todos`);
-
-      // 后台分批加载剩余数据
-      if (validTodos.length > 50) {
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            setTodos(validTodos);
-            setHasMoreData(validTodos.length > 50);
-            console.log(`[App] ✅ All todos loaded: ${validTodos.length} total`);
-          }, 100);
-        });
-      }
+      console.log(`[App] ✅ Loaded todos: ${validTodos.length} total`);
 
       // 🔍 自动诊断：如果加载的待办数量异常，自动运行诊断
       if (validTodos.length < 20 && window.electronAPI.debug) {
@@ -620,20 +601,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       message.error('加载关系失败');
     }
   };
-
-
-  // 加载更多数据（分页）
-  const loadMore = useCallback(() => {
-    const newCount = displayCount + 50;
-    setDisplayCount(newCount);
-    
-    // 检查是否还有更多数据
-    if (newCount >= todos.length) {
-      setHasMoreData(false);
-    }
-    
-    console.log(`[分页] 加载更多数据，当前显示: ${newCount}/${todos.length}`);
-  }, [displayCount, todos.length]);
 
   // 获取当前 Tab 的设置（带默认值）
   const getCurrentTabSettings = useCallback((): TabSettings => {
@@ -1750,22 +1717,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     return result;
   }, [searchedTodos, parallelGroups, activeTab, getCurrentTabSettings, getCurrentDragOrder]);
 
-  // 第五层：应用分页限制
-  const paginatedTodos = useMemo(() => {
-    // 只显示前 displayCount 条数据
-    const paginated = filteredTodos.slice(0, displayCount);
-    
-    // 更新是否还有更多数据的状态
-    const hasMore = displayCount < filteredTodos.length;
-    if (hasMore !== hasMoreData) {
-      setHasMoreData(hasMore);
-    }
-    
-    console.log(`[分页] 总数据: ${filteredTodos.length}, 显示: ${paginated.length}, 还有更多: ${hasMore}`);
-    
-    return paginated;
-  }, [filteredTodos, displayCount, hasMoreData]);
-
   // Tab配置
   const tabItems = useMemo(() => {
     const defaultTabs = [
@@ -1943,7 +1894,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
                   exit="exit"
                 >
                   <TodoList
-                    todos={paginatedTodos}
+                    todos={filteredTodos}
                     allTodos={todos}
                     loading={loading}
                     onEdit={handleEditTodo}
@@ -1958,8 +1909,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
                     onUpdateDisplayOrder={handleUpdateDisplayOrder}
                     viewMode={currentTabSettings.viewMode}
                     enableVirtualScroll={false}
-                    hasMoreData={hasMoreData}
-                    onLoadMore={loadMore}
                     totalCount={filteredTodos.length}
                     colorTheme={colorTheme}
                     onDragEnd={handleDragEnd}

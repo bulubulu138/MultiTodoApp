@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Checkbox, CheckboxChangeEvent, InputNumber, Tooltip } from 'antd';
+import { App, Button, Checkbox, CheckboxChangeEvent, InputNumber, Tooltip } from 'antd';
+import { PlayCircleOutlined } from '@ant-design/icons';
 import { Todo } from '../../shared/types';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useCompactTodoEdit } from '../hooks/useCompactTodoEdit';
@@ -10,6 +11,7 @@ interface CompactTodoItemProps {
   onUpdate: (id: string, updates: any) => Promise<void>;
   onView: (todo: Todo) => void | Promise<void>;
   onToggleTodayCompleted: (todo: Todo) => void;
+  activeTab: string;
   colors?: any;
   enableDrag?: boolean;
   dragHandleProps?: any;
@@ -32,6 +34,7 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
   onUpdate,
   onView,
   onToggleTodayCompleted,
+  activeTab,
   colors: propColors,
   enableDrag = false,
   dragHandleProps,
@@ -45,6 +48,7 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
   isGroupStart = false,
 }) => {
   const colors = propColors || useThemeColors();
+  const { message } = App.useApp();
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isHoveringDragHandle, setIsHoveringDragHandle] = useState(false);
@@ -153,6 +157,22 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
     alignItems: 'center',
   };
 
+  const startButtonStyle: React.CSSProperties = {
+    width: 24,
+    height: 24,
+    minWidth: 24,
+    marginRight: '6px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    border: 'none',
+    color: '#ffffff',
+    boxShadow: '0 2px 8px rgba(102, 126, 234, 0.4)',
+    transition: 'all 0.3s ease',
+    flexShrink: 0,
+  };
+
   const titleInputStyle: React.CSSProperties = {
     flex: 1,
     border: 'none',
@@ -231,6 +251,21 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
     }
   };
 
+  // 开始任务：仅用于待办池紧凑模式，将任务送入今日事
+  const handleStartTask = async (e: React.MouseEvent<HTMLElement>) => {
+    e.stopPropagation();
+
+    if (!todo.id || todo.status !== 'pending') return;
+
+    try {
+      await onUpdate(todo.id, { status: 'in_progress' });
+      message.success('任务已进入"今日事"');
+    } catch (error) {
+      message.error('启动任务失败');
+      console.error('Failed to start task:', error);
+    }
+  };
+
   return (
     <div
       ref={containerRef}
@@ -252,12 +287,33 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
         </div>
       )}
 
-      {/* Checkbox */}
-      <Checkbox
-        checked={isTodayCompleted}
-        onChange={handleCheckboxChange}
-        style={checkboxStyle}
-      />
+      {/* 待办池显示开始按钮，其他Tab保持原有Checkbox */}
+      {activeTab === 'pending' && todo.status === 'pending' ? (
+        <Tooltip title="进入今日事">
+          <Button
+            className="start-task-button"
+            shape="circle"
+            size="small"
+            icon={<PlayCircleOutlined />}
+            onClick={handleStartTask}
+            style={startButtonStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.1)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.6)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.4)';
+            }}
+          />
+        </Tooltip>
+      ) : (
+        <Checkbox
+          checked={isTodayCompleted}
+          onChange={handleCheckboxChange}
+          style={checkboxStyle}
+        />
+      )}
 
       {/* 序号编辑器 */}
       <OrderEditor />
@@ -296,6 +352,7 @@ const MemoizedCompactTodoItem = React.memo(CompactTodoItem, (prevProps, nextProp
     prevProps.todo.id === nextProps.todo.id &&
     prevProps.todo.status === nextProps.todo.status &&
     prevProps.todo.title === nextProps.todo.title &&
+    prevProps.activeTab === nextProps.activeTab &&
     prevProps.currentDisplayOrder === nextProps.currentDisplayOrder &&
     prevProps.editingOrder === nextProps.editingOrder &&
     prevProps.savingOrder === nextProps.savingOrder &&
