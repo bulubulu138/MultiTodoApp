@@ -35,7 +35,7 @@ const ColorThemeSelector: React.FC<ColorThemeSelectorProps> = ({ value, onChange
   ];
 
   return (
-    <Space size={12}>
+    <Space size={12} wrap>
       {colors.map(({ key, color, label }) => (
         <Tooltip key={key} title={label}>
           <div
