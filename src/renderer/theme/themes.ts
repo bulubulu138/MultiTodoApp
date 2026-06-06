@@ -52,6 +52,42 @@ export const COLOR_SCHEMES: Record<ColorTheme, ColorScheme> = {
     primaryDark: 'hsl(180, 80%, 40%)',
     primaryLight: 'hsl(180, 80%, 92%)',
   },
+  magenta: {
+    hue: 320,
+    primary: 'hsl(320, 80%, 60%)',
+    primaryDark: 'hsl(320, 80%, 45%)',
+    primaryLight: 'hsl(320, 80%, 92%)',
+  },
+  yellow: {
+    hue: 48,
+    primary: 'hsl(48, 90%, 58%)',
+    primaryDark: 'hsl(48, 90%, 45%)',
+    primaryLight: 'hsl(48, 90%, 92%)',
+  },
+  indigo: {
+    hue: 240,
+    primary: 'hsl(240, 80%, 60%)',
+    primaryDark: 'hsl(240, 80%, 45%)',
+    primaryLight: 'hsl(240, 80%, 92%)',
+  },
+  pink: {
+    hue: 340,
+    primary: 'hsl(340, 80%, 65%)',
+    primaryDark: 'hsl(340, 80%, 50%)',
+    primaryLight: 'hsl(340, 80%, 92%)',
+  },
+  teal: {
+    hue: 170,
+    primary: 'hsl(170, 80%, 45%)',
+    primaryDark: 'hsl(170, 80%, 35%)',
+    primaryLight: 'hsl(170, 80%, 92%)',
+  },
+  amber: {
+    hue: 42,
+    primary: 'hsl(42, 90%, 55%)',
+    primaryDark: 'hsl(42, 90%, 42%)',
+    primaryLight: 'hsl(42, 90%, 92%)',
+  },
 };
 
 // ============================================
