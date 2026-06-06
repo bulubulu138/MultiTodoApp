@@ -31,7 +31,7 @@ const ColorThemeSelector: React.FC<ColorThemeSelectorProps> = ({ value, onChange
     { key: 'indigo', color: '#6366F1', label: '靛蓝' },
     { key: 'pink', color: '#EC4899', label: '粉色' },
     { key: 'teal', color: '#0D9488', label: '青绿' },
-    { key: 'amber', color: '#F59E0B', label: '琥珀' },
+    { key: 'amber', color: '#F9A825', label: '琥珀' },
   ];
 
   return (
