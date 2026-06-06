@@ -311,6 +311,10 @@ export const createDarkTheme = (colorTheme: ColorTheme = 'purple'): ThemeConfig 
       },
       Drawer: {
         colorBgElevated: '#111111',
+        colorBgContainer: '#111111',
+        colorBgMask: 'rgba(0, 0, 0, 0.65)',
+        colorBorder: '#3f3f46',
+        colorText: '#fafafa',
       },
       Input: {
         colorBgContainer: '#181818',
@@ -352,6 +356,14 @@ export const createDarkTheme = (colorTheme: ColorTheme = 'purple'): ThemeConfig 
         headerBg: '#181818',
         colorBorder: '#3f3f46',
         borderRadiusLG: 24,
+      },
+      Descriptions: {
+        labelBg: '#111111',
+        colorBgContainer: '#111111',
+        colorBorder: '#3f3f46',
+        colorBorderSecondary: '#27272a',
+        colorText: '#fafafa',
+        colorTextSecondary: '#d4d4d8',
       },
     },
   };
