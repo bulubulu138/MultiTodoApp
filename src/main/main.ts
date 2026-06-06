@@ -3,8 +3,6 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { Todo, TodoRelation, TodoTreeNode, TreeRelationData } from '../shared/types';
 import { SettingsManager } from './SettingsManager';
-import { FlowchartFileManager } from './FlowchartFileManager';
-import { FlowchartTodoAssociationManager } from './FlowchartTodoAssociationManager';
 import { FileStorageManager } from './FileStorageManager';
 import { ImageManager } from './utils/ImageManager';
 import { BackupManager } from './utils/BackupManager';
@@ -22,8 +20,6 @@ class Application {
   private settingsManager: SettingsManager; // 用于设置
   private fileStorageManager: FileStorageManager | null = null; // 用于主要业务数据
   private useFileStorage: boolean = false; // 文件存储模式标志
-  private flowchartFileManager: FlowchartFileManager;
-  private flowchartTodoAssociationManager: FlowchartTodoAssociationManager;
   private imageManager: ImageManager;
   private backupManager: BackupManager | null = null;
   private backflowManager: any = null; // 任务回流管理器
@@ -43,8 +39,6 @@ class Application {
   constructor() {
     this.settingsManager = new SettingsManager(); // 用于设置
     this.fileStorageManager = null; // 将在 initializeFileStorage 中正确初始化
-    this.flowchartFileManager = new FlowchartFileManager();
-    this.flowchartTodoAssociationManager = new FlowchartTodoAssociationManager();
     this.imageManager = new ImageManager();
   }
 
@@ -1341,197 +1335,6 @@ class Application {
       }
     });
 
-
-    // 流程图文件操作
-    ipcMain.handle('flowchart:save', async (_, flowchartData: any) => {
-      try {
-        // 直接保存流程图数据
-        this.flowchartFileManager.saveFlowchartData(flowchartData.schema.id, flowchartData);
-        console.log(`[Flowchart] Saved flowchart: ${flowchartData.schema.id} with ${flowchartData.nodes.length} nodes and ${flowchartData.edges.length} edges`);
-        return { success: true };
-      } catch (error) {
-        console.error('Error saving flowchart:', error);
-        throw error;
-      }
-    });
-
-    ipcMain.handle('flowchart:load', async (_, flowchartId: string) => {
-      try {
-        const flowchartData = this.flowchartFileManager.getFlowchartData(flowchartId);
-
-        if (!flowchartData) {
-          return null;
-        }
-
-        console.log(`[Flowchart] Loaded flowchart: ${flowchartId}, nodes: ${flowchartData.nodes.length}, edges: ${flowchartData.edges.length}`);
-        return flowchartData;
-      } catch (error) {
-        console.error('Error loading flowchart:', error);
-        throw error;
-      }
-    });
-
-    ipcMain.handle('flowchart:list', async () => {
-      try {
-        const flowcharts = this.flowchartFileManager.getAllFlowcharts();
-        console.log(`[Flowchart] Listed ${flowcharts.length} flowcharts`);
-        return flowcharts;
-      } catch (error) {
-        console.error('Error listing flowcharts:', error);
-        return [];
-      }
-    });
-
-    ipcMain.handle('flowchart:delete', async (_, flowchartId: string) => {
-      try {
-        this.flowchartFileManager.deleteFlowchart(flowchartId);
-        this.flowchartTodoAssociationManager.deleteAssociationsByFlowchart(flowchartId);
-        console.log(`[Flowchart] Deleted flowchart: ${flowchartId}`);
-        return { success: true };
-      } catch (error) {
-        console.error('Error deleting flowchart:', error);
-        throw error;
-      }
-    });
-
-    ipcMain.handle('flowchart:savePatches', async (_, flowchartId: string, patches: any[]) => {
-      try {
-        // 获取当前流程图数据
-        const flowchartData = this.flowchartFileManager.getFlowchartData(flowchartId);
-        if (!flowchartData) {
-          throw new Error(`Flowchart not found: ${flowchartId}`);
-        }
-
-        // 手动处理每个patch
-        for (const patch of patches) {
-          switch (patch.action) {
-            case 'upsert':
-              if (patch.type === 'node') {
-                const nodeIndex = flowchartData.nodes.findIndex(n => n.id === patch.data.id);
-                if (nodeIndex !== -1) {
-                  flowchartData.nodes[nodeIndex] = { ...flowchartData.nodes[nodeIndex], ...patch.data };
-                } else {
-                  flowchartData.nodes.push(patch.data);
-                }
-              } else if (patch.type === 'edge') {
-                const edgeIndex = flowchartData.edges.findIndex(e => e.id === patch.data.id);
-                if (edgeIndex !== -1) {
-                  flowchartData.edges[edgeIndex] = { ...flowchartData.edges[edgeIndex], ...patch.data };
-                } else {
-                  flowchartData.edges.push(patch.data);
-                }
-              }
-              break;
-            case 'delete':
-              if (patch.type === 'node') {
-                flowchartData.nodes = flowchartData.nodes.filter(n => n.id !== patch.data.id);
-              } else if (patch.type === 'edge') {
-                flowchartData.edges = flowchartData.edges.filter(e => e.id !== patch.data.id);
-              }
-              break;
-          }
-        }
-
-        // 保存更新后的数据
-        this.flowchartFileManager.saveFlowchartData(flowchartId, flowchartData);
-
-        console.log(`[Flowchart] Saved ${patches.length} patches for flowchart: ${flowchartId}`);
-        return { success: true };
-      } catch (error) {
-        console.error('Error saving flowchart patches:', error);
-        throw error;
-      }
-    });
-
-    // 流程图待办关联API
-    ipcMain.handle('flowchart-todo-association:queryByFlowchart', async (_, flowchartId: string) => {
-      try {
-        const associations = this.flowchartTodoAssociationManager.getAssociationsByFlowchart(flowchartId);
-        const todoIds = associations.map(a => a.todo_id);
-
-        console.log(`[FlowchartAssociation] Queried ${associations.length} todos for flowchart: ${flowchartId}`);
-        return todoIds;
-      } catch (error) {
-        console.error('Error querying flowchart associations:', error);
-        throw error;
-      }
-    });
-
-    ipcMain.handle('flowchart-todo-association:create', async (_, flowchartId: string, todoId: string) => {
-      try {
-        this.flowchartTodoAssociationManager.createAssociation({
-          flowchart_id: flowchartId,
-          todo_id: todoId
-        });
-
-        console.log(`[FlowchartAssociation] Created association: flowchart=${flowchartId}, todo=${todoId}`);
-      } catch (error) {
-        console.error('Error creating flowchart association:', error);
-        throw error;
-      }
-    });
-
-    ipcMain.handle('flowchart-todo-association:delete', async (_, flowchartId: string, todoId: string) => {
-      try {
-        const associations = this.flowchartTodoAssociationManager.getAssociationsByFlowchart(flowchartId);
-        const association = associations.find(a => a.todo_id === todoId);
-        if (association) {
-          this.flowchartTodoAssociationManager.deleteAssociation(association.id);
-        }
-
-        console.log(`[FlowchartAssociation] Deleted association: flowchart=${flowchartId}, todo=${todoId}`);
-      } catch (error) {
-        console.error('Error deleting flowchart association:', error);
-        throw error;
-      }
-    });
-
-    // 流程图待办关联查询
-    ipcMain.handle('flowchart:getAssociationsByTodoIds', async (_, todoIds: number[]) => {
-      try {
-        // 获取所有相关的关联关系
-        const allAssociations = await Promise.all(
-          todoIds.map(todoId => this.flowchartTodoAssociationManager.getAssociationsByTodo(todoId.toString()))
-        );
-
-        // 构建associationsMap
-        const associationsMap = new Map<number, any[]>();
-        todoIds.forEach((todoId, index) => {
-          associationsMap.set(todoId, allAssociations[index]);
-        });
-
-        // 获取流程图名称映射
-        const flowchartMap = new Map<string, string>();
-        const flowcharts = this.flowchartFileManager.getAllFlowcharts();
-        for (const flowchart of flowcharts) {
-          flowchartMap.set(flowchart.id, flowchart.name);
-        }
-
-        // 将Map转换为Record<number, Array<...>>格式，使用实际可用的字段
-        const result: Record<number, Array<{
-          flowchartId: string;
-          flowchartName: string;
-          nodeId: string;
-          nodeLabel: string;
-        }>> = {};
-
-        associationsMap.forEach((associations, todoId) => {
-          result[todoId] = associations.map(assoc => ({
-            flowchartId: assoc.flowchart_id,
-            flowchartName: flowchartMap.get(assoc.flowchart_id) || '',
-            nodeId: assoc.flowchart_id, // 使用flowchartId作为nodeId
-            nodeLabel: flowchartMap.get(assoc.flowchart_id) || '' // 使用flowchartName作为nodeLabel
-          }));
-        });
-
-        console.log(`[Flowchart] Retrieved associations for ${todoIds.length} todos`);
-
-        return result;
-      } catch (error) {
-        console.error('Error getting flowchart associations by todo ids:', error);
-        throw error;
-      }
-    });
 
     // URL标题获取
     ipcMain.handle('url-titles:fetch-batch', async (_, urls: string[]) => {

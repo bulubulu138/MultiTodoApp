@@ -36,7 +36,6 @@ interface TodoListProps {
   viewMode?: ViewMode; // 视图模式
   onUpdateInPlace?: (id: string, updates: Partial<Todo>) => void; // 专注模式专用：乐观更新
   enableVirtualScroll?: boolean; // 是否启用虚拟滚动
-  onNavigateToFlowchart?: (flowchartId: string, nodeId: string) => void; // 跳转到流程图
   hasMoreData?: boolean; // 是否还有更多数据
   onLoadMore?: () => void; // 加载更多数据的回调
   totalCount?: number; // 总数据量
@@ -61,7 +60,6 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   viewMode = 'card',
   onUpdateInPlace,
   enableVirtualScroll = true, // 默认启用虚拟滚动以提升性能
-  onNavigateToFlowchart,
   hasMoreData = false,
   onLoadMore,
   totalCount = 0,

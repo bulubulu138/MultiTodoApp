@@ -5,7 +5,6 @@ import { EditOutlined, DeleteOutlined, LinkOutlined, EyeOutlined, EyeInvisibleOu
 import { SortOption } from './Toolbar';
 import RelationContext from './RelationContext';
 import RelationIndicators from './RelationIndicators';
-import { FlowchartIndicator } from './FlowchartIndicator';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { formatCompletedTime } from '../utils/timeFormatter';
@@ -27,8 +26,6 @@ interface TodoCardProps {
   onView: (todo: Todo) => void | Promise<void>;
   onShowRelations: (todo: Todo) => void;
   onUpdateDisplayOrder?: (id: string, tabKey: string, order: number | null) => Promise<void>;
-  onNavigateToFlowchart?: (flowchartId: string, nodeId: string) => void;
-  associationsByTodo: Map<string, any[]>;
   parallelRelationsByTodo: Map<string, TodoRelation[]>;
   parallelGroups: Map<string, Set<string>>;
   prevTodo: Todo | null;
@@ -49,8 +46,6 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
   onView,
   onShowRelations,
   onUpdateDisplayOrder,
-  onNavigateToFlowchart,
-  associationsByTodo,
   parallelRelationsByTodo,
   parallelGroups,
   prevTodo,
@@ -305,15 +300,6 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
                   showLabels={false}
                   onViewRelations={() => onView(todo)}
                 />
-                {onNavigateToFlowchart && (
-                  <FlowchartIndicator
-                    todoId={todo.id}
-                    associations={associationsByTodo.get(todo.id) || []}
-                    onNavigate={onNavigateToFlowchart}
-                    size="small"
-                    showLabel={false}
-                  />
-                )}
                 {renderTags(todo.tags)}
               </Space>
             </div>

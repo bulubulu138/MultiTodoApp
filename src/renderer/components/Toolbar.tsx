@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, Space, Select, Tooltip, Segmented, Input } from 'antd';
-import { PlusOutlined, SettingOutlined, CalendarOutlined, SortAscendingOutlined, UnorderedListOutlined, AlignLeftOutlined, AppstoreOutlined, SearchOutlined, ApartmentOutlined } from '@ant-design/icons';
+import { PlusOutlined, SettingOutlined, CalendarOutlined, SortAscendingOutlined, UnorderedListOutlined, AlignLeftOutlined, AppstoreOutlined, SearchOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 
 const { Option } = Select;
@@ -20,7 +20,6 @@ interface ToolbarProps {
   onAddTodo: () => void;
   onShowSettings: () => void;
   onShowCalendar: () => void;
-  onShowFlowchart?: () => void;
   sortOption?: SortOption;
   onSortChange?: (option: SortOption) => void;
   viewMode?: ViewMode;
@@ -34,7 +33,6 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
   onAddTodo,
   onShowSettings,
   onShowCalendar,
-  onShowFlowchart,
   sortOption = 'createdAt-desc',
   onSortChange,
   viewMode = 'card',
@@ -102,18 +100,6 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
             <span className="btn-text">日历</span>
           </Button>
         </Tooltip>
-
-        {onShowFlowchart && (
-          <Tooltip title="流程图">
-            <Button
-              icon={<ApartmentOutlined />}
-              onClick={onShowFlowchart}
-              className="toolbar-btn-with-text"
-            >
-              <span className="btn-text">流程图</span>
-            </Button>
-          </Tooltip>
-        )}
 
         <Button
           type="primary"

@@ -35,7 +35,6 @@ interface TodoViewDrawerProps {
   relations: TodoRelation[];
   onClose: () => void;
   onEdit: (todo: Todo) => void;
-  onOpenFlowchart?: (flowchartId: string, nodeId?: string) => void; // 修改：nodeId改为可选
   onRelationsChange?: () => Promise<void>; // 新增
   onUpdateViewingTodo?: (todo: Todo) => void; // 新增
   onTodoUpdate?: (id: string, updates: Partial<Todo>) => Promise<void>; // 新增：内联更新回调
@@ -48,7 +47,6 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   relations,
   onClose,
   onEdit,
-  onOpenFlowchart, // 新增
   onRelationsChange, // 新增
   onUpdateViewingTodo, // 新增
   onTodoUpdate // 新增：内联更新回调

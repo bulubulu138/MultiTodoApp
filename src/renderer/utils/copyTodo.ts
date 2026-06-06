@@ -10,22 +10,6 @@ export interface CopyResult {
 
 // 图片URL转Base64
 
-function getFlowchartPlaceholder(element: Element): string {
-  const raw = element.getAttribute('data-flowchart');
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw) as { nodes?: unknown[]; edges?: unknown[] };
-      const nodeCount = Array.isArray(parsed.nodes) ? parsed.nodes.length : 0;
-      const edgeCount = Array.isArray(parsed.edges) ? parsed.edges.length : 0;
-      return `[流程图: ${nodeCount}个节点, ${edgeCount}条连线]`;
-    } catch {
-      return '[流程图]';
-    }
-  }
-
-  return '[流程图]';
-}
-
 async function imageUrlToBase64(url: string): Promise<string | null> {
   try {
     const response = await fetch(url);
@@ -47,10 +31,6 @@ async function imageUrlToBase64(url: string): Promise<string | null> {
 async function processImagesInHtml(html: string): Promise<{ html: string; totalSize: number }> {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
-
-  doc.querySelectorAll('flowchart-preview').forEach((flowchartElement) => {
-    flowchartElement.replaceWith(document.createTextNode(getFlowchartPlaceholder(flowchartElement)));
-  });
 
   const images = doc.querySelectorAll('img');
 
@@ -97,11 +77,6 @@ async function processImagesInHtml(html: string): Promise<{ html: string; totalS
 function htmlToPlainText(html: string): string {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
-  
-  // 处理流程图
-  doc.querySelectorAll('flowchart-preview').forEach(flowchartElement => {
-    flowchartElement.replaceWith(document.createTextNode(getFlowchartPlaceholder(flowchartElement)));
-  });
 
   // 处理图片
   doc.querySelectorAll('img').forEach(img => {

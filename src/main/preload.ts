@@ -124,28 +124,6 @@ export interface ElectronAPI {
       backupEnabled: boolean;
     }>;
   };
-  
-  // 流程图API
-  flowchart: {
-    getAssociationsByTodoIds: (todoIds: string[]) => Promise<Record<string, Array<{
-      flowchartId: string;
-      flowchartName: string;
-      nodeId: string;
-      nodeLabel: string;
-    }>>>;
-    save: (flowchartData: any) => Promise<{success: boolean}>;
-    load: (flowchartId: string) => Promise<any | null>;
-    list: () => Promise<any[]>;
-    delete: (flowchartId: string) => Promise<{success: boolean}>;
-    savePatches: (flowchartId: string, patches: any[]) => Promise<{success: boolean}>;
-  };
-
-  // 流程图待办关联API
-  flowchartTodoAssociation: {
-    queryByFlowchart: (flowchartId: string) => Promise<string[]>;
-    create: (flowchartId: string, todoId: string) => Promise<void>;
-    delete: (flowchartId: string, todoId: string) => Promise<void>;
-  };
 
   // Shell API
   openExternal: (url: string) => Promise<{success: boolean; error?: string}>;
@@ -432,28 +410,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     create: () => ipcRenderer.invoke('backup:create'),
     restore: (backupPath: string) => ipcRenderer.invoke('backup:restore', backupPath),
     getCurrentBackupStatus: () => ipcRenderer.invoke('backup:getCurrentBackupStatus'),
-  },
-  flowchart: {
-    getAssociationsByTodoIds: (todoIds: string[]) =>
-      ipcRenderer.invoke('flowchart:getAssociationsByTodoIds', todoIds),
-    save: (flowchartData: any) =>
-      ipcRenderer.invoke('flowchart:save', flowchartData),
-    load: (flowchartId: string) =>
-      ipcRenderer.invoke('flowchart:load', flowchartId),
-    list: () =>
-      ipcRenderer.invoke('flowchart:list'),
-    delete: (flowchartId: string) =>
-      ipcRenderer.invoke('flowchart:delete', flowchartId),
-    savePatches: (flowchartId: string, patches: any[]) =>
-      ipcRenderer.invoke('flowchart:savePatches', flowchartId, patches),
-  },
-  flowchartTodoAssociation: {
-    queryByFlowchart: (flowchartId: string) =>
-      ipcRenderer.invoke('flowchart-todo-association:queryByFlowchart', flowchartId),
-    create: (flowchartId: string, todoId: string) =>
-      ipcRenderer.invoke('flowchart-todo-association:create', flowchartId, todoId),
-    delete: (flowchartId: string, todoId: string) =>
-      ipcRenderer.invoke('flowchart-todo-association:delete', flowchartId, todoId),
   },
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
 
