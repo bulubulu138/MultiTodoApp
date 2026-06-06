@@ -46,6 +46,12 @@ export const COLOR_SCHEMES: Record<ColorTheme, ColorScheme> = {
     primaryDark: 'hsl(0, 80%, 45%)',    // #DC2626
     primaryLight: 'hsl(0, 80%, 92%)',    // #FEE2E2
   },
+  cyan: {
+    hue: 180,
+    primary: 'hsl(180, 80%, 50%)',
+    primaryDark: 'hsl(180, 80%, 40%)',
+    primaryLight: 'hsl(180, 80%, 92%)',
+  },
 };
 
 // ============================================
