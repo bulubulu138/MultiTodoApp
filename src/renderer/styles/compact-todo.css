@@ -83,7 +83,7 @@
 }
 
 .compact-todo-item input:focus {
-  background-color: var(--content-bg, #ffffff);
+  background-color: var(--content-bg);
   border-radius: 2px; /* 稍微减小圆角 */
   box-shadow: 0 0 0 2px var(--color-primary, #1890ff);
   padding: 0 4px; /* 聚焦时增加内边距 */

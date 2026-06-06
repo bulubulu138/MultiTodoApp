@@ -108,25 +108,58 @@ const ContentFocusItem = React.memo(
       latestTodoIdRef.current = todo.id;
     }, [todo.id]);
 
-    // 🔥 新增：延迟设置编辑器就绪状态，确保编辑器完全初始化后才允许外部内容同步
+    // 🔥 关键修复：当todo.id变化时，完全重置组件状态
+    // 这确保了tab切换后，用户看到的始终是当前todo的最新内容
     useEffect(() => {
-      // 重置就绪状态
-      editorReadyRef.current = false;
+      console.log('[ContentFocusItem] Resetting state for todo change', {
+        todoId: todo.id,
+        status: todo.status,
+        contentPreview: todo.content.substring(0, 50) + '...',
+        title: todo.title,
+        updatedAt: todo.updatedAt
+      });
 
-      // 延迟设置就绪状态，给编辑器足够的初始化时间
+      // 1. 清理所有定时器（防止保存到错误的todo）
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+      if (titleSaveTimeoutRef.current) {
+        clearTimeout(titleSaveTimeoutRef.current);
+        titleSaveTimeoutRef.current = null;
+      }
+
+      // 2. 重置所有状态为新todo的值
+      setEditedContent(todo.content);
+      setEditedTitle(todo.title);
+      setIsSaving(false);
+      setIsSavingTitle(false);
+
+      // 3. 重置所有refs（关键！）
+      lastSavedContentRef.current = todo.content;
+      lastSavedTitleRef.current = todo.title;
+      editorFocusedRef.current = false;
+      editorReadyRef.current = false;
+      isComposingRef.current = false;
+      currentProcessingTodoRef.current = null;
+
+      // 4. 重置编辑器就绪状态（延迟设置，确保编辑器完全初始化）
       const readyTimer = setTimeout(() => {
         editorReadyRef.current = true;
-      }, 200); // 200ms 延迟，确保编辑器完全初始化
+      }, 200);
 
+      // 5. 清理函数
       return () => {
         clearTimeout(readyTimer);
-        editorReadyRef.current = false;
       };
-    }, [todo.id]); // 当 todo.id 变化时（切换到不同的 todo），重新初始化就绪状态
+    }, [todo.id, todo.content, todo.title, todo.status, todo.updatedAt])
 
     // 🔥 关键修复：同步外部更新的 todo.content（仅在编辑器失焦且初始化完成后才同步）
+    // 注意：
+    // - todo.id变化时的完全重置由上面的集中重置useEffect处理
+    // - 这里只处理同一个todo的增量同步（例如在TodoViewDrawer中修改了内容）
+    // 只在以下情况下才同步外部value到编辑器：
     useEffect(() => {
-      // 只在以下情况下才同步外部value到编辑器：
       // 1. 外部内容确实发生了变化（todo.content !== lastSavedContentRef.current）
       // 2. 当前不在保存中（!isSaving）
       // 3. **编辑器不在焦点状态**（!editorFocusedRef.current）← 这是关键！
@@ -142,9 +175,26 @@ const ContentFocusItem = React.memo(
         setEditedContent(todo.content);
         lastSavedContentRef.current = todo.content;
       }
+
+      // 🔧 新增：开发环境下的数据一致性检查
+      if (process.env.NODE_ENV === 'development') {
+        if (todo.content !== editedContent && !isSaving && !editorFocusedRef.current && !isCurrentlyEditing && editorReadyRef.current) {
+          console.warn('[ContentFocusView] Potential data inconsistency detected:', {
+            todoId: todo.id,
+            todoContentPreview: todo.content.substring(0, 50) + '...',
+            editedContentPreview: editedContent.substring(0, 50) + '...',
+            isSaving,
+            editorFocused: editorFocusedRef.current,
+            isCurrentlyEditing
+          });
+        }
+      }
     }, [todo.content, isSaving, editedContent]);
 
     // 同步外部更新的 todo.title（仅在保存完成后更新）
+    // 注意：
+    // - todo.id变化时的完全重置由上面的集中重置useEffect处理
+    // - 这里只处理同一个todo的增量同步
     useEffect(() => {
       // 添加额外检查：如果当前正在编辑标题，不覆盖
       const isCurrentlyEditing = editedTitle !== lastSavedTitleRef.current;
@@ -152,6 +202,19 @@ const ContentFocusItem = React.memo(
       if (todo.title !== lastSavedTitleRef.current && !isSavingTitle && !isCurrentlyEditing) {
         setEditedTitle(todo.title);
         lastSavedTitleRef.current = todo.title;
+      }
+
+      // 🔧 新增：开发环境下的数据一致性检查
+      if (process.env.NODE_ENV === 'development') {
+        if (todo.title !== editedTitle && !isSavingTitle && !isCurrentlyEditing) {
+          console.warn('[ContentFocusView] Title data inconsistency detected:', {
+            todoId: todo.id,
+            todoTitle: todo.title,
+            editedTitle: editedTitle,
+            isSavingTitle,
+            isCurrentlyEditing
+          });
+        }
       }
     }, [todo.title, isSavingTitle, editedTitle]);
 
@@ -185,6 +248,35 @@ const ContentFocusItem = React.memo(
         setIsSaving(false);
       }
     }, [todo.id, getLatestContent, onUpdate, message]);
+
+    // 🔧 新增：监听isSaving状态变化，在保存完成后检查是否需要补偿同步
+    useEffect(() => {
+      // 当isSaving从true变为false时，检查是否有待同步的外部更新
+      if (!isSaving && todo.content !== lastSavedContentRef.current) {
+        const isCurrentlyEditing = editedContent !== lastSavedContentRef.current;
+
+        // 如果编辑器不在焦点状态且用户未在编辑，执行补偿同步
+        if (!editorFocusedRef.current && !isCurrentlyEditing && editorReadyRef.current) {
+          console.log('[ContentFocusView] Compensation sync triggered after save completed', {
+            todoId: todo.id,
+            externalContent: todo.content.substring(0, 50) + '...',
+            currentEditedContent: editedContent.substring(0, 50) + '...'
+          });
+
+          // 使用短延迟确保在当前渲染周期结束后再同步，避免状态更新冲突
+          const compensationTimer = setTimeout(() => {
+            // 再次检查条件，确保在延迟期间状态没有变化
+            if (todo.content !== lastSavedContentRef.current && !editorFocusedRef.current) {
+              setEditedContent(todo.content);
+              lastSavedContentRef.current = todo.content;
+              console.log('[ContentFocusView] Compensation sync completed', { todoId: todo.id });
+            }
+          }, 100); // 100ms延迟
+
+          return () => clearTimeout(compensationTimer);
+        }
+      }
+    }, [isSaving, todo.content, todo.id, editedContent]);
 
     // 保存标题（防抖）
     const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -869,6 +961,16 @@ interface TimeDisplayProps {
   todo: Todo;
 }
 
+// 🔧 修复：自定义memo比较函数，确保deadline变化时能触发重渲染
+const TimeDisplayMemoComparator = (
+  prevProps: TimeDisplayProps,
+  nextProps: TimeDisplayProps
+) => {
+  // 只比较deadline字段，忽略其他todo字段的变化
+  // 返回true表示props相等（不重渲染），返回false表示props不同（需要重渲染）
+  return prevProps.todo.deadline === nextProps.todo.deadline;
+};
+
 const TimeDisplay: React.FC<TimeDisplayProps> = React.memo(({ todo }) => {
   // 只显示截止时间，使用相对时间格式
   if (!todo.deadline) return null;
@@ -888,7 +990,7 @@ const TimeDisplay: React.FC<TimeDisplayProps> = React.memo(({ todo }) => {
       {deadlineInfo.text}
     </Tag>
   );
-});
+}, TimeDisplayMemoComparator);
 
 export default ContentFocusView;
 

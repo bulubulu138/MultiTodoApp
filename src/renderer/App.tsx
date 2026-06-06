@@ -812,35 +812,43 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   }, [todos, message]);
 
   // 🔧 新增：增量刷新机制 - 从文件系统重新加载单个待办
-  const handleRefreshTodo = useCallback(async (todoId: string) => {
+  const handleRefreshTodo = useCallback(async (todoId: string, silent = false) => {
     try {
-      console.log('[App] handleRefreshTodo: Starting refresh', { todoId });
+      if (!silent) {
+        console.log('[App] handleRefreshTodo: Starting refresh', { todoId });
+      }
 
       // 从文件系统获取最新数据
       const latestTodo = await window.electronAPI.todo.getById(String(todoId));
 
       if (!latestTodo) {
-        console.warn('[App] handleRefreshTodo: Todo not found', { todoId });
+        if (!silent) {
+          console.warn('[App] handleRefreshTodo: Todo not found', { todoId });
+        }
         return false;
       }
 
-      console.log('[App] handleRefreshTodo: Retrieved latest data', {
-        todoId,
-        title: latestTodo.title,
-        updatedAt: latestTodo.updatedAt
-      });
+      if (!silent) {
+        console.log('[App] handleRefreshTodo: Retrieved latest data', {
+          todoId,
+          title: latestTodo.title,
+          updatedAt: latestTodo.updatedAt
+        });
+      }
 
       // 更新todos中的对应项
       setTodos(prev => {
         return prev.map(todo => {
-          if (todo.id === todoId) {
-            console.log('[App] handleRefreshTodo: Updating todo in list', {
-              todoId,
-              oldTitle: todo.title,
-              newTitle: latestTodo.title,
-              oldUpdatedAt: todo.updatedAt,
-              newUpdatedAt: latestTodo.updatedAt
-            });
+          if (areIdsEqual(todo.id, todoId)) {
+            if (!silent) {
+              console.log('[App] handleRefreshTodo: Updating todo in list', {
+                todoId,
+                oldTitle: todo.title,
+                newTitle: latestTodo.title,
+                oldUpdatedAt: todo.updatedAt,
+                newUpdatedAt: latestTodo.updatedAt
+              });
+            }
             return latestTodo;
           }
           return todo;
@@ -848,18 +856,24 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       });
 
       // 如果当前正在查看这个待办，也更新viewingTodo
-      if (viewingTodo?.id === todoId) {
-        console.log('[App] handleRefreshTodo: Updating viewingTodo');
+      if (viewingTodo && areIdsEqual(viewingTodo.id, todoId)) {
+        if (!silent) {
+          console.log('[App] handleRefreshTodo: Updating viewingTodo');
+        }
         setViewingTodo(latestTodo);
       }
 
-      console.log('[App] handleRefreshTodo: Refresh completed successfully');
+      if (!silent) {
+        console.log('[App] handleRefreshTodo: Refresh completed successfully');
+      }
       return true;
     } catch (error) {
-      console.error('[App] handleRefreshTodo: Refresh failed', {
-        todoId,
-        error: error instanceof Error ? error.message : String(error)
-      });
+      if (!silent) {
+        console.error('[App] handleRefreshTodo: Refresh failed', {
+          todoId,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
       return false;
     }
   }, [viewingTodo]);
@@ -896,6 +910,17 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     const savePromise = (async () => {
       try {
         await window.electronAPI.todo.update(String(id), updates);
+
+        // 🔥 新增：保存成功后，从数据库重新获取最新数据
+        // 这确保React state与数据库完全同步，特别是content字段
+        const refreshSuccess = await handleRefreshTodo(String(id), true);
+
+        if (!refreshSuccess) {
+          // 如果增量刷新失败，记录警告但不回滚
+          // 因为数据库保存已经成功，乐观更新的数据至少是部分正确的
+          console.warn(`[handleUpdateTodoInPlace] Refresh failed for ${id}, but save succeeded`);
+        }
+
         // 保存成功，移除追踪
         savingTodosRef.current.delete(idString);
         pendingSavesRef.current.delete(idString);
@@ -912,30 +937,43 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     })();
 
     pendingSavesRef.current.set(idString, savePromise);
-  }, []);
+  }, [handleRefreshTodo]);
 
   // 等待所有保存完成
-  const waitForAllSaves = useCallback(async (): Promise<boolean> => {
+  const waitForAllSaves = useCallback(async (silent = false): Promise<boolean> => {
     if (pendingSavesRef.current.size === 0) {
       return true;
     }
 
-    const hide = message.loading('正在保存更改...', 0);
-    
+    let hide: (() => void) | null = null;
+
+    // 只在非静默模式显示loading
+    if (!silent) {
+      hide = message.loading('正在保存更改...', 0);
+    }
+
     try {
-      // 等待所有保存操作完成（最多等待 10 秒）
+      // 等待所有保存操作完成（最多等待 5 秒）
       const allSaves = Array.from(pendingSavesRef.current.values());
       await Promise.race([
         Promise.all(allSaves),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('保存超时')), 10000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('保存超时')), 5000))
       ]);
-      
-      hide();
-      message.success('所有更改已保存');
+
+      if (hide) {
+        hide();
+      }
+      if (!silent) {
+        message.success('所有更改已保存');
+      }
       return true;
     } catch (error) {
-      hide();
-      message.error('部分更改保存超时');
+      if (hide) {
+        hide();
+      }
+      if (!silent) {
+        message.error('部分更改保存超时');
+      }
       return false;
     }
   }, [message]);
@@ -1774,21 +1812,23 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     };
   }, [activeTab, tabSettings]);
 
-  // Tab 切换处理（优化：非阻塞切换 + 性能监控）
-  const handleTabChange = useCallback((newTab: string) => {
+  // Tab 切换处理（优化：等待保存完成后再切换）
+  const handleTabChange = useCallback(async (newTab: string) => {
     // 性能监控：开始计时
     PerformanceMonitor.start('tab-switch');
 
-    // 立即切换 tab（乐观更新）
-    setActiveTab(newTab);
-
-    // 如果当前在专注模式，后台保存所有未保存的内容（非阻塞）
+    // 🔥 关键修复：如果在专注模式，等待所有保存完成
     if (currentTabSettings.viewMode === 'content-focus') {
-      contentFocusRef.current?.saveAll().catch(error => {
-        console.error('Background save failed:', error);
-        message.warning('保存失败，部分更改可能未保存');
-      });
+      const allSaved = await waitForAllSaves(true); // silent=true，不显示loading
+
+      if (!allSaved) {
+        console.warn('[handleTabChange] Some saves failed during tab switch');
+        // 即使失败也允许切换，避免阻塞用户
+      }
     }
+
+    // 等待完成后再切换 tab
+    setActiveTab(newTab);
 
     // 性能监控：在下一帧测量切换时间
     requestAnimationFrame(() => {
@@ -1802,13 +1842,13 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         }
       }
     });
-  }, [currentTabSettings.viewMode, message]);
+  }, [currentTabSettings.viewMode, waitForAllSaves]);
 
   return (
     <Layout
       style={{
         height: '100vh',
-        background: themeMode === 'dark' ? 'var(--content-bg)' : '#F2F2F7'
+        background: 'var(--color-background)'
       }}
       data-theme={themeMode}
       data-color-theme={colorTheme}
@@ -1825,9 +1865,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         searchText={searchText}
         onSearchChange={setSearchText}
       />
-        
-        <Content className="content-area" style={{ background: 'var(--content-bg)' }}>
-        <div className="content-card-shell" style={{ background: 'var(--color-bg-elevated, #ffffff)' }}>
+
+        <Content className="content-area" style={{ background: 'var(--color-surface)' }}>
+        <div className="content-card-shell" style={{ background: 'var(--color-surface-elevated)' }}>
         <Tabs
           activeKey={activeTab}
           onChange={handleTabChange}

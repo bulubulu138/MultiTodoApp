@@ -29,11 +29,16 @@
   --color-info-light: rgba(59, 130, 246, 0.1);
   --color-highlight: #F472B6;
 
-  /* 浅色模式 - 背景色 */
-  --color-background: #FFFFFF;
-  --color-surface: #F4F4F5;
-  --color-surface-elevated: #E4E4E7;
-  --color-surface-hover: #FAFAFA;
+  /* 浅色模式 - 背景色 (中性灰，明显层次 8-12%) */
+  --color-background: #F5F5F5;      /* 主背景 - 中性浅灰 */
+  --color-surface: #EBEBEB;          /* 容器背景 - 明显更深 (-10%) */
+  --color-surface-elevated: #FFFFFF; /* 卡片悬浮 - 纯白，最突出 */
+  --color-surface-hover: #F0F0F0;    /* hover状态 */
+
+  /* 滚动条颜色 */
+  --scroll-track-bg: #f1f1f1;
+  --scroll-thumb-bg: #c1c1c1;
+  --scroll-thumb-hover-bg: #a8a8a8;
 
   /* 浅色模式 - 文字色 */
   --color-text-primary: #18181B;
@@ -137,6 +142,11 @@
   --color-surface: #141414;
   --color-surface-elevated: #1a1a1a;
   --color-surface-hover: #1f1f1f;
+
+  /* 滚动条颜色 */
+  --scroll-track-bg: #1a1a1a;
+  --scroll-thumb-bg: #404040;
+  --scroll-thumb-hover-bg: #525252;
 
   /* 深色模式 - 文字色 */
   --color-text-primary: #f5f5f5;

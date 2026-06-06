@@ -34,7 +34,7 @@
   --list-item-overdue-bg: #fff4f2;
   --list-item-overdue-hover-bg: #ffefeb;
   --list-item-current-bg: #f2f8ff;
-  --content-bg: #F2F2F7;
+  --content-bg: #F5F5F5;
   --border-color: rgba(60, 60, 67, 0.08);
   --group-border-color: var(--color-warning);
   --group-border-bg: rgba(250, 140, 22, 0.12);
@@ -82,17 +82,17 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--scroll-track-bg, #f1f1f1);
+  background: var(--scroll-track-bg);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--scroll-thumb-bg, #c1c1c1);
+  background: var(--scroll-thumb-bg);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--scroll-thumb-hover-bg, #a8a8a8);
+  background: var(--scroll-thumb-hover-bg);
 }
 
 /* 深色主题滚动条 */
@@ -176,7 +176,7 @@ body {
 }
 
 .content-card-shell {
-  background: var(--color-bg-elevated, #ffffff);
+  background: var(--color-surface-elevated);
   border-radius: var(--ios-card-radius);
   box-shadow: var(--ios-card-shadow);
   padding: 8px 20px 20px;
@@ -184,7 +184,7 @@ body {
 }
 
 [data-theme='dark'] .content-card-shell {
-  background: var(--color-bg-elevated, #111111) !important;
+  background: var(--color-surface-elevated) !important;
 }
 
 .todo-view-stage {
@@ -246,7 +246,7 @@ body {
   box-shadow: var(--ios-card-shadow);
   transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease-in, box-shadow 0.2s ease;
   border: none !important;
-  background: var(--color-bg-elevated, #ffffff);
+  background: var(--color-surface-elevated);
 }
 
 .todo-card.is-deleting {
@@ -1299,68 +1299,68 @@ flowchart-preview.flowchart-embedded:hover {
 }
 
 /* ============================================
-   深色主题下的浅色内容卡片（可读性优先）
+   深色主题优化 - 统一深色背景
    ============================================ */
 
-/* 1. 关联上下文卡片保持浅色背景以确保可读性 */
+/* 1. 详情页富文本内容区使用深色背景 */
+[data-theme='dark'] .todo-view-content {
+  background: #1a1a1a !important;
+  color: #e5e5e5 !important;
+  border-radius: 8px;
+}
+
+/* 2. 关联上下文卡片使用深色 */
 [data-theme='dark'] .relation-context .ant-card {
-  background: #f5f5f5 !important;
-  color: #000000 !important;
-  border-color: #d9d9d9 !important;
+  background: #1a1a1a !important;
+  color: #e5e5e5 !important;
+  border-color: #404040 !important;
 }
 
 [data-theme='dark'] .relation-context .ant-card-head {
-  background: #e6e6e6 !important;
-  border-bottom-color: #d9d9d9 !important;
-  color: #000000 !important;
+  background: #0a0a0a !important;
+  border-bottom-color: #404040 !important;
+  color: #e5e5e5 !important;
 }
 
 [data-theme='dark'] .relation-context .ant-card-body {
-  color: #000000 !important;
+  color: #e5e5e5 !important;
 }
 
-/* 2. 当前待办卡片保持浅蓝色高亮 */
+/* 3. 当前待办卡片使用深蓝色高亮 */
 [data-theme='dark'] .relation-current {
-  background: #e6f7ff !important;
+  background: #0d1829 !important;
 }
 
 [data-theme='dark'] .relation-current .ant-card {
-  background: #f0f9ff !important;
-  color: #000000 !important;
+  background: #1a2942 !important;
+  color: #e5e5e5 !important;
 }
 
-/* 3. 详情页富文本内容区保持浅色背景 */
-[data-theme='dark'] .todo-view-content {
-  background: #f5f5f5 !important;
-  color: #000000 !important;
-}
-
-/* 4. Collapse 展开内容中的卡片保持浅色 */
+/* 4. Collapse 展开内容中的卡片使用深色 */
 [data-theme='dark'] .ant-collapse-content .ant-card {
-  background: #f5f5f5 !important;
-  color: #000000 !important;
-  border-color: #d9d9d9 !important;
+  background: #1a1a1a !important;
+  color: #e5e5e5 !important;
+  border-color: #404040 !important;
 }
 
 /* 5. 主列表中展开的关联上下文区域 */
 [data-theme='dark'] .todo-card .relation-context {
-  background: #1a1a1a !important;
+  background: #0a0a0a !important;
 }
 
 [data-theme='dark'] .todo-card .relation-context .ant-card {
-  background: #f5f5f5 !important;
-  color: #000000 !important;
+  background: #1a1a1a !important;
+  color: #e5e5e5 !important;
 }
 
 /* ============================================
-   深色主题下的文字颜色修复（根本原因分析版本）
+   深色主题下的文字颜色优化
    ============================================ */
 
-/* 修复1：富文本内容区 - 强制所有HTML元素（包括内联样式）使用深色文字 */
-/* 使用更强的选择器确保优先级 */
+/* 修复1：富文本内容区 - 使用浅色文字（深色背景） */
 [data-theme='dark'] div.todo-view-content {
-  background: #f5f5f5 !important;
-  color: #000000 !important;
+  background: #1a1a1a !important;
+  color: #e5e5e5 !important;
 }
 
 [data-theme='dark'] div.todo-view-content *:not(br):not(hr):not(a),
@@ -1380,17 +1380,17 @@ flowchart-preview.flowchart-embedded:hover {
 [data-theme='dark'] div.todo-view-content em,
 [data-theme='dark'] div.todo-view-content code,
 [data-theme='dark'] div.todo-view-content pre {
-  color: #000000 !important;
+  color: #e5e5e5 !important;
 }
 
-/* 确保链接在深色主题下也显示为蓝色 */
+/* 确保链接在深色主题下显示为亮蓝色 */
 [data-theme='dark'] .ant-drawer .todo-view-content a {
-  color: #1890ff !important;
+  color: #69b1ff !important;
   text-decoration: underline !important;
 }
 
 [data-theme='dark'] .ant-drawer .todo-view-content a:hover {
-  color: #40a9ff !important;
+  color: #91d5ff !important;
 }
 
 /* 修复2：Popover 中的富文本内容预览 */
@@ -1399,19 +1399,19 @@ flowchart-preview.flowchart-embedded:hover {
 [data-theme='dark'] .ant-popover-inner-content div[dangerouslySetInnerHTML] p,
 [data-theme='dark'] .ant-popover-inner-content div[dangerouslySetInnerHTML] span,
 [data-theme='dark'] .ant-popover-inner-content div[dangerouslySetInnerHTML] div {
-  color: #000000 !important;
+  color: #e5e5e5 !important;
 }
 
 /* 修复3：日历抽屉中的列表项 - 使用浅色文字（因为背景是暗色） */
 [data-theme='dark'] .todo-list-panel .ant-list-item {
-  color: #ffffff !important;
+  color: #e5e5e5 !important;
 }
 
 [data-theme='dark'] .todo-list-panel .ant-list-item *:not(.ant-tag):not(.ant-tag *) {
-  color: #ffffff !important;
+  color: #e5e5e5 !important;
 }
 
-/* 修复4：关联上下文卡片 - 浅色背景需要深色文字 */
+/* 修复4：关联上下文卡片 - 深色背景使用浅色文字 */
 [data-theme='dark'] .relation-context .ant-card,
 [data-theme='dark'] .relation-context .ant-card *,
 [data-theme='dark'] .relation-current,
@@ -1420,20 +1420,20 @@ flowchart-preview.flowchart-embedded:hover {
 [data-theme='dark'] .ant-collapse-content .ant-card *,
 [data-theme='dark'] .todo-card .relation-context .ant-card,
 [data-theme='dark'] .todo-card .relation-context .ant-card * {
-  color: #000000 !important;
+  color: #e5e5e5 !important;
 }
 
 /* 确保 Ant Design 的 Typography 组件也使用正确的颜色 */
 [data-theme='dark'] .relation-context .ant-typography,
 [data-theme='dark'] .relation-current .ant-typography,
 [data-theme='dark'] .ant-collapse-content .ant-typography {
-  color: #000000 !important;
+  color: #e5e5e5 !important;
 }
 
-/* 次要文字使用深灰 */
+/* 次要文字使用较暗的灰色 */
 [data-theme='dark'] .relation-context .ant-typography-secondary,
 [data-theme='dark'] .relation-current .ant-typography-secondary {
-  color: #333333 !important;
+  color: #a0a0a0 !important;
 }
 
 /* 标签保持自己的颜色方案 */
@@ -1500,8 +1500,8 @@ flowchart-preview.flowchart-embedded:hover {
   padding: 8px 12px;
   resize: none;
   transition: all 0.2s;
-  background: var(--bg-color, #ffffff);
-  color: var(--text-color, #000000);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
 }
 
 .content-focus-title-input:hover {
@@ -2147,7 +2147,7 @@ motion.div {
 }
 
 .toolbar {
-  background: color-mix(in srgb, var(--color-bg-elevated, #ffffff) 72%, transparent);
+  background: color-mix(in srgb, var(--color-surface-elevated) 72%, transparent);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border-bottom: none;
@@ -2171,7 +2171,7 @@ motion.div {
 .toolbar .ant-segmented,
 .toolbar .toolbar-btn-with-text,
 .toolbar .toolbar-btn-settings {
-  background: var(--color-bg-elevated, #ffffff) !important;
+  background: var(--color-surface-elevated) !important;
   border: none !important;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
 }
@@ -2209,7 +2209,7 @@ motion.div {
 
 .ios-modal .ant-modal-header,
 .ios-modal .ant-drawer-header {
-  background: var(--color-bg-elevated, #ffffff) !important;
+  background: var(--color-surface-elevated) !important;
   border-bottom: none !important;
   padding: 20px 24px 8px !important;
 }
@@ -2223,7 +2223,7 @@ motion.div {
 .ios-modal .ant-modal-body,
 .ios-modal .ant-drawer-body {
   padding: 16px 24px 24px !important;
-  background: var(--color-bg-elevated, #ffffff);
+  background: var(--color-surface-elevated);
 }
 
 .ios-modal .ant-modal-footer {
@@ -2235,7 +2235,7 @@ motion.div {
   border: none !important;
   border-radius: var(--ios-card-radius) !important;
   box-shadow: var(--ios-card-shadow) !important;
-  background: var(--color-bg-elevated, #ffffff) !important;
+  background: var(--color-surface-elevated) !important;
 }
 
 .ios-modal .ant-card .ant-card-head {
@@ -2327,7 +2327,7 @@ motion.div {
 .ios-drawer .ant-drawer-footer {
   border-top: none !important;
   padding: 12px 24px 24px !important;
-  background: var(--color-bg-elevated, #ffffff);
+  background: var(--color-surface-elevated);
 }
 
 .ios-modal .ant-list-item {
@@ -2477,7 +2477,7 @@ motion.div {
 }
 
 .todo-card:hover {
-  background: linear-gradient(180deg, var(--color-bg-elevated, #ffffff) 0%, var(--list-item-hover-bg, #fcfcfd) 100%);
+  background: linear-gradient(180deg, var(--color-surface-elevated) 0%, var(--list-item-hover-bg) 100%);
 }
 
 .content-card-shell .ant-list-item > .todo-card,
@@ -2566,7 +2566,7 @@ motion.div {
 .ios-modal .ant-table-container,
 .content-card-shell .ant-collapse,
 .ios-modal .ant-collapse {
-  background: var(--color-bg-elevated, #ffffff) !important;
+  background: var(--color-surface-elevated) !important;
   color: var(--color-text-primary) !important;
 }
 
@@ -2578,9 +2578,9 @@ motion.div {
 .ios-modal .ant-collapse > .ant-collapse-item > .ant-collapse-header,
 .content-card-shell .ant-collapse-content,
 .ios-modal .ant-collapse-content {
-  background: var(--color-bg-elevated, #ffffff) !important;
+  background: var(--color-surface-elevated) !important;
   color: var(--color-text-primary) !important;
-  border-color: var(--color-border, #e4e4e7) !important;
+  border-color: var(--color-border) !important;
 }
 
 .content-card-shell .ant-statistic .ant-statistic-title,
@@ -2607,9 +2607,9 @@ motion.div {
 .ant-modal-root .ant-select-dropdown,
 .ant-drawer .ant-picker-panel,
 .ant-drawer .ant-select-dropdown {
-  background: var(--color-bg-elevated, #ffffff) !important;
+  background: var(--color-surface-elevated) !important;
   color: var(--color-text-primary) !important;
-  border-color: var(--color-border, #e4e4e7) !important;
+  border-color: var(--color-border) !important;
 }
 
 .ant-select-item,
@@ -2625,7 +2625,7 @@ motion.div {
 .ant-select-item-option-selected:not(.ant-select-item-option-disabled),
 .ant-dropdown-menu-item:hover,
 .ant-dropdown-menu-submenu-title:hover {
-  background: var(--list-item-hover-bg, #f5f5f5) !important;
+  background: var(--list-item-hover-bg) !important;
 }
 
 .ant-picker-cell-in-view,
@@ -2658,14 +2658,14 @@ motion.div {
 .ios-modal .ant-radio-button-wrapper,
 .content-card-shell .ant-radio-button-wrapper {
   color: var(--color-text-primary) !important;
-  border-color: var(--color-border, #e4e4e7) !important;
+  border-color: var(--color-border) !important;
 }
 
 .ios-modal .ant-segmented-item-selected,
 .content-card-shell .ant-segmented-item-selected,
 .ios-modal .ant-radio-button-wrapper-checked,
 .content-card-shell .ant-radio-button-wrapper-checked {
-  background: var(--color-bg-elevated, #ffffff) !important;
+  background: var(--color-surface-elevated) !important;
   color: var(--color-primary) !important;
 }
 
