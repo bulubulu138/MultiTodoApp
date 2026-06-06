@@ -2,7 +2,7 @@ import { theme } from 'antd';
 import type { ThemeConfig } from 'antd';
 
 export type ThemeMode = 'light' | 'dark';
-export type ColorTheme = 'purple' | 'blue' | 'green' | 'orange' | 'red';
+export type ColorTheme = 'purple' | 'blue' | 'green' | 'orange' | 'red' | 'cyan' | 'magenta' | 'yellow' | 'indigo' | 'pink' | 'teal' | 'amber';
 
 // ============================================
 // 色彩配置接口
@@ -85,11 +85,11 @@ export const createLightTheme = (colorTheme: ColorTheme = 'purple'): ThemeConfig
       colorLinkHover: hslToHex(scheme.hue, 80, 50),
       colorLinkActive: hslToHex(scheme.hue, 80, 40),
 
-      // 背景色 - 使用设计token
-      colorBgBase: '#FFFFFF',
-      colorBgContainer: '#F4F4F5',
-      colorBgElevated: '#E4E4E7',
-      colorBgLayout: '#FFFFFF',
+      // 背景色 - 中性灰，明显层次 (8-12%)
+      colorBgBase: '#F5F5F5',      // 主背景 - 中性浅灰
+      colorBgContainer: '#EBEBEB',  // 容器背景 - 明显更深 (-10%)
+      colorBgElevated: '#FFFFFF',   // 卡片悬浮 - 纯白，最突出
+      colorBgLayout: '#F5F5F5',     // 布局背景 - 与主背景一致
 
       // 边框色 - 使用设计token
       colorBorder: '#E4E4E7',
@@ -130,7 +130,7 @@ export const createLightTheme = (colorTheme: ColorTheme = 'purple'): ThemeConfig
     },
     components: {
       Card: {
-        colorBgContainer: '#F4F4F5',
+        colorBgContainer: '#EBEBEB',
         colorBorder: '#E4E4E7',
         colorBorderSecondary: '#D4D4D8',
         borderRadiusLG: 24,
@@ -146,28 +146,28 @@ export const createLightTheme = (colorTheme: ColorTheme = 'purple'): ThemeConfig
         colorBgElevated: '#FFFFFF',
       },
       Input: {
-        colorBgContainer: '#F4F4F5',
+        colorBgContainer: '#EBEBEB',
         borderRadius: 24,
         paddingBlock: 12,
         paddingInline: 16,
       },
       Select: {
-        colorBgContainer: '#F4F4F5',
+        colorBgContainer: '#EBEBEB',
         colorBgElevated: '#FFFFFF',
         borderRadius: 24,
       },
       Button: {
-        colorBgContainer: '#F4F4F5',
+        colorBgContainer: '#EBEBEB',
         borderRadius: 24,
         paddingBlock: 10,
         paddingInline: 20,
         fontWeight: 600,
       },
       List: {
-        colorBgContainer: '#FFFFFF',
+        colorBgContainer: '#F5F5F5',
       },
       Tabs: {
-        colorBgContainer: '#FFFFFF',
+        colorBgContainer: '#F5F5F5',
         borderRadius: 0,
       },
       Checkbox: {
@@ -181,7 +181,7 @@ export const createLightTheme = (colorTheme: ColorTheme = 'purple'): ThemeConfig
         borderRadiusSM: 14,
       },
       Collapse: {
-        colorBgContainer: '#F4F4F5',
+        colorBgContainer: '#EBEBEB',
         headerBg: '#FFFFFF',
         colorBorder: '#E4E4E7',
         borderRadiusLG: 24,
