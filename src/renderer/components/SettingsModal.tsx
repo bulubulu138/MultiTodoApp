@@ -25,6 +25,13 @@ const ColorThemeSelector: React.FC<ColorThemeSelectorProps> = ({ value, onChange
     { key: 'green', color: '#10B981', label: '绿色' },
     { key: 'orange', color: '#F59E0B', label: '橙色' },
     { key: 'red', color: '#EF4444', label: '红色' },
+    { key: 'cyan', color: '#14B8A6', label: '青色' },
+    { key: 'magenta', color: '#D946EF', label: '品红' },
+    { key: 'yellow', color: '#EAB308', label: '金黄' },
+    { key: 'indigo', color: '#6366F1', label: '靛蓝' },
+    { key: 'pink', color: '#EC4899', label: '粉色' },
+    { key: 'teal', color: '#0D9488', label: '青绿' },
+    { key: 'amber', color: '#F59E0B', label: '琥珀' },
   ];
 
   return (
