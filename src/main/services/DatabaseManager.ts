@@ -9,8 +9,6 @@ import { app, BrowserWindow } from 'electron';
 import { FileStorageManager } from '../FileStorageManager';
 import { BackupManager } from '../utils/BackupManager';
 import { appConfigManager, DatabaseRecord } from '../config/AppConfig';
-import { TodayCompletedScheduler } from './TodayCompletedScheduler';
-import { TodayCompletedManager } from './TodayCompletedManager';
 
 export interface DatabaseInfo {
   path: string;
@@ -26,7 +24,6 @@ export class DatabaseManager {
   private currentBackupManager: BackupManager | null = null;
   private currentDatabasePath: string = '';
   private isInitialized: boolean = false;
-  private todayCompletedScheduler: TodayCompletedScheduler | null = null;
   private mainWindow: BrowserWindow | null = null;
 
   /**
@@ -88,14 +85,6 @@ export class DatabaseManager {
       // 切换到当前数据库
       await this.switchDatabase(currentPath, false);
 
-      // ✅ 初始化今日完成调度器
-      if (this.currentStorageManager) {
-        this.todayCompletedScheduler = new TodayCompletedScheduler(this.currentStorageManager, this.mainWindow || undefined);
-        await this.todayCompletedScheduler.checkOnStartup(); // 启动时检查
-        this.todayCompletedScheduler.start(); // 启动定时任务
-        console.log('[DatabaseManager] ✅ Today completed scheduler initialized');
-      }
-
       this.isInitialized = true;
       console.log('[DatabaseManager] ✅ Database manager initialized successfully');
     } catch (error) {
@@ -118,13 +107,6 @@ export class DatabaseManager {
         console.log('[DatabaseManager] 🛑 Stopped current backup manager');
       }
 
-      // 2. 停止当前的今日完成调度器
-      if (this.todayCompletedScheduler) {
-        this.todayCompletedScheduler.stop();
-        this.todayCompletedScheduler = null;
-        console.log('[DatabaseManager] 🛑 Stopped today completed scheduler');
-      }
-
       // 3. 停止当前的存储管理器
       if (this.currentStorageManager) {
         await this.currentStorageManager.stopWatching();
@@ -145,12 +127,6 @@ export class DatabaseManager {
       // 5. 创建新的备份管理器
       this.currentBackupManager = new BackupManager(this.currentStorageManager);
       this.currentBackupManager.startAutoBackup();
-
-      // 6. 创建新的今日完成调度器
-      this.todayCompletedScheduler = new TodayCompletedScheduler(this.currentStorageManager, this.mainWindow || undefined);
-      await this.todayCompletedScheduler.checkOnStartup(); // 启动时检查
-      this.todayCompletedScheduler.start(); // 启动定时任务
-      console.log('[DatabaseManager] ✅ Today completed scheduler initialized');
 
       // 6. 原子性更新配置（同时更新 storageLocation 和 currentDatabasePath）
       console.log('[DatabaseManager] 💾 Updating configuration atomically...');
@@ -270,11 +246,6 @@ export class DatabaseManager {
         this.currentBackupManager = null;
       }
 
-      if (this.todayCompletedScheduler) {
-        this.todayCompletedScheduler.stop();
-        this.todayCompletedScheduler = null;
-      }
-
       if (this.currentStorageManager) {
         await this.currentStorageManager.stopWatching();
         this.currentStorageManager = null;
@@ -292,16 +263,6 @@ export class DatabaseManager {
    */
   setMainWindow(mainWindow: BrowserWindow | null): void {
     this.mainWindow = mainWindow;
-    if (this.todayCompletedScheduler) {
-      this.todayCompletedScheduler.setMainWindow(mainWindow || undefined);
-    }
-  }
-
-  /**
-   * 获取今日完成管理器
-   */
-  getTodayCompletedManager(): TodayCompletedManager | null {
-    return this.todayCompletedScheduler?.['todayCompletedManager'] || null;
   }
 }
 

@@ -315,7 +315,6 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
                   <List.Item 
                     onClick={() => {
                       onSelectTodo(todo);
-                      onClose();
                     }}
                     className="calendar-list-item calendar-list-item-overdue"
                     style={{
@@ -366,7 +365,6 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
                   <List.Item 
                     onClick={() => {
                       onSelectTodo(todo);
-                      onClose();
                     }}
                     className="calendar-list-item calendar-list-item-starting"
                     style={{
@@ -418,7 +416,6 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
                     <List.Item 
                       onClick={() => {
                         onSelectTodo(todo);
-                        onClose();
                       }}
                       className={`calendar-list-item ${overdueFlag ? 'calendar-list-item-overdue' : 'calendar-list-item-normal'}`}
                       style={{
@@ -470,7 +467,6 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
                   <List.Item
                     onClick={() => {
                       onSelectTodo(todo);
-                      onClose();
                     }}
                     style={{
                       cursor: 'pointer',
@@ -520,7 +516,6 @@ const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
                   <List.Item
                     onClick={() => {
                       onSelectTodo(todo);
-                      onClose();
                     }}
                     style={{
                       cursor: 'pointer',

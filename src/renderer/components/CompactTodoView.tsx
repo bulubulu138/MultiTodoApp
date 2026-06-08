@@ -4,7 +4,7 @@ import { SortOption } from './Toolbar';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { App } from 'antd';
 import CompactTodoItem from './CompactTodoItem';
-import { sortTodosWithTodayCompleted } from '../utils/sortUtils';
+import { sortTodos } from '../utils/sortUtils';
 import DragDropTodoList from './DragDropTodoList';
 import { resolveOrderConflicts, syncParallelGroupOrders } from '../utils/orderConflictResolver';
 
@@ -99,21 +99,11 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
     }
 
     // 否则使用原有排序逻辑
-    return sortTodosWithTodayCompleted(todos, {
+    return sortTodos(todos, {
       activeTab,
       sortOption,
     });
   }, [todos, activeTab, sortOption, propDragDropOrder]);
-
-  // 处理今日完成状态切换
-  const handleToggleTodayCompleted = async (todo: Todo) => {
-    const newStatus = todo.status === 'today_completed' ? 'pending' : 'today_completed';
-    const updates: any = {
-      status: newStatus,
-      todayCompletedAt: newStatus === 'today_completed' ? new Date().toISOString() : undefined,
-    };
-    await onUpdate(todo.id, updates);
-  };
 
   // 处理序号保存
   const handleOrderSave = useCallback(async (
@@ -205,7 +195,6 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
 
   // 渲染单个待办项
   const renderTodoItem = useCallback((todo: Todo, isDragging?: boolean, dragHandleProps?: any) => {
-    const canDrag = todo.status !== 'today_completed';
     const parallelGroup = parallelGroups.get(todo.id);
     const isInGroup = parallelGroup && parallelGroup.size > 1;
     const isGroupStart = isInGroup && (() => {
@@ -218,10 +207,9 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
         todo={todo}
         onUpdate={onUpdate}
         onView={onView}
-        onToggleTodayCompleted={handleToggleTodayCompleted}
         activeTab={activeTab}
         colors={colors}
-        enableDrag={canDrag}
+        enableDrag={true}
         dragHandleProps={dragHandleProps}
         // 新增 props
         currentDisplayOrder={todo.displayOrders?.[activeTab]}
@@ -243,7 +231,7 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
         isGroupStart={isGroupStart}
       />
     );
-  }, [parallelGroups, sortedTodos, activeTab, editingOrders, savingOrders, handleOrderSave, handleToggleTodayCompleted, colors, onUpdate]);
+  }, [parallelGroups, sortedTodos, activeTab, editingOrders, savingOrders, handleOrderSave, colors, onUpdate]);
 
   return (
     <DragDropTodoList
@@ -251,7 +239,7 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
       activeTab={activeTab}
       onDragEnd={handleCompactDragEnd}
       renderTodoItem={renderTodoItem}
-      isTodoDraggable={(todo) => todo.status !== 'today_completed'}
+      isTodoDraggable={() => true}
       useCompactAnimation={true}
     />
   );

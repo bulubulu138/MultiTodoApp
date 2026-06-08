@@ -18,7 +18,10 @@
       "Bash(curl -s http://localhost:3000)",
       "Bash(npm uninstall *)",
       "Bash(tasklist)",
-      "mcp__pencil__get_editor_state"
+      "mcp__pencil__get_editor_state",
+      "Bash(git push *)",
+      "Bash(git checkout *)",
+      "Bash(git merge *)"
     ],
     "deny": [],
     "ask": []

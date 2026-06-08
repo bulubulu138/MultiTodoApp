@@ -26,26 +26,26 @@
 }
 
 /* 今日已完成状态样式 */
-.compact-todo-item.today-completed {
+.compact-todo-item.completed {
   opacity: 0.4; /* 更明显的透明度 */
   background-color: var(--completed-bg, rgba(0, 0, 0, 0.02));
   cursor: pointer;
 }
 
-.compact-todo-item.today-completed:hover {
+.compact-todo-item.completed:hover {
   opacity: 0.5; /* hover时稍微不透明 */
   background-color: var(--completed-bg, rgba(0, 0, 0, 0.04));
 }
 
 /* 今日已完成状态的删除线效果 */
-.compact-todo-item.today-completed input {
+.compact-todo-item.completed input {
   text-decoration: line-through;
   opacity: 0.7;
   color: var(--completed-text, #8c8c8c);
 }
 
 /* 今日已完成状态的左侧指示条 */
-.compact-todo-item.today-completed::before {
+.compact-todo-item.completed::before {
   content: '';
   position: absolute;
   left: 0;

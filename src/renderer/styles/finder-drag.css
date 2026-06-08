@@ -72,11 +72,11 @@
 }
 
 /* 今日已完成的项目 */
-.compact-todo-item.today-completed {
+.compact-todo-item.completed {
   opacity: 0.4;
 }
 
-.compact-todo-item.today-completed:hover {
+.compact-todo-item.completed:hover {
   opacity: 0.5;
 }
 

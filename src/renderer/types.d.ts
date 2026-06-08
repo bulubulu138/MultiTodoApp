@@ -235,10 +235,6 @@ interface ElectronAPI {
   onQuickCreateTodo: (callback: (data: { content: string }) => void) => void;
   removeQuickCreateListener: () => void;
 
-  // 今日完成事件API
-  onTodayCompletedMidnightConversion: (callback: (data: { convertedCount: number }) => void) => void;
-  removeTodayCompletedListeners: () => void;
-
   // 存储位置API
   storageLocation: {
     getConfig: () => Promise<{

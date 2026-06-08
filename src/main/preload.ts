@@ -54,7 +54,7 @@ export interface ElectronAPI {
     toggleTodayCompleted: (uuid: string, currentState: string) => Promise<{
       success: boolean;
       error?: string;
-    }>;  // 今日完成状态切换
+    }>;  // 兼容旧接口：切换完成状态
     backflow: {
       checkAndBackflow: () => Promise<{
         success: boolean;
@@ -211,10 +211,6 @@ export interface ElectronAPI {
   onQuickCreateTodo: (callback: (data: { content: string }) => void) => void;
   removeQuickCreateListener: () => void;
 
-  // 今日完成事件API
-  onTodayCompletedMidnightConversion: (callback: (data: { convertedCount: number }) => void) => void;
-  removeTodayCompletedListeners: () => void;
-
   // 存储位置API
   storageLocation: {
     getConfig: () => Promise<{
@@ -360,7 +356,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     exportAll: () => ipcRenderer.invoke('todo:exportAll'),  // 导出所有数据
     importAll: (data: any) => ipcRenderer.invoke('todo:importAll', data),  // 导入数据
     toggleTodayCompleted: (uuid: string, currentState: string) =>
-      ipcRenderer.invoke('todo:toggleTodayCompleted', uuid, currentState),  // 今日完成状态切换
+      ipcRenderer.invoke('todo:toggleTodayCompleted', uuid, currentState),  // 兼容旧接口：切换完成状态
     backflow: {
       checkAndBackflow: () => ipcRenderer.invoke('todo-backflow:check-and-backflow'),
     },
@@ -504,14 +500,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('hybridStorage:config-changed', listener);
       return () => ipcRenderer.removeListener('hybridStorage:config-changed', listener);
     },
-  },
-
-  // 今日完成事件监听
-  onTodayCompletedMidnightConversion: (callback: (data: { convertedCount: number }) => void) => {
-    ipcRenderer.on('today-completed:midnight-conversion', (_event, data) => callback(data));
-  },
-  removeTodayCompletedListeners: () => {
-    ipcRenderer.removeAllListeners('today-completed:midnight-conversion');
   },
 
   // 内容迁移

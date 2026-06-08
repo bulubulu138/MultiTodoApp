@@ -34,12 +34,17 @@ export class MarkdownParser {
     const extractedContent = this.extractContent(content);
     const processedContent = this.preserveImageReferences(extractedContent);
 
+    const rawStatus = data.status as string | undefined;
+    const legacyTodayCompletedAt = data.today_completed_at as string | undefined || data.todayCompletedAt as string | undefined;
+    const completedAt = data.completed_at as string | undefined || data.completedAt as string | undefined;
+    const status = rawStatus === 'today_completed' ? 'completed' : (rawStatus as Todo['status'] || 'pending');
+
     // 解析 YAML frontmatter
     const todo: Todo = {
       id: data.id as string || this.generateUUID(),
       title: data.title as string || '',
       content: processedContent,
-      status: data.status as Todo['status'] || 'pending',
+      status,
       priority: data.priority as Todo['priority'] || 'trivial',
       tags: this.parseTags(data.tags),
       imageUrl: data.imageUrl as string | undefined,
@@ -50,8 +55,8 @@ export class MarkdownParser {
       displayOrders: data.display_orders as { [key: string]: number } | undefined,
       contentHash: data.content_hash as string | undefined || data.contentHash as string | undefined,
       keywords: data.keywords as string[] | undefined,
-      completedAt: data.completed_at as string | undefined || data.completedAt as string | undefined,
-      todayCompletedAt: data.today_completed_at as string | undefined || data.todayCompletedAt as string | undefined,
+      completedAt: completedAt || (rawStatus === 'today_completed' ? legacyTodayCompletedAt : undefined),
+      todayCompletedAt: rawStatus === 'today_completed' ? undefined : legacyTodayCompletedAt,
       createdAt: data.created_at as string || new Date().toISOString(),
       updatedAt: data.updated_at as string || new Date().toISOString()
     };
@@ -88,7 +93,6 @@ export class MarkdownParser {
     // 添加可选字段
     if (todo.deadline) frontmatter.deadline = todo.deadline;
     if (todo.completedAt) frontmatter.completed_at = todo.completedAt;
-    if (todo.todayCompletedAt) frontmatter.today_completed_at = todo.todayCompletedAt;
     if (todo.displayOrder !== undefined) frontmatter.display_order = todo.displayOrder;
     if (todo.displayOrders) frontmatter.display_orders = todo.displayOrders;
     if (todo.contentHash) frontmatter.content_hash = todo.contentHash;

@@ -1,8 +1,17 @@
 import { Todo, TodoRelation, CalendarViewSize, CustomTab } from '../shared/types';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Layout, App as AntApp, Tabs, ConfigProvider, FloatButton, Modal, Typography, Space, Tag, Button, notification } from 'antd';
+import { Layout, App as AntApp, ConfigProvider, FloatButton, Modal, Typography, Space, Tag, Button, Tooltip } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
-import { VerticalAlignTopOutlined } from '@ant-design/icons';
+import {
+  AppstoreOutlined,
+  CheckCircleOutlined,
+  InboxOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  PlayCircleOutlined,
+  TagsOutlined,
+  VerticalAlignTopOutlined
+} from '@ant-design/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import TodoList from './components/TodoList';
 import TodoForm from './components/TodoForm';
@@ -37,6 +46,13 @@ type TabSettingsMap = {
   [tabKey: string]: TabSettings;
 };
 
+interface TodoTabItem {
+  key: string;
+  label: string;
+  count: number;
+  icon: React.ReactNode;
+}
+
 interface AppContentProps {
   themeMode: ThemeMode;
   onThemeChange: (mode: ThemeMode) => void;
@@ -58,6 +74,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const [viewingTodo, setViewingTodo] = useState<Todo | null>(null);
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<string>('pending');
+  const [todoSidebarCollapsed, setTodoSidebarCollapsed] = useState(false);
   const [relations, setRelations] = useState<TodoRelation[]>([]);
   const [tabSettings, setTabSettings] = useState<TabSettingsMap>({});
   const [customTabs, setCustomTabs] = useState<CustomTab[]>([]);
@@ -311,28 +328,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     };
   }, []);
 
-  // 监听午夜转换事件
-  useEffect(() => {
-    const handleMidnightConversion = (data: { convertedCount: number }) => {
-      if (data.convertedCount > 0) {
-        notification.info({
-          message: '待办状态更新',
-          description: `已将 ${data.convertedCount} 个"今日已完成"项目转换为"已完成"状态`,
-          duration: 5
-        });
-
-        // 刷新待办列表
-        window.location.reload();
-      }
-    };
-
-    window.electronAPI.onTodayCompletedMidnightConversion(handleMidnightConversion);
-
-    return () => {
-      window.electronAPI.removeTodayCompletedListeners();
-    };
-  }, [message]);
-
   // 监听页面可见性变化，页面隐藏时自动保存
   useEffect(() => {
     const handleVisibilityChange = async () => {
@@ -550,6 +545,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       if (appSettings.theme) {
         onThemeChange(appSettings.theme as ThemeMode);
       }
+
+      setTodoSidebarCollapsed(appSettings.todoSidebarCollapsed === 'true');
       
       // 加载自定义Tab
       if (appSettings.customTabs) {
@@ -761,55 +758,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       throw error;
     }
   }, [viewingTodo]);
-
-  const convertTodayCompletedTodos = useCallback(async (): Promise<Map<string, Todo>> => {
-    const now = new Date().toISOString();
-    const todayCompletedTodos = todos.filter(todo => todo.status === 'today_completed');
-
-    if (todayCompletedTodos.length === 0) {
-      return new Map();
-    }
-
-    const convertedTodos = new Map<string, Todo>();
-    const bulkUpdates = todayCompletedTodos.map(todo => {
-      const convertedTodo: Todo = {
-        ...todo,
-        status: 'completed',
-        completedAt: todo.todayCompletedAt || now,
-        todayCompletedAt: undefined,
-        updatedAt: now
-      };
-
-      convertedTodos.set(todo.id, convertedTodo);
-
-      return {
-        uuid: String(todo.id),
-        updates: {
-          status: convertedTodo.status,
-          completedAt: convertedTodo.completedAt,
-          todayCompletedAt: convertedTodo.todayCompletedAt,
-          updatedAt: convertedTodo.updatedAt
-        }
-      };
-    });
-
-    try {
-      await window.electronAPI.todo.bulkUpdateTodos(bulkUpdates);
-
-      setTodos(prevTodos => prevTodos.map(todo => convertedTodos.get(todo.id) || todo));
-      setViewingTodo(prevViewingTodo => {
-        if (!prevViewingTodo) return prevViewingTodo;
-        return convertedTodos.get(prevViewingTodo.id) || prevViewingTodo;
-      });
-
-      console.log(`[App] Converted ${convertedTodos.size} today_completed todos to completed`);
-      return convertedTodos;
-    } catch (error) {
-      console.error('[App] Failed to convert today_completed todos:', error);
-      message.error('今日完成状态转换失败');
-      return new Map();
-    }
-  }, [todos, message]);
 
   // 🔧 新增：增量刷新机制 - 从文件系统重新加载单个待办
   const handleRefreshTodo = useCallback(async (todoId: string, silent = false) => {
@@ -1057,20 +1005,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   };
 
   const handleViewTodo = useCallback(async (todo: Todo) => {
-    const convertedTodos = await convertTodayCompletedTodos();
-
     // 🔧 修复：从最新的todos列表中查找待办，确保数据同步
     const latestTodo = todos.find(t => t.id === todo.id);
-    const convertedTodo = convertedTodos.get(todo.id);
 
-    if (convertedTodo) {
-      console.log('[App] handleViewTodo: Using converted today_completed todo', {
-        todoId: todo.id,
-        convertedStatus: convertedTodo.status,
-        completedAt: convertedTodo.completedAt
-      });
-      setViewingTodo(convertedTodo);
-    } else if (latestTodo) {
+    if (latestTodo) {
       console.log('[App] handleViewTodo: Found latest todo from list', {
         todoId: todo.id,
         hasUpdate: JSON.stringify(latestTodo) !== JSON.stringify(todo),
@@ -1087,7 +1025,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     }
 
     setShowViewDrawer(true);
-  }, [todos, convertTodayCompletedTodos]);
+  }, [todos]);
 
   // 新增：详情页关闭处理函数
   const handleCloseViewDrawer = useCallback(async () => {
@@ -1515,10 +1453,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         return tags.includes(targetTag);
       });
     } else if (activeTab === 'pending') {
-      // 待办tab中包含pending和today_completed状态的待办
-      return validTodos.filter(todo => todo.status === 'pending' || todo.status === 'today_completed');
+      return validTodos.filter(todo => todo.status === 'pending');
     } else if (activeTab === 'completed') {
-      // 已完成tab中不包含today_completed状态的待办（它们只显示在待办tab中）
       return validTodos.filter(todo => todo.status === 'completed');
     } else {
       return activeTab === 'all' ? validTodos : validTodos.filter(todo => todo.status === activeTab);
@@ -1755,24 +1691,43 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     return result;
   }, [searchedTodos, parallelGroups, activeTab, getCurrentTabSettings, getCurrentDragOrder]);
 
+  const handleToggleTodoSidebar = useCallback(() => {
+    setTodoSidebarCollapsed(prev => {
+      const next = !prev;
+      window.electronAPI.settings.update({ todoSidebarCollapsed: String(next) }).catch(error => {
+        console.error('Error saving todo sidebar collapsed state:', error);
+      });
+      setSettings(current => ({ ...current, todoSidebarCollapsed: String(next) }));
+      return next;
+    });
+  }, []);
+
   // Tab配置
-  const tabItems = useMemo(() => {
+  const tabItems = useMemo<TodoTabItem[]>(() => {
     const defaultTabs = [
     {
       key: 'all',
-      label: `全部 (${statusCounts.all})`,
+      label: '全部',
+      count: statusCounts.all,
+      icon: <AppstoreOutlined />,
     },
     {
       key: 'pending',
-      label: `待办池 (${statusCounts.pending})`,
+      label: '待办池',
+      count: statusCounts.pending,
+      icon: <InboxOutlined />,
     },
     {
       key: 'in_progress',
-      label: `今日事 (${statusCounts.in_progress})`,
+      label: '今日事',
+      count: statusCounts.in_progress,
+      icon: <PlayCircleOutlined />,
     },
     {
       key: 'completed',
-      label: `已完成 (${statusCounts.completed})`,
+      label: '已完成',
+      count: statusCounts.completed,
+      icon: <CheckCircleOutlined />,
     },
   ];
 
@@ -1797,7 +1752,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
 
         return {
           key: `tag:${tagValue}`,
-          label: `🏷️ ${tab.label} (${count})`,
+          label: tab.label,
+          count,
+          icon: <TagsOutlined />,
         };
       });
 
@@ -1854,8 +1811,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       data-color-theme={colorTheme}
       className="app-shell"
     >
-        <Toolbar
-          onAddTodo={() => setShowPositionSelector(true)}
+      <Toolbar
+        onAddTodo={() => setShowPositionSelector(true)}
         onShowSettings={() => setShowSettings(true)}
         onShowCalendar={() => setShowCalendar(true)}
         sortOption={currentTabSettings.sortOption}
@@ -1866,15 +1823,49 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         onSearchChange={setSearchText}
       />
 
+      <Layout className="app-main-layout">
+        <aside className={`todo-sidebar ${todoSidebarCollapsed ? 'todo-sidebar-collapsed' : ''}`}>
+          <div className="todo-sidebar-header">
+            {!todoSidebarCollapsed && <span className="todo-sidebar-title">分类</span>}
+            <Tooltip title={todoSidebarCollapsed ? '展开分类' : '收起分类'} placement="right">
+              <Button
+                type="text"
+                icon={todoSidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                onClick={handleToggleTodoSidebar}
+                className="todo-sidebar-toggle"
+                aria-label={todoSidebarCollapsed ? '展开分类' : '收起分类'}
+              />
+            </Tooltip>
+          </div>
+          <nav className="todo-sidebar-nav" aria-label="待办分类">
+            {tabItems.map(item => {
+              const isActive = item.key === activeTab;
+              const tabButton = (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={`todo-sidebar-item ${isActive ? 'active' : ''}`}
+                  onClick={() => { handleTabChange(item.key); }}
+                  aria-current={isActive ? 'page' : undefined}
+                  aria-label={todoSidebarCollapsed ? `${item.label} (${item.count})` : undefined}
+                >
+                  <span className="todo-sidebar-icon">{item.icon}</span>
+                  {!todoSidebarCollapsed && <span className="todo-sidebar-label">{item.label}</span>}
+                  <span className="todo-sidebar-count">{item.count}</span>
+                </button>
+              );
+
+              return todoSidebarCollapsed ? (
+                <Tooltip key={item.key} title={`${item.label} (${item.count})`} placement="right">
+                  {tabButton}
+                </Tooltip>
+              ) : tabButton;
+            })}
+          </nav>
+        </aside>
+
         <Content className="content-area" style={{ background: 'var(--color-surface)' }}>
         <div className="content-card-shell" style={{ background: 'var(--color-surface-elevated)' }}>
-        <Tabs
-          activeKey={activeTab}
-          onChange={handleTabChange}
-          items={tabItems}
-          className="status-tabs"
-          size="large"
-        />
         <div className="todo-view-stage" style={{ position: 'relative' }}>
           <motion.div key="todo-view-container">
             <AnimatePresence mode="wait">
@@ -1886,7 +1877,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
                   animate="visible"
                   exit="exit"
                   style={{
-                    height: 'calc(100vh - 73px - 64px - 64px)',
+                    height: '100%',
                     overflow: 'hidden'
                   }}
                 >
@@ -1960,6 +1951,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         </div>
         </div>
       </Content>
+      </Layout>
 
       {showPositionSelector && (
         <TodoPositionSelector
@@ -2025,7 +2017,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         visible={showCalendar}
         todos={todos}
         onClose={() => setShowCalendar(false)}
-        onSelectTodo={handleEditTodo}
+        onSelectTodo={handleViewTodo}
         viewSize={(settings.calendarViewSize as CalendarViewSize) || 'compact'}
       />
 

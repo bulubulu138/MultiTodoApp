@@ -10,7 +10,6 @@ interface CompactTodoItemProps {
   todo: Todo;
   onUpdate: (id: string, updates: any) => Promise<void>;
   onView: (todo: Todo) => void | Promise<void>;
-  onToggleTodayCompleted: (todo: Todo) => void;
   activeTab: string;
   colors?: any;
   enableDrag?: boolean;
@@ -33,7 +32,6 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
   todo,
   onUpdate,
   onView,
-  onToggleTodayCompleted,
   activeTab,
   colors: propColors,
   enableDrag = false,
@@ -77,11 +75,10 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
     }
   }, [isEditing]);
 
-  // 检查是否为今日已完成状态
-  const isTodayCompleted = todo.status === 'today_completed';
+  const isCompleted = todo.status === 'completed';
 
   // 检查是否可拖拽
-  const canDrag = todo.status !== 'today_completed';
+  const canDrag = true;
 
   // 检查是否可以编辑序号
   const canEditOrder = canDrag && !(isInGroup && !isGroupStart);
@@ -146,7 +143,7 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
     borderRadius: '3px', // 稍微减小圆角
     transition: 'background-color 0.2s, opacity 0.2s',
     cursor: canDrag ? 'move' : 'pointer',
-    opacity: isTodayCompleted ? 0.4 : 1,
+    opacity: isCompleted ? 0.4 : 1,
     position: 'relative', // 为绝对定位的截止时间提供定位上下文
   };
 
@@ -182,7 +179,7 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
     padding: '0 2px', // 减少内边距
     paddingRight: deadlineInfo ? '90px' : '2px', // 如果有截止时间，为右侧留出空间
     outline: 'none',
-    textDecoration: isTodayCompleted ? 'line-through' : 'none',
+    textDecoration: isCompleted ? 'line-through' : 'none',
     cursor: isEditing ? 'text' : 'pointer',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -232,22 +229,22 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
     }
   };
 
-  // 处理checkbox变化 - 简化逻辑，直接更新状态
+  // 处理checkbox变化：直接切换为已完成/待办状态
   const handleCheckboxChange = async (e: CheckboxChangeEvent) => {
     e.stopPropagation(); // 防止触发容器的点击事件
 
-    // 直接调用状态管理器进行状态切换
     try {
-      const newState = todo.status === 'today_completed' ? 'pending' : 'today_completed';
+      const newState = isCompleted ? 'pending' : 'completed';
       const updates: any = {
         status: newState,
-        todayCompletedAt: newState === 'today_completed' ? new Date().toISOString() : undefined,
+        completedAt: newState === 'completed' ? new Date().toISOString() : undefined,
+        todayCompletedAt: undefined,
         updatedAt: new Date().toISOString()
       };
 
       await onUpdate(todo.id, updates);
     } catch (error) {
-      console.error('Failed to toggle today completed status:', error);
+      console.error('Failed to toggle completed status:', error);
     }
   };
 
@@ -270,7 +267,7 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
     <div
       ref={containerRef}
       style={containerStyle}
-      className={`compact-todo-item ${isTodayCompleted ? 'today-completed' : ''}`}
+      className={`compact-todo-item ${isCompleted ? 'completed' : ''}`}
       onDoubleClick={handleContainerDoubleClick}
     >
       {/* 拖拽手柄（在拖拽模式下显示） - 移至左侧 */}
@@ -279,7 +276,6 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
           style={dragHandleStyle}
           {...dragHandleProps?.attributes}
           {...dragHandleProps?.listeners}
-          {...(!canDrag ? { title: '今日已完成的项目不可拖拽' } : {})}
           onMouseEnter={() => setIsHoveringDragHandle(true)}
           onMouseLeave={() => setIsHoveringDragHandle(false)}
         >
@@ -309,7 +305,7 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
         </Tooltip>
       ) : (
         <Checkbox
-          checked={isTodayCompleted}
+          checked={isCompleted}
           onChange={handleCheckboxChange}
           style={checkboxStyle}
         />

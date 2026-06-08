@@ -8,7 +8,7 @@ export interface Todo {
   id: TodoId;
   title: string;
   content: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'paused' | 'today_completed';
+  status: 'pending' | 'in_progress' | 'completed' | 'paused';
   priority: 'mental' | 'communication' | 'trivial';
   tags: string;
   imageUrl?: string;
@@ -20,7 +20,7 @@ export interface Todo {
   contentHash?: string; // 内容哈希值，用于去重检测
   keywords?: string[]; // 关键词数组
   completedAt?: string; // 完成时间，准确记录待办完成的时间点
-  todayCompletedAt?: string; // 今日完成时间，标记何时进入今日已完成状态
+  todayCompletedAt?: string; // 兼容旧数据：历史“今日完成”时间，新逻辑不再写入
   isDeleting?: boolean; // 前端运行态：用于退出动画，不写入数据库
   createdAt: string;
   updatedAt: string;

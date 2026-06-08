@@ -548,9 +548,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
           // 更新显示顺序 - 批量更新每个项目的显示顺序
           for (let i = 0; i < newOrder.length; i++) {
             const todo = newOrder[i];
-            if (todo.status !== 'today_completed') { // 跳过今日已完成项目
-              await onUpdateDisplayOrder(todo.id, activeTab, i);
-            }
+            await onUpdateDisplayOrder(todo.id, activeTab, i);
           }
         } : undefined}
       />

@@ -466,14 +466,6 @@ class Application {
     };
   }
 
-  /**
-   * 获取今日完成管理器
-   * @returns TodayCompletedManager实例或null
-   */
-  private getTodayCompletedManager(): any {
-    return this.databaseManager.getTodayCompletedManager();
-  }
-
   private getBackflowManager(): any {
     if (!this.backflowManager) {
       const { TodoBackflowManager } = require('./services/TodoBackflowManager');
@@ -641,15 +633,16 @@ class Application {
 
     ipcMain.handle('todo:toggleTodayCompleted', async (_, uuid: string, currentState: string) => {
       try {
-        const todayCompletedManager = this.getTodayCompletedManager();
-        if (!todayCompletedManager) {
-          return { success: false, error: 'Today completed manager not initialized' };
-        }
-
-        await todayCompletedManager.toggleTodayCompleted(uuid, currentState);
+        const nextStatus = currentState === 'completed' ? 'pending' : 'completed';
+        await this.databaseManager.getStorageManager().updateTodo(uuid, {
+          status: nextStatus as Todo['status'],
+          completedAt: nextStatus === 'completed' ? new Date().toISOString() : undefined,
+          todayCompletedAt: undefined,
+          updatedAt: new Date().toISOString()
+        });
         return { success: true };
       } catch (error) {
-        console.error('[IPC] Failed to toggle today_completed:', error);
+        console.error('[IPC] Failed to toggle completed status:', error);
         return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
       }
     });

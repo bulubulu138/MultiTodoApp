@@ -11,30 +11,12 @@ export interface SortConfig {
  * @param config 排序配置
  * @returns 排序后的待办列表
  */
-export function sortTodosWithTodayCompleted(todos: Todo[], config: SortConfig): Todo[] {
+export function sortTodos(todos: Todo[], config: SortConfig): Todo[] {
   const { activeTab, sortOption } = config;
-
-  // 分离 today_completed 和其他状态
-  const todayCompletedTodos: Todo[] = [];
-  const otherTodos: Todo[] = [];
-
-  todos.forEach(todo => {
-    if (todo.status === 'today_completed') {
-      todayCompletedTodos.push(todo);
-    } else {
-      otherTodos.push(todo);
-    }
-  });
-
-  // 对非 today_complete 的待办进行正常排序
-  const sortedOtherTodos = sortOtherTodos(otherTodos, activeTab, sortOption);
-
-  // 对 today_completed 待办按 displayOrder 排序
-  const sortedTodayCompletedTodos = sortTodayCompletedTodos(todayCompletedTodos, activeTab);
-
-  // 合并：today_completed 始终在底部
-  return [...sortedOtherTodos, ...sortedTodayCompletedTodos];
+  return sortOtherTodos([...todos], activeTab, sortOption);
 }
+
+export const sortTodosWithTodayCompleted = sortTodos;
 
 /**
  * 排序非今日完成待办
@@ -66,25 +48,6 @@ function sortOtherTodos(todos: Todo[], activeTab: string, sortOption: string): T
 }
 
 /**
- * 排序今日完成待办（保持在底部）
- */
-function sortTodayCompletedTodos(todos: Todo[], activeTab: string): Todo[] {
-  return todos.sort((a, b) => {
-    const displayOrderA = getDisplayOrder(a, activeTab);
-    const displayOrderB = getDisplayOrder(b, activeTab);
-
-    if (displayOrderA !== null && displayOrderB !== null) {
-      return displayOrderA - displayOrderB;
-    }
-
-    // 按今日完成时间排序
-    const timeA = a.todayCompletedAt ? new Date(a.todayCompletedAt).getTime() : 0;
-    const timeB = b.todayCompletedAt ? new Date(b.todayCompletedAt).getTime() : 0;
-    return timeA - timeB;
-  });
-}
-
-/**
  * 获取待办在特定Tab中的显示顺序
  */
 function getDisplayOrder(todo: Todo, activeTab: string): number | null {
@@ -106,7 +69,7 @@ export function calculateNewDisplayOrder(
   activeTab: string,
   insertPosition: 'top' | 'bottom' = 'bottom'
 ): number {
-  const filteredTodos = todos.filter(todo => todo.status !== 'today_completed');
+  const filteredTodos = todos;
 
   if (filteredTodos.length === 0) {
     return 0;
@@ -132,7 +95,7 @@ export function calculateNewDisplayOrder(
  * @returns 是否可拖拽
  */
 export function isTodoDraggable(todo: Todo): boolean {
-  return todo.status !== 'today_completed';
+  return true;
 }
 
 /**
