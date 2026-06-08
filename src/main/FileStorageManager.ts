@@ -466,7 +466,14 @@ export class FileStorageManager {
       ...currentTodo,
       ...updates,
       id: uuid, // 确保 ID 不被覆盖
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      // 自动处理 completedAt：状态变为 completed 时设置时间戳，从 completed 变为其他状态时清除
+      ...(updates.status === 'completed' && !updates.completedAt && currentTodo.status !== 'completed'
+        ? { completedAt: new Date().toISOString() }
+        : {}),
+      ...(updates.status && updates.status !== 'completed' && currentTodo.status === 'completed'
+        ? { completedAt: undefined }
+        : {})
     };
 
     // 根据 UUID 查找文件名
