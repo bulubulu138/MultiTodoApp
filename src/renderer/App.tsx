@@ -104,6 +104,20 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       .join('|');
   }, []);
 
+  const buildTodoDataSignature = useCallback((todos: Todo[]) => {
+    return todos
+      .map(todo => [
+        todo.id,
+        todo.updatedAt ?? '',
+        todo.title ?? '',
+        todo.content ?? '',
+        todo.status ?? '',
+        todo.priority ?? '',
+        todo.tags ?? '',
+      ].join(':'))
+      .join('|');
+  }, []);
+
   // 性能优化：并列关系分组缓存 - 避免重复计算
   const parallelGroupsCacheRef = useRef<{
     relationsHash: string;
@@ -284,8 +298,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
 
   // 内存管理优化：缓存清理机制
   useEffect(() => {
-    // 清理搜索缓存（当待办数据变化时）
+    // 清理派生缓存（当待办数据变化时）
     searchCacheRef.current.clear();
+    sortingCacheRef.current.clear();
+    parallelGroupsCacheRef.current = null;
   }, [todos]);
 
   // 定期清理缓存机制
@@ -1472,7 +1488,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     const currentSettings = getCurrentTabSettings();
     const sortOption = currentSettings.sortOption;
     const searchScopeKey = buildDisplayOrderSignature(baseFilteredTodos, activeTab);
-    const cacheKey = `${activeTab}-${sortOption}-${searchLower}-${searchScopeKey}`;
+    const baseDataSignature = buildTodoDataSignature(baseFilteredTodos);
+    const cacheKey = `${activeTab}-${sortOption}-${searchLower}-${searchScopeKey}-${baseDataSignature}`;
 
     // 检查缓存
     if (searchCacheRef.current.has(cacheKey)) {
@@ -1518,7 +1535,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     searchCacheRef.current.set(cacheKey, [...filtered]);
 
     return filtered;
-  }, [baseFilteredTodos, debouncedSearchText, activeTab, getCurrentTabSettings]);
+  }, [baseFilteredTodos, debouncedSearchText, activeTab, getCurrentTabSettings, buildDisplayOrderSignature, buildTodoDataSignature]);
 
   // 第三层：构建并列关系分组（优化：添加缓存）
   const parallelGroups = useMemo(() => {
@@ -1527,7 +1544,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       .map(r => `${r.source_id}-${r.target_id}-${r.relation_type}`)
       .sort()
       .join('|');
-    const todoIds = searchedTodos.map(t => t.id).join(',');
+    const todoIds = searchedTodos
+      .map(t => `${t.id}:${t.updatedAt ?? ''}:${t.status ?? ''}`)
+      .join(',');
 
     // 检查缓存
     const cache = parallelGroupsCacheRef.current;
@@ -1555,7 +1574,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     const dragOrder = getCurrentDragOrder();
     const dragOrderKey = dragOrder ? dragOrder.join(',') : 'none';
     const displayOrderKey = buildDisplayOrderSignature(searchedTodos, activeTab);
-    const cacheKey = `${activeTab}-${sortOption}-${searchedTodos.length}-${dragOrderKey}-${displayOrderKey}`;
+    const searchedDataSignature = buildTodoDataSignature(searchedTodos);
+    const cacheKey = `${activeTab}-${sortOption}-${searchedTodos.length}-${dragOrderKey}-${displayOrderKey}-${searchedDataSignature}`;
 
     // 检查缓存
     if (sortingCacheRef.current.has(cacheKey)) {
@@ -1689,7 +1709,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     sortingCacheRef.current.set(cacheKey, result);
 
     return result;
-  }, [searchedTodos, parallelGroups, activeTab, getCurrentTabSettings, getCurrentDragOrder]);
+  }, [searchedTodos, parallelGroups, activeTab, getCurrentTabSettings, getCurrentDragOrder, buildDisplayOrderSignature, buildTodoDataSignature]);
 
   const handleToggleTodoSidebar = useCallback(() => {
     setTodoSidebarCollapsed(prev => {
