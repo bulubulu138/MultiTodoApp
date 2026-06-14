@@ -1,0 +1,28 @@
+/* Todo Detail Drawer */
+.todo-detail-drawer .ant-drawer-body {
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.todo-detail-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.todo-detail-section {
+  margin-bottom: 4px;
+}
+
+.todo-detail-section:last-child {
+  margin-bottom: 0;
+}
+
+/* Dark Mode Support */
+[data-theme="dark"] .todo-detail-drawer .ant-drawer-header {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+[data-theme="dark"] .todo-detail-drawer .ant-drawer-body {
+  background: var(--color-surface);
+}

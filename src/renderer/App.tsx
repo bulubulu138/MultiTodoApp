@@ -21,6 +21,7 @@ import SettingsModal from './components/SettingsModal';
 import ContentMigrationModal from './components/ContentMigrationModal';
 import TodoViewDrawer from './components/TodoViewDrawer';
 import CalendarDrawer from './components/CalendarDrawer';
+import ReviewModePage from './components/review/ReviewModePage';
 import ContentFocusView, { ContentFocusViewRef } from './components/ContentFocusView';
 import CompactTodoView from './components/CompactTodoView';
 import FirstRunDialog from './components/FirstRunDialog';
@@ -70,6 +71,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const [showMigrationModal, setShowMigrationModal] = useState(false);
   const [showViewDrawer, setShowViewDrawer] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showReviewMode, setShowReviewMode] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [viewingTodo, setViewingTodo] = useState<Todo | null>(null);
   const [settings, setSettings] = useState<Record<string, string>>({});
@@ -1821,6 +1823,17 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     });
   }, [currentTabSettings.viewMode, waitForAllSaves]);
 
+  // 如果在复盘模式，显示复盘页面
+  if (showReviewMode) {
+    return (
+      <ReviewModePage
+        onClose={() => setShowReviewMode(false)}
+        todos={todos}
+        onDeleteTodo={handleDeleteTodo}
+      />
+    );
+  }
+
   return (
     <Layout
       style={{
@@ -1835,6 +1848,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         onAddTodo={() => setShowPositionSelector(true)}
         onShowSettings={() => setShowSettings(true)}
         onShowCalendar={() => setShowCalendar(true)}
+        onShowReview={() => setShowReviewMode(true)}
         sortOption={currentTabSettings.sortOption}
         onSortChange={handleSortChange}
         viewMode={currentTabSettings.viewMode}

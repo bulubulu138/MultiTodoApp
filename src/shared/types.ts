@@ -85,3 +85,12 @@ export interface BackupInfo {
   createdAt: string;
 }
 
+// 复盘文件类型
+export interface ReviewFile {
+  filename: string;
+  filepath: string;
+  createdAt: string;
+  updatedAt: string;
+  size: number;
+}
+

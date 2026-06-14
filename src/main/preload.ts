@@ -334,6 +334,30 @@ export interface ElectronAPI {
       recommendations: string[];
     }>;
   };
+
+  // 复盘API
+  review: {
+    list: () => Promise<Array<{
+      filename: string;
+      filepath: string;
+      createdAt: string;
+      updatedAt: string;
+      size: number;
+    }>>;
+    create: (filename?: string, initialContent?: string) => Promise<{
+      filename: string;
+      filepath: string;
+      createdAt: string;
+      updatedAt: string;
+      size: number;
+    }>;
+    read: (filepath: string) => Promise<string>;
+    update: (filepath: string, content: string) => Promise<void>;
+    delete: (filepath: string) => Promise<void>;
+    rename: (oldPath: string, newPath: string) => Promise<void>;
+    getReviewsPath: () => Promise<string>;
+    openInExplorer: (filepath: string) => Promise<void>;
+  };
 }
 
 // 暴露API到渲染进程
@@ -514,5 +538,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     repairUuidMapping: () => ipcRenderer.invoke('debug:repairUuidMapping'),
     rebuildIndex: () => ipcRenderer.invoke('debug:rebuildIndex'),
     quickDiagnostic: () => ipcRenderer.invoke('debug:quickDiagnostic'),
+  },
+
+  // 复盘
+  review: {
+    list: () => ipcRenderer.invoke('review:list'),
+    create: (filename?: string, initialContent?: string) =>
+      ipcRenderer.invoke('review:create', filename, initialContent),
+    read: (filepath: string) => ipcRenderer.invoke('review:read', filepath),
+    update: (filepath: string, content: string) =>
+      ipcRenderer.invoke('review:update', filepath, content),
+    delete: (filepath: string) => ipcRenderer.invoke('review:delete', filepath),
+    rename: (oldPath: string, newPath: string) =>
+      ipcRenderer.invoke('review:rename', oldPath, newPath),
+    getReviewsPath: () => ipcRenderer.invoke('review:getReviewsPath'),
+    openInExplorer: (filepath: string) => ipcRenderer.invoke('review:openInExplorer', filepath),
   },
 } as ElectronAPI);

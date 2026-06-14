@@ -1,0 +1,223 @@
+/* Review Mode Page - Full Page Layout */
+.review-mode-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--color-background);
+  overflow: hidden;
+}
+
+/* Header */
+.review-mode-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  flex-shrink: 0;
+}
+
+.review-mode-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+/* Main Content Area */
+.review-mode-content {
+  display: flex;
+  flex: 1;
+  min-height: 0; /* Critical for flex scrolling */
+  overflow: hidden;
+}
+
+/* Left Sidebar */
+.review-sidebar {
+  width: 320px;
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Parent doesn't scroll */
+  background: var(--color-surface);
+  flex-shrink: 0;
+}
+
+.review-sidebar .ant-tabs {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.review-sidebar .ant-tabs-nav {
+  flex-shrink: 0;
+  margin-bottom: 0;
+}
+
+.review-sidebar .ant-tabs-content-holder {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.review-sidebar .ant-tabs-content {
+  height: 100%;
+  overflow: hidden;
+}
+
+.review-sidebar .ant-tabs-tabpane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Files Tab Content */
+.files-tab-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.file-item-active {
+  background-color: var(--color-primary-bg-hover);
+}
+
+.file-item-title {
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+}
+
+.file-item-meta {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+/* Todos Tab Content - CRITICAL FIX FOR SCROLLING */
+.todos-tab-content {
+  flex: 1;
+  min-height: 0; /* Allow flex child to shrink */
+  overflow-y: auto; /* THIS FIXES THE SCROLLING BUG */
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.todos-tab-content .ant-input {
+  flex-shrink: 0;
+}
+
+.todos-tab-content .ant-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.todo-item {
+  transition: background-color 0.2s;
+}
+
+.todo-item:hover {
+  background-color: var(--color-fill-secondary);
+}
+
+/* Status and Priority Badges */
+.status-badge,
+.priority-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.status-badge.status-pending {
+  background-color: #fff7e6;
+  color: #fa8c16;
+}
+
+.status-badge.status-in_progress {
+  background-color: #e6f7ff;
+  color: #1890ff;
+}
+
+.status-badge.status-completed {
+  background-color: #f6ffed;
+  color: #52c41a;
+}
+
+.priority-badge.priority-mental {
+  background-color: #e6f7ff;
+  color: #1890ff;
+}
+
+.priority-badge.priority-communication {
+  background-color: #fff7e6;
+  color: #fa8c16;
+}
+
+.priority-badge.priority-trivial {
+  background-color: #f5f5f5;
+  color: #8c8c8c;
+}
+
+/* Right Editor Area */
+.review-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--color-surface);
+}
+
+.editor-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-tertiary);
+}
+
+/* Dark Mode Support */
+[data-theme="dark"] .review-mode-page {
+  background: var(--color-background);
+}
+
+[data-theme="dark"] .review-sidebar,
+[data-theme="dark"] .review-editor {
+  background: var(--color-surface);
+}
+
+[data-theme="dark"] .status-badge.status-pending {
+  background-color: rgba(250, 140, 22, 0.15);
+  color: #fa8c16;
+}
+
+[data-theme="dark"] .status-badge.status-in_progress {
+  background-color: rgba(24, 144, 255, 0.15);
+  color: #1890ff;
+}
+
+[data-theme="dark"] .status-badge.status-completed {
+  background-color: rgba(82, 196, 26, 0.15);
+  color: #52c41a;
+}
+
+[data-theme="dark"] .priority-badge.priority-mental {
+  background-color: rgba(24, 144, 255, 0.15);
+  color: #1890ff;
+}
+
+[data-theme="dark"] .priority-badge.priority-communication {
+  background-color: rgba(250, 140, 22, 0.15);
+  color: #fa8c16;
+}
+
+[data-theme="dark"] .priority-badge.priority-trivial {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #8c8c8c;
+}

@@ -1,0 +1,120 @@
+.markdown-editor-review {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-color, #ffffff);
+}
+
+.markdown-editor-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color, #e8e8e8);
+  background: var(--bg-secondary, #fafafa);
+}
+
+.save-status {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+}
+
+.markdown-editor-content {
+  flex: 1;
+  overflow: hidden;
+  padding: 16px;
+}
+
+.markdown-editor-content .w-md-editor {
+  box-shadow: none !important;
+  border: 1px solid var(--border-color, #e8e8e8);
+}
+
+/* 代办选择器样式 */
+.todo-selector-modal {
+  max-height: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+.todo-selector-list {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color, #e8e8e8);
+  border-radius: 4px;
+}
+
+.todo-selector-item {
+  padding: 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
+  transition: background-color 0.2s;
+}
+
+.todo-selector-item:hover {
+  background-color: var(--hover-bg, #f5f5f5);
+}
+
+.todo-selector-item:last-child {
+  border-bottom: none;
+}
+
+.todo-selector-item-title {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--text-primary, #000);
+}
+
+.todo-selector-item-meta {
+  display: flex;
+  gap: 8px;
+}
+
+.status-tag,
+.priority-tag {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+.status-tag.status-pending {
+  background: #fff7e6;
+  color: #fa8c16;
+}
+
+.status-tag.status-in_progress {
+  background: #e6f7ff;
+  color: #1890ff;
+}
+
+.status-tag.status-completed {
+  background: #f6ffed;
+  color: #52c41a;
+}
+
+.status-tag.status-paused {
+  background: #f0f0f0;
+  color: #666;
+}
+
+.priority-tag.priority-mental {
+  background: #fff0f6;
+  color: #eb2f96;
+}
+
+.priority-tag.priority-communication {
+  background: #f0f5ff;
+  color: #597ef7;
+}
+
+.priority-tag.priority-trivial {
+  background: #f0f0f0;
+  color: #8c8c8c;
+}
+
+.todo-selector-empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-secondary, #999);
+}

@@ -1533,6 +1533,103 @@ class Application {
       }
     });
 
+    // 复盘相关的IPC处理器
+    ipcMain.handle('review:list', async () => {
+      try {
+        const { ReviewManager } = await import('./services/ReviewManager');
+        const dbPath = this.databaseManager.getCurrentDatabasePath();
+        const reviewManager = new ReviewManager(dbPath);
+        return await reviewManager.listReviews();
+      } catch (error) {
+        console.error('[IPC] Failed to list reviews:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('review:create', async (_, filename?: string, initialContent?: string) => {
+      try {
+        const { ReviewManager } = await import('./services/ReviewManager');
+        const dbPath = this.databaseManager.getCurrentDatabasePath();
+        const reviewManager = new ReviewManager(dbPath);
+        return await reviewManager.createReview(filename, initialContent);
+      } catch (error) {
+        console.error('[IPC] Failed to create review:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('review:read', async (_, filepath: string) => {
+      try {
+        const { ReviewManager } = await import('./services/ReviewManager');
+        const dbPath = this.databaseManager.getCurrentDatabasePath();
+        const reviewManager = new ReviewManager(dbPath);
+        return await reviewManager.readReview(filepath);
+      } catch (error) {
+        console.error('[IPC] Failed to read review:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('review:update', async (_, filepath: string, content: string) => {
+      try {
+        const { ReviewManager } = await import('./services/ReviewManager');
+        const dbPath = this.databaseManager.getCurrentDatabasePath();
+        const reviewManager = new ReviewManager(dbPath);
+        await reviewManager.updateReview(filepath, content);
+      } catch (error) {
+        console.error('[IPC] Failed to update review:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('review:delete', async (_, filepath: string) => {
+      try {
+        const { ReviewManager } = await import('./services/ReviewManager');
+        const dbPath = this.databaseManager.getCurrentDatabasePath();
+        const reviewManager = new ReviewManager(dbPath);
+        await reviewManager.deleteReview(filepath);
+      } catch (error) {
+        console.error('[IPC] Failed to delete review:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('review:rename', async (_, oldPath: string, newPath: string) => {
+      try {
+        const { ReviewManager } = await import('./services/ReviewManager');
+        const dbPath = this.databaseManager.getCurrentDatabasePath();
+        const reviewManager = new ReviewManager(dbPath);
+        await reviewManager.renameReview(oldPath, newPath);
+      } catch (error) {
+        console.error('[IPC] Failed to rename review:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('review:getReviewsPath', async () => {
+      try {
+        const { ReviewManager } = await import('./services/ReviewManager');
+        const dbPath = this.databaseManager.getCurrentDatabasePath();
+        const reviewManager = new ReviewManager(dbPath);
+        return reviewManager.getReviewsPath();
+      } catch (error) {
+        console.error('[IPC] Failed to get reviews path:', error);
+        throw error;
+      }
+    });
+
+    ipcMain.handle('review:openInExplorer', async (_, filepath: string) => {
+      try {
+        const { ReviewManager } = await import('./services/ReviewManager');
+        const dbPath = this.databaseManager.getCurrentDatabasePath();
+        const reviewManager = new ReviewManager(dbPath);
+        await reviewManager.openInExplorer(filepath);
+      } catch (error) {
+        console.error('[IPC] Failed to open in explorer:', error);
+        throw error;
+      }
+    });
+
     // 更多 IPC 处理器将在这里添加
   }
 
