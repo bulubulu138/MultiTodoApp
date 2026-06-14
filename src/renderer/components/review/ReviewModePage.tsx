@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Tabs, List, Button, Input, Space, Modal, message, Tooltip, Dropdown, Menu } from 'antd';
+import { Tabs, List, Button, Input, Space, Modal, message, Tooltip, Dropdown, Menu, Drawer } from 'antd';
 import {
   PlusOutlined,
   FileTextOutlined,
@@ -13,11 +13,10 @@ import {
 } from '@ant-design/icons';
 import type { Todo, ReviewFile } from '../../../shared/types';
 import MarkdownEditorReview from './MarkdownEditorReview';
-import TodoDetailDrawer from './TodoDetailDrawer';
+import DOMPurify from 'dompurify';
 import dayjs from 'dayjs';
 import './ReviewModePage.css';
 
-const { TabPane } = Tabs;
 const { confirm } = Modal;
 
 interface ReviewModePageProps {
@@ -41,11 +40,11 @@ const ReviewModePage: React.FC<ReviewModePageProps> = ({
   const [todoSearchText, setTodoSearchText] = useState('');
   const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
   const [newFilename, setNewFilename] = useState('');
-  const [viewingTodo, setViewingTodo] = useState<Todo | null>(null);
-  const [showTodoDetail, setShowTodoDetail] = useState(false);
 
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const editorRef = useRef<any>(null);
+  const reviewContentRef = useRef<HTMLDivElement>(null);
+  const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
 
   // 加载复盘文件列表
   const loadReviewFiles = useCallback(async () => {
@@ -273,10 +272,9 @@ const ReviewModePage: React.FC<ReviewModePageProps> = ({
     message.success('已插入待办链接');
   }, [currentFile, content, handleContentChange]);
 
-  // 查看待办详情
-  const handleViewTodo = useCallback((todo: Todo) => {
-    setViewingTodo(todo);
-    setShowTodoDetail(true);
+
+  const handleTodoClick = useCallback((todo: Todo) => {
+    setSelectedTodo(todo);
   }, []);
 
   // 过滤代办列表
@@ -285,37 +283,6 @@ const ReviewModePage: React.FC<ReviewModePageProps> = ({
         todo.title.toLowerCase().includes(todoSearchText.toLowerCase())
       )
     : todos;
-
-  // 文件右键菜单
-  const getFileContextMenu = (file: ReviewFile) => (
-    <Menu>
-      <Menu.Item
-        key="rename"
-        icon={<EditOutlined />}
-        onClick={() => {
-          setRenamingFileId(file.filepath);
-          setNewFilename(file.filename.replace('.md', ''));
-        }}
-      >
-        重命名
-      </Menu.Item>
-      <Menu.Item
-        key="explorer"
-        icon={<FolderOpenOutlined />}
-        onClick={() => handleOpenInExplorer(file)}
-      >
-        在文件管理器中打开
-      </Menu.Item>
-      <Menu.Item
-        key="delete"
-        icon={<DeleteOutlined />}
-        danger
-        onClick={() => handleDeleteFile(file)}
-      >
-        删除
-      </Menu.Item>
-    </Menu>
-  );
 
   return (
     <div className="review-mode-page">
@@ -334,11 +301,23 @@ const ReviewModePage: React.FC<ReviewModePageProps> = ({
       </div>
 
       {/* Main Content */}
-      <div className="review-mode-content">
+      <div className="review-mode-content" ref={reviewContentRef}>
         {/* Left Sidebar */}
         <div className="review-sidebar">
-          <Tabs activeKey={activeTab} onChange={(key) => setActiveTab(key as 'files' | 'todos')}>
-            <TabPane tab="复盘文档" key="files">
+          {/* Tab nav bar only — no children in items */}
+          <Tabs
+            activeKey={activeTab}
+            onChange={(key) => setActiveTab(key as 'files' | 'todos')}
+            className="review-sidebar-tabs"
+            items={[
+              { key: 'files', label: '复盘文档' },
+              { key: 'todos', label: '代办列表' },
+            ]}
+          />
+
+          {/* Content area — manually rendered based on activeTab */}
+          <div className="review-sidebar-content">
+            {activeTab === 'files' ? (
               <div className="files-tab-content">
                 <Button
                   type="primary"
@@ -359,7 +338,30 @@ const ReviewModePage: React.FC<ReviewModePageProps> = ({
                       onClick={() => handleFileSelect(file)}
                       style={{ cursor: 'pointer' }}
                     >
-                      <Dropdown overlay={getFileContextMenu(file)} trigger={['contextMenu']}>
+                      <Dropdown menu={{ items: [
+                        {
+                          key: 'rename',
+                          icon: <EditOutlined />,
+                          label: '重命名',
+                          onClick: () => {
+                            setRenamingFileId(file.filepath);
+                            setNewFilename(file.filename.replace('.md', ''));
+                          }
+                        },
+                        {
+                          key: 'explorer',
+                          icon: <FolderOpenOutlined />,
+                          label: '在文件管理器中打开',
+                          onClick: () => handleOpenInExplorer(file)
+                        },
+                        {
+                          key: 'delete',
+                          icon: <DeleteOutlined />,
+                          label: '删除',
+                          danger: true,
+                          onClick: () => handleDeleteFile(file)
+                        }
+                      ]}} trigger={['contextMenu']}>
                         <div style={{ width: '100%' }}>
                           {renamingFileId === file.filepath ? (
                             <Input
@@ -392,9 +394,7 @@ const ReviewModePage: React.FC<ReviewModePageProps> = ({
                   )}
                 />
               </div>
-            </TabPane>
-
-            <TabPane tab="代办列表" key="todos">
+            ) : (
               <div className="todos-tab-content">
                 <Input
                   placeholder="搜索代办..."
@@ -410,6 +410,8 @@ const ReviewModePage: React.FC<ReviewModePageProps> = ({
                   renderItem={(todo) => (
                     <List.Item
                       className="todo-item"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => handleTodoClick(todo)}
                       actions={[
                         <Tooltip title="插入到复盘文档">
                           <Button
@@ -433,8 +435,6 @@ const ReviewModePage: React.FC<ReviewModePageProps> = ({
                           />
                         </Tooltip>,
                       ]}
-                      onClick={() => handleViewTodo(todo)}
-                      style={{ cursor: 'pointer' }}
                     >
                       <List.Item.Meta
                         title={todo.title}
@@ -456,8 +456,8 @@ const ReviewModePage: React.FC<ReviewModePageProps> = ({
                   )}
                 />
               </div>
-            </TabPane>
-          </Tabs>
+            )}
+          </div>
         </div>
 
         {/* Right Editor */}
@@ -481,17 +481,81 @@ const ReviewModePage: React.FC<ReviewModePageProps> = ({
             </div>
           )}
         </div>
-      </div>
 
-      {/* Todo Detail Drawer */}
-      <TodoDetailDrawer
-        visible={showTodoDetail}
-        todo={viewingTodo}
-        onClose={() => {
-          setShowTodoDetail(false);
-          setViewingTodo(null);
-        }}
-      />
+        <Drawer
+          open={selectedTodo !== null}
+          onClose={() => setSelectedTodo(null)}
+          placement="left"
+          width={320}
+          getContainer={() => reviewContentRef.current!}
+          mask={false}
+          rootStyle={{ position: 'absolute' }}
+          title={selectedTodo?.title}
+          styles={{ body: { padding: '16px', overflow: 'auto' } }}
+        >
+          {selectedTodo && (
+            <div>
+              <div className="todo-detail-meta-row">
+                <span className={`status-badge status-${selectedTodo.status}`}>
+                  {selectedTodo.status === 'pending' ? '待处理' :
+                   selectedTodo.status === 'in_progress' ? '进行中' :
+                   selectedTodo.status === 'completed' ? '已完成' : '暂停'}
+                </span>
+                <span className={`priority-badge priority-${selectedTodo.priority}`}>
+                  {selectedTodo.priority === 'mental' ? '脑力' :
+                   selectedTodo.priority === 'communication' ? '沟通' : '琐碎'}
+                </span>
+              </div>
+
+              {selectedTodo.tags && (
+                <div className="todo-detail-section">
+                  <div className="todo-detail-label">标签</div>
+                  <div className="todo-detail-tags">
+                    {selectedTodo.tags.split(',').filter(Boolean).map(tag => (
+                      <span key={tag.trim()} className="todo-detail-tag">{tag.trim()}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(selectedTodo.startTime || selectedTodo.deadline || selectedTodo.completedAt) && (
+                <div className="todo-detail-section">
+                  {selectedTodo.startTime && (
+                    <div className="todo-detail-time">
+                      <span className="todo-detail-label">开始时间：</span>
+                      {dayjs(selectedTodo.startTime).format('YYYY-MM-DD HH:mm')}
+                    </div>
+                  )}
+                  {selectedTodo.deadline && (
+                    <div className="todo-detail-time">
+                      <span className="todo-detail-label">截止时间：</span>
+                      {dayjs(selectedTodo.deadline).format('YYYY-MM-DD HH:mm')}
+                    </div>
+                  )}
+                  {selectedTodo.completedAt && (
+                    <div className="todo-detail-time">
+                      <span className="todo-detail-label">完成时间：</span>
+                      {dayjs(selectedTodo.completedAt).format('YYYY-MM-DD HH:mm')}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {selectedTodo.content && (
+                <div className="todo-detail-section">
+                  <div className="todo-detail-label">内容</div>
+                  <div
+                    className="todo-detail-rich-content ql-editor"
+                    dangerouslySetInnerHTML={{
+                      __html: DOMPurify.sanitize(selectedTodo.content)
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </Drawer>
+      </div>
     </div>
   );
 };

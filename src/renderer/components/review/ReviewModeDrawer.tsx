@@ -261,37 +261,6 @@ const ReviewModeDrawer: React.FC<ReviewModeDrawerProps> = ({
       )
     : todos;
 
-  // 文件右键菜单
-  const getFileContextMenu = (file: ReviewFile) => (
-    <Menu>
-      <Menu.Item
-        key="rename"
-        icon={<EditOutlined />}
-        onClick={() => {
-          setRenamingFileId(file.filepath);
-          setNewFilename(file.filename.replace('.md', ''));
-        }}
-      >
-        重命名
-      </Menu.Item>
-      <Menu.Item
-        key="explorer"
-        icon={<FolderOpenOutlined />}
-        onClick={() => handleOpenInExplorer(file)}
-      >
-        在文件管理器中打开
-      </Menu.Item>
-      <Menu.Item
-        key="delete"
-        icon={<DeleteOutlined />}
-        danger
-        onClick={() => handleDeleteFile(file)}
-      >
-        删除
-      </Menu.Item>
-    </Menu>
-  );
-
   return (
     <Drawer
       title="复盘模式"
@@ -326,7 +295,30 @@ const ReviewModeDrawer: React.FC<ReviewModeDrawerProps> = ({
                       onClick={() => handleFileSelect(file)}
                       style={{ cursor: 'pointer' }}
                     >
-                      <Dropdown overlay={getFileContextMenu(file)} trigger={['contextMenu']}>
+                      <Dropdown menu={{ items: [
+                        {
+                          key: 'rename',
+                          icon: <EditOutlined />,
+                          label: '重命名',
+                          onClick: () => {
+                            setRenamingFileId(file.filepath);
+                            setNewFilename(file.filename.replace('.md', ''));
+                          }
+                        },
+                        {
+                          key: 'explorer',
+                          icon: <FolderOpenOutlined />,
+                          label: '在文件管理器中打开',
+                          onClick: () => handleOpenInExplorer(file)
+                        },
+                        {
+                          key: 'delete',
+                          icon: <DeleteOutlined />,
+                          label: '删除',
+                          danger: true,
+                          onClick: () => handleDeleteFile(file)
+                        }
+                      ]}} trigger={['contextMenu']}>
                         <div style={{ width: '100%' }}>
                           {renamingFileId === file.filepath ? (
                             <Input

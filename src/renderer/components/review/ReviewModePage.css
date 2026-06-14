@@ -30,6 +30,7 @@
   flex: 1;
   min-height: 0; /* Critical for flex scrolling */
   overflow: hidden;
+  position: relative;
 }
 
 /* Left Sidebar */
@@ -38,39 +39,27 @@
   border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Parent doesn't scroll */
+  overflow: hidden;
   background: var(--color-surface);
   flex-shrink: 0;
 }
 
-.review-sidebar .ant-tabs {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
+/* Tab nav bar — just shrinks to nav height */
+.review-sidebar-tabs {
+  flex-shrink: 0;
 }
 
-.review-sidebar .ant-tabs-nav {
-  flex-shrink: 0;
+.review-sidebar-tabs .ant-tabs-nav {
   margin-bottom: 0;
 }
 
-.review-sidebar .ant-tabs-content-holder {
+/* Content area fills remaining height */
+.review-sidebar-content {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-}
-
-.review-sidebar .ant-tabs-content {
-  height: 100%;
-  overflow: hidden;
-}
-
-.review-sidebar .ant-tabs-tabpane {
-  height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 /* Files Tab Content */
@@ -180,6 +169,58 @@
   justify-content: center;
   height: 100%;
   color: var(--color-text-tertiary);
+}
+
+/* Todo Detail Drawer Content */
+.todo-detail-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.todo-detail-section {
+  margin-bottom: 16px;
+}
+
+.todo-detail-label {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  margin-bottom: 4px;
+}
+
+.todo-detail-time {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+}
+
+.todo-detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.todo-detail-tag {
+  background: var(--color-fill-secondary);
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.todo-detail-rich-content {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+  word-break: break-word;
+  padding: 0 !important;
+}
+
+.todo-detail-rich-content img {
+  max-width: 100%;
+  height: auto;
 }
 
 /* Dark Mode Support */
