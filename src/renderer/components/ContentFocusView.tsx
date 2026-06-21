@@ -425,7 +425,9 @@ const ContentFocusItem = React.memo(
         }
 
         // 保存标题（同步，不等待）
-        const currentTitle = latestTitleRef.current.trim();
+        const currentTitle = typeof latestTitleRef.current === 'string'
+          ? latestTitleRef.current.trim()
+          : String(latestTitleRef.current || '').trim();
         if (currentTitle !== lastSavedTitleRef.current && currentTitle && currentTodoId) {
           onUpdate(currentTodoId, { title: currentTitle });
         }

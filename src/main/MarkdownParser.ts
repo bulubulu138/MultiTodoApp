@@ -54,7 +54,7 @@ export class MarkdownParser {
       displayOrder: data.display_order as number | undefined,
       displayOrders: data.display_orders as { [key: string]: number } | undefined,
       contentHash: data.content_hash as string | undefined || data.contentHash as string | undefined,
-      keywords: data.keywords as string[] | undefined,
+      keywords: this.parseKeywords(data.keywords),
       completedAt: completedAt || (rawStatus === 'today_completed' ? legacyTodayCompletedAt : undefined),
       todayCompletedAt: rawStatus === 'today_completed' ? undefined : legacyTodayCompletedAt,
       createdAt: data.created_at as string || new Date().toISOString(),
@@ -318,6 +318,24 @@ export class MarkdownParser {
       return tags;
     }
     return '';
+  }
+
+  /**
+   * 解析 keywords 字段，归一化为 string[]
+   * frontmatter 中 keywords 可能是数组（["a","b"]）或标量字符串（"a,b" / "a"），
+   * 不做归一化会导致下游调用 .join() 时崩溃（entry.keywords.join is not a function）。
+   * 缺省或为空时返回 undefined，保持原有语义。
+   */
+  private parseKeywords(keywords: any): string[] | undefined {
+    if (Array.isArray(keywords)) {
+      const arr = keywords.map(k => String(k).trim()).filter(Boolean);
+      return arr.length ? arr : undefined;
+    }
+    if (typeof keywords === 'string') {
+      const arr = keywords.split(',').map(k => k.trim()).filter(Boolean);
+      return arr.length ? arr : undefined;
+    }
+    return undefined;
   }
 
   /**

@@ -211,6 +211,10 @@ export interface ElectronAPI {
   onQuickCreateTodo: (callback: (data: { content: string }) => void) => void;
   removeQuickCreateListener: () => void;
 
+  // 同步完成监听器
+  onSyncComplete: (callback: (stats: any) => void) => void;
+  removeSyncCompleteListener: () => void;
+
   // 存储位置API
   storageLocation: {
     getConfig: () => Promise<{
@@ -358,6 +362,20 @@ export interface ElectronAPI {
     getReviewsPath: () => Promise<string>;
     openInExplorer: (filepath: string) => Promise<void>;
   };
+
+  // 同步API
+  sync: {
+    startServer: () => Promise<{success: boolean; error?: string}>;
+    stopServer: () => Promise<{success: boolean; error?: string}>;
+    startDiscovery: (deviceName: string) => Promise<{success: boolean; error?: string}>;
+    stopDiscovery: () => Promise<{success: boolean; error?: string}>;
+    getStats: () => Promise<{syncCount: number; lastSyncTime: string | null}>;
+    onPairingCodeGenerated: (callback: (data: {code: string; deviceName: string; deviceId: string}) => void) => () => void;
+    onPairingSuccess: (callback: () => void) => () => void;
+    onProgress: (callback: (progress: {phase: string; current: number; total: number}) => void) => () => void;
+    onComplete: (callback: (stats: {sent: number; received: number; skipped: number; total: number}) => void) => () => void;
+    onError: (callback: (error: {message: string; code?: string}) => void) => () => void;
+  };
 }
 
 // 暴露API到渲染进程
@@ -488,6 +506,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('quick-create-todo');
   },
 
+  // 同步完成监听器
+  onSyncComplete: (callback: (stats: any) => void) => {
+    ipcRenderer.on('sync:complete', (_event, stats) => callback(stats));
+  },
+  removeSyncCompleteListener: () => {
+    ipcRenderer.removeAllListeners('sync:complete');
+  },
+
   // 存储位置
   storageLocation: {
     getConfig: () => ipcRenderer.invoke('storageLocation:getConfig'),
@@ -553,5 +579,45 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('review:rename', oldPath, newPath),
     getReviewsPath: () => ipcRenderer.invoke('review:getReviewsPath'),
     openInExplorer: (filepath: string) => ipcRenderer.invoke('review:openInExplorer', filepath),
+  },
+
+  // 同步
+  sync: {
+    startServer: () => ipcRenderer.invoke('sync:start-server'),
+    stopServer: () => ipcRenderer.invoke('sync:stop-server'),
+    startDiscovery: (deviceName: string) => ipcRenderer.invoke('sync:start-discovery', deviceName),
+    stopDiscovery: () => ipcRenderer.invoke('sync:stop-discovery'),
+    getStats: () => ipcRenderer.invoke('sync:get-stats'),
+    getDiscoveredDevices: () => ipcRenderer.invoke('sync:get-discovered-devices'),
+    onPairingCodeGenerated: (callback: (data: any) => void) => {
+      const listener = (_: any, data: any) => callback(data);
+      ipcRenderer.on('sync:pairing-code-generated', listener);
+      return () => ipcRenderer.removeListener('sync:pairing-code-generated', listener);
+    },
+    onPairingSuccess: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on('sync:pairing-success', listener);
+      return () => ipcRenderer.removeListener('sync:pairing-success', listener);
+    },
+    onProgress: (callback: (progress: any) => void) => {
+      const listener = (_: any, progress: any) => callback(progress);
+      ipcRenderer.on('sync:progress', listener);
+      return () => ipcRenderer.removeListener('sync:progress', listener);
+    },
+    onComplete: (callback: (stats: any) => void) => {
+      const listener = (_: any, stats: any) => callback(stats);
+      ipcRenderer.on('sync:complete', listener);
+      return () => ipcRenderer.removeListener('sync:complete', listener);
+    },
+    onError: (callback: (error: any) => void) => {
+      const listener = (_: any, error: any) => callback(error);
+      ipcRenderer.on('sync:error', listener);
+      return () => ipcRenderer.removeListener('sync:error', listener);
+    },
+    onDeviceDiscovered: (callback: (device: any) => void) => {
+      const listener = (_: any, device: any) => callback(device);
+      ipcRenderer.on('sync:device-discovered', listener);
+      return () => ipcRenderer.removeListener('sync:device-discovered', listener);
+    },
   },
 } as ElectronAPI);

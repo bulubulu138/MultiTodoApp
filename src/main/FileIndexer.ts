@@ -485,7 +485,7 @@ export class FileIndexer {
         status: frontmatter.status || 'pending',
         priority: frontmatter.priority || 'medium',
         tags: this.parseTags(frontmatter.tags),
-        keywords: frontmatter.keywords || [],
+        keywords: this.parseTags(frontmatter.keywords),
         createdAt: frontmatter.created_at || new Date().toISOString(),
         updatedAt: frontmatter.updated_at || new Date().toISOString(),
         filePath: todoPath

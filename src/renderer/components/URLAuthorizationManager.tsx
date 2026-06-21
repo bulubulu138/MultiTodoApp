@@ -104,7 +104,7 @@ const URLAuthorizationManager: React.FC = () => {
       const result = await window.electronAPI.urlAuth.getAllUrls();
       if (result.success && result.data) {
         // 转换数据格式
-        const displayRecords: URLDisplayRecord[] = result.data.map(item => {
+        const displayRecords: URLDisplayRecord[] = result.data.map((item: any) => {
           if (item.hasAuthorization && item.authorization) {
             return {
               id: item.authorization.id,

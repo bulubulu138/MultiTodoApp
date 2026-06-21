@@ -136,7 +136,7 @@ export const useAppState = () => {
     try {
       dispatch(actions.setLoading(true));
       const todoList = await window.electronAPI.todo.getAll();
-      dispatch(actions.setTodos(todoList.filter(todo => todo && todo.id)));
+      dispatch(actions.setTodos(todoList.filter((todo: any) => todo && todo.id)));
     } catch (error) {
       console.error('Error loading todos:', error);
     } finally {

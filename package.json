@@ -68,6 +68,7 @@
     "@milkdown/theme-nord": "^7.21.1",
     "@milkdown/utils": "^7.21.1",
     "@types/react-window": "^1.8.8",
+    "@types/ws": "^8.18.1",
     "@uiw/react-md-editor": "^4.1.1",
     "antd": "^5.12.0",
     "buffer": "^6.0.3",
@@ -92,7 +93,8 @@
     "segment": "^0.1.3",
     "stream-browserify": "^3.0.0",
     "util": "^0.12.5",
-    "uuid": "9.0.1"
+    "uuid": "9.0.1",
+    "ws": "^8.21.0"
   },
   "build": {
     "appId": "com.multitodo.app",

@@ -191,7 +191,7 @@ export function useBatchURLTitles(todos: Todo[]): {
         : {};
 
       // 更新缓存
-      const fetchedEntries = Object.entries(fetchedTitles);
+      const fetchedEntries = Object.entries(fetchedTitles) as [string, string][];
       if (fetchedEntries.length > 0) {
         cache.current.setBatch(fetchedEntries);
       }

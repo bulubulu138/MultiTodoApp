@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, Space, Select, Tooltip, Segmented, Input } from 'antd';
-import { PlusOutlined, SettingOutlined, CalendarOutlined, SortAscendingOutlined, UnorderedListOutlined, AlignLeftOutlined, AppstoreOutlined, SearchOutlined, FileTextOutlined } from '@ant-design/icons';
+import { PlusOutlined, SettingOutlined, CalendarOutlined, SortAscendingOutlined, UnorderedListOutlined, AlignLeftOutlined, AppstoreOutlined, SearchOutlined, FileTextOutlined, SyncOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 
 const { Option } = Select;
@@ -21,6 +21,7 @@ interface ToolbarProps {
   onShowSettings: () => void;
   onShowCalendar: () => void;
   onShowReview?: () => void;
+  onShowSync?: () => void;
   sortOption?: SortOption;
   onSortChange?: (option: SortOption) => void;
   viewMode?: ViewMode;
@@ -35,6 +36,7 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
   onShowSettings,
   onShowCalendar,
   onShowReview,
+  onShowSync,
   sortOption = 'createdAt-desc',
   onSortChange,
   viewMode = 'card',
@@ -111,6 +113,18 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
               className="toolbar-btn-with-text"
             >
               <span className="btn-text">复盘</span>
+            </Button>
+          </Tooltip>
+        )}
+
+        {onShowSync && (
+          <Tooltip title="局域网同步">
+            <Button
+              icon={<SyncOutlined />}
+              onClick={onShowSync}
+              className="toolbar-btn-with-text"
+            >
+              <span className="btn-text">同步</span>
             </Button>
           </Tooltip>
         )}

@@ -69,7 +69,7 @@ const MarkdownFileBrowser: React.FC<MarkdownFileBrowserProps> = ({
     try {
       const filePaths = await window.electronAPI.hybridStorage.scanMarkdownFiles();
 
-      const fileData: MarkdownFile[] = filePaths.map(filePath => {
+      const fileData: MarkdownFile[] = filePaths.map((filePath: string) => {
         const name = filePath.split(/[/\\]/).pop() || 'unknown';
         const stats = require('fs').statSync(filePath);
         return {

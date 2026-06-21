@@ -25,6 +25,7 @@ import ReviewModePage from './components/review/ReviewModePage';
 import ContentFocusView, { ContentFocusViewRef } from './components/ContentFocusView';
 import CompactTodoView from './components/CompactTodoView';
 import FirstRunDialog from './components/FirstRunDialog';
+import SyncModal from './components/SyncModal';
 import { getTheme, ThemeMode, ColorTheme } from './theme/themes';
 import { buildParallelGroups, selectGroupRepresentatives, sortWithGroups, getSortComparator } from './utils/sortWithGroups';
 import { toStringId, areIdsEqual } from '../shared/utils/typeUtils';
@@ -85,6 +86,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearchText, setDebouncedSearchText] = useState<string>('');
   const [showPositionSelector, setShowPositionSelector] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState(false);
   const [pendingPosition, setPendingPosition] = useState<PositionSelection | null>(null);
 
   // ✅ 新增：首次运行状态
@@ -267,6 +269,25 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     };
   }, [message]);
 
+  // 监听同步完成事件，自动刷新待办列表
+  useEffect(() => {
+    const handleSyncComplete = () => {
+      console.log('[App] Sync completed, reloading todos...');
+      loadTodos();
+    };
+
+    // 注册监听器
+    if (window.electronAPI.onSyncComplete) {
+      window.electronAPI.onSyncComplete(handleSyncComplete);
+    }
+
+    return () => {
+      if (window.electronAPI.removeSyncCompleteListener) {
+        window.electronAPI.removeSyncCompleteListener();
+      }
+    };
+  }, []);
+
   // 检查首次运行，显示快捷键引导
   useEffect(() => {
     const hasSeenHotkeyGuide = localStorage.getItem('hasSeenHotkeyGuide');
@@ -438,7 +459,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       setLoading(true);
 
       const todoList = await window.electronAPI.todo.getAll();
-      const validTodos = todoList.filter(todo => todo && todo.id);
+      const validTodos = todoList.filter((todo: any) => todo && todo.id);
 
       // Always keep the renderer state in sync with the complete storage result.
       // Rendering performance for large lists is handled by VirtualizedTodoList.
@@ -660,12 +681,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     todoData: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'>
   ) => {
     try {
-      // 获取当前tab的排序设置
-      const currentSettings = getCurrentTabSettings();
-
-      const newTodo = currentSettings.sortOption === 'manual'
-        ? await window.electronAPI.todo.createManualAtTop(todoData, activeTab)
-        : await window.electronAPI.todo.create(todoData);
+      // 所有排序模式下，新待办都插入到列表顶部（序号0，已有项顺次下移），
+      // 确保新待办拥有真实序号参与排序，避免空序号导致掉入"无序号组"沉底难找
+      const newTodo = await window.electronAPI.todo.createManualAtTop(todoData, activeTab);
 
       // 乐观更新：直接将新待办添加到列表中（避免重新加载320+待办）
       setTodos(prev => [newTodo, ...prev]);
@@ -1716,7 +1734,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const handleToggleTodoSidebar = useCallback(() => {
     setTodoSidebarCollapsed(prev => {
       const next = !prev;
-      window.electronAPI.settings.update({ todoSidebarCollapsed: String(next) }).catch(error => {
+      window.electronAPI.settings.update({ todoSidebarCollapsed: String(next) }).catch((error: any) => {
         console.error('Error saving todo sidebar collapsed state:', error);
       });
       setSettings(current => ({ ...current, todoSidebarCollapsed: String(next) }));
@@ -1849,6 +1867,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         onShowSettings={() => setShowSettings(true)}
         onShowCalendar={() => setShowCalendar(true)}
         onShowReview={() => setShowReviewMode(true)}
+        onShowSync={() => setShowSyncModal(true)}
         sortOption={currentTabSettings.sortOption}
         onSortChange={handleSortChange}
         viewMode={currentTabSettings.viewMode}
@@ -2055,6 +2074,11 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         viewSize={(settings.calendarViewSize as CalendarViewSize) || 'compact'}
       />
 
+      <SyncModal
+        visible={showSyncModal}
+        onClose={() => setShowSyncModal(false)}
+      />
+
       {/* 回到顶部按钮 */}
       <FloatButton.BackTop
         target={() => {
@@ -2150,7 +2174,7 @@ const App: React.FC = () => {
   const handleColorThemeChange = (theme: ColorTheme) => {
     setColorTheme(theme);
     // Also persist the color theme to settings
-    window.electronAPI.settings.update({ colorTheme: theme }).catch(err => {
+    window.electronAPI.settings.update({ colorTheme: theme }).catch((err: any) => {
       console.error('Error saving color theme:', err);
     });
   };

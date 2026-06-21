@@ -1350,12 +1350,16 @@ export class FileStorageManager {
     // 清理过期缓存
     this.cleanExpiredCache();
 
-    // 限制缓存大小 - 同时应用于两套缓存
+    // 限制热缓存大小：仅作用于 this.cache（LRU 热缓存），不得影响全量缓存 todosCache。
+    // ⚠️ 关键修复：todosCache 是全量缓存，getAllTodos() 直接返回它。
+    //    若在此处同步删除 todosCache 的条目，会导致大量 updateCache 调用后
+    //    （文件监听 change、getTodoById 缓存未命中、同步/重建等触发）
+    //    全量缓存被腐蚀到 MAX_CACHE_SIZE(100) 附近，从而出现"300+ 待办只显示约 100 个、需重启"的问题。
     if (this.cache.size >= this.MAX_CACHE_SIZE) {
       const oldestKey = this.cache.keys().next().value;
       if (oldestKey) {
         this.cache.delete(oldestKey);
-        this.todosCache.delete(oldestKey); // 🔧 同步删除全量缓存中的对应项
+        // 故意不删除 todosCache —— 全量缓存必须保持完整
       }
     }
 
@@ -1485,8 +1489,11 @@ export class FileStorageManager {
    * 生成安全的文件名（Obsidian 风格）
    */
   private async generateFileName(title: string, uuid: string): Promise<string> {
+    // 确保 title 是字符串
+    const titleStr = typeof title === 'string' ? title : String(title || '');
+
     // 1. 移除或替换特殊字符
-    let safeTitle = title.replace(/[\/\\:*?"<>|]/g, '_');
+    let safeTitle = titleStr.replace(/[\/\\:*?"<>|]/g, '_');
 
     // 2. 限制长度（避免文件系统限制）
     if (safeTitle.length > 200) {

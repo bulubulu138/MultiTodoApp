@@ -14,6 +14,9 @@ import { URLAuthorizationService } from './services/URLAuthorizationServiceStub'
 // import { AuthorizationRefreshScheduler } from './services/AuthorizationRefreshScheduler';
 import { databaseManager } from './services/DatabaseManager';
 import { appConfigManager } from './config/AppConfig';
+import { SyncServer } from './services/SyncServer';
+import { DeviceDiscovery } from './services/DeviceDiscovery';
+import { SyncManager } from './services/SyncManager';
 
 class Application {
   private mainWindow: BrowserWindow | null = null;
@@ -36,10 +39,19 @@ class Application {
   private storageLocationService: any = null;
   private databaseManager = databaseManager; // 数据库管理器
 
+  // 同步服务
+  private syncServer: SyncServer;
+  private deviceDiscovery: DeviceDiscovery;
+  private syncManager: SyncManager | null = null;
+
   constructor() {
     this.settingsManager = new SettingsManager(); // 用于设置
     this.fileStorageManager = null; // 将在 initializeFileStorage 中正确初始化
     this.imageManager = new ImageManager();
+
+    // 初始化同步服务
+    this.syncServer = new SyncServer();
+    this.deviceDiscovery = new DeviceDiscovery();
   }
 
   private async checkFileStorageCompatibility(): Promise<void> {
@@ -262,6 +274,9 @@ class Application {
 
       // 初始化 FileStorageManager
       this.fileStorageManager = new FileStorageManager(storagePath);
+
+      // 初始化 SyncManager
+      this.syncManager = new SyncManager(this.fileStorageManager);
 
       console.log('[initializeFileStorage] ✅ File storage initialized successfully');
     } catch (error) {
@@ -503,6 +518,226 @@ class Application {
    * @param templateId 模板ID
    * @returns 模板内容或undefined（如果获取失败则使用默认提示词）
    */
+  /**
+   * 设置同步事件监听器
+   */
+  private setupSyncEventListeners(): void {
+    // 配对码生成事件
+    this.syncServer.on('pairing-code-generated', (data) => {
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('sync:pairing-code-generated', data);
+      }
+    });
+
+    // 配对成功事件
+    this.syncServer.on('pairing-success', () => {
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('sync:pairing-success');
+      }
+    });
+
+    // 设备发现事件
+    this.deviceDiscovery.on('device-discovered', (device) => {
+      if (this.mainWindow) {
+        console.log('Forwarding device-discovered event to renderer:', device);
+        this.mainWindow.webContents.send('sync:device-discovered', device);
+      }
+    });
+
+    // 同步请求事件
+    this.syncServer.on('sync-request', async (data, ws) => {
+      try {
+        if (!this.syncManager) {
+          console.error('SyncManager not initialized');
+          return;
+        }
+
+        console.log('[SYNC DEBUG] Received sync-request from mobile');
+        console.log('[SYNC DEBUG] Mobile metadata count:', data.files?.length || 0);
+        console.log('[SYNC DEBUG] Mobile metadata sample:', data.files?.slice(0, 3));
+
+        // 获取本地元数据
+        const localMetadata = await this.syncManager.getLocalMetadata();
+        console.log('[SYNC DEBUG] Local (desktop) metadata count:', localMetadata.length);
+        console.log('[SYNC DEBUG] Local metadata sample:', localMetadata.slice(0, 3));
+
+        // 生成同步计划
+        const plan = this.syncManager.generateSyncPlan(localMetadata, data.files);
+        console.log('[SYNC DEBUG] Generated plan:', {
+          toMobile: plan.toMobile.length,
+          toDesktop: plan.toDesktop.length,
+          skip: plan.skip.length,
+          conflicts: plan.conflicts.length
+        });
+
+        // 发送同步计划（使用手机端期望的字段名）
+        this.syncServer.sendMessage(ws, {
+          type: 'sync-plan',
+          toRemote: plan.toMobile,  // 桌面端发送到移动端 = 移动端接收
+          toLocal: plan.toDesktop,   // 移动端发送到桌面端 = 移动端本地发送
+          skip: plan.skip,
+          totalFiles: plan.totalFiles,
+        });
+
+        console.log('[SYNC DEBUG] Sync plan sent, now waiting for mobile to send its files first...');
+
+        // 第二阶段：发送文件到移动端（先声明函数）
+        const sendFilesToMobile = async () => {
+          for (let i = 0; i < plan.toMobile.length; i++) {
+            const fileData = await this.syncManager!.prepareFileForSending(plan.toMobile[i]);
+            if (fileData) {
+              console.log(`[SYNC DEBUG] Sending file ${i + 1}/${plan.toMobile.length}:`, fileData.filename);
+              this.syncServer.sendMessage(ws, {
+                type: 'file',
+                ...fileData,
+                index: i + 1,
+                total: plan.toMobile.length,
+              });
+
+              // 通知UI更新进度
+              if (this.mainWindow) {
+                this.mainWindow.webContents.send('sync:progress', {
+                  phase: 'sending',
+                  current: i + 1,
+                  total: plan.toMobile.length,
+                });
+              }
+
+              // 等待移动端确认收到文件
+              console.log(`[SYNC DEBUG] Waiting for file-ack for file ${i + 1}...`);
+              await new Promise<void>((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                  this.syncServer.off('file-ack', ackHandler);
+                  reject(new Error(`Timeout waiting for file-ack for file ${i + 1}`));
+                }, 10000);
+
+                const ackHandler = (ackData: any) => {
+                  if (ackData.id === fileData.id) {
+                    clearTimeout(timeout);
+                    this.syncServer.off('file-ack', ackHandler);
+                    console.log(`[SYNC DEBUG] Received file-ack for file ${i + 1}:`, ackData.status);
+                    if (ackData.status === 'success') {
+                      resolve();
+                    } else {
+                      reject(new Error(`File ${i + 1} failed to save on mobile`));
+                    }
+                  }
+                };
+
+                this.syncServer.on('file-ack', ackHandler);
+              });
+            }
+          }
+          console.log('[SYNC DEBUG] All files sent to mobile successfully!');
+        };
+
+        // 第一阶段：接收来自移动端的文件
+        let desktopReceivedCount = 0;
+        const desktopFileHandler = async (data: any, fileWs: any) => {
+          if (fileWs === ws && data.id) {
+            console.log(`[SYNC DEBUG] Desktop receiving file ${desktopReceivedCount + 1}/${plan.toDesktop.length}`);
+
+            const success = await this.syncManager!.applyReceivedFile(
+              data.filename,
+              data.content,
+              data.hash
+            );
+
+            this.syncServer.sendMessage(ws, {
+              type: 'file-ack',
+              id: data.id,
+              status: success ? 'success' : 'error',
+            });
+
+            if (success) {
+              desktopReceivedCount++;
+              console.log(`[SYNC DEBUG] Desktop received ${desktopReceivedCount}/${plan.toDesktop.length} files`);
+            }
+
+            // 接收完成后，开始发送
+            if (desktopReceivedCount >= plan.toDesktop.length) {
+              this.syncServer.off('file-received', desktopFileHandler);
+              console.log('[SYNC DEBUG] Desktop finished receiving, now sending files to mobile...');
+              await sendFilesToMobile();
+            }
+          }
+        };
+
+        // 注册接收处理器
+        if (plan.toDesktop.length > 0) {
+          console.log('[SYNC DEBUG] Registering file-received listener, expecting', plan.toDesktop.length, 'files');
+          this.syncServer.on('file-received', desktopFileHandler);
+          console.log('[SYNC DEBUG] Listener registered successfully');
+        } else {
+          // 如果不需要接收，直接发送
+          console.log('[SYNC DEBUG] No files to receive, starting to send...');
+          await sendFilesToMobile();
+        }
+      } catch (error) {
+        console.error('Failed to handle sync request:', error);
+        if (this.mainWindow) {
+          this.mainWindow.webContents.send('sync:error', {
+            message: (error as Error).message,
+          });
+        }
+      }
+    });
+
+    // 文件接收事件 - 已由 sync-request 处理器内部处理，不需要全局监听器
+    // this.syncServer.on('file-received', async (data, ws) => {
+    //   try {
+    //     if (!this.syncManager) {
+    //       console.error('SyncManager not initialized');
+    //       return;
+    //     }
+
+    //     const success = await this.syncManager.applyReceivedFile(
+    //       data.filename,
+    //       data.content,
+    //       data.hash
+    //     );
+
+    //     this.syncServer.sendMessage(ws, {
+    //       type: 'file-ack',
+    //       id: data.id,
+    //       status: success ? 'success' : 'error',
+    //     });
+
+    //     // 通知UI更新进度
+    //     if (this.mainWindow && data.index && data.total) {
+    //       this.mainWindow.webContents.send('sync:progress', {
+    //         phase: 'receiving',
+    //         current: data.index,
+    //         total: data.total,
+    //       });
+    //     }
+    //   } catch (error) {
+    //     console.error('Failed to handle file received:', error);
+    //   }
+    // });
+
+    // 同步完成事件
+    this.syncServer.on('sync-complete', (data) => {
+      if (this.syncManager) {
+        this.syncManager.updateSyncStats();
+      }
+
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('sync:complete', data.stats);
+      }
+    });
+
+    // 错误事件
+    this.syncServer.on('error', (error) => {
+      console.error('Sync server error:', error);
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('sync:error', {
+          message: (error as Error).message,
+        });
+      }
+    });
+  }
+
   private setupIpcHandlers(): void {
     // 待办事项相关的IPC处理器
     ipcMain.handle('todo:getAll', async () => {
@@ -1629,6 +1864,89 @@ class Application {
         throw error;
       }
     });
+
+    // ==================== 同步相关 IPC Handlers ====================
+
+    // 启动WebSocket服务器
+    ipcMain.handle('sync:start-server', async () => {
+      try {
+        await this.syncServer.start();
+        return { success: true };
+      } catch (error) {
+        console.error('[IPC] Failed to start sync server:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // 停止WebSocket服务器
+    ipcMain.handle('sync:stop-server', async () => {
+      try {
+        this.syncServer.stop();
+        return { success: true };
+      } catch (error) {
+        console.error('[IPC] Failed to stop sync server:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // 开始UDP设备发现广播
+    ipcMain.handle('sync:start-discovery', async (_, deviceName: string) => {
+      try {
+        // 获取或生成设备ID
+        const settings = this.settingsManager.getSettings();
+        let deviceId = settings.deviceId;
+
+        if (!deviceId) {
+          deviceId = `desktop-${Date.now()}`;
+          this.settingsManager.updateSettings({ deviceId });
+        }
+
+        this.deviceDiscovery.initialize(deviceId, deviceName);
+        await this.deviceDiscovery.startBroadcasting();
+
+        return { success: true };
+      } catch (error) {
+        console.error('[IPC] Failed to start device discovery:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // 停止UDP设备发现广播
+    ipcMain.handle('sync:stop-discovery', async () => {
+      try {
+        this.deviceDiscovery.stopBroadcasting();
+        return { success: true };
+      } catch (error) {
+        console.error('[IPC] Failed to stop device discovery:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // 获取同步统计
+    ipcMain.handle('sync:get-stats', async () => {
+      try {
+        if (!this.syncManager) {
+          return { syncCount: 0, lastSyncTime: null };
+        }
+        return this.syncManager.getSyncStats();
+      } catch (error) {
+        console.error('[IPC] Failed to get sync stats:', error);
+        return { syncCount: 0, lastSyncTime: null };
+      }
+    });
+
+    // 获取已发现的设备列表
+    ipcMain.handle('sync:get-discovered-devices', async () => {
+      try {
+        return this.deviceDiscovery.getDiscoveredDevices();
+      } catch (error) {
+        console.error('[IPC] Failed to get discovered devices:', error);
+        return [];
+      }
+    });
+
+    // 设置同步服务器事件监听
+    this.setupSyncEventListeners();
 
     // 更多 IPC 处理器将在这里添加
   }
