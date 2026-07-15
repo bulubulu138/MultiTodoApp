@@ -39,6 +39,7 @@ interface ContentFocusItemProps {
   allTodos: Todo[];
   relations: TodoRelation[];
   parallelGroup?: Set<string>;
+  parallelGroupsMap?: Map<string, Set<string>>;
   prevTodo: Todo | null;
   nextTodo: Todo | null;
   onUpdateDisplayOrder: (todoId: string, tabKey: string, displayOrder: number) => Promise<void>;
@@ -60,6 +61,7 @@ const ContentFocusItem = React.memo(
     allTodos,
     relations,
     parallelGroup,
+    parallelGroupsMap,
     prevTodo,
     nextTodo,
     onUpdateDisplayOrder,
@@ -87,7 +89,7 @@ const ContentFocusItem = React.memo(
       todo,
       activeTab,
       allTodos: allTodos || [],
-      parallelGroup,
+      parallelGroupsMap,
       onUpdateDisplayOrder,
     });
 
@@ -945,6 +947,7 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
               allTodos={allTodos || todos}
               relations={relations}
               parallelGroup={parallelGroups.get(todo.id)}
+              parallelGroupsMap={parallelGroups}
               prevTodo={index > 0 ? todos[index - 1] : null}
               nextTodo={index < todos.length - 1 ? todos[index + 1] : null}
               onUpdateDisplayOrder={onUpdateDisplayOrder}
