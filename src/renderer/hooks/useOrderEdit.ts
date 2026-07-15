@@ -63,7 +63,7 @@ export const useOrderEdit = (props: UseOrderEditProps) => {
     } finally {
       setSavingOrder(false);
     }
-  }, [todo.id, editingOrder, activeTab, allTodos, parallelGroupsMap, message]);
+  }, [todo, editingOrder, activeTab, allTodos, parallelGroupsMap, message]);
 
   return {
     editingOrder,

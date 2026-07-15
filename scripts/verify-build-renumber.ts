@@ -3,7 +3,7 @@
  * 运行：node --experimental-strip-types scripts/verify-build-renumber.ts
  */
 import { buildRenumberedOrder } from '../src/renderer/utils/orderConflictResolver.ts';
-import type { Todo } from '../src/shared/types.js';
+import type { Todo } from '../src/shared/types.ts';
 
 function makeTodo(id: string): Todo {
   return { id, title: id } as Todo;
