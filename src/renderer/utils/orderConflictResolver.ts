@@ -1,4 +1,4 @@
-import { Todo } from '../../shared/types';
+import type { Todo } from '../../shared/types.js';
 
 interface ConflictResolutionConfig {
   targetOrder: number;
@@ -250,4 +250,40 @@ export function computeAllFinalOrders(
   });
 
   return finalUpdates;
+}
+
+/**
+ * 构建全量重排后的顺序数组（专注模式序号编辑用）
+ *
+ * 把 currentTodoId 对应待办移到 targetPosition（钳制到合法范围），
+ * 其余待办保持原有相对顺序。返回的数组交给 computeAllFinalOrders
+ * 按 index 分配连续 displayOrder，行为等价于紧凑模式拖拽：
+ * 覆盖全部可见待办（含原本无序号的），结果无空号。
+ *
+ * @param sortedTodos  当前可见、已按显示顺序排好的列表（专注模式下即 todos 数组）
+ * @param currentTodoId 要移动的待办 id
+ * @param targetPosition 目标位置（用户输入的序号）
+ * @returns 重排后的 Todo[]，数组顺序即新位置
+ */
+export function buildRenumberedOrder(
+  sortedTodos: Todo[],
+  currentTodoId: string,
+  targetPosition: number
+): Todo[] {
+  const currentIndex = sortedTodos.findIndex(t => t.id === currentTodoId);
+  if (currentIndex === -1) {
+    return sortedTodos; // 防御：目标待办不在列表
+  }
+
+  // 1. 移除当前待办
+  const remaining = sortedTodos.filter(t => t.id !== currentTodoId);
+  const currentTodo = sortedTodos[currentIndex];
+
+  // 2. 钳制 targetPosition 到 [0, remaining.length]（合法插入位置）
+  const clamped = Math.max(0, Math.min(targetPosition, remaining.length));
+
+  // 3. 插入目标位置
+  const result = [...remaining];
+  result.splice(clamped, 0, currentTodo);
+  return result;
 }
