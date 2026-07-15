@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Tree, Input, Button, Space, Tag, message, Spin, Radio } from 'antd';
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
-import { Todo, TodoTreeNode, TreeRelationData } from '../../shared/types';
+import { Todo, TodoId, TodoTreeNode, TreeRelationData } from '../../shared/types';
 
 interface TodoPositionSelectorProps {
   visible: boolean;
@@ -12,7 +12,7 @@ interface TodoPositionSelectorProps {
 
 export interface PositionSelection {
   mode: 'root' | 'child' | 'extends' | 'parallel';
-  targetTodoId?: number;
+  targetTodoId?: TodoId;
   relationType?: 'extends' | 'background' | 'parallel';
 }
 
@@ -33,7 +33,7 @@ const TodoPositionSelector: React.FC<TodoPositionSelectorProps> = ({
   const [treeData, setTreeData] = useState<TreeDataNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedMode, setSelectedMode] = useState<'root' | 'relative'>('root');
-  const [selectedTodoId, setSelectedTodoId] = useState<number | null>(null);
+  const [selectedTodoId, setSelectedTodoId] = useState<TodoId | null>(null);
   const [selectedRelationType, setSelectedRelationType] = useState<'extends' | 'parallel'>('extends');
   const [treeRelationData, setTreeRelationData] = useState<TreeRelationData | null>(null);
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
@@ -140,7 +140,7 @@ const TodoPositionSelector: React.FC<TodoPositionSelectorProps> = ({
   const handleConfirm = () => {
     if (selectedMode === 'root') {
       onConfirm({ mode: 'root' });
-    } else if (selectedTodoId) {
+    } else if (selectedTodoId !== null) {
       if (selectedRelationType === 'extends') {
         onConfirm({
           mode: 'extends',
@@ -179,7 +179,9 @@ const TodoPositionSelector: React.FC<TodoPositionSelectorProps> = ({
 
   const handleTreeSelect = (selectedKeys: React.Key[], info: any) => {
     if (selectedKeys.length > 0) {
-      setSelectedTodoId(Number(selectedKeys[0]));
+      setSelectedTodoId(String(selectedKeys[0]));
+    } else {
+      setSelectedTodoId(null);
     }
   };
 
@@ -232,6 +234,7 @@ const TodoPositionSelector: React.FC<TodoPositionSelectorProps> = ({
                   treeData={filteredTreeData}
                   onSelect={handleTreeSelect}
                   onExpand={handleExpand}
+                  selectedKeys={selectedTodoId ? [selectedTodoId] : []}
                   expandedKeys={expandedKeys}
                   autoExpandParent={autoExpandParent}
                   style={{ backgroundColor: 'rgba(0, 0, 0, 0.02)', padding: '16px', borderRadius: '4px', maxHeight: '400px', overflow: 'auto' }}
