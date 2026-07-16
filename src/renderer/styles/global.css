@@ -2853,6 +2853,67 @@ motion.div {
   color: var(--color-primary) !important;
 }
 
+[data-theme='dark'] .ios-modal .ant-modal-content,
+[data-theme='dark'] .ios-modal .ant-modal-header,
+[data-theme='dark'] .ios-modal .ant-modal-body,
+[data-theme='dark'] .ios-modal .ant-modal-footer,
+[data-theme='dark'] .ios-modal .ant-drawer-content,
+[data-theme='dark'] .ios-modal .ant-drawer-header,
+[data-theme='dark'] .ios-modal .ant-drawer-body,
+[data-theme='dark'] .ios-modal .ant-drawer-footer {
+  background: var(--color-surface-elevated) !important;
+  color: var(--color-text-primary) !important;
+  border-color: var(--color-border) !important;
+}
+
+[data-theme='dark'] .ios-modal .ant-card,
+[data-theme='dark'] .ios-modal .ant-list,
+[data-theme='dark'] .ios-modal .ant-descriptions,
+[data-theme='dark'] .ios-modal .ant-descriptions-view,
+[data-theme='dark'] .ios-modal .ant-descriptions-item-label,
+[data-theme='dark'] .ios-modal .ant-descriptions-item-content {
+  background: var(--color-surface-elevated) !important;
+  color: var(--color-text-primary) !important;
+  border-color: var(--color-border) !important;
+}
+
+[data-theme='dark'] .ios-modal .ant-form-item-label > label,
+[data-theme='dark'] .ios-modal .ant-form-item-extra,
+[data-theme='dark'] .ios-modal .ant-select-selection-item,
+[data-theme='dark'] .ios-modal .ant-picker-input > input,
+[data-theme='dark'] .ios-modal .ant-input-number-input,
+[data-theme='dark'] .ant-modal-confirm-body,
+[data-theme='dark'] .ant-modal-confirm-title,
+[data-theme='dark'] .ant-modal-confirm-content {
+  color: var(--color-text-primary) !important;
+}
+
+[data-theme='dark'] .ios-modal .ant-form-item-extra,
+[data-theme='dark'] .ios-modal .ant-input::placeholder,
+[data-theme='dark'] .ios-modal .ant-select-selection-placeholder,
+[data-theme='dark'] .ios-modal .ant-picker-input > input::placeholder {
+  color: var(--color-text-tertiary) !important;
+}
+
+[data-theme='dark'] .ant-modal-root .ant-modal-content,
+[data-theme='dark'] .ant-modal-root .ant-modal-header,
+[data-theme='dark'] .ant-modal-root .ant-modal-body,
+[data-theme='dark'] .ant-modal-root .ant-modal-footer {
+  background: var(--color-surface-elevated) !important;
+  color: var(--color-text-primary) !important;
+}
+
+[data-theme='dark'] .ant-picker-dropdown .ant-picker-panel,
+[data-theme='dark'] .ant-picker-dropdown .ant-picker-header,
+[data-theme='dark'] .ant-picker-dropdown .ant-picker-content th,
+[data-theme='dark'] .ant-picker-dropdown .ant-picker-content td,
+[data-theme='dark'] .ant-select-dropdown,
+[data-theme='dark'] .ant-dropdown-menu {
+  background: var(--color-surface-elevated) !important;
+  color: var(--color-text-primary) !important;
+  border-color: var(--color-border) !important;
+}
+
 @media (max-width: 768px) {
   .content-card-shell .ant-btn,
   .toolbar .ant-btn,

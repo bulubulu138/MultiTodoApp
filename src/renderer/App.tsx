@@ -27,6 +27,7 @@ import CompactTodoView from './components/CompactTodoView';
 import FirstRunDialog from './components/FirstRunDialog';
 import SyncModal from './components/SyncModal';
 import { getTheme, ThemeMode, ColorTheme } from './theme/themes';
+import { applyRootThemeAttributes } from './theme/domTheme';
 import { buildParallelGroups, selectGroupRepresentatives, sortWithGroups, getSortComparator } from './utils/sortWithGroups';
 import { toStringId, areIdsEqual } from '../shared/utils/typeUtils';
 import { optimizedMotionVariants, useConditionalAnimation, shouldReduceMotion, useMotionPerformanceMonitor } from './utils/optimizedMotionVariants';
@@ -2170,6 +2171,10 @@ const App: React.FC = () => {
     };
     loadTheme();
   }, []);
+
+  useEffect(() => {
+    applyRootThemeAttributes(document.documentElement, themeMode, colorTheme);
+  }, [themeMode, colorTheme]);
 
   const handleColorThemeChange = (theme: ColorTheme) => {
     setColorTheme(theme);
