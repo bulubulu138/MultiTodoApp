@@ -7,6 +7,7 @@ import CompactTodoItem from './CompactTodoItem';
 import { sortTodos } from '../utils/sortUtils';
 import DragDropTodoList from './DragDropTodoList';
 import { resolveOrderConflicts, syncParallelGroupOrders } from '../utils/orderConflictResolver';
+import { buildCompactTodoRows } from '../utils/compactTodoNesting';
 
 interface CompactTodoViewProps {
   todos: Todo[];
@@ -104,6 +105,16 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
       sortOption,
     });
   }, [todos, activeTab, sortOption, propDragDropOrder]);
+
+  const compactRows = useMemo(() => {
+    return buildCompactTodoRows(sortedTodos, relations);
+  }, [sortedTodos, relations]);
+
+  const compactTodos = useMemo(() => compactRows.map(row => row.todo), [compactRows]);
+
+  const indentLevelByTodoId = useMemo(() => {
+    return new Map(compactRows.map(row => [row.todo.id, row.indentLevel]));
+  }, [compactRows]);
 
   // 处理序号保存
   const handleOrderSave = useCallback(async (
@@ -229,13 +240,14 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
         savingOrder={savingOrders[todo.id]}
         isInGroup={isInGroup}
         isGroupStart={isGroupStart}
+        indentLevel={indentLevelByTodoId.get(todo.id) ?? 0}
       />
     );
-  }, [parallelGroups, sortedTodos, activeTab, editingOrders, savingOrders, handleOrderSave, colors, onUpdate]);
+  }, [parallelGroups, sortedTodos, activeTab, editingOrders, savingOrders, handleOrderSave, colors, onUpdate, indentLevelByTodoId]);
 
   return (
     <DragDropTodoList
-      todos={sortedTodos}
+      todos={compactTodos}
       activeTab={activeTab}
       onDragEnd={handleCompactDragEnd}
       renderTodoItem={renderTodoItem}

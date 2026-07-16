@@ -22,6 +22,7 @@ interface CompactTodoItemProps {
   savingOrder?: boolean;
   isInGroup?: boolean;
   isGroupStart?: boolean;
+  indentLevel?: number;
 }
 
 /**
@@ -44,6 +45,7 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
   savingOrder = false,
   isInGroup = false,
   isGroupStart = false,
+  indentLevel = 0,
 }) => {
   const colors = propColors || useThemeColors();
   const { message } = App.useApp();
@@ -136,7 +138,7 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
     display: 'flex',
     alignItems: 'center',
     height: '36px', // 稍微减小高度以更紧凑
-    padding: '0 4px', // 减少内边距
+    padding: `0 4px 0 ${4 + indentLevel * 24}px`, // 子代办按层级缩进
     margin: '1px 0', // 减少外边距
     backgroundColor: deadlineInfo?.isOverdue ? (document.documentElement.dataset.theme === 'dark' ? 'rgba(248, 113, 113, 0.14)' : '#fff1f0') : 'transparent', // 已过期待办的背景
     borderLeft: deadlineInfo?.isOverdue ? `3px solid ${colors.dangerColor}` : undefined, // 已过期待办的左边框
@@ -268,6 +270,7 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
       ref={containerRef}
       style={containerStyle}
       className={`compact-todo-item ${isCompleted ? 'completed' : ''}`}
+      data-indent-level={indentLevel}
       onDoubleClick={handleContainerDoubleClick}
     >
       {/* 拖拽手柄（在拖拽模式下显示） - 移至左侧 */}
@@ -353,7 +356,8 @@ const MemoizedCompactTodoItem = React.memo(CompactTodoItem, (prevProps, nextProp
     prevProps.editingOrder === nextProps.editingOrder &&
     prevProps.savingOrder === nextProps.savingOrder &&
     prevProps.isInGroup === nextProps.isInGroup &&
-    prevProps.isGroupStart === nextProps.isGroupStart
+    prevProps.isGroupStart === nextProps.isGroupStart &&
+    prevProps.indentLevel === nextProps.indentLevel
     // 注意：不再比较 updatedAt，因为拖拽操作会频繁更新它
     // 注意：不再比较 displayOrders，因为拖拽排序已经通过 currentDisplayOrder 处理
   );
