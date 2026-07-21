@@ -9,9 +9,11 @@ import {
 interface UseOrderEditProps {
   todo: Todo;
   activeTab: string;
+  sortedTodos: Todo[];
   allTodos: Todo[];
   parallelGroupsMap?: Map<string, Set<string>>;
   onUpdateDisplayOrder: (id: string, tabKey: string, order: number) => Promise<void>;
+  onUpdateDisplayOrders?: (updates: Array<{uuid: string, tabKey: string, displayOrder: number}>) => Promise<void>;
 }
 
 /**
@@ -19,7 +21,7 @@ interface UseOrderEditProps {
  * 提供统一的序号编辑逻辑，支持冲突解决和并列分组同步
  */
 export const useOrderEdit = (props: UseOrderEditProps) => {
-  const { todo, activeTab, allTodos, parallelGroupsMap } = props;
+  const { todo, activeTab, sortedTodos, allTodos, parallelGroupsMap, onUpdateDisplayOrders } = props;
   const [editingOrder, setEditingOrder] = useState<number | undefined>();
   const [savingOrder, setSavingOrder] = useState(false);
   const { message } = App.useApp();
@@ -37,7 +39,7 @@ export const useOrderEdit = (props: UseOrderEditProps) => {
 
     try {
       // 1. 构建重排顺序：把当前待办移到目标位置，其余保持相对顺序
-      const reordered = buildRenumberedOrder(allTodos, todo.id, editingOrder);
+      const reordered = buildRenumberedOrder(sortedTodos, todo.id, editingOrder);
 
       // 2. 全量重排：按 index 分配连续 displayOrder，并同步并列分组
       const updates = computeAllFinalOrders({
@@ -48,7 +50,11 @@ export const useOrderEdit = (props: UseOrderEditProps) => {
       });
 
       // 3. 一次性落库（含当前待办）+ 刷新（与紧凑拖拽同一通路）
-      await window.electronAPI.todo.batchUpdateDisplayOrders(updates);
+      if (onUpdateDisplayOrders) {
+        await onUpdateDisplayOrders(updates);
+      } else {
+        await window.electronAPI.todo.batchUpdateDisplayOrders(updates);
+      }
 
       setEditingOrder(undefined);
       if (updates.length > 1) {
@@ -63,7 +69,7 @@ export const useOrderEdit = (props: UseOrderEditProps) => {
     } finally {
       setSavingOrder(false);
     }
-  }, [todo, editingOrder, activeTab, allTodos, parallelGroupsMap, message]);
+  }, [todo, editingOrder, activeTab, sortedTodos, allTodos, parallelGroupsMap, onUpdateDisplayOrders, message]);
 
   return {
     editingOrder,

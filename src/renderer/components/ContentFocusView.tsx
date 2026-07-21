@@ -20,6 +20,7 @@ interface ContentFocusViewProps {
   activeTab: string;
   relations: TodoRelation[];
   onUpdateDisplayOrder: (todoId: string, tabKey: string, displayOrder: number) => Promise<void>;
+  onUpdateDisplayOrders?: (updates: Array<{uuid: string, tabKey: string, displayOrder: number}>) => Promise<void>;
   colorTheme?: ColorTheme;
 }
 
@@ -36,6 +37,7 @@ interface ContentFocusItemProps {
   onView: (todo: Todo) => void | Promise<void>;
   isLast: boolean;
   activeTab: string;
+  sortedTodos: Todo[];
   allTodos: Todo[];
   relations: TodoRelation[];
   parallelGroup?: Set<string>;
@@ -43,6 +45,7 @@ interface ContentFocusItemProps {
   prevTodo: Todo | null;
   nextTodo: Todo | null;
   onUpdateDisplayOrder: (todoId: string, tabKey: string, displayOrder: number) => Promise<void>;
+  onUpdateDisplayOrders?: (updates: Array<{uuid: string, tabKey: string, displayOrder: number}>) => Promise<void>;
 }
 
 // 暴露给父组件的方法
@@ -58,6 +61,7 @@ const ContentFocusItem = React.memo(
     onView,
     isLast,
     activeTab,
+    sortedTodos,
     allTodos,
     relations,
     parallelGroup,
@@ -65,6 +69,7 @@ const ContentFocusItem = React.memo(
     prevTodo,
     nextTodo,
     onUpdateDisplayOrder,
+    onUpdateDisplayOrders,
   }, ref) => {
     const { message } = App.useApp();
     const colors = useThemeColors();
@@ -88,9 +93,11 @@ const ContentFocusItem = React.memo(
     } = useOrderEdit({
       todo,
       activeTab,
+      sortedTodos,
       allTodos: allTodos || [],
       parallelGroupsMap,
       onUpdateDisplayOrder,
+      onUpdateDisplayOrders,
     });
 
     const lastSavedContentRef = useRef(todo.content);
@@ -847,6 +854,7 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
   activeTab,
   relations,
   onUpdateDisplayOrder,
+  onUpdateDisplayOrders,
   colorTheme,
 }, ref) => {
   // 为每个待办项创建 ref
@@ -944,6 +952,7 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
               onView={onView}
               isLast={index === todos.length - 1}
               activeTab={activeTab}
+              sortedTodos={todos}
               allTodos={allTodos || todos}
               relations={relations}
               parallelGroup={parallelGroups.get(todo.id)}
@@ -951,6 +960,7 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
               prevTodo={index > 0 ? todos[index - 1] : null}
               nextTodo={index < todos.length - 1 ? todos[index + 1] : null}
               onUpdateDisplayOrder={onUpdateDisplayOrder}
+              onUpdateDisplayOrders={onUpdateDisplayOrders}
             />
           ))}
         </div>

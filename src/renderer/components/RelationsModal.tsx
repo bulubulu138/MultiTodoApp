@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Modal, List, Card, Button, Space, Tag, Select, App, Typography, Segmented, Timeline } from 'antd';
 import { LinkOutlined, DeleteOutlined, PlusOutlined, ClockCircleOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { Todo, TodoRelation } from '../../shared/types';
+import {
+  createRelationForModalSelection,
+  getDisplayRelationForTodo,
+  RelationDisplayType
+} from '../../shared/relationDirection';
 
 const { Option } = Select;
 const { Text } = Typography;
@@ -58,31 +63,10 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
     }
 
     try {
-      let sourceId: string = todo.id;
-      let targetId: string = targetTodo.id;
-      let relationType = newRelationType;
-
-      // 处理关系方向和类型
-      if (newRelationType === 'extends') {
-        // 当前todo extends targetTodo（子待办关系）
-        // 含义：当前todo是targetTodo的子待办
-        // 存储：source=当前todo, target=targetTodo, type='extends'
-        sourceId = todo.id;
-        targetId = targetTodo.id;
-        relationType = 'extends';
-      } else if (newRelationType === 'background') {
-        // targetTodo background 当前todo（父待办关系）
-        // 含义：targetTodo是当前todo的父待办
-        // 存储：source=targetTodo, target=当前todo, type='background'
-        sourceId = targetTodo.id;
-        targetId = todo.id;
-        relationType = 'background';
-      } else if (newRelationType === 'parallel') {
-        // 并列关系，保持原样（无方向性，双向查询时会自动匹配）
-        sourceId = todo.id;
-        targetId = targetTodo.id;
-        relationType = 'parallel';
-      }
+      const relationData = createRelationForModalSelection(todo.id, targetTodo.id, newRelationType);
+      const sourceId = relationData.source_id;
+      const targetId = relationData.target_id;
+      const relationType = relationData.relation_type;
 
       // 性能优化：使用客户端内存中的关系数据检查，避免数据库查询
       const exists = relations.some(r => 
@@ -227,37 +211,19 @@ const RelationsModal: React.FC<RelationsModalProps> = ({
   // 获取显示的关系类型和相关待办
   const getDisplayRelation = (relation: TodoRelation): { 
     relatedTodo: Todo | undefined; 
-    displayType: 'background' | 'extends' | 'parallel';
+    displayType: RelationDisplayType;
   } => {
-    if (relation.relation_type === 'parallel') {
-      // 并列关系，双向显示
-      const relatedTodoId = relation.source_id === todo?.id ? relation.target_id : relation.source_id;
-      return {
-        relatedTodo: todos.find(t => t.id === relatedTodoId),
-        displayType: 'parallel'
-      };
-    } else if (relation.relation_type === 'background') {
-      // 判断方向
-      if (relation.target_id === todo?.id) {
-        // source 是当前 todo 的背景
-        return {
-          relatedTodo: todos.find(t => t.id === relation.source_id),
-          displayType: 'background'
-        };
-      } else if (relation.source_id === todo?.id) {
-        // target 是当前 todo 的延伸
-        return {
-          relatedTodo: todos.find(t => t.id === relation.target_id),
-          displayType: 'extends'
-        };
-      }
+    if (todo?.id) {
+      const display = getDisplayRelationForTodo(todo.id, relation, todoId => todos.find(t => t.id === todoId));
+      if (display) return display;
     }
+
     return { relatedTodo: undefined, displayType: 'background' };
   };
 
   // 获取所有关联的待办（包括递归查找）
-  const getAllRelatedTodos = (): { todo: Todo; relation: TodoRelation; displayType: 'background' | 'extends' | 'parallel' }[] => {
-    const result: { todo: Todo; relation: TodoRelation; displayType: 'background' | 'extends' | 'parallel' }[] = [];
+  const getAllRelatedTodos = (): { todo: Todo; relation: TodoRelation; displayType: RelationDisplayType }[] => {
+    const result: { todo: Todo; relation: TodoRelation; displayType: RelationDisplayType }[] = [];
     const visited = new Set<string>();
 
     relations.forEach(relation => {

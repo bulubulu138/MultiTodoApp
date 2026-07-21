@@ -1,4 +1,5 @@
 import { Todo, TodoRelation, CalendarViewSize, CustomTab } from '../shared/types';
+import { createRelationForNewTodoPlacement } from '../shared/relationDirection';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Layout, App as AntApp, ConfigProvider, FloatButton, Modal, Typography, Space, Tag, Button, Tooltip } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
@@ -692,12 +693,15 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       // 处理位置选择器中选择的关系
       if (pendingPosition && pendingPosition.mode !== 'root' && pendingPosition.targetTodoId) {
         const relationType = pendingPosition.mode === 'extends' ? 'extends' : 'parallel';
+        const relation = createRelationForNewTodoPlacement(
+          newTodo.id,
+          pendingPosition.targetTodoId,
+          relationType
+        );
 
         try {
           await window.electronAPI.relations.create({
-            source_id: newTodo.id,
-            target_id: pendingPosition.targetTodoId,
-            relation_type: relationType
+            ...relation
           });
           // 只在创建关系时需要刷新关系列表
           await loadRelations();
@@ -1348,6 +1352,109 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     }
   };
 
+  const handleUpdateDisplayOrders = useCallback(async (
+    updates: Array<{uuid: string; tabKey: string; displayOrder: number}>
+  ) => {
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return;
+    }
+
+    const previousTodos = todos;
+    const previousDragDropOrder = dragDropOrder;
+    const now = new Date().toISOString();
+    const updatesByTodoId = new Map<string, Array<{tabKey: string; displayOrder: number}>>();
+
+    updates.forEach(update => {
+      if (!updatesByTodoId.has(update.uuid)) {
+        updatesByTodoId.set(update.uuid, []);
+      }
+      updatesByTodoId.get(update.uuid)!.push({
+        tabKey: update.tabKey,
+        displayOrder: update.displayOrder,
+      });
+    });
+
+    const nextTodos = todos.map(todo => {
+      const todoUpdates = updatesByTodoId.get(todo.id);
+      if (!todoUpdates) {
+        return todo;
+      }
+
+      const nextDisplayOrders = { ...(todo.displayOrders || {}) };
+      let changed = false;
+
+      todoUpdates.forEach(({ tabKey, displayOrder }) => {
+        if (nextDisplayOrders[tabKey] !== displayOrder) {
+          nextDisplayOrders[tabKey] = displayOrder;
+          changed = true;
+        }
+      });
+
+      return changed
+        ? { ...todo, displayOrders: nextDisplayOrders, updatedAt: now }
+        : todo;
+    });
+
+    setTodos(nextTodos);
+
+    const affectedTabKeys = Array.from(new Set(updates.map(update => update.tabKey)));
+    setDragDropOrder(prev => {
+      const next = { ...prev };
+
+      affectedTabKeys.forEach(tabKey => {
+        if (!next[tabKey]) {
+          return;
+        }
+
+        next[tabKey] = [...nextTodos]
+          .sort((a, b) => {
+            const orderA = a.displayOrders?.[tabKey];
+            const orderB = b.displayOrders?.[tabKey];
+
+            if (orderA != null && orderB != null && orderA !== orderB) {
+              return orderA - orderB;
+            }
+            if (orderA != null && orderB == null) {
+              return -1;
+            }
+            if (orderA == null && orderB != null) {
+              return 1;
+            }
+
+            const existingIndexA = prev[tabKey]?.indexOf(a.id) ?? -1;
+            const existingIndexB = prev[tabKey]?.indexOf(b.id) ?? -1;
+            if (existingIndexA !== -1 && existingIndexB !== -1) {
+              return existingIndexA - existingIndexB;
+            }
+            if (existingIndexA !== -1) {
+              return -1;
+            }
+            if (existingIndexB !== -1) {
+              return 1;
+            }
+
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          })
+          .map(todo => todo.id);
+      });
+
+      return next;
+    });
+
+    try {
+      const result = await window.electronAPI.todo.batchUpdateDisplayOrders(updates) as any;
+      if (result && result.success === false) {
+        throw new Error(`批量更新序号失败：${result.failed ?? updates.length} 个待办未保存`);
+      }
+    } catch (error) {
+      setTodos(previousTodos);
+      setDragDropOrder(previousDragDropOrder);
+      message.error('更新排序失败，已恢复');
+      console.error('Error batch updating display orders:', error);
+      throw error;
+    }
+  }, [todos, dragDropOrder, message]);
+
   // 保存自定义Tab
   const handleSaveCustomTabs = async (tabs: CustomTab[]) => {
     try {
@@ -1945,6 +2052,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
                     activeTab={activeTab}
                     relations={relations}
                     onUpdateDisplayOrder={handleUpdateDisplayOrder}
+                    onUpdateDisplayOrders={handleUpdateDisplayOrders}
                     colorTheme={colorTheme}
                   />
                 </motion.div>

@@ -813,33 +813,7 @@ class Application {
     });
 
     ipcMain.handle('todo:batchUpdateDisplayOrders', async (_, updates: {uuid: string, tabKey: string, displayOrder: number}[]) => {
-      // 按待办分组更新
-      const groupedUpdates = new Map<string, Array<{tabKey: string; displayOrder: number}>>();
-
-      for (const update of updates) {
-        if (!groupedUpdates.has(update.uuid)) {
-          groupedUpdates.set(update.uuid, []);
-        }
-        groupedUpdates.get(update.uuid)!.push({
-          tabKey: update.tabKey,
-          displayOrder: update.displayOrder
-        });
-      }
-
-      // 批量更新
-      for (const [uuid, displayOrders] of groupedUpdates) {
-        const todo = await this.databaseManager.getStorageManager().getTodoById(uuid);
-        if (todo) {
-          const newDisplayOrders = todo.displayOrders || {};
-          displayOrders.forEach(({ tabKey, displayOrder }) => {
-            newDisplayOrders[tabKey] = displayOrder;
-          });
-
-          await this.databaseManager.getStorageManager().updateTodo(uuid, { displayOrders: newDisplayOrders });
-        }
-      }
-
-      return { success: true };
+      return await this.databaseManager.getStorageManager().batchUpdateDisplayOrders(updates);
     });
 
     ipcMain.handle('todo:bulkUpdateTodos', async (_, updates: Array<{uuid: string; updates: any}>) => {
@@ -1332,11 +1306,11 @@ class Application {
             }
             childToParents.get(targetId)!.push(sourceId);
           } else if (rel.relation_type === 'extends') {
-            // source延伸了target，即target是source的父节点
-            if (!parentToChildren.has(targetId)) {
-              parentToChildren.set(targetId, []);
+            // source是父待办，target是子待办
+            if (!parentToChildren.has(sourceId)) {
+              parentToChildren.set(sourceId, []);
             }
-            parentToChildren.get(targetId)!.push(sourceId);
+            parentToChildren.get(sourceId)!.push(targetId);
           }
           // parallel关系暂不处理
         });
