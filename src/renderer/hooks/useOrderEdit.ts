@@ -3,14 +3,13 @@ import { App } from 'antd';
 import { Todo } from '../../shared/types';
 import {
   buildRenumberedOrder,
-  computeAllFinalOrders
+  computeSequentialFinalOrders
 } from '../utils/orderConflictResolver';
 
 interface UseOrderEditProps {
   todo: Todo;
   activeTab: string;
   sortedTodos: Todo[];
-  allTodos: Todo[];
   parallelGroupsMap?: Map<string, Set<string>>;
   onUpdateDisplayOrder: (id: string, tabKey: string, order: number) => Promise<void>;
   onUpdateDisplayOrders?: (updates: Array<{uuid: string, tabKey: string, displayOrder: number}>) => Promise<void>;
@@ -21,7 +20,7 @@ interface UseOrderEditProps {
  * 提供统一的序号编辑逻辑，支持冲突解决和并列分组同步
  */
 export const useOrderEdit = (props: UseOrderEditProps) => {
-  const { todo, activeTab, sortedTodos, allTodos, parallelGroupsMap, onUpdateDisplayOrders } = props;
+  const { todo, activeTab, sortedTodos, parallelGroupsMap, onUpdateDisplayOrders } = props;
   const [editingOrder, setEditingOrder] = useState<number | undefined>();
   const [savingOrder, setSavingOrder] = useState(false);
   const { message } = App.useApp();
@@ -42,11 +41,10 @@ export const useOrderEdit = (props: UseOrderEditProps) => {
       const reordered = buildRenumberedOrder(sortedTodos, todo.id, editingOrder);
 
       // 2. 全量重排：按 index 分配连续 displayOrder，并同步并列分组
-      const updates = computeAllFinalOrders({
+      const updates = computeSequentialFinalOrders({
         newOrder: reordered,
         activeTab,
         parallelGroupsMap: parallelGroupsMap ?? new Map(),
-        allTodos,
       });
 
       // 3. 一次性落库（含当前待办）+ 刷新（与紧凑拖拽同一通路）
@@ -69,7 +67,7 @@ export const useOrderEdit = (props: UseOrderEditProps) => {
     } finally {
       setSavingOrder(false);
     }
-  }, [todo, editingOrder, activeTab, sortedTodos, allTodos, parallelGroupsMap, onUpdateDisplayOrders, message]);
+  }, [todo, editingOrder, activeTab, sortedTodos, parallelGroupsMap, onUpdateDisplayOrders, message]);
 
   return {
     editingOrder,

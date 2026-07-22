@@ -154,6 +154,53 @@ export function computeParallelGroupFinalOrders(
   return [...mainUpdates, ...updates];
 }
 
+/**
+ * 按当前可见顺序直接生成连续 displayOrders。
+ *
+ * 适用于专注模式输入序号后的全量重排：newOrder 已经是最终顺序，
+ * 旧序号占用不应再次参与冲突解析，否则会把正确的连续序号推开。
+ */
+export function computeSequentialFinalOrders(
+  config: ComputeOrdersConfig
+): Array<{uuid: string, tabKey: string, displayOrder: number}> {
+  const { newOrder, activeTab, parallelGroupsMap } = config;
+  const updates = new Map<string, {uuid: string, tabKey: string, displayOrder: number}>();
+  const processedGroups = new Set<string>();
+
+  newOrder.forEach((todo, index) => {
+    updates.set(todo.id, {
+      uuid: todo.id,
+      tabKey: activeTab,
+      displayOrder: index,
+    });
+  });
+
+  for (const group of parallelGroupsMap.values()) {
+    if (group.size <= 1) continue;
+
+    const groupKey = Array.from(group).sort().join(',');
+    if (processedGroups.has(groupKey)) continue;
+    processedGroups.add(groupKey);
+
+    const groupIndexes = Array.from(group)
+      .map(id => newOrder.findIndex(todo => todo.id === id))
+      .filter(index => index >= 0);
+
+    if (groupIndexes.length === 0) continue;
+
+    const groupOrder = Math.min(...groupIndexes);
+    group.forEach(id => {
+      updates.set(id, {
+        uuid: id,
+        tabKey: activeTab,
+        displayOrder: groupOrder,
+      });
+    });
+  }
+
+  return Array.from(updates.values());
+}
+
 interface BatchConflictResolutionConfig {
   proposedUpdates: Array<{uuid: string, displayOrder: number}>;
   allTodos: Todo[];

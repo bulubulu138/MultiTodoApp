@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Card, Space, Typography, Collapse, Tag, Popover } from 'antd';
 import { Todo, TodoRelation } from '../../shared/types';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { getRelationContextGroups } from '../utils/relationContext';
 
 const { Text } = Typography;
 
@@ -155,109 +156,10 @@ const RelationContext: React.FC<RelationContextProps> = ({
   compact = false
 }) => {
   const colors = useThemeColors();
-  // 查找所有父待办（递归）
-  const backgrounds = useMemo(() => {
-    const result: Todo[] = [];
-    const visited = new Set<string>();
-    const maxDepth = 5; // 限制递归深度
-
-    function recurse(currentId: string, depth: number) {
-      if (visited.has(currentId) || depth >= maxDepth) return;
-      visited.add(currentId);
-
-      // 找到所有指向当前todo的background关系
-      const bgRelations = relations.filter(
-        r => String(r.target_id) === currentId && r.relation_type === 'background'
-      );
-
-      bgRelations.forEach(rel => {
-        const bgTodo = allTodos.find(t => t && t.id === rel.source_id);
-        if (bgTodo && !visited.has(bgTodo.id)) {
-          result.push(bgTodo);
-          recurse(bgTodo.id, depth + 1);
-        }
-      });
-    }
-
-    if (currentTodo.id) {
-      recurse(currentTodo.id, 0);
-    }
-
-    return result.sort((a, b) =>
-      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
-  }, [currentTodo.id, relations, allTodos]);
-
-  // 查找兄弟待办
-  const backgroundExtensions = useMemo(() => {
-    const result: Todo[] = [];
-    const visited = new Set<string>();
-
-    backgrounds.forEach(bg => {
-      // 找到以背景为 source 的 background 关系
-      // 这些就是背景的延伸（其他待办以背景为背景）
-      const extendsRels = relations.filter(
-        r => r.source_id === bg.id && r.relation_type === 'background'
-      );
-
-      extendsRels.forEach(rel => {
-        const extTodo = allTodos.find(t => t && t.id === rel.target_id);
-        if (extTodo && !visited.has(extTodo.id) && extTodo.id !== currentTodo.id) {
-          result.push(extTodo);
-          visited.add(extTodo.id);
-        }
-      });
-    });
-
-    return result.sort((a, b) =>
-      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
-  }, [backgrounds, relations, allTodos, currentTodo.id]);
-
-  // 查找子待办（以当前待办为父待办的事项）
-  const extensions = useMemo(() => {
-    const result: Todo[] = [];
-
-    // 查找所有以当前待办为 source 的 extends 关系
-    const extensionRels = relations.filter(
-      r => r.source_id === currentTodo.id && r.relation_type === 'extends'
-    );
-    
-    extensionRels.forEach(rel => {
-      const extTodo = allTodos.find(t => t && t.id === rel.target_id);
-      if (extTodo) {
-        result.push(extTodo);
-      }
-    });
-    
-    return result.sort((a, b) =>
-      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
-  }, [currentTodo.id, relations, allTodos]);
-
-  // 查找并列事项
-  const parallels = useMemo(() => {
-    const result: Todo[] = [];
-
-    relations.forEach(rel => {
-      if (rel.relation_type === 'parallel') {
-        // ✅ 必须确保当前 todo 参与了这个并列关系
-        if (rel.source_id === currentTodo.id) {
-          const parallelTodo = allTodos.find(t => t && t.id === rel.target_id);
-          if (parallelTodo) {
-            result.push(parallelTodo);
-          }
-        } else if (rel.target_id === currentTodo.id) {
-          const parallelTodo = allTodos.find(t => t && t.id === rel.source_id);
-          if (parallelTodo) {
-            result.push(parallelTodo);
-          }
-        }
-      }
-    });
-
-    return result;
-  }, [currentTodo.id, relations, allTodos]);
+  const { backgrounds, backgroundExtensions, extensions, parallels } = useMemo(
+    () => getRelationContextGroups(currentTodo, allTodos, relations),
+    [currentTodo, allTodos, relations]
+  );
 
   const hasRelations = backgrounds.length + backgroundExtensions.length + extensions.length + parallels.length > 0;
 

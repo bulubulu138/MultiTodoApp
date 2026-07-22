@@ -94,7 +94,6 @@ const ContentFocusItem = React.memo(
       todo,
       activeTab,
       sortedTodos,
-      allTodos: allTodos || [],
       parallelGroupsMap,
       onUpdateDisplayOrder,
       onUpdateDisplayOrders,
