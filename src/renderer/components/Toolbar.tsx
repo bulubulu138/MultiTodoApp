@@ -1,7 +1,9 @@
 import React from 'react';
 import { Button, Space, Select, Tooltip, Segmented, Input } from 'antd';
-import { PlusOutlined, SettingOutlined, CalendarOutlined, SortAscendingOutlined, UnorderedListOutlined, AlignLeftOutlined, AppstoreOutlined, SearchOutlined, FileTextOutlined, SyncOutlined } from '@ant-design/icons';
+import { PlusOutlined, SettingOutlined, CalendarOutlined, SortAscendingOutlined, UnorderedListOutlined, AlignLeftOutlined, AppstoreOutlined, SearchOutlined, FileTextOutlined, SyncOutlined, UserOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
+import TodoOwnerAvatar from './TodoOwnerAvatar';
+import { OwnerFilter, UNASSIGNED_OWNER_FILTER } from '../utils/todoOwner';
 
 const { Option } = Select;
 const { Search } = Input;
@@ -28,6 +30,9 @@ interface ToolbarProps {
   onViewModeChange?: (mode: ViewMode) => void;
   searchText?: string;
   onSearchChange?: (value: string) => void;
+  ownerOptions?: string[];
+  ownerFilter?: OwnerFilter;
+  onOwnerFilterChange?: (value: OwnerFilter) => void;
 }
 
 // 性能优化：使用 React.memo 避免不必要的重渲染
@@ -42,7 +47,10 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
   viewMode = 'card',
   onViewModeChange,
   searchText = '',
-  onSearchChange
+  onSearchChange,
+  ownerOptions = [],
+  ownerFilter = 'all',
+  onOwnerFilterChange,
 }) => {
   return (
     <div className="toolbar">
@@ -57,6 +65,30 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
       </div>
       
       <Space size="middle" className="toolbar-right" wrap>
+        <Select
+          value={ownerFilter}
+          onChange={(value) => onOwnerFilterChange?.(value)}
+          className="toolbar-sort-select"
+          style={{ minWidth: 160 }}
+          suffixIcon={<UserOutlined />}
+          optionLabelProp="label"
+        >
+          <Option value="all" label="全部负责人">全部负责人</Option>
+          <Option value={UNASSIGNED_OWNER_FILTER} label="未分配">未分配</Option>
+          {ownerOptions.map((owner) => (
+            <Option
+              key={owner}
+              value={owner}
+              label={owner}
+            >
+              <Space size={8}>
+                <TodoOwnerAvatar owner={owner} size={20} showTooltip={false} />
+                <span>{owner}</span>
+              </Space>
+            </Option>
+          ))}
+        </Select>
+
         <Select
           value={sortOption}
           onChange={onSortChange}

@@ -5,6 +5,7 @@ import { Todo } from '../../shared/types';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useCompactTodoEdit } from '../hooks/useCompactTodoEdit';
 import { getDeadlineDisplay } from '../utils/deadlineFormatter';
+import TodoOwnerAvatar from './TodoOwnerAvatar';
 
 interface CompactTodoItemProps {
   todo: Todo;
@@ -318,20 +319,23 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
       <OrderEditor />
 
       {/* 可编辑标题 */}
-      <input
-        ref={inputRef}
-        type="text"
-        value={editedTitle}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        onKeyDown={handleKeyDown}
-        onClick={handleClick}
-        onCompositionStart={handleCompositionStart}
-        onCompositionEnd={handleCompositionEnd}
-        style={titleInputStyle}
-        disabled={isSaving}
-        placeholder="输入待办标题..."
-      />
+      <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, gap: 6 }}>
+        <input
+          ref={inputRef}
+          type="text"
+          value={editedTitle}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          onClick={handleClick}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
+          style={titleInputStyle}
+          disabled={isSaving}
+          placeholder="输入待办标题..."
+        />
+        <TodoOwnerAvatar owner={todo.owner} size={20} />
+      </div>
 
       {/* 截止时间显示 */}
       {deadlineInfo && (

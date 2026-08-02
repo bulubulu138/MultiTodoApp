@@ -12,6 +12,7 @@ import { embedUrlTitleInContent } from '../utils/urlTitleStorage';
 import ReadOnlyMarkdown from './ReadOnlyMarkdown';
 import InlineEditPanel from './InlineEditPanel';
 import { convertRelativePathsToFileProtocol } from '../utils/PathResolver';
+import TodoOwnerAvatar from './TodoOwnerAvatar';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -813,9 +814,12 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
           {/* 左侧：主要内容 */}
           <div style={{ flex: showRelationContext ? 2 : 1 }}>
             {/* 标题 */}
-            <Title level={3} style={{ marginTop: 0 }}>
-              {todo.title}
-            </Title>
+            <Space size={10} align="center" style={{ marginBottom: 16 }}>
+              <Title level={3} style={{ marginTop: 0, marginBottom: 0 }}>
+                {todo.title}
+              </Title>
+              <TodoOwnerAvatar owner={todo.owner} size={28} />
+            </Space>
 
           {/* 基本信息 */}
           <Descriptions column={2} size="small" bordered style={{ marginBottom: 16 }}>
@@ -828,6 +832,16 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
               <Tag color={getPriorityColor(todo.priority)}>
                 {getPriorityText(todo.priority)}
               </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="负责人" span={2}>
+              {todo.owner ? (
+                <Space>
+                  <TodoOwnerAvatar owner={todo.owner} size={24} />
+                  <span>{todo.owner}</span>
+                </Space>
+              ) : (
+                <Text type="secondary">未分配</Text>
+              )}
             </Descriptions.Item>
             <Descriptions.Item label="创建时间" span={2}>
               <Space>

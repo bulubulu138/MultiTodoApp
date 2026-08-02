@@ -35,6 +35,7 @@ import { optimizedMotionVariants, useConditionalAnimation, shouldReduceMotion, u
 import { PerformanceMonitor } from './utils/performanceMonitor';
 import { useGlobalKeyboardHandler } from './hooks/useGlobalKeyboardHandler';
 import { syncParallelGroupOrders, computeAllFinalOrders } from './utils/orderConflictResolver';
+import { collectTodoOwners, matchesTodoOwner, OwnerFilter } from './utils/todoOwner';
 import dayjs from 'dayjs';
 
 const { Content } = Layout;
@@ -87,6 +88,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const [showHotkeyGuide, setShowHotkeyGuide] = useState(false);
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearchText, setDebouncedSearchText] = useState<string>('');
+  const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>('all');
   const [showPositionSelector, setShowPositionSelector] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [pendingPosition, setPendingPosition] = useState<PositionSelection | null>(null);
@@ -120,6 +122,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         todo.status ?? '',
         todo.priority ?? '',
         todo.tags ?? '',
+        todo.owner ?? '',
       ].join(':'))
       .join('|');
   }, []);
@@ -1573,6 +1576,18 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     return Array.from(tagsSet).sort();
   }, [todos]);
 
+  const ownerOptions = useMemo(() => collectTodoOwners(todos).sort((a, b) => a.localeCompare(b, 'zh-CN')), [todos]);
+
+  useEffect(() => {
+    if (ownerFilter === 'all') {
+      return;
+    }
+
+    if (!ownerOptions.includes(ownerFilter)) {
+      setOwnerFilter('all');
+    }
+  }, [ownerFilter, ownerOptions]);
+
   // 统计各状态的待办数量
   const statusCounts = useMemo(() => ({
     all: todos.filter(t => t && t.id).length,
@@ -1585,11 +1600,12 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   // 第一层：基础过滤（按Tab状态过滤）
   const baseFilteredTodos = useMemo(() => {
     const validTodos = todos.filter(todo => todo && todo.id);
+    let tabFilteredTodos: Todo[];
 
     // 处理自定义标签Tab
     if (activeTab.startsWith('tag:')) {
       const targetTag = activeTab.replace('tag:', '').trim().toLowerCase();
-      return validTodos.filter(todo => {
+      tabFilteredTodos = validTodos.filter(todo => {
         if (!todo.tags) return false;
         const tags = todo.tags.split(',')
           .map(t => t.trim().toLowerCase())
@@ -1597,13 +1613,15 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         return tags.includes(targetTag);
       });
     } else if (activeTab === 'pending') {
-      return validTodos.filter(todo => todo.status === 'pending');
+      tabFilteredTodos = validTodos.filter(todo => todo.status === 'pending');
     } else if (activeTab === 'completed') {
-      return validTodos.filter(todo => todo.status === 'completed');
+      tabFilteredTodos = validTodos.filter(todo => todo.status === 'completed');
     } else {
-      return activeTab === 'all' ? validTodos : validTodos.filter(todo => todo.status === activeTab);
+      tabFilteredTodos = activeTab === 'all' ? validTodos : validTodos.filter(todo => todo.status === activeTab);
     }
-  }, [todos, activeTab]);
+
+    return tabFilteredTodos.filter((todo) => matchesTodoOwner(todo, ownerFilter));
+  }, [todos, activeTab, ownerFilter]);
 
   // 第二层：搜索过滤（带缓存优化）
   const searchedTodos = useMemo(() => {
@@ -1982,6 +2000,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         onViewModeChange={handleViewModeChange}
         searchText={searchText}
         onSearchChange={setSearchText}
+        ownerOptions={ownerOptions}
+        ownerFilter={ownerFilter}
+        onOwnerFilterChange={setOwnerFilter}
       />
 
       <Layout className="app-main-layout">

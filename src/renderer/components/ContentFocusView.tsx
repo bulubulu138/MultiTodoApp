@@ -9,6 +9,7 @@ import { ColorTheme } from '../theme/themes';
 import { useOrderEdit } from '../hooks/useOrderEdit';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { getDeadlineDisplay } from '../utils/deadlineFormatter';
+import TodoOwnerAvatar from './TodoOwnerAvatar';
 import dayjs from 'dayjs';
 
 interface ContentFocusViewProps {
@@ -655,6 +656,8 @@ const ContentFocusItem = React.memo(
                 并列分组
               </Tag>
             )}
+
+            <TodoOwnerAvatar owner={todo.owner} size={22} />
             
             <Button
               type="link"

@@ -8,6 +8,7 @@ import { SortOption, ViewMode } from './Toolbar';
 import RelationIndicators from './RelationIndicators';
 import TodoLinksPreview from './TodoLinksPreview';
 import { copyTodoToClipboard } from '../utils/copyTodo';
+import TodoOwnerAvatar from './TodoOwnerAvatar';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { formatCompletedTime } from '../utils/timeFormatter';
 import { optimizedMotionVariants, shouldReduceMotion } from '../utils/optimizedMotionVariants';
@@ -245,6 +246,7 @@ const VirtualizedTodoItem = memo<VirtualizedTodoItemProps>(({
               >
                 {todo.title}
               </Text>
+              <TodoOwnerAvatar owner={todo.owner} size={22} />
               {todo.id && (
                 <RelationIndicators
                   todoId={todo.id}

@@ -5,6 +5,7 @@ const { Text } = Typography;
 import { CopyOutlined } from '@ant-design/icons';
 import MilkdownEditorWrapper, { MilkdownEditorRef } from './MilkdownEditor';
 import { copyTodoToClipboard } from '../utils/copyTodo';
+import { collectTodoOwners, normalizeTodoOwner } from '../utils/todoOwner';
 import dayjs from 'dayjs';
 // import TipTapEditor from './TipTapEditor'; // Temporarily disabled until dependencies are installed
 
@@ -34,6 +35,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const [tags, setTags] = useState<string[]>([]);
+  const [owner, setOwner] = useState<string | undefined>(undefined);
   const [richContent, setRichContent] = useState<string>('');
   const [isEditorReady, setIsEditorReady] = useState(false);
   const [editorError, setEditorError] = useState(false);
@@ -82,6 +84,8 @@ const TodoForm: React.FC<TodoFormProps> = ({
     );
   }, [allTodos]);
 
+  const historyOwners = useMemo(() => collectTodoOwners(allTodos), [allTodos]);
+
   useEffect(() => {
     if (visible) {
       if (todo) {
@@ -90,6 +94,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
           title: todo.title,
           status: todo.status,
           priority: todo.priority,
+          owner: todo.owner,
           startTime: todo.startTime ? dayjs(todo.startTime) : undefined,
           deadline: todo.deadline ? dayjs(todo.deadline) : undefined,
         });
@@ -100,16 +105,19 @@ const TodoForm: React.FC<TodoFormProps> = ({
         // 设置标签
         const todoTags = todo.tags ? todo.tags.split(',').filter(tag => tag.trim()) : [];
         setTags(todoTags);
+        setOwner(normalizeTodoOwner(todo.owner));
       } else {
         // 新建模式
         form.resetFields();
         // 新建时默认开始时间为当前时间
         form.setFieldsValue({
           startTime: dayjs(),
+          owner: undefined,
         });
         // 🔧 简化逻辑：直接设置内容，避免复杂的状态检查
         setRichContent(quickCreateContent || '');
         setTags([]);
+        setOwner(undefined);
       }
 
       setIsEditorReady(true);
@@ -198,6 +206,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
         deadline: values.deadline ? values.deadline.toISOString() : undefined,
         priority: values.priority || 'trivial',
         tags: tags.join(','),
+        owner: normalizeTodoOwner(values.owner),
         images: '', // 图片现在嵌入在富文本中
         contentHash: contentHash,
       };
@@ -237,6 +246,12 @@ const TodoForm: React.FC<TodoFormProps> = ({
   const handleTagsChange = (value: string[]) => {
     // 允许任意数量的标签
     setTags(value);
+  };
+
+  const handleOwnerChange = (value: string | undefined) => {
+    const normalized = normalizeTodoOwner(value);
+    setOwner(normalized);
+    form.setFieldValue('owner', normalized);
   };
 
   return (
@@ -322,6 +337,26 @@ const TodoForm: React.FC<TodoFormProps> = ({
             <Option value="completed">已完成</Option>
           </Select>
         </Form.Item>
+
+        <Form.Item
+          name="owner"
+          label="负责人"
+          extra={historyOwners.length > 0 ? `可从 ${historyOwners.length} 个历史负责人中选择，也可直接输入新负责人` : '可直接输入负责人'}
+        >
+          <Input
+            value={owner}
+            onChange={(e) => handleOwnerChange(e.target.value)}
+            placeholder="输入负责人，或参考已有负责人名称"
+            list="todo-owner-history"
+            allowClear
+          />
+        </Form.Item>
+
+        <datalist id="todo-owner-history">
+          {historyOwners.map((item) => (
+            <option key={item} value={item} />
+          ))}
+        </datalist>
 
         <Form.Item
           name="startTime"

@@ -47,6 +47,7 @@ export class MarkdownParser {
       status,
       priority: data.priority as Todo['priority'] || 'trivial',
       tags: this.parseTags(data.tags),
+      owner: this.parseOwner(data.owner),
       imageUrl: data.imageUrl as string | undefined,
       images: data.images as string | undefined,
       startTime: data.start_time as string | undefined || data.startTime as string | undefined,
@@ -91,6 +92,7 @@ export class MarkdownParser {
     };
 
     // 添加可选字段
+    if (todo.owner?.trim()) frontmatter.owner = todo.owner.trim();
     if (todo.deadline) frontmatter.deadline = todo.deadline;
     if (todo.completedAt) frontmatter.completed_at = todo.completedAt;
     if (todo.displayOrder !== undefined) frontmatter.display_order = todo.displayOrder;
@@ -336,6 +338,15 @@ export class MarkdownParser {
       return arr.length ? arr : undefined;
     }
     return undefined;
+  }
+
+  private parseOwner(owner: any): string | undefined {
+    if (typeof owner !== 'string') {
+      return undefined;
+    }
+
+    const normalized = owner.trim();
+    return normalized || undefined;
   }
 
   /**

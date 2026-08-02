@@ -10,6 +10,7 @@ import RelationIndicators from './RelationIndicators';
 import VirtualizedTodoList from './VirtualizedTodoList';
 import TodoLinksPreview from './TodoLinksPreview';
 import { copyTodoToClipboard } from '../utils/copyTodo';
+import TodoOwnerAvatar from './TodoOwnerAvatar';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useBatchURLTitles } from '../hooks/useBatchURLTitles';
 import { formatCompletedTime } from '../utils/timeFormatter';
@@ -499,6 +500,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                       <Text strong style={{ fontSize: 16, flex: 1 }}>
                         {todo.title}
                       </Text>
+                      <TodoOwnerAvatar owner={todo.owner} size={24} />
                       <Tag color={getPriorityColor(todo.priority)}>{getPriorityText(todo.priority)}</Tag>
                     </div>
                     {todo.content && (
@@ -773,6 +775,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                     >
                       {todo.title}
                     </Text>
+                    <TodoOwnerAvatar owner={todo.owner} size={22} />
                     {/* 关联指示器 */}
                     {todo.id && (
                       <RelationIndicators

@@ -11,6 +11,7 @@ export interface Todo {
   status: 'pending' | 'in_progress' | 'completed' | 'paused';
   priority: 'mental' | 'communication' | 'trivial';
   tags: string;
+  owner?: string;
   imageUrl?: string;
   images?: string; // JSON string of image array
   startTime?: string; // 预计开始时间
@@ -66,6 +67,7 @@ export interface TodoFormData {
   content: string;
   priority: 'mental' | 'communication' | 'trivial';
   tags: string;
+  owner?: string;
   imageUrl?: string;
 }
 

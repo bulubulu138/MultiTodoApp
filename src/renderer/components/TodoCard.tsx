@@ -8,6 +8,7 @@ import RelationIndicators from './RelationIndicators';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { formatCompletedTime } from '../utils/timeFormatter';
+import TodoOwnerAvatar from './TodoOwnerAvatar';
 import dayjs from 'dayjs';
 
 const { Text } = Typography;
@@ -292,6 +293,7 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
                 >
                   {todo.title}
                 </Text>
+                <TodoOwnerAvatar owner={todo.owner} size={22} />
                 <RelationIndicators
                   todoId={todo.id}
                   relations={relations}
