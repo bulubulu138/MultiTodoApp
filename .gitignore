@@ -68,6 +68,7 @@ userData/
 # Build and cache files
 electron-cache/
 build-local.js
+.worktrees/
 
 # Windows shortcuts
 *.lnk
