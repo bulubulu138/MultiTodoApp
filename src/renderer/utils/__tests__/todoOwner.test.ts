@@ -26,10 +26,10 @@ describe('todoOwner utilities', () => {
     ).toEqual(['张三', '李四']);
   });
 
-  it('builds avatar text for Chinese and Latin names', () => {
-    expect(getTodoOwnerAvatarText('张三')).toBe('张三');
-    expect(getTodoOwnerAvatarText('欧阳娜娜')).toBe('娜娜');
-    expect(getTodoOwnerAvatarText('Zhang San')).toBe('ZS');
+  it('builds avatar text from the first visible owner character', () => {
+    expect(getTodoOwnerAvatarText('张三')).toBe('张');
+    expect(getTodoOwnerAvatarText('欧阳娜娜')).toBe('欧');
+    expect(getTodoOwnerAvatarText('Zhang San')).toBe('Z');
     expect(getTodoOwnerAvatarText('alice')).toBe('A');
   });
 

@@ -33,10 +33,6 @@ export function collectTodoOwners(todos: Todo[]): string[] {
   return Array.from(owners);
 }
 
-function isCjkCharacter(char: string): boolean {
-  return /[\u3400-\u9fff\uf900-\ufaff]/.test(char);
-}
-
 export function getTodoOwnerAvatarText(owner?: string | null): string {
   const normalized = normalizeTodoOwner(owner);
   if (!normalized) {
@@ -44,24 +40,7 @@ export function getTodoOwnerAvatarText(owner?: string | null): string {
   }
 
   const compact = normalized.replace(/\s+/g, '');
-  const cjkCharacters = Array.from(compact).filter(isCjkCharacter);
-  if (cjkCharacters.length > 0) {
-    return cjkCharacters.slice(-2).join('');
-  }
-
-  const parts = normalized
-    .split(/\s+/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  if (parts.length >= 2) {
-    return parts
-      .slice(0, 2)
-      .map((part) => part.charAt(0).toUpperCase())
-      .join('');
-  }
-
-  return parts[0]?.charAt(0).toUpperCase() ?? compact.charAt(0).toUpperCase();
+  return Array.from(compact)[0]?.toUpperCase() ?? '';
 }
 
 export function getTodoOwnerColor(owner?: string | null): string {

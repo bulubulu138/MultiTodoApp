@@ -35,7 +35,6 @@ const TodoForm: React.FC<TodoFormProps> = ({
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const [tags, setTags] = useState<string[]>([]);
-  const [owner, setOwner] = useState<string | undefined>(undefined);
   const [richContent, setRichContent] = useState<string>('');
   const [isEditorReady, setIsEditorReady] = useState(false);
   const [editorError, setEditorError] = useState(false);
@@ -105,7 +104,6 @@ const TodoForm: React.FC<TodoFormProps> = ({
         // 设置标签
         const todoTags = todo.tags ? todo.tags.split(',').filter(tag => tag.trim()) : [];
         setTags(todoTags);
-        setOwner(normalizeTodoOwner(todo.owner));
       } else {
         // 新建模式
         form.resetFields();
@@ -117,7 +115,6 @@ const TodoForm: React.FC<TodoFormProps> = ({
         // 🔧 简化逻辑：直接设置内容，避免复杂的状态检查
         setRichContent(quickCreateContent || '');
         setTags([]);
-        setOwner(undefined);
       }
 
       setIsEditorReady(true);
@@ -248,12 +245,6 @@ const TodoForm: React.FC<TodoFormProps> = ({
     setTags(value);
   };
 
-  const handleOwnerChange = (value: string | undefined) => {
-    const normalized = normalizeTodoOwner(value);
-    setOwner(normalized);
-    form.setFieldValue('owner', normalized);
-  };
-
   return (
     <Modal
       title={todo ? '编辑待办事项' : '新建待办事项'}
@@ -344,8 +335,6 @@ const TodoForm: React.FC<TodoFormProps> = ({
           extra={historyOwners.length > 0 ? `可从 ${historyOwners.length} 个历史负责人中选择，也可直接输入新负责人` : '可直接输入负责人'}
         >
           <Input
-            value={owner}
-            onChange={(e) => handleOwnerChange(e.target.value)}
             placeholder="输入负责人，或参考已有负责人名称"
             list="todo-owner-history"
             allowClear
