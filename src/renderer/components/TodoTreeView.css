@@ -1,12 +1,12 @@
-.treeView {
+.todo-tree-view {
   display: grid;
   grid-template-columns: minmax(320px, 40%) minmax(360px, 1fr);
   gap: 16px;
   min-height: calc(100vh - 132px);
 }
 
-.treePane,
-.detailPane {
+.todo-tree-pane,
+.todo-tree-detailPane {
   min-width: 0;
   border: 1px solid var(--color-border);
   border-radius: 8px;
@@ -14,13 +14,13 @@
   overflow: hidden;
 }
 
-.treePane {
+.todo-tree-pane {
   display: flex;
   flex-direction: column;
 }
 
-.treeHeader,
-.detailHeader {
+.todo-tree-header,
+.todo-tree-detailHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -29,28 +29,28 @@
   border-bottom: 1px solid var(--color-border);
 }
 
-.treeBody,
-.detailBody {
+.todo-tree-body,
+.todo-tree-detailBody {
   min-width: 0;
 }
 
-.treeBody {
+.todo-tree-body {
   flex: 1;
   overflow: auto;
   padding: 8px;
 }
 
-.detailBody {
+.todo-tree-detailBody {
   max-height: calc(100vh - 190px);
   overflow: auto;
   padding: 16px;
 }
 
-.nodeWrap {
+.todo-tree-nodeWrap {
   min-width: 0;
 }
 
-.nodeRow {
+.todo-tree-nodeRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -62,16 +62,16 @@
   transition: background-color 0.15s ease;
 }
 
-.nodeRow:hover,
-.nodeRowSelected {
+.todo-tree-nodeRow:hover,
+.todo-tree-nodeRowSelected {
   background: var(--color-surface-hover);
 }
 
-.nodeMain {
+.todo-tree-nodeMain {
   min-width: 0;
 }
 
-.nodeTitle {
+.todo-tree-nodeTitle {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -79,7 +79,7 @@
   color: var(--color-text);
 }
 
-.nodeMeta {
+.todo-tree-nodeMeta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -87,42 +87,42 @@
   margin-top: 4px;
 }
 
-.nodeActions {
+.todo-tree-nodeActions {
   display: inline-flex;
   align-items: center;
   gap: 2px;
 }
 
-.children {
+.todo-tree-children {
   margin-left: 22px;
   padding-left: 12px;
   border-left: 1px solid var(--color-border);
 }
 
-.detailTitle {
+.todo-tree-detailTitle {
   margin: 0;
   line-height: 1.3;
 }
 
-.detailMeta {
+.todo-tree-detailMeta {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.detailSection {
+.todo-tree-detailSection {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
 @media (max-width: 960px) {
-  .treeView {
+  .todo-tree-view {
     grid-template-columns: 1fr;
     min-height: auto;
   }
 
-  .detailBody {
+  .todo-tree-detailBody {
     max-height: none;
   }
 }

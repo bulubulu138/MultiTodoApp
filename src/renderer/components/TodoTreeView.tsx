@@ -6,7 +6,7 @@ import { Todo, TodoRelation, TodoTreeNode } from '../../shared/types';
 import { buildTodoTree } from '../utils/todoTree';
 import ReadOnlyMarkdown from './ReadOnlyMarkdown';
 import TodoOwnerAvatar from './TodoOwnerAvatar';
-import styles from './TodoTreeView.module.css';
+import './TodoTreeView.css';
 
 const { Text, Title } = Typography;
 
@@ -61,24 +61,24 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
   const marginLeft = depth > 0 ? depth * 8 : 0;
 
   return (
-    <div ref={droppable.setNodeRef} className={styles.nodeWrap} style={{ marginLeft }}>
+    <div ref={droppable.setNodeRef} className="todo-tree-nodeWrap" style={{ marginLeft }}>
       <div
         ref={draggable.setNodeRef}
         {...draggable.attributes}
         {...draggable.listeners}
-        className={`${styles.nodeRow} ${isSelected ? styles.nodeRowSelected : ''}`}
+        className={`todo-tree-nodeRow ${isSelected ? 'todo-tree-nodeRowSelected' : ''}`}
         onClick={() => onSelectTodo(node.todo)}
       >
-        <div className={styles.nodeMain}>
-          <div className={styles.nodeTitle}>{node.todo.title || '未命名待办'}</div>
-          <div className={styles.nodeMeta}>
+        <div className="todo-tree-nodeMain">
+          <div className="todo-tree-nodeTitle">{node.todo.title || '未命名待办'}</div>
+          <div className="todo-tree-nodeMeta">
             <Tag>{statusText[node.todo.status]}</Tag>
             <Tag>{priorityText[node.todo.priority]}</Tag>
             {node.todo.owner && <TodoOwnerAvatar owner={node.todo.owner} size={18} />}
           </div>
         </div>
 
-        <Space size={4} className={styles.nodeActions} onClick={(event) => event.stopPropagation()}>
+        <Space size={4} className="todo-tree-nodeActions" onClick={(event) => event.stopPropagation()}>
           <Tooltip title="新增子待办">
             <Button size="small" type="text" icon={<PlusOutlined />} onClick={() => onAddChild(node.todo)} />
           </Tooltip>
@@ -92,7 +92,7 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
       </div>
 
       {node.children && node.children.length > 0 && (
-        <div className={styles.children}>
+        <div className="todo-tree-children">
           {node.children.map(child => (
             <TreeNodeRow
               key={child.key}
@@ -133,14 +133,14 @@ const TodoTreeView: React.FC<TodoTreeViewProps> = ({
   };
 
   return (
-    <div className={styles.treeView}>
-      <section className={styles.treePane}>
-        <div className={styles.treeHeader}>
+    <div className="todo-tree-view">
+      <section className="todo-tree-pane">
+        <div className="todo-tree-header">
           <Text strong>待办树</Text>
           <Text type="secondary">{todos.length} 项</Text>
         </div>
 
-        <div className={styles.treeBody}>
+        <div className="todo-tree-body">
           {loading ? (
             <Spin />
           ) : tree.roots.length === 0 ? (
@@ -163,8 +163,8 @@ const TodoTreeView: React.FC<TodoTreeViewProps> = ({
         </div>
       </section>
 
-      <section className={styles.detailPane}>
-        <div className={styles.detailHeader}>
+      <section className="todo-tree-detailPane">
+        <div className="todo-tree-detailHeader">
           <Text strong>详情</Text>
           {selectedTodo && (
             <Space>
@@ -178,14 +178,14 @@ const TodoTreeView: React.FC<TodoTreeViewProps> = ({
           )}
         </div>
 
-        <div className={styles.detailBody}>
+        <div className="todo-tree-detailBody">
           {!selectedTodo ? (
             <Empty description="选择一个待办查看详情" />
           ) : (
-            <Space direction="vertical" size={16} className={styles.detailSection} style={{ width: '100%' }}>
-              <Title level={4} className={styles.detailTitle}>{selectedTodo.title || '未命名待办'}</Title>
+            <Space direction="vertical" size={16} className="todo-tree-detailSection" style={{ width: '100%' }}>
+              <Title level={4} className="todo-tree-detailTitle">{selectedTodo.title || '未命名待办'}</Title>
 
-              <div className={styles.detailMeta}>
+              <div className="todo-tree-detailMeta">
                 <Tag>{statusText[selectedTodo.status]}</Tag>
                 <Tag>{priorityText[selectedTodo.priority]}</Tag>
                 {selectedTodo.owner && <TodoOwnerAvatar owner={selectedTodo.owner} size={22} />}
