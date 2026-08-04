@@ -122,6 +122,7 @@ export class DatabaseManager {
 
       // 4. 创建新的存储管理器
       this.currentStorageManager = new FileStorageManager(dbPath);
+      await this.currentStorageManager.waitUntilReady();
       this.currentDatabasePath = dbPath;
 
       // 5. 创建新的备份管理器
@@ -173,6 +174,7 @@ export class DatabaseManager {
 
       // 创建临时存储管理器以获取待办数量
       const tempStorage = new FileStorageManager(dbPath);
+      await tempStorage.waitUntilReady();
       const todoCount = await tempStorage.getAllTodos().then(todos => todos.length);
       await tempStorage.stopWatching();
 

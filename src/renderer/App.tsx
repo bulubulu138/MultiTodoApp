@@ -122,7 +122,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         todo.id,
         todo.updatedAt ?? '',
         todo.title ?? '',
-        todo.content ?? '',
         todo.status ?? '',
         todo.priority ?? '',
         todo.tags ?? '',
@@ -467,7 +466,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       // 立即显示加载状态（不阻塞 UI）
       setLoading(true);
 
-      const todoList = await window.electronAPI.todo.getAll();
+      const todoList = await window.electronAPI.todo.getSummaries();
       const validTodos = todoList.filter((todo: any) => todo && todo.id);
 
       // Always keep the renderer state in sync with the complete storage result.
@@ -1063,10 +1062,11 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     }
   };
 
-  const handleEditTodo = (todo: Todo) => {
-    setEditingTodo(todo);
+  const handleEditTodo = useCallback(async (todo: Todo) => {
+    const latestTodo = await window.electronAPI.todo.getById(String(todo.id));
+    setEditingTodo(latestTodo || todo);
     setShowForm(true);
-  };
+  }, []);
 
   const handleSelectTreeTodo = useCallback((todo: Todo) => {
     setSelectedTreeTodoId(String(todo.id));
@@ -1135,27 +1135,24 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   };
 
   const handleViewTodo = useCallback(async (todo: Todo) => {
-    // 🔧 修复：从最新的todos列表中查找待办，确保数据同步
-    const latestTodo = todos.find(t => t.id === todo.id);
+    const latestTodo = await window.electronAPI.todo.getById(String(todo.id));
 
     if (latestTodo) {
-      console.log('[App] handleViewTodo: Found latest todo from list', {
+      console.log('[App] handleViewTodo: Loaded latest full todo', {
         todoId: todo.id,
-        hasUpdate: JSON.stringify(latestTodo) !== JSON.stringify(todo),
         latestTitle: latestTodo.title,
         latestUpdatedAt: latestTodo.updatedAt
       });
       setViewingTodo(latestTodo);
     } else {
-      // 如果找不到（可能被删除），使用传入的todo
-      console.warn('[App] handleViewTodo: Todo not found in latest list, using provided todo', {
+      console.warn('[App] handleViewTodo: Todo not found on disk, using provided data', {
         todoId: todo.id
       });
       setViewingTodo(todo);
     }
 
     setShowViewDrawer(true);
-  }, [todos]);
+  }, []);
 
   // 新增：详情页关闭处理函数
   const handleCloseViewDrawer = useCallback(async () => {
@@ -1199,10 +1196,11 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     setViewingTodo(null);
   }, [viewingTodo, todos, handleRefreshTodo]);
 
-  const handleEditFromView = (todo: Todo) => {
+  const handleEditFromView = async (todo: Todo) => {
     setShowViewDrawer(false);
     setViewingTodo(null);
-    setEditingTodo(todo);
+    const latestTodo = await window.electronAPI.todo.getById(String(todo.id));
+    setEditingTodo(latestTodo || todo);
     setShowForm(true);
   };
 

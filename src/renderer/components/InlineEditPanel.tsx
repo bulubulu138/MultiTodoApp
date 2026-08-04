@@ -4,6 +4,7 @@ import { Input, Select, Button, Space, Divider, message, Spin, Tag, Modal, DateP
 import { SaveOutlined, CloseOutlined, CheckOutlined, LoadingOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import MilkdownEditorWrapper, { MilkdownEditorRef } from './MilkdownEditor';
 import dayjs from 'dayjs';
+import { collectTodoOwners, normalizeTodoOwner } from '../utils/todoOwner';
 
 const { Option } = Select;
 
@@ -33,6 +34,7 @@ const InlineEditPanel: React.FC<InlineEditPanelProps> = ({
   const [editedTitle, setEditedTitle] = useState(todo.title);
   const [editedStatus, setEditedStatus] = useState(todo.status);
   const [editedPriority, setEditedPriority] = useState(todo.priority);
+  const [editedOwner, setEditedOwner] = useState(todo.owner || '');
   const [editedTags, setEditedTags] = useState<string[]>(
     todo.tags ? todo.tags.split(',').filter(tag => tag.trim()) : []
   );
@@ -60,6 +62,7 @@ const InlineEditPanel: React.FC<InlineEditPanelProps> = ({
       editedTitle !== todo.title ||
       editedStatus !== todo.status ||
       editedPriority !== todo.priority ||
+      normalizeTodoOwner(editedOwner) !== normalizeTodoOwner(todo.owner) ||
       editedTags.join(',') !== (todo.tags || '') ||
       editedContent !== (todo.content || '') ||
       (editedStartTime?.toISOString() ?? undefined) !== todo.startTime ||
@@ -73,7 +76,7 @@ const InlineEditPanel: React.FC<InlineEditPanelProps> = ({
     }
 
     return hasChanges;
-  }, [editedTitle, editedStatus, editedPriority, editedTags, editedContent, editedStartTime, editedDeadline, todo, onUnsavedChange]);
+  }, [editedTitle, editedStatus, editedPriority, editedOwner, editedTags, editedContent, editedStartTime, editedDeadline, todo, onUnsavedChange]);
 
   // 🔧 新增：内容变化时更新未保存状态
   const handleContentChange = useCallback((content: string) => {
@@ -123,6 +126,11 @@ const InlineEditPanel: React.FC<InlineEditPanelProps> = ({
     );
   }, [allTodos]);
 
+  const historyOwners = React.useMemo(
+    () => collectTodoOwners(allTodos).sort((a, b) => a.localeCompare(b, 'zh-CN')),
+    [allTodos]
+  );
+
   // 移除旧的自动保存逻辑
 
   // 🔧 优化：手动保存函数（立即执行，无延迟）
@@ -135,6 +143,7 @@ const InlineEditPanel: React.FC<InlineEditPanelProps> = ({
         content: editedContent,
         status: editedStatus,
         priority: editedPriority,
+        owner: normalizeTodoOwner(editedOwner),
         tags: editedTags.join(','),
         startTime: editedStartTime ? editedStartTime.toISOString() : undefined,
         deadline: editedDeadline ? editedDeadline.toISOString() : undefined,
@@ -190,6 +199,7 @@ const InlineEditPanel: React.FC<InlineEditPanelProps> = ({
     setEditedTitle(todo.title);
     setEditedStatus(todo.status);
     setEditedPriority(todo.priority);
+    setEditedOwner(todo.owner || '');
     setEditedTags(todo.tags ? todo.tags.split(',').filter(tag => tag.trim()) : []);
     setEditedContent(todo.content || '');
     setEditedStartTime(todo.startTime ? dayjs(todo.startTime) : null);
@@ -311,6 +321,27 @@ const InlineEditPanel: React.FC<InlineEditPanelProps> = ({
           size="large"
           style={{ fontSize: 18, fontWeight: 500 }}
         />
+      </div>
+
+      {/* 负责人编辑 */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>负责人</div>
+        <Input
+          value={editedOwner}
+          onChange={(e) => {
+            setEditedOwner(e.target.value);
+            setHasUnsavedChanges(true);
+            setSaveStatus('unsaved');
+          }}
+          placeholder="输入负责人，或参考已有负责人名称"
+          list="inline-edit-owner-history"
+          allowClear
+        />
+        <datalist id="inline-edit-owner-history">
+          {historyOwners.map(owner => (
+            <option key={owner} value={owner} />
+          ))}
+        </datalist>
       </div>
 
       {/* 状态和优先级编辑 */}

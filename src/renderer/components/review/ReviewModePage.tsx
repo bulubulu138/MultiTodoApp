@@ -13,8 +13,8 @@ import {
 } from '@ant-design/icons';
 import type { Todo, ReviewFile } from '../../../shared/types';
 import MarkdownEditorReview from './MarkdownEditorReview';
-import DOMPurify from 'dompurify';
 import dayjs from 'dayjs';
+import TodoDetailDrawer from './ReviewTodoDetailContent';
 import './ReviewModePage.css';
 
 const { confirm } = Modal;
@@ -493,67 +493,7 @@ const ReviewModePage: React.FC<ReviewModePageProps> = ({
           title={selectedTodo?.title}
           styles={{ body: { padding: '16px', overflow: 'auto' } }}
         >
-          {selectedTodo && (
-            <div>
-              <div className="todo-detail-meta-row">
-                <span className={`status-badge status-${selectedTodo.status}`}>
-                  {selectedTodo.status === 'pending' ? '待处理' :
-                   selectedTodo.status === 'in_progress' ? '进行中' :
-                   selectedTodo.status === 'completed' ? '已完成' : '暂停'}
-                </span>
-                <span className={`priority-badge priority-${selectedTodo.priority}`}>
-                  {selectedTodo.priority === 'mental' ? '脑力' :
-                   selectedTodo.priority === 'communication' ? '沟通' : '琐碎'}
-                </span>
-              </div>
-
-              {selectedTodo.tags && (
-                <div className="todo-detail-section">
-                  <div className="todo-detail-label">标签</div>
-                  <div className="todo-detail-tags">
-                    {selectedTodo.tags.split(',').filter(Boolean).map(tag => (
-                      <span key={tag.trim()} className="todo-detail-tag">{tag.trim()}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {(selectedTodo.startTime || selectedTodo.deadline || selectedTodo.completedAt) && (
-                <div className="todo-detail-section">
-                  {selectedTodo.startTime && (
-                    <div className="todo-detail-time">
-                      <span className="todo-detail-label">开始时间：</span>
-                      {dayjs(selectedTodo.startTime).format('YYYY-MM-DD HH:mm')}
-                    </div>
-                  )}
-                  {selectedTodo.deadline && (
-                    <div className="todo-detail-time">
-                      <span className="todo-detail-label">截止时间：</span>
-                      {dayjs(selectedTodo.deadline).format('YYYY-MM-DD HH:mm')}
-                    </div>
-                  )}
-                  {selectedTodo.completedAt && (
-                    <div className="todo-detail-time">
-                      <span className="todo-detail-label">完成时间：</span>
-                      {dayjs(selectedTodo.completedAt).format('YYYY-MM-DD HH:mm')}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {selectedTodo.content && (
-                <div className="todo-detail-section">
-                  <div className="todo-detail-label">内容</div>
-                  <div
-                    className="todo-detail-rich-content ql-editor"
-                    dangerouslySetInnerHTML={{
-                      __html: DOMPurify.sanitize(selectedTodo.content)
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          )}
+          {selectedTodo && <TodoDetailDrawer todo={selectedTodo} />}
         </Drawer>
       </div>
     </div>

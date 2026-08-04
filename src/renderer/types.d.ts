@@ -3,6 +3,7 @@
  * 扩展 window 对象，确保 TypeScript 能识别 electronAPI 属性
  * 与 preload.ts 中的定义保持一致
  */
+import type { Todo, TodoSummary } from '../shared/types';
 
 /**
  * 批量授权结果
@@ -37,9 +38,10 @@ export interface BatchAuthorizationProgress {
 interface ElectronAPI {
   // 待办事项API
   todo: {
-    getAll: () => Promise<any[]>;
-    getById: (uuid: string) => Promise<any | null>;
-    getMultipleByIds: (uuids: string[]) => Promise<any[]>;
+    getAll: () => Promise<Todo[]>;
+    getSummaries: () => Promise<TodoSummary[]>;
+    getById: (uuid: string) => Promise<Todo | null>;
+    getMultipleByIds: (uuids: string[]) => Promise<Todo[]>;
     create: (todo: any) => Promise<any>;
     createManualAtTop: (todo: any, tabKey: string) => Promise<any>;
     update: (uuid: string, updates: any) => Promise<any>;
@@ -366,3 +368,4 @@ declare global {
 }
 
 export {};
+import type { Todo, TodoSummary } from '../shared/types';

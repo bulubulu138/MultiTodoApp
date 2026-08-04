@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import * as chokidar from 'chokidar';
 import MiniSearch from 'minisearch';
 import matter from 'gray-matter';
-import { Todo, TodoRelation, Settings } from '../shared/types';
+import { Todo, TodoRelation, Settings, TodoSummary } from '../shared/types';
 import { MarkdownParser } from './MarkdownParser';
 import { FileIndexer, TodoIndexEntry } from './FileIndexer';
 import { ImageManager } from './utils/ImageManager';
@@ -19,9 +19,11 @@ export class FileStorageManager {
   private markdownParser: MarkdownParser;
   private fileIndexer: FileIndexer;
   private fileWatcher: chokidar.FSWatcher | null = null;
+  private initializationPromise: Promise<void>;
   private cache: Map<string, { todo: Todo; timestamp: number }> = new Map();
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5分钟缓存
   private readonly MAX_CACHE_SIZE = 100;
+  private readonly FILE_READ_CONCURRENCY = 8;
 
   // ✅ Phase 3: Track recently written files to prevent immediate reprocessing
   private recentWrites: Map<string, number> = new Map();
@@ -37,7 +39,14 @@ export class FileStorageManager {
     this.markdownParser = new MarkdownParser();
     this.markdownParser.setStoragePath(this.storagePath); // 设置存储路径用于相对路径转换
     this.fileIndexer = new FileIndexer(this.storagePath);
-    this.initializeStorage();
+    this.initializationPromise = this.initializeStorage();
+  }
+
+  /**
+   * 等待存储初始化完成
+   */
+  async waitUntilReady(): Promise<void> {
+    await this.initializationPromise;
   }
 
   /**
@@ -87,10 +96,6 @@ export class FileStorageManager {
         }
       }
     }
-
-    // ✅ 新增：预加载缓存以提升性能
-    console.log('[FileStorageManager] 🚀 Preloading cache for performance optimization...');
-    await this.preloadCache();
 
     console.log('[FileStorageManager] 🎉 Storage initialization completed');
   }
@@ -357,8 +362,7 @@ export class FileStorageManager {
       console.log(`[FileStorageManager] 📂 Storage path: ${this.storagePath}`);
     }
 
-    // 性能优化：使用Promise.all并行加载待办，而不是串行
-    const loadPromises = entries.map(async (entry) => {
+    const results = await this.mapWithConcurrency(entries, this.FILE_READ_CONCURRENCY, async (entry) => {
       try {
         const todo = await this.getTodoById(entry.uuid);
         if (todo) {
@@ -374,8 +378,6 @@ export class FileStorageManager {
         return { success: false, uuid: entry.uuid, reason };
       }
     });
-
-    const results = await Promise.all(loadPromises);
 
     results.forEach(result => {
       if (result.success && result.todo) {
@@ -410,6 +412,26 @@ export class FileStorageManager {
   }
 
   /**
+   * 获取列表摘要，避免主列表把完整正文加载到渲染进程内存。
+   */
+  async getTodoSummaries(): Promise<TodoSummary[]> {
+    if (this.cacheInitialized && this.todosCache.size > 0) {
+      console.log(`[getTodoSummaries] ✅ Using cache: ${this.todosCache.size} summaries`);
+      return Array.from(this.todosCache.values()).map(todo => this.toTodoSummary(todo));
+    }
+
+    const entries = await this.fileIndexer.getAllTodos();
+    if (entries.length > 0) {
+      console.log(`[getTodoSummaries] ✅ Using index: ${entries.length} summaries`);
+      return entries.map(entry => this.toTodoSummaryFromIndex(entry));
+    }
+
+    console.warn('[getTodoSummaries] ⚠️ Index is empty, falling back to bounded full load');
+    const todos = await this.getAllTodos();
+    return todos.map(todo => this.toTodoSummary(todo));
+  }
+
+  /**
    * 批量获取待办（增量加载优化版本）
    * 优先使用缓存，只从文件系统加载未缓存的待办
    */
@@ -427,10 +449,10 @@ export class FileStorageManager {
       }
     }
 
-    // 并行加载未缓存的待办
+    // 限制并发加载未缓存的待办，避免大批量详情读取打满文件句柄。
     const uncachedTodos: Todo[] = [];
     if (uncachedUuids.length > 0) {
-      const loadPromises = uncachedUuids.map(async (uuid) => {
+      const results = await this.mapWithConcurrency(uncachedUuids, this.FILE_READ_CONCURRENCY, async (uuid) => {
         try {
           const todo = await this.getTodoById(uuid);
           return todo;
@@ -441,8 +463,6 @@ export class FileStorageManager {
           return null;
         }
       });
-
-      const results = await Promise.all(loadPromises);
       results.forEach(result => {
         if (result) {
           uncachedTodos.push(result);
@@ -774,9 +794,9 @@ export class FileStorageManager {
         this.updateCache(uuid, updatedTodo);
       }
 
-      // ✅ 性能优化：批量写入文件（并行执行）
-      console.log(`[batchUpdateDisplayOrders] 💾 Writing ${updatedTodos.length} files in parallel...`);
-      const writePromises = updatedTodos.map(async (todo) => {
+      // ✅ 性能优化：批量写入文件，但限制为串行，避免同一时间打开过多文件句柄
+      console.log(`[batchUpdateDisplayOrders] 💾 Writing ${updatedTodos.length} files sequentially...`);
+      for (const todo of updatedTodos) {
         const fileName = await this.getFileNameByUuid(todo.id);
         if (!fileName) {
           throw new Error(`File name not found for todo: ${todo.id}`);
@@ -784,9 +804,7 @@ export class FileStorageManager {
         const todoPath = path.join(this.storagePath, fileName);
         const markdown = await this.markdownParser.generateTodo(todo, [], [], this.storagePath, fileName);
         await this.atomicWrite(todoPath, markdown);
-      });
-
-      await Promise.all(writePromises);
+      }
       console.log(`[batchUpdateDisplayOrders] ✅ All files written successfully`);
 
       // ✅ 性能优化：批量更新索引（一次性操作）
@@ -1383,6 +1401,84 @@ export class FileStorageManager {
     console.log(`[updateCache] ✅ Updated caches for todo ${uuid} (${todo.title})`);
   }
 
+  private toTodoSummary(todo: Todo): TodoSummary {
+    const contentPreview = this.createContentPreview(todo.content);
+    return {
+      ...todo,
+      content: contentPreview,
+      contentPreview,
+      isSummary: true
+    };
+  }
+
+  private toTodoSummaryFromIndex(entry: TodoIndexEntry): TodoSummary {
+    return {
+      id: entry.uuid,
+      title: entry.title,
+      content: entry.contentPreview || '',
+      contentPreview: entry.contentPreview || '',
+      status: this.normalizeTodoStatus(entry.status),
+      priority: this.normalizeTodoPriority(entry.priority),
+      tags: entry.tags.join(', '),
+      owner: entry.owner,
+      imageUrl: entry.imageUrl,
+      images: entry.images,
+      startTime: entry.startTime,
+      deadline: entry.deadline,
+      displayOrder: entry.displayOrder,
+      displayOrders: entry.displayOrders,
+      contentHash: entry.contentHash,
+      keywords: entry.keywords || [],
+      completedAt: entry.completedAt,
+      todayCompletedAt: entry.todayCompletedAt,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+      isSummary: true
+    };
+  }
+
+  private createContentPreview(content: string): string {
+    if (!content) return '';
+    const plainText = content.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+    return plainText.length > 200 ? `${plainText.slice(0, 200)}...` : plainText;
+  }
+
+  private normalizeTodoStatus(status: string): Todo['status'] {
+    if (status === 'in_progress' || status === 'completed' || status === 'paused') {
+      return status;
+    }
+    return 'pending';
+  }
+
+  private normalizeTodoPriority(priority: string): Todo['priority'] {
+    if (priority === 'mental' || priority === 'communication' || priority === 'trivial') {
+      return priority;
+    }
+    return 'trivial';
+  }
+
+  private async mapWithConcurrency<T, R>(
+    items: T[],
+    limit: number,
+    mapper: (item: T, index: number) => Promise<R>
+  ): Promise<R[]> {
+    if (items.length === 0) return [];
+
+    const concurrency = Math.max(1, Math.min(limit, items.length));
+    const results = new Array<R>(items.length);
+    let nextIndex = 0;
+
+    const workers = Array.from({ length: concurrency }, async () => {
+      while (nextIndex < items.length) {
+        const currentIndex = nextIndex++;
+        results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+      }
+    });
+
+    await Promise.all(workers);
+    return results;
+  }
+
   /**
    * ✅ 新增：预加载全量缓存
    * 在初始化时加载所有待办到内存，避免重复文件读取
@@ -1403,8 +1499,7 @@ export class FileStorageManager {
       let loaded = 0;
       let failed = 0;
 
-      // 并行加载所有待办
-      const loadPromises = entries.map(async (entry) => {
+      await this.mapWithConcurrency(entries, this.FILE_READ_CONCURRENCY, async (entry) => {
         try {
           const todo = await this.getTodoById(entry.uuid);
           if (todo) {
@@ -1423,8 +1518,6 @@ export class FileStorageManager {
           console.error(`[Cache] ❌ Failed to load todo ${entry.uuid}:`, error);
         }
       });
-
-      await Promise.all(loadPromises);
 
       this.cacheInitialized = true;
       const duration = Date.now() - startTime;

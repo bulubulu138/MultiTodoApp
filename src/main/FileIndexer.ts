@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import MiniSearch from 'minisearch';
+import matter from 'gray-matter';
 import { Todo } from '../shared/types';
 
 /**
@@ -17,6 +18,16 @@ export interface TodoIndexEntry {
   createdAt: string;
   updatedAt: string;
   filePath: string;
+  owner?: string;
+  imageUrl?: string;
+  images?: string;
+  startTime?: string;
+  deadline?: string;
+  displayOrder?: number;
+  displayOrders?: { [tabKey: string]: number };
+  contentHash?: string;
+  completedAt?: string;
+  todayCompletedAt?: string;
 }
 
 /**
@@ -43,6 +54,7 @@ interface TodoIndex {
  * 提供高性能的搜索和过滤功能
  */
 export class FileIndexer {
+  private static readonly INDEX_VERSION = 2;
   private storagePath: string;
   private indexPath: string;
   private index: TodoIndex;
@@ -62,7 +74,7 @@ export class FileIndexer {
   private createEmptyIndex(): TodoIndex {
     return {
       metadata: {
-        version: 1,
+        version: FileIndexer.INDEX_VERSION,
         lastUpdated: Date.now(),
         todoCount: 0
       },
@@ -92,6 +104,12 @@ export class FileIndexer {
       if (fs.existsSync(this.indexPath)) {
         const content = await fs.promises.readFile(this.indexPath, 'utf-8');
         const data = JSON.parse(content);
+
+        if (data.metadata?.version !== FileIndexer.INDEX_VERSION) {
+          console.log(`[FileIndexer] Index version ${data.metadata?.version || 0} is outdated, rebuilding`);
+          await this.buildIndex();
+          return;
+        }
 
         // 重建索引结构
         this.index = this.deserializeIndex(data);
@@ -292,9 +310,19 @@ export class FileIndexer {
           priority: todo.priority,
           tags: this.parseTags(todo.tags),
           keywords: todo.keywords || [],
-          createdAt: todo.createdAt,
-          updatedAt: todo.updatedAt,
-          filePath: '' // Obsidian 风格不需要特定路径
+      createdAt: todo.createdAt,
+      updatedAt: todo.updatedAt,
+      filePath: '', // Obsidian 风格不需要特定路径
+      owner: todo.owner,
+      imageUrl: todo.imageUrl,
+      images: todo.images,
+      startTime: todo.startTime,
+      deadline: todo.deadline,
+      displayOrder: todo.displayOrder,
+      displayOrders: todo.displayOrders,
+      contentHash: todo.contentHash,
+      completedAt: todo.completedAt,
+      todayCompletedAt: todo.todayCompletedAt
         });
       });
 
@@ -469,10 +497,8 @@ export class FileIndexer {
    */
   private async createIndexEntryFromFile(todoPath: string): Promise<TodoIndexEntry | null> {
     const content = await fs.promises.readFile(todoPath, 'utf-8');
-
-    // 解析 YAML frontmatter
-    const frontmatterMatch = content.match(/^---\n([\s\S]+?)\n---/);
-    const frontmatter = frontmatterMatch ? this.parseYaml(frontmatterMatch[1]) : {};
+    const parsed = matter(content);
+    const frontmatter = parsed.data;
 
     // 从 frontmatter 中提取 UUID
     const uuid = frontmatter.id;
@@ -481,14 +507,24 @@ export class FileIndexer {
       return {
         uuid: String(uuid),
         title: frontmatter.title || 'Untitled',
-        contentPreview: this.generateContentPreview(content),
+        contentPreview: this.generateContentPreview(parsed.content),
         status: frontmatter.status || 'pending',
         priority: frontmatter.priority || 'medium',
         tags: this.parseTags(frontmatter.tags),
         keywords: this.parseTags(frontmatter.keywords),
         createdAt: frontmatter.created_at || new Date().toISOString(),
         updatedAt: frontmatter.updated_at || new Date().toISOString(),
-        filePath: todoPath
+        filePath: todoPath,
+        owner: frontmatter.owner,
+        imageUrl: frontmatter.imageUrl,
+        images: frontmatter.images,
+        startTime: frontmatter.start_time || frontmatter.startTime,
+        deadline: frontmatter.deadline,
+        displayOrder: frontmatter.display_order,
+        displayOrders: frontmatter.display_orders,
+        contentHash: frontmatter.content_hash || frontmatter.contentHash,
+        completedAt: frontmatter.completed_at || frontmatter.completedAt,
+        todayCompletedAt: frontmatter.today_completed_at || frontmatter.todayCompletedAt
       };
     }
 
@@ -530,7 +566,17 @@ export class FileIndexer {
       keywords: todo.keywords || [],
       createdAt: todo.createdAt || new Date().toISOString(),
       updatedAt: todo.updatedAt || new Date().toISOString(),
-      filePath: todoPath
+      filePath: todoPath,
+      owner: todo.owner,
+      imageUrl: todo.imageUrl,
+      images: todo.images,
+      startTime: todo.startTime,
+      deadline: todo.deadline,
+      displayOrder: todo.displayOrder,
+      displayOrders: todo.displayOrders,
+      contentHash: todo.contentHash,
+      completedAt: todo.completedAt,
+      todayCompletedAt: todo.todayCompletedAt
     };
   }
 

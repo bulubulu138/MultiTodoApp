@@ -744,6 +744,10 @@ class Application {
       return await this.databaseManager.getStorageManager().getAllTodos();
     });
 
+    ipcMain.handle('todo:getSummaries', async () => {
+      return await this.databaseManager.getStorageManager().getTodoSummaries();
+    });
+
     ipcMain.handle('todo:getById', async (_, uuid: string) => {
       // 🔧 新增：根据UUID获取单个待办，用于增量刷新
       return await this.databaseManager.getStorageManager().getTodoByUuid(uuid);
@@ -801,13 +805,9 @@ class Application {
     });
 
     ipcMain.handle('todo:batchUpdateDisplayOrder', async (_, updates: {uuid: string, displayOrder: number}[]) => {
-      // 简化实现：逐个更新
+      const storageManager = this.databaseManager.getStorageManager();
       for (const update of updates) {
-        try {
-          await this.databaseManager.getStorageManager().updateTodo(update.uuid, { displayOrder: update.displayOrder });
-        } catch (error) {
-          console.error('Failed to update display order:', error);
-        }
+        await storageManager.updateTodo(update.uuid, { displayOrder: update.displayOrder });
       }
       return { success: true };
     });
@@ -817,26 +817,14 @@ class Application {
     });
 
     ipcMain.handle('todo:bulkUpdateTodos', async (_, updates: Array<{uuid: string; updates: any}>) => {
-      // 简化实现：逐个更新
-      for (const { uuid, updates: todoUpdates } of updates) {
-        try {
-          await this.databaseManager.getStorageManager().updateTodo(uuid, todoUpdates);
-        } catch (error) {
-          console.error('Failed to update todo:', error);
-        }
-      }
+      await this.databaseManager.getStorageManager().bulkUpdateTodos(
+        updates.map(item => ({ uuid: item.uuid, updates: item.updates }))
+      );
       return { success: true };
     });
 
     ipcMain.handle('todo:bulkDeleteTodos', async (_, uuids: string[]) => {
-      // 简化实现：逐个删除
-      for (const uuid of uuids) {
-        try {
-          await this.databaseManager.getStorageManager().deleteTodo(uuid);
-        } catch (error) {
-          console.error('Failed to delete todo:', error);
-        }
-      }
+      await this.databaseManager.getStorageManager().bulkDeleteTodos(uuids);
       return { success: true };
     });
 

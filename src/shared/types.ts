@@ -27,6 +27,12 @@ export interface Todo {
   updatedAt: string;
 }
 
+export interface TodoSummary extends Omit<Todo, 'content'> {
+  content: string;
+  contentPreview?: string;
+  isSummary?: boolean;
+}
+
 export interface Settings {
   [key: string]: string;
 }

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { TodoRelation } from '../shared/types';
+import type { Todo, TodoRelation, TodoSummary } from '../shared/types';
 
 /**
  * 批量授权结果
@@ -35,9 +35,10 @@ export interface BatchAuthorizationProgress {
 export interface ElectronAPI {
   // 待办事项API
   todo: {
-    getAll: () => Promise<any[]>;
-    getById: (uuid: string) => Promise<any | null>;  // 🔧 新增：根据ID获取单个待办
-    getMultipleByIds: (uuids: string[]) => Promise<any[]>;  // 🔧 新增：批量获取待办，优先使用缓存
+    getAll: () => Promise<Todo[]>;
+    getSummaries: () => Promise<TodoSummary[]>;
+    getById: (uuid: string) => Promise<Todo | null>;  // 🔧 新增：根据ID获取单个待办
+    getMultipleByIds: (uuids: string[]) => Promise<Todo[]>;  // 🔧 新增：批量获取待办，优先使用缓存
     create: (todo: any) => Promise<any>;
     createManualAtTop: (todo: any, tabKey: string) => Promise<any>;
     update: (uuid: string, updates: any) => Promise<any>;  // 修复：uuid 参数类型为 string
@@ -382,6 +383,7 @@ export interface ElectronAPI {
 contextBridge.exposeInMainWorld('electronAPI', {
   todo: {
     getAll: () => ipcRenderer.invoke('todo:getAll'),
+    getSummaries: () => ipcRenderer.invoke('todo:getSummaries'),
     getById: (uuid: string) => ipcRenderer.invoke('todo:getById', uuid),  // 🔧 新增：根据ID获取单个待办
     getMultipleByIds: (uuids: string[]) => ipcRenderer.invoke('todo:getMultipleByIds', uuids),  // 🔧 新增：批量获取待办，优先使用缓存
     create: (todo: any) => ipcRenderer.invoke('todo:create', todo),
