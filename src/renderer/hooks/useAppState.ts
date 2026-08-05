@@ -135,7 +135,7 @@ export const useAppState = () => {
   const loadTodos = useCallback(async () => {
     try {
       dispatch(actions.setLoading(true));
-      const todoList = await window.electronAPI.todo.getSummaries();
+      const todoList = await window.electronAPI.todo.getAll();
       dispatch(actions.setTodos(todoList.filter((todo: any) => todo && todo.id)));
     } catch (error) {
       console.error('Error loading todos:', error);

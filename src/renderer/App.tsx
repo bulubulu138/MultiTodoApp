@@ -466,7 +466,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       // 立即显示加载状态（不阻塞 UI）
       setLoading(true);
 
-      const todoList = await window.electronAPI.todo.getSummaries();
+      const todoList = await window.electronAPI.todo.getAll();
       const validTodos = todoList.filter((todo: any) => todo && todo.id);
 
       // Always keep the renderer state in sync with the complete storage result.
