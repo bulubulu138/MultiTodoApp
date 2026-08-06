@@ -20,4 +20,16 @@ describe('renderer theme tokens', () => {
     expect(light.token?.colorPrimary).toBe(dark.token?.colorPrimary);
     expect(light.token?.colorPrimary).toBe('#EBA747');
   });
+
+  it('scales Ant Design typography and spacing for medium and large font levels', () => {
+    const small = createLightTheme('blue', 'small');
+    const medium = createLightTheme('blue', 'medium');
+    const large = createLightTheme('blue', 'large');
+
+    expect(small.token?.fontSize).toBe(14);
+    expect(medium.token?.fontSize).toBeGreaterThan(small.token?.fontSize as number);
+    expect(large.token?.fontSize).toBeGreaterThan(medium.token?.fontSize as number);
+    expect(medium.token?.padding).toBeGreaterThan(small.token?.padding as number);
+    expect(large.token?.controlHeight).toBeGreaterThan(medium.token?.controlHeight as number);
+  });
 });

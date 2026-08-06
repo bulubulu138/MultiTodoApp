@@ -28,7 +28,7 @@ import CompactTodoView from './components/CompactTodoView';
 import TodoTreeView from './components/TodoTreeView';
 import FirstRunDialog from './components/FirstRunDialog';
 import SyncModal from './components/SyncModal';
-import { getTheme, ThemeMode, ColorTheme } from './theme/themes';
+import { getTheme, ThemeMode, ColorTheme, FontSizeLevel, normalizeFontSizeLevel } from './theme/themes';
 import { applyRootThemeAttributes } from './theme/domTheme';
 import { buildParallelGroups, selectGroupRepresentatives, sortWithGroups, getSortComparator } from './utils/sortWithGroups';
 import { toStringId, areIdsEqual } from '../shared/utils/typeUtils';
@@ -65,10 +65,12 @@ interface AppContentProps {
   onThemeChange: (mode: ThemeMode) => void;
   colorTheme: ColorTheme;
   onColorThemeChange: (theme: ColorTheme) => void;
+  fontSizeLevel: FontSizeLevel;
+  onFontSizeLevelChange: (level: FontSizeLevel) => void;
 }
 
 // 内部组件，可以使用 App.useApp()
-const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, colorTheme, onColorThemeChange }) => {
+const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, colorTheme, onColorThemeChange, fontSizeLevel, onFontSizeLevelChange }) => {
   const { message } = AntApp.useApp();
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,7 +97,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [pendingPosition, setPendingPosition] = useState<PositionSelection | null>(null);
   const [selectedTreeTodoId, setSelectedTreeTodoId] = useState<string | null>(null);
-  const [treeParentForNewTodo, setTreeParentForNewTodo] = useState<Todo | null>(null);
 
   // ✅ 新增：首次运行状态
   const [showFirstRunDialog, setShowFirstRunDialog] = useState(false);
@@ -592,6 +593,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       if (appSettings.theme) {
         onThemeChange(appSettings.theme as ThemeMode);
       }
+      if (appSettings.fontSizeLevel) {
+        onFontSizeLevelChange(normalizeFontSizeLevel(appSettings.fontSizeLevel));
+      }
 
       setTodoSidebarCollapsed(appSettings.todoSidebarCollapsed === 'true');
       
@@ -723,23 +727,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         message.success('待办事项创建成功');
       }
 
-      if (treeParentForNewTodo) {
-        try {
-          await window.electronAPI.relations.create({
-            source_id: String(treeParentForNewTodo.id),
-            target_id: String(newTodo.id),
-            relation_type: 'extends',
-          });
-          await loadRelations();
-          setSelectedTreeTodoId(String(newTodo.id));
-        } catch (error) {
-          console.error('Failed to create tree relation:', error);
-          message.error('待办事项创建成功，但树形关系创建失败');
-        } finally {
-          setTreeParentForNewTodo(null);
-        }
-      }
-
       setShowForm(false);
       return newTodo;
     } catch (error) {
@@ -747,7 +734,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       await loadTodos();
       message.error('创建待办事项失败');
       console.error('Error creating todo:', error);
-      setTreeParentForNewTodo(null);
       return null;
     }
   };
@@ -1029,7 +1015,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       okButtonProps: { danger: true },
       cancelText: '取消',
       onOk: async () => {
-        await handleDeleteTodo(String(todo.id));
+      await handleDeleteTodo(String(todo.id));
         setSelectedTreeTodoId(current => (current === String(todo.id) ? null : current));
       },
     });
@@ -1048,6 +1034,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       // 更新颜色主题
       if (newSettings.colorTheme) {
         onColorThemeChange(newSettings.colorTheme as ColorTheme);
+      }
+
+      if (newSettings.fontSizeLevel) {
+        onFontSizeLevelChange(normalizeFontSizeLevel(newSettings.fontSizeLevel));
       }
 
       if (shouldCloseModal) {
@@ -1070,12 +1060,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
 
   const handleSelectTreeTodo = useCallback((todo: Todo) => {
     setSelectedTreeTodoId(String(todo.id));
-  }, []);
-
-  const handleAddTreeChild = useCallback((parentTodo: Todo) => {
-    setTreeParentForNewTodo(parentTodo);
-    setEditingTodo(null);
-    setShowForm(true);
   }, []);
 
   const handleReparentTreeTodo = useCallback(async (childTodoId: string, parentTodoId: string) => {
@@ -1109,6 +1093,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       }
 
       await loadRelations();
+      setSelectedTreeTodoId(String(childTodoId));
     } catch (error) {
       console.error('Failed to reparent tree todo:', error);
       message.error('调整树形关系失败');
@@ -1131,7 +1116,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     setShowForm(false);
     setEditingTodo(null);
     setQuickCreateContent(null); // 清空快速创建内容
-    setTreeParentForNewTodo(null);
   };
 
   const handleViewTodo = useCallback(async (todo: Todo) => {
@@ -2093,6 +2077,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       }}
       data-theme={themeMode}
       data-color-theme={colorTheme}
+      data-font-size-level={fontSizeLevel}
       className="app-shell"
     >
       <Toolbar
@@ -2200,7 +2185,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
                     loading={loading}
                     selectedTodo={selectedTreeTodo}
                     onSelectTodo={handleSelectTreeTodo}
-                    onAddChild={handleAddTreeChild}
                     onEdit={handleEditTodo}
                     onDelete={handleDeleteTreeTodo}
                     onReparent={handleReparentTreeTodo}
@@ -2306,6 +2290,8 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         onThemeModeChange={onThemeChange}
         colorTheme={colorTheme}
         onColorThemeChange={onColorThemeChange}
+        fontSizeLevel={fontSizeLevel}
+        onFontSizeLevelChange={onFontSizeLevelChange}
       />
 
       <ContentMigrationModal
@@ -2411,6 +2397,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
 const App: React.FC = () => {
   const [themeMode, setThemeMode] = useState<ThemeMode>('light');
   const [colorTheme, setColorTheme] = useState<ColorTheme>('purple');
+  const [fontSizeLevel, setFontSizeLevel] = useState<FontSizeLevel>('small');
 
   // 加载主题设置
   useEffect(() => {
@@ -2423,6 +2410,9 @@ const App: React.FC = () => {
         if (appSettings.colorTheme) {
           setColorTheme(appSettings.colorTheme as ColorTheme);
         }
+        if (appSettings.fontSizeLevel) {
+          setFontSizeLevel(normalizeFontSizeLevel(appSettings.fontSizeLevel));
+        }
       } catch (error) {
         console.error('Error loading theme:', error);
       }
@@ -2431,8 +2421,8 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    applyRootThemeAttributes(document.documentElement, themeMode, colorTheme);
-  }, [themeMode, colorTheme]);
+    applyRootThemeAttributes(document.documentElement, themeMode, colorTheme, fontSizeLevel);
+  }, [themeMode, colorTheme, fontSizeLevel]);
 
   const handleColorThemeChange = (theme: ColorTheme) => {
     setColorTheme(theme);
@@ -2442,10 +2432,17 @@ const App: React.FC = () => {
     });
   };
 
+  const handleFontSizeLevelChange = (level: FontSizeLevel) => {
+    setFontSizeLevel(level);
+    window.electronAPI.settings.update({ fontSizeLevel: level }).catch((err: any) => {
+      console.error('Error saving font size level:', err);
+    });
+  };
+
   return (
     <ConfigProvider
       locale={zhCN}
-      theme={getTheme(themeMode, colorTheme)}
+      theme={getTheme(themeMode, colorTheme, fontSizeLevel)}
       // 性能优化：减少不必要的动画效果
       virtual={false}
       // 优化波纹效果和动画时长
@@ -2457,6 +2454,8 @@ const App: React.FC = () => {
           onThemeChange={setThemeMode}
           colorTheme={colorTheme}
           onColorThemeChange={handleColorThemeChange}
+          fontSizeLevel={fontSizeLevel}
+          onFontSizeLevelChange={handleFontSizeLevelChange}
         />
       </AntApp>
     </ConfigProvider>

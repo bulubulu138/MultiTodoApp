@@ -42,6 +42,7 @@ export class SettingsManager {
       storageMode: 'file',
       storagePath: '',
       theme: 'purple',
+      fontSizeLevel: 'small',
       language: 'zh-CN',
       aiProvider: 'disabled',
       aiApiKey: '',

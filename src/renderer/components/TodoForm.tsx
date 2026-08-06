@@ -245,6 +245,143 @@ const TodoForm: React.FC<TodoFormProps> = ({
     setTags(value);
   };
 
+  const titleAndContentFields = (
+    <>
+      <Form.Item
+        name="title"
+        label="标题"
+        rules={[{ required: false }]}
+      >
+        <Input placeholder="留空则自动从内容第一行生成" />
+      </Form.Item>
+
+      <Form.Item label="内容描述">
+        <MilkdownEditorWrapper
+          ref={richEditorRef}
+          value={richContent}
+          onChange={handleContentChange}
+          minHeight="250px"
+        />
+      </Form.Item>
+    </>
+  );
+
+  const metadataFields = (
+    <>
+      <Form.Item
+        name="priority"
+        label="描述"
+      >
+        <Select>
+          <Option value="mental">脑力劳动</Option>
+          <Option value="communication">沟通对齐</Option>
+          <Option value="trivial">临时小活</Option>
+        </Select>
+      </Form.Item>
+
+      <Form.Item
+        name="status"
+        label="状态"
+      >
+        <Select>
+          <Option value="pending">待办</Option>
+          <Option value="in_progress">今日事</Option>
+          <Option value="completed">已完成</Option>
+        </Select>
+      </Form.Item>
+
+      <Form.Item
+        name="owner"
+        label="负责人"
+        extra={historyOwners.length > 0 ? `可从 ${historyOwners.length} 个历史负责人中选择，也可直接输入新负责人` : '可直接输入负责人'}
+      >
+        <Input
+          placeholder="输入负责人，或参考已有负责人名称"
+          list="todo-owner-history"
+          allowClear
+        />
+      </Form.Item>
+
+      <datalist id="todo-owner-history">
+        {historyOwners.map((item) => (
+          <option key={item} value={item} />
+        ))}
+      </datalist>
+
+      <Form.Item
+        name="startTime"
+        label="预计开始时间"
+      >
+        <DatePicker
+          showTime
+          format="YYYY-MM-DD HH:mm"
+          placeholder="选择开始时间"
+          style={{ width: '100%' }}
+          onChange={() => {
+            // 当开始时间变化时，重新验证截止时间
+            const deadline = form.getFieldValue('deadline');
+            if (deadline) {
+              form.validateFields(['deadline']);
+            }
+          }}
+        />
+      </Form.Item>
+
+      <Form.Item
+        name="deadline"
+        label="截止时间"
+        rules={[
+          ({ getFieldValue }) => ({
+            validator(_, value) {
+              const startTime = getFieldValue('startTime');
+              if (startTime && value && startTime.isAfter(value)) {
+                return Promise.reject(new Error('截止时间不能早于开始时间'));
+              }
+              return Promise.resolve();
+            },
+          }),
+        ]}
+      >
+        <DatePicker
+          showTime
+          format="YYYY-MM-DD HH:mm"
+          placeholder="选择截止时间"
+          style={{ width: '100%' }}
+          onChange={() => {
+            // 当截止时间变化时，重新验证开始时间
+            const startTime = form.getFieldValue('startTime');
+            if (startTime) {
+              form.validateFields(['startTime']);
+            }
+          }}
+        />
+      </Form.Item>
+
+      <Form.Item
+        label="标签"
+        extra={`已添加 ${tags.length} 个标签${historyTags.length > 0 ? `，可从 ${historyTags.length} 个历史标签中选择` : ''}`}
+      >
+        <Select
+          mode="tags"
+          value={tags}
+          onChange={handleTagsChange}
+          placeholder="选择已有标签或输入新标签后按回车"
+          style={{ width: '100%' }}
+          options={historyTags.map(tag => ({
+            label: tag,
+            value: tag,
+          }))}
+          maxTagCount="responsive"
+          tokenSeparators={[',']}
+          showSearch
+          filterOption={(input, option) =>
+            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+          }
+        />
+      </Form.Item>
+    </>
+  );
+
   return (
     <Modal
       title={todo ? '编辑待办事项' : '新建待办事项'}
@@ -290,134 +427,8 @@ const TodoForm: React.FC<TodoFormProps> = ({
           priority: 'trivial'
         }}
       >
-        <Form.Item
-          name="title"
-          label="标题"
-          rules={[{ required: false }]}
-        >
-          <Input placeholder="留空则自动从内容第一行生成" />
-        </Form.Item>
-
-        <Form.Item label="内容描述">
-          <MilkdownEditorWrapper
-            ref={richEditorRef}
-            value={richContent}
-            onChange={handleContentChange}
-            minHeight="250px"
-          />
-        </Form.Item>
-
-        <Form.Item
-          name="priority"
-          label="描述"
-        >
-          <Select>
-            <Option value="mental">脑力劳动</Option>
-            <Option value="communication">沟通对齐</Option>
-            <Option value="trivial">临时小活</Option>
-          </Select>
-        </Form.Item>
-
-        <Form.Item
-          name="status"
-          label="状态"
-        >
-          <Select>
-            <Option value="pending">待办</Option>
-            <Option value="in_progress">今日事</Option>
-            <Option value="completed">已完成</Option>
-          </Select>
-        </Form.Item>
-
-        <Form.Item
-          name="owner"
-          label="负责人"
-          extra={historyOwners.length > 0 ? `可从 ${historyOwners.length} 个历史负责人中选择，也可直接输入新负责人` : '可直接输入负责人'}
-        >
-          <Input
-            placeholder="输入负责人，或参考已有负责人名称"
-            list="todo-owner-history"
-            allowClear
-          />
-        </Form.Item>
-
-        <datalist id="todo-owner-history">
-          {historyOwners.map((item) => (
-            <option key={item} value={item} />
-          ))}
-        </datalist>
-
-        <Form.Item
-          name="startTime"
-          label="预计开始时间"
-        >
-          <DatePicker
-            showTime
-            format="YYYY-MM-DD HH:mm"
-            placeholder="选择开始时间"
-            style={{ width: '100%' }}
-            onChange={() => {
-              // 当开始时间变化时，重新验证截止时间
-              const deadline = form.getFieldValue('deadline');
-              if (deadline) {
-                form.validateFields(['deadline']);
-              }
-            }}
-          />
-        </Form.Item>
-
-        <Form.Item
-          name="deadline"
-          label="截止时间"
-          rules={[
-            ({ getFieldValue }) => ({
-              validator(_, value) {
-                const startTime = getFieldValue('startTime');
-                if (startTime && value && startTime.isAfter(value)) {
-                  return Promise.reject(new Error('截止时间不能早于开始时间'));
-                }
-                return Promise.resolve();
-              },
-            }),
-          ]}
-        >
-          <DatePicker
-            showTime
-            format="YYYY-MM-DD HH:mm"
-            placeholder="选择截止时间"
-            style={{ width: '100%' }}
-            onChange={() => {
-              // 当截止时间变化时，重新验证开始时间
-              const startTime = form.getFieldValue('startTime');
-              if (startTime) {
-                form.validateFields(['startTime']);
-              }
-            }}
-          />
-        </Form.Item>
-
-        <Form.Item
-          label="标签"
-          extra={`已添加 ${tags.length} 个标签${historyTags.length > 0 ? `，可从 ${historyTags.length} 个历史标签中选择` : ''}`}
-        >
-          <Select
-            mode="tags"
-            value={tags}
-            onChange={handleTagsChange}
-            placeholder="选择已有标签或输入新标签后按回车"
-            style={{ width: '100%' }}
-            options={historyTags.map(tag => ({
-              label: tag,
-              value: tag,
-            }))}
-            maxTagCount="responsive"
-            tokenSeparators={[',']}
-            showSearch
-            filterOption={(input, option) =>
-              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-            }
-          />
-        </Form.Item>
+        {todo ? titleAndContentFields : metadataFields}
+        {todo ? metadataFields : titleAndContentFields}
       </Form>
     </Modal>
   );

@@ -64,6 +64,17 @@ export const getDescendantIds = (
   return descendants;
 };
 
+export const getAttachableTodos = (
+  parentTodoId: string,
+  todos: Todo[],
+  relations: TodoRelation[]
+): Todo[] => {
+  const tree = buildTodoTree(todos, relations);
+  const excludedIds = new Set<string>([String(parentTodoId), ...getDescendantIds(parentTodoId, tree.nodeById)]);
+
+  return todos.filter(todo => todo?.id && !excludedIds.has(String(todo.id)));
+};
+
 export const buildTodoTree = (todos: Todo[], relations: TodoRelation[]): BuiltTodoTree => {
   const nodeById = new Map<string, TodoTreeNode>();
   const parentByChildId = new Map<string, TodoRelation>();

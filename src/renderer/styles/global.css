@@ -2565,9 +2565,52 @@ motion.div {
   --ios-text-caption: var(--font-size-sm);
   --ios-button-height: 38px;
   --ios-button-height-large: 42px;
+  --ios-icon-button-size: 36px;
+  --ios-sidebar-width: 220px;
+  --ios-sidebar-collapsed-width: 56px;
+  --ios-sidebar-item-min-height: 40px;
+  --ios-card-body-padding: 16px;
+  --ios-toolbar-margin-x: 24px;
+  --ios-toolbar-margin-top: 16px;
+  --ios-page-padding: 24px;
+  --ios-content-shell-padding-x: 20px;
+  --ios-editor-min-height: 200px;
+  --ios-editor-max-height: 400px;
   --ios-list-hover: rgba(60, 60, 67, 0.04);
   --ios-list-selected: rgba(0, 122, 255, 0.08);
   --ios-subtle-surface: #f7f7fa;
+}
+
+[data-font-size-level='medium'] {
+  --ios-button-height: 44px;
+  --ios-button-height-large: 48px;
+  --ios-icon-button-size: 42px;
+  --ios-sidebar-width: 252px;
+  --ios-sidebar-collapsed-width: 64px;
+  --ios-sidebar-item-min-height: 48px;
+  --ios-card-body-padding: 20px;
+  --ios-toolbar-margin-x: 28px;
+  --ios-toolbar-margin-top: 18px;
+  --ios-page-padding: 28px;
+  --ios-content-shell-padding-x: 24px;
+  --ios-editor-min-height: 260px;
+  --ios-editor-max-height: 520px;
+}
+
+[data-font-size-level='large'] {
+  --ios-button-height: 50px;
+  --ios-button-height-large: 56px;
+  --ios-icon-button-size: 48px;
+  --ios-sidebar-width: 292px;
+  --ios-sidebar-collapsed-width: 72px;
+  --ios-sidebar-item-min-height: 56px;
+  --ios-card-body-padding: 24px;
+  --ios-toolbar-margin-x: 32px;
+  --ios-toolbar-margin-top: 20px;
+  --ios-page-padding: 32px;
+  --ios-content-shell-padding-x: 28px;
+  --ios-editor-min-height: 320px;
+  --ios-editor-max-height: 620px;
 }
 
 [data-theme='dark'] {
@@ -2851,6 +2894,86 @@ motion.div {
 .content-card-shell .ant-radio-button-wrapper-checked {
   background: var(--color-surface-elevated) !important;
   color: var(--color-primary) !important;
+}
+
+.ant-typography,
+.ant-form-item,
+.ant-input,
+.ant-input-number,
+.ant-select,
+.ant-picker,
+.ant-btn,
+.ant-tag,
+.ant-list,
+.ant-descriptions,
+.ant-table,
+.ant-tabs {
+  font-size: var(--ios-text-body);
+}
+
+.ant-modal-title,
+.ant-drawer-title,
+.ant-card-head-title {
+  font-size: var(--ios-text-title);
+}
+
+.toolbar {
+  margin: var(--ios-toolbar-margin-top) var(--ios-toolbar-margin-x) 12px;
+}
+
+.todo-sidebar {
+  width: var(--ios-sidebar-width);
+  flex-basis: var(--ios-sidebar-width);
+  margin-left: var(--ios-page-padding);
+}
+
+.todo-sidebar-collapsed {
+  width: var(--ios-sidebar-collapsed-width);
+  flex-basis: var(--ios-sidebar-collapsed-width);
+}
+
+.todo-sidebar-item {
+  min-height: var(--ios-sidebar-item-min-height);
+  font-size: var(--ios-text-body);
+}
+
+.todo-sidebar-icon {
+  font-size: var(--font-size-xl);
+}
+
+.todo-sidebar-count {
+  font-size: var(--ios-text-caption);
+}
+
+.todo-sidebar-toggle {
+  width: var(--ios-icon-button-size) !important;
+  min-width: var(--ios-icon-button-size) !important;
+  height: var(--ios-icon-button-size) !important;
+}
+
+.content-area {
+  padding-right: var(--ios-page-padding);
+  padding-bottom: var(--ios-page-padding);
+  padding-left: var(--ios-page-padding);
+}
+
+.content-card-shell {
+  padding-right: var(--ios-content-shell-padding-x);
+  padding-bottom: var(--ios-content-shell-padding-x);
+  padding-left: var(--ios-content-shell-padding-x);
+}
+
+.todo-card .ant-card-body {
+  padding: var(--ios-card-body-padding);
+}
+
+.ql-container,
+.ql-editor,
+.tiptap-editor {
+  min-height: var(--ios-editor-min-height);
+  max-height: var(--ios-editor-max-height);
+  font-size: var(--ios-text-body);
+  line-height: var(--line-height-relaxed);
 }
 
 [data-theme='dark'] .ios-modal .ant-modal-content,

@@ -3,7 +3,7 @@ import { Modal, Form, Select, Button, Typography, Space, Tabs, Card, Tag, Divide
 import { BulbOutlined, FolderOpenOutlined, DatabaseOutlined, TagOutlined, ThunderboltOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, LinkOutlined, BgColorsOutlined, LockOutlined, SwapOutlined, FileTextOutlined, ToolOutlined, PlusOutlined } from '@ant-design/icons';
 import { App } from 'antd';
 import { Todo, CustomTab } from '../../shared/types';
-import { ColorTheme, ThemeMode } from '../theme/themes';
+import { ColorTheme, FontSizeLevel, ThemeMode } from '../theme/themes';
 import TagManagement from './TagManagement';
 import BackupSettings from './BackupSettings';
 import CustomTabManager from './CustomTabManager';
@@ -76,6 +76,8 @@ interface SettingsModalProps {
   onThemeModeChange?: (mode: ThemeMode) => void;
   colorTheme?: ColorTheme;
   onColorThemeChange?: (theme: ColorTheme) => void;
+  fontSizeLevel?: FontSizeLevel;
+  onFontSizeLevelChange?: (level: FontSizeLevel) => void;
 }
 
 // 存储管理组件
@@ -328,6 +330,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   onThemeModeChange,
   colorTheme,
   onColorThemeChange,
+  fontSizeLevel = 'small',
+  onFontSizeLevelChange,
 }) => {
   const [form] = Form.useForm();
   const [activeTab, setActiveTab] = useState('general');
@@ -381,6 +385,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     value={colorTheme || 'blue'}
                     onChange={onColorThemeChange || (() => {})}
                   />
+                </div>
+
+                <Divider style={{ margin: '20px 0 16px' }} />
+
+                <Text strong>整体字号：</Text>
+                <div style={{ marginTop: 12 }}>
+                  <Radio.Group
+                    value={fontSizeLevel}
+                    onChange={(e) => onFontSizeLevelChange?.(e.target.value as FontSizeLevel)}
+                    optionType="button"
+                    buttonStyle="solid"
+                  >
+                    <Radio.Button value="small">小</Radio.Button>
+                    <Radio.Button value="medium">中</Radio.Button>
+                    <Radio.Button value="large">大</Radio.Button>
+                  </Radio.Group>
                 </div>
               </div>
             </Space>

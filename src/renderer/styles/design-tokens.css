@@ -134,6 +134,50 @@
   --z-tooltip: 1070;
 }
 
+[data-font-size-level='medium'] {
+  --spacing-xs: 10px;
+  --spacing-sm: 14px;
+  --spacing-md: 18px;
+  --spacing-lg: 28px;
+  --spacing-xl: 36px;
+  --spacing-2xl: 54px;
+  --spacing-3xl: 72px;
+
+  --font-size-xs: 13px;
+  --font-size-sm: 14px;
+  --font-size-base: 15px;
+  --font-size-md: 16px;
+  --font-size-lg: 17px;
+  --font-size-xl: 18px;
+  --font-size-2xl: 20px;
+  --font-size-3xl: 23px;
+  --font-size-4xl: 28px;
+  --font-size-5xl: 32px;
+  --font-size-6xl: 38px;
+}
+
+[data-font-size-level='large'] {
+  --spacing-xs: 12px;
+  --spacing-sm: 18px;
+  --spacing-md: 22px;
+  --spacing-lg: 34px;
+  --spacing-xl: 44px;
+  --spacing-2xl: 64px;
+  --spacing-3xl: 84px;
+
+  --font-size-xs: 15px;
+  --font-size-sm: 16px;
+  --font-size-base: 17px;
+  --font-size-md: 18px;
+  --font-size-lg: 20px;
+  --font-size-xl: 22px;
+  --font-size-2xl: 25px;
+  --font-size-3xl: 28px;
+  --font-size-4xl: 34px;
+  --font-size-5xl: 38px;
+  --font-size-6xl: 44px;
+}
+
 /* ==================== 深色模式 ==================== */
 
 [data-theme='dark'] {

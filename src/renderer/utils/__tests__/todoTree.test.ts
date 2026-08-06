@@ -2,6 +2,7 @@ import { Todo, TodoRelation } from '../../../shared/types';
 import {
   buildTodoTree,
   canReparentTodo,
+  getAttachableTodos,
   getCurrentParentRelation,
   getDescendantIds,
   getParentRelations,
@@ -108,6 +109,13 @@ describe('todoTree utilities', () => {
     ];
 
     expect(getParentRelations('child', relations).map(parentRelation => parentRelation.id)).toEqual(['old', 'new']);
+  });
+
+  it('filters attachable todos by excluding the selected node and its descendants', () => {
+    const todos = [makeTodo('parent'), makeTodo('child'), makeTodo('grandchild'), makeTodo('sibling')];
+    const relations = [relation('pc', 'parent', 'child'), relation('cg', 'child', 'grandchild')];
+
+    expect(getAttachableTodos('parent', todos, relations).map(todo => todo.id)).toEqual(['sibling']);
   });
 
   it('breaks cycles by leaving at least one node as a root', () => {

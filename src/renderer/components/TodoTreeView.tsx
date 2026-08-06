@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
-import { Button, Empty, Space, Spin, Tag, Tooltip, Typography } from 'antd';
+import React, { useMemo, useState } from 'react';
+import { Button, Empty, Modal, Select, Space, Spin, Tag, Tooltip, Typography } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { DndContext, DragEndEvent, useDraggable, useDroppable } from '@dnd-kit/core';
 import { Todo, TodoRelation, TodoTreeNode } from '../../shared/types';
-import { buildTodoTree } from '../utils/todoTree';
+import { buildTodoTree, getAttachableTodos } from '../utils/todoTree';
 import ReadOnlyMarkdown from './ReadOnlyMarkdown';
 import TodoOwnerAvatar from './TodoOwnerAvatar';
 import './TodoTreeView.css';
@@ -16,11 +16,74 @@ interface TodoTreeViewProps {
   loading: boolean;
   selectedTodo: Todo | null;
   onSelectTodo: (todo: Todo) => void;
-  onAddChild: (parentTodo: Todo) => void;
   onEdit: (todo: Todo) => void;
   onDelete: (todo: Todo) => void;
   onReparent: (childTodoId: string, parentTodoId: string) => void;
 }
+
+interface ExistingTodoSelectorProps {
+  visible: boolean;
+  parentTodo: Todo | null;
+  todos: Todo[];
+  relations: TodoRelation[];
+  onCancel: () => void;
+  onConfirm: (todo: Todo) => void;
+}
+
+const ExistingTodoSelector: React.FC<ExistingTodoSelectorProps> = ({
+  visible,
+  parentTodo,
+  todos,
+  relations,
+  onCancel,
+  onConfirm,
+}) => {
+  const [selectedTodoId, setSelectedTodoId] = useState<string | undefined>(undefined);
+
+  const attachableTodos = useMemo(() => {
+    if (!parentTodo) return [];
+    return getAttachableTodos(String(parentTodo.id), todos, relations);
+  }, [parentTodo, relations, todos]);
+
+  const options = useMemo(() => attachableTodos.map(todo => ({
+    value: String(todo.id),
+    label: todo.title || '未命名待办',
+  })), [attachableTodos]);
+
+  return (
+    <Modal
+      title="选择已有待办"
+      open={visible}
+      onCancel={onCancel}
+      onOk={() => {
+        const selectedTodo = attachableTodos.find(todo => String(todo.id) === selectedTodoId);
+        if (selectedTodo) {
+          onConfirm(selectedTodo);
+        }
+      }}
+      okText="确认加入子树"
+      cancelText="取消"
+      destroyOnClose
+      afterClose={() => setSelectedTodoId(undefined)}
+    >
+      <Space direction="vertical" style={{ width: '100%' }} size={16}>
+        <Select
+          showSearch
+          placeholder="选择一个已有待办"
+          value={selectedTodoId}
+          onChange={setSelectedTodoId}
+          options={options}
+          optionFilterProp="label"
+          style={{ width: '100%' }}
+          disabled={!parentTodo}
+        />
+        <div style={{ color: 'var(--color-text-secondary)', fontSize: 12 }}>
+          只显示不会造成循环引用的待办。
+        </div>
+      </Space>
+    </Modal>
+  );
+};
 
 const statusText: Record<Todo['status'], string> = {
   pending: '待处理',
@@ -40,7 +103,7 @@ interface TreeNodeRowProps {
   selectedTodoId: string | null;
   depth?: number;
   onSelectTodo: (todo: Todo) => void;
-  onAddChild: (todo: Todo) => void;
+  onOpenAttachSelector: (todo: Todo) => void;
   onEdit: (todo: Todo) => void;
   onDelete: (todo: Todo) => void;
 }
@@ -50,7 +113,7 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
   selectedTodoId,
   depth = 0,
   onSelectTodo,
-  onAddChild,
+  onOpenAttachSelector,
   onEdit,
   onDelete,
 }) => {
@@ -79,8 +142,8 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
         </div>
 
         <Space size={4} className="todo-tree-nodeActions" onClick={(event) => event.stopPropagation()}>
-          <Tooltip title="新增子待办">
-            <Button size="small" type="text" icon={<PlusOutlined />} onClick={() => onAddChild(node.todo)} />
+          <Tooltip title="加入已有待办到子树">
+            <Button size="small" type="text" icon={<PlusOutlined />} onClick={() => onOpenAttachSelector(node.todo)} />
           </Tooltip>
           <Tooltip title="编辑待办">
             <Button size="small" type="text" icon={<EditOutlined />} onClick={() => onEdit(node.todo)} />
@@ -100,7 +163,7 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
               depth={depth + 1}
               selectedTodoId={selectedTodoId}
               onSelectTodo={onSelectTodo}
-              onAddChild={onAddChild}
+              onOpenAttachSelector={onOpenAttachSelector}
               onEdit={onEdit}
               onDelete={onDelete}
             />
@@ -117,19 +180,25 @@ const TodoTreeView: React.FC<TodoTreeViewProps> = ({
   loading,
   selectedTodo,
   onSelectTodo,
-  onAddChild,
   onEdit,
   onDelete,
   onReparent,
 }) => {
   const tree = useMemo(() => buildTodoTree(todos, relations), [todos, relations]);
   const selectedTodoId = selectedTodo ? String(selectedTodo.id) : null;
+  const [attachTargetTodo, setAttachTargetTodo] = useState<Todo | null>(null);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const childTodoId = event.active.id ? String(event.active.id) : '';
     const parentTodoId = event.over?.id ? String(event.over.id) : '';
     if (!childTodoId || !parentTodoId || childTodoId === parentTodoId) return;
     onReparent(childTodoId, parentTodoId);
+  };
+
+  const handleAttachConfirm = (todo: Todo) => {
+    if (!attachTargetTodo) return;
+    onReparent(String(todo.id), String(attachTargetTodo.id));
+    setAttachTargetTodo(null);
   };
 
   return (
@@ -153,7 +222,7 @@ const TodoTreeView: React.FC<TodoTreeViewProps> = ({
                   node={node}
                   selectedTodoId={selectedTodoId}
                   onSelectTodo={onSelectTodo}
-                  onAddChild={onAddChild}
+                  onOpenAttachSelector={setAttachTargetTodo}
                   onEdit={onEdit}
                   onDelete={onDelete}
                 />
@@ -163,12 +232,21 @@ const TodoTreeView: React.FC<TodoTreeViewProps> = ({
         </div>
       </section>
 
+      <ExistingTodoSelector
+        visible={Boolean(attachTargetTodo)}
+        parentTodo={attachTargetTodo}
+        todos={todos}
+        relations={relations}
+        onCancel={() => setAttachTargetTodo(null)}
+        onConfirm={handleAttachConfirm}
+      />
+
       <section className="todo-tree-detailPane">
         <div className="todo-tree-detailHeader">
           <Text strong>详情</Text>
           {selectedTodo && (
             <Space>
-              <Button size="small" icon={<PlusOutlined />} onClick={() => onAddChild(selectedTodo)}>
+              <Button size="small" icon={<PlusOutlined />} onClick={() => setAttachTargetTodo(selectedTodo)}>
                 子待办
               </Button>
               <Button size="small" icon={<EditOutlined />} onClick={() => onEdit(selectedTodo)}>

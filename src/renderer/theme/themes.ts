@@ -3,6 +3,75 @@ import type { ThemeConfig } from 'antd';
 
 export type ThemeMode = 'light' | 'dark';
 export type ColorTheme = 'purple' | 'blue' | 'green' | 'orange' | 'red' | 'cyan' | 'magenta' | 'yellow' | 'indigo' | 'pink' | 'teal' | 'amber';
+export type FontSizeLevel = 'small' | 'medium' | 'large';
+
+interface TypographyScale {
+  fontSize: number;
+  heading1: number;
+  heading2: number;
+  heading3: number;
+  heading4: number;
+  heading5: number;
+  padding: number;
+  paddingLG: number;
+  paddingSM: number;
+  paddingXS: number;
+  controlHeight: number;
+  controlHeightLG: number;
+  controlHeightSM: number;
+}
+
+export const FONT_SIZE_SCALES: Record<FontSizeLevel, TypographyScale> = {
+  small: {
+    fontSize: 14,
+    heading1: 34,
+    heading2: 28,
+    heading3: 24,
+    heading4: 20,
+    heading5: 18,
+    padding: 16,
+    paddingLG: 24,
+    paddingSM: 12,
+    paddingXS: 8,
+    controlHeight: 32,
+    controlHeightLG: 40,
+    controlHeightSM: 24,
+  },
+  medium: {
+    fontSize: 16,
+    heading1: 38,
+    heading2: 32,
+    heading3: 28,
+    heading4: 24,
+    heading5: 20,
+    padding: 18,
+    paddingLG: 28,
+    paddingSM: 14,
+    paddingXS: 10,
+    controlHeight: 38,
+    controlHeightLG: 46,
+    controlHeightSM: 30,
+  },
+  large: {
+    fontSize: 18,
+    heading1: 44,
+    heading2: 38,
+    heading3: 32,
+    heading4: 28,
+    heading5: 24,
+    padding: 22,
+    paddingLG: 34,
+    paddingSM: 18,
+    paddingXS: 12,
+    controlHeight: 44,
+    controlHeightLG: 54,
+    controlHeightSM: 36,
+  },
+};
+
+export const normalizeFontSizeLevel = (level?: string): FontSizeLevel => {
+  return level === 'medium' || level === 'large' ? level : 'small';
+};
 
 // ============================================
 // 色彩配置接口
@@ -114,9 +183,10 @@ export const getColorTheme = (colorTheme: ColorTheme = 'purple'): ColorScheme =>
 // ============================================
 // 浅色主题
 // ============================================
-export const createLightTheme = (colorTheme: ColorTheme = 'purple'): ThemeConfig => {
+export const createLightTheme = (colorTheme: ColorTheme = 'purple', fontSizeLevel: FontSizeLevel = 'small'): ThemeConfig => {
   const scheme = COLOR_SCHEMES[colorTheme];
   const primaryHex = hslToHex(scheme.hue, 80, 60);
+  const scale = FONT_SIZE_SCALES[fontSizeLevel];
 
   return {
     algorithm: theme.defaultAlgorithm,
@@ -151,19 +221,22 @@ export const createLightTheme = (colorTheme: ColorTheme = 'purple'): ThemeConfig
 
       // 字体系统
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      fontSize: 14,
-      fontSizeHeading1: 34,
-      fontSizeHeading2: 28,
-      fontSizeHeading3: 24,
-      fontSizeHeading4: 20,
-      fontSizeHeading5: 18,
+      fontSize: scale.fontSize,
+      fontSizeHeading1: scale.heading1,
+      fontSizeHeading2: scale.heading2,
+      fontSizeHeading3: scale.heading3,
+      fontSizeHeading4: scale.heading4,
+      fontSizeHeading5: scale.heading5,
+      controlHeight: scale.controlHeight,
+      controlHeightLG: scale.controlHeightLG,
+      controlHeightSM: scale.controlHeightSM,
 
       // 间距
-      padding: 16,
-      paddingLG: 24,
-      paddingMD: 16,
-      paddingSM: 12,
-      paddingXS: 8,
+      padding: scale.padding,
+      paddingLG: scale.paddingLG,
+      paddingMD: scale.padding,
+      paddingSM: scale.paddingSM,
+      paddingXS: scale.paddingXS,
       paddingXXS: 4,
 
       // 阴影 - 更柔和
@@ -235,9 +308,10 @@ export const createLightTheme = (colorTheme: ColorTheme = 'purple'): ThemeConfig
 // ============================================
 // 深色主题
 // ============================================
-export const createDarkTheme = (colorTheme: ColorTheme = 'purple'): ThemeConfig => {
+export const createDarkTheme = (colorTheme: ColorTheme = 'purple', fontSizeLevel: FontSizeLevel = 'small'): ThemeConfig => {
   const scheme = COLOR_SCHEMES[colorTheme];
   const primaryHex = hslToHex(scheme.hue, 80, 60);
+  const scale = FONT_SIZE_SCALES[fontSizeLevel];
 
   return {
     algorithm: theme.darkAlgorithm,
@@ -276,19 +350,22 @@ export const createDarkTheme = (colorTheme: ColorTheme = 'purple'): ThemeConfig 
 
       // 字体系统
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      fontSize: 14,
-      fontSizeHeading1: 34,
-      fontSizeHeading2: 28,
-      fontSizeHeading3: 24,
-      fontSizeHeading4: 20,
-      fontSizeHeading5: 18,
+      fontSize: scale.fontSize,
+      fontSizeHeading1: scale.heading1,
+      fontSizeHeading2: scale.heading2,
+      fontSizeHeading3: scale.heading3,
+      fontSizeHeading4: scale.heading4,
+      fontSizeHeading5: scale.heading5,
+      controlHeight: scale.controlHeight,
+      controlHeightLG: scale.controlHeightLG,
+      controlHeightSM: scale.controlHeightSM,
 
       // 间距
-      padding: 16,
-      paddingLG: 24,
-      paddingMD: 16,
-      paddingSM: 12,
-      paddingXS: 8,
+      padding: scale.padding,
+      paddingLG: scale.paddingLG,
+      paddingMD: scale.padding,
+      paddingSM: scale.paddingSM,
+      paddingXS: scale.paddingXS,
       paddingXXS: 4,
 
       // 阴影 - 深色模式更强
@@ -380,9 +457,10 @@ export const darkTheme = createDarkTheme('purple');
 // ============================================
 export const getTheme = (
   mode: ThemeMode,
-  colorTheme: ColorTheme = 'purple'
+  colorTheme: ColorTheme = 'purple',
+  fontSizeLevel: FontSizeLevel = 'small'
 ): ThemeConfig => {
   return mode === 'dark'
-    ? createDarkTheme(colorTheme)
-    : createLightTheme(colorTheme);
+    ? createDarkTheme(colorTheme, fontSizeLevel)
+    : createLightTheme(colorTheme, fontSizeLevel);
 };
