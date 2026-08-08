@@ -17,6 +17,8 @@ const TodoOwnerAvatar: React.FC<TodoOwnerAvatarProps> = memo(({
   className,
 }) => {
   const normalizedOwner = normalizeTodoOwner(owner);
+  const avatarSize = `calc(${size}px * var(--avatar-size-scale, 1))`;
+  const avatarFontSize = `max(10px, calc(${Math.round(size * 0.45)}px * var(--avatar-size-scale, 1)))`;
 
   if (!normalizedOwner) {
     return null;
@@ -31,7 +33,10 @@ const TodoOwnerAvatar: React.FC<TodoOwnerAvatarProps> = memo(({
         backgroundColor: getTodoOwnerColor(normalizedOwner),
         color: '#fff',
         flexShrink: 0,
-        fontSize: Math.max(10, Math.round(size * 0.45)),
+        width: avatarSize,
+        height: avatarSize,
+        lineHeight: avatarSize,
+        fontSize: avatarFontSize,
         fontWeight: 600,
       }}
       icon={!getTodoOwnerAvatarText(normalizedOwner) ? <UserOutlined /> : undefined}

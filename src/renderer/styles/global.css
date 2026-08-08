@@ -909,6 +909,16 @@ body {
 }
 
 /* Drawer 中的富文本内容样式 */
+.ant-drawer .todo-view-content {
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-relaxed);
+}
+
+.ant-drawer .todo-view-content *:not(h1):not(h2):not(h3):not(h4):not(h5):not(h6) {
+  font-size: inherit;
+  line-height: inherit;
+}
+
 .ant-drawer .todo-view-content p {
   margin-bottom: 8px;
 }
@@ -956,6 +966,18 @@ body {
   margin-top: 16px;
   margin-bottom: 8px;
   font-weight: 600;
+}
+
+.ant-drawer .todo-view-content h1 {
+  font-size: var(--font-size-4xl);
+}
+
+.ant-drawer .todo-view-content h2 {
+  font-size: var(--font-size-3xl);
+}
+
+.ant-drawer .todo-view-content h3 {
+  font-size: var(--font-size-2xl);
 }
 
 /* 标题悬停效果 - 性能优化 */
@@ -1648,7 +1670,7 @@ body {
 
 /* 标题输入框样式 */
 .content-focus-title-input {
-  font-size: 18px;
+  font-size: var(--font-size-2xl);
   font-weight: 600;
   border: 1px solid var(--border-color, #e8e8e8);
   border-radius: 6px;
@@ -1723,8 +1745,8 @@ body {
   height: auto;
   overflow: visible;
   padding: 16px;
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-relaxed);
   word-break: break-all;
   overflow-wrap: break-word;
   word-wrap: break-word;
@@ -1736,6 +1758,25 @@ body {
   height: auto;
   overflow: visible;
   outline: none;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.content-focus-item-editor .ProseMirror * {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.content-focus-item-editor .ProseMirror h1 {
+  font-size: var(--font-size-4xl);
+}
+
+.content-focus-item-editor .ProseMirror h2 {
+  font-size: var(--font-size-3xl);
+}
+
+.content-focus-item-editor .ProseMirror h3 {
+  font-size: var(--font-size-2xl);
 }
 
 /* 旧的 Quill 编辑器样式（保留以防回退） */
@@ -1754,8 +1795,8 @@ body {
 .content-focus-item-editor .ql-container {
   min-height: 150px;
   max-height: none;
-  font-size: 15px;
-  line-height: 1.8;
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-relaxed);
 }
 
 .content-focus-item-editor .ql-editor {
@@ -1768,6 +1809,13 @@ body {
   word-wrap: break-word;
   /* 防止内容变化时的布局抖动 */
   will-change: contents;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.content-focus-item-editor .ql-editor *:not(h1):not(h2):not(h3) {
+  font-size: inherit;
+  line-height: inherit;
 }
 
 /* 分割线 */

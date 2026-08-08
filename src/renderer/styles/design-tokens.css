@@ -97,6 +97,7 @@
   --font-size-4xl: 24px;
   --font-size-5xl: 28px;
   --font-size-6xl: 34px;
+  --avatar-size-scale: 1;
 
   /* 字重 */
   --font-weight-normal: 400;
@@ -154,6 +155,7 @@
   --font-size-4xl: 28px;
   --font-size-5xl: 32px;
   --font-size-6xl: 38px;
+  --avatar-size-scale: 1.12;
 }
 
 [data-font-size-level='large'] {
@@ -176,6 +178,7 @@
   --font-size-4xl: 34px;
   --font-size-5xl: 38px;
   --font-size-6xl: 44px;
+  --avatar-size-scale: 1.25;
 }
 
 /* ==================== 深色模式 ==================== */
