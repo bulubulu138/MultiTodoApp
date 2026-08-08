@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, Space, Select, Tooltip, Segmented, Input } from 'antd';
-import { PlusOutlined, SettingOutlined, CalendarOutlined, SortAscendingOutlined, UnorderedListOutlined, AlignLeftOutlined, AppstoreOutlined, SearchOutlined, FileTextOutlined, SyncOutlined, UserOutlined, ApartmentOutlined } from '@ant-design/icons';
+import { PlusOutlined, SettingOutlined, CalendarOutlined, SortAscendingOutlined, UnorderedListOutlined, AlignLeftOutlined, AppstoreOutlined, SearchOutlined, FileTextOutlined, SyncOutlined, UserOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 import TodoOwnerAvatar from './TodoOwnerAvatar';
 import { OwnerFilter, UNASSIGNED_OWNER_FILTER } from '../utils/todoOwner';
@@ -16,7 +16,7 @@ export type SortOption =
   | 'manual'
   | 'drag';
 
-export type ViewMode = 'card' | 'content-focus' | 'compact' | 'tree';
+export type ViewMode = 'card' | 'content-focus' | 'compact';
 
 interface ToolbarProps {
   onAddTodo: () => void;
@@ -117,11 +117,6 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
                 label: '紧凑',
                 value: 'compact',
                 icon: <AppstoreOutlined />,
-              },
-              {
-                label: '树形',
-                value: 'tree',
-                icon: <ApartmentOutlined />,
               },
               {
                 label: '专注',

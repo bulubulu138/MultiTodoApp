@@ -25,7 +25,6 @@ import CalendarDrawer from './components/CalendarDrawer';
 import ReviewModePage from './components/review/ReviewModePage';
 import ContentFocusView, { ContentFocusViewRef } from './components/ContentFocusView';
 import CompactTodoView from './components/CompactTodoView';
-import TodoTreeView from './components/TodoTreeView';
 import FirstRunDialog from './components/FirstRunDialog';
 import SyncModal from './components/SyncModal';
 import { getTheme, ThemeMode, ColorTheme, FontSizeLevel, normalizeFontSizeLevel } from './theme/themes';
@@ -37,7 +36,6 @@ import { PerformanceMonitor } from './utils/performanceMonitor';
 import { useGlobalKeyboardHandler } from './hooks/useGlobalKeyboardHandler';
 import { syncParallelGroupOrders, computeAllFinalOrders } from './utils/orderConflictResolver';
 import { collectTodoOwners, matchesTodoOwner, OwnerFilter } from './utils/todoOwner';
-import { buildTodoTree, canReparentTodo, getParentRelations } from './utils/todoTree';
 import dayjs from 'dayjs';
 
 const { Content } = Layout;
@@ -96,7 +94,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const [showPositionSelector, setShowPositionSelector] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [pendingPosition, setPendingPosition] = useState<PositionSelection | null>(null);
-  const [selectedTreeTodoId, setSelectedTreeTodoId] = useState<string | null>(null);
 
   // ✅ 新增：首次运行状态
   const [showFirstRunDialog, setShowFirstRunDialog] = useState(false);
@@ -609,11 +606,22 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         }
       }
       
+      const normalizeViewMode = (viewMode?: string): ViewMode => (
+        viewMode === 'compact' || viewMode === 'content-focus' ? viewMode : 'card'
+      );
+
       // 加载 Tab 设置（新格式）
       let loadedTabSettings: TabSettingsMap = {};
       if (appSettings.tabSettings) {
         try {
           loadedTabSettings = JSON.parse(appSettings.tabSettings);
+          loadedTabSettings = Object.entries(loadedTabSettings).reduce<TabSettingsMap>((acc, [tabKey, tabSetting]) => {
+            acc[tabKey] = {
+              ...tabSetting,
+              viewMode: normalizeViewMode(tabSetting?.viewMode as string | undefined),
+            };
+            return acc;
+          }, {});
         } catch (e) {
           console.error('Failed to parse tabSettings:', e);
         }
@@ -623,7 +631,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       if (Object.keys(loadedTabSettings).length === 0) {
         const defaultTab: TabSettings = {
           sortOption: (appSettings.sortOption as SortOption) || 'createdAt-desc',
-          viewMode: (appSettings.viewMode as ViewMode) || 'card'
+          viewMode: normalizeViewMode(appSettings.viewMode)
         };
         loadedTabSettings = {
           all: defaultTab
@@ -1007,20 +1015,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     }
   };
 
-  const handleDeleteTreeTodo = useCallback((todo: Todo) => {
-    Modal.confirm({
-      title: '删除待办',
-      content: `确定删除「${todo.title || '未命名待办'}」吗？`,
-      okText: '删除',
-      okButtonProps: { danger: true },
-      cancelText: '取消',
-      onOk: async () => {
-      await handleDeleteTodo(String(todo.id));
-        setSelectedTreeTodoId(current => (current === String(todo.id) ? null : current));
-      },
-    });
-  }, [handleDeleteTodo]);
-
   const handleSettingsUpdate = async (newSettings: Record<string, string>, shouldCloseModal: boolean = true) => {
     try {
       await window.electronAPI.settings.update(newSettings);
@@ -1057,48 +1051,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     setEditingTodo(latestTodo || todo);
     setShowForm(true);
   }, []);
-
-  const handleSelectTreeTodo = useCallback((todo: Todo) => {
-    setSelectedTreeTodoId(String(todo.id));
-  }, []);
-
-  const handleReparentTreeTodo = useCallback(async (childTodoId: string, parentTodoId: string) => {
-    const treeSnapshot = buildTodoTree(todos, relations);
-    const validation = canReparentTodo(childTodoId, parentTodoId, treeSnapshot.nodeById);
-
-    if (!validation.allowed) {
-      if (validation.reason === 'same-node') {
-        message.warning('不能拖拽到自己');
-      } else if (validation.reason === 'descendant') {
-        message.warning('不能拖拽到子待办下方');
-      }
-      return;
-    }
-
-    const parentRelations = getParentRelations(childTodoId, relations);
-    const matchingParentRelation = parentRelations.find(relation => String(relation.source_id) === String(parentTodoId));
-    const relationsToDelete = parentRelations.filter(relation =>
-      relation.id && String(relation.id) !== String(matchingParentRelation?.id || '')
-    );
-
-    try {
-      await Promise.all(relationsToDelete.map(relation => window.electronAPI.relations.delete(String(relation.id))));
-
-      if (!matchingParentRelation) {
-        await window.electronAPI.relations.create({
-          source_id: String(parentTodoId),
-          target_id: String(childTodoId),
-          relation_type: 'extends',
-        });
-      }
-
-      await loadRelations();
-      setSelectedTreeTodoId(String(childTodoId));
-    } catch (error) {
-      console.error('Failed to reparent tree todo:', error);
-      message.error('调整树形关系失败');
-    }
-  }, [loadRelations, message, relations, todos]);
 
   // 处理位置选择
   const handlePositionSelect = (selection: PositionSelection) => {
@@ -1664,29 +1616,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     completed: todos.filter(t => t && t.status === 'completed').length
   }), [todos]);
 
-  const treeViewTodos = useMemo(() => {
-    const validTodos = todos.filter(todo => todo && todo.id);
-
-    if (!debouncedSearchText.trim() || debouncedSearchText.trim().length < 2) {
-      return validTodos.filter(todo => matchesTodoOwner(todo, ownerFilter));
-    }
-
-    const searchLower = debouncedSearchText.toLowerCase();
-    return validTodos.filter(todo => {
-      if (!matchesTodoOwner(todo, ownerFilter)) return false;
-
-      const title = (todo.title || '').toLowerCase();
-      const content = (todo.content || '').toLowerCase();
-      const tags = (todo.tags || '').toLowerCase();
-      return title.includes(searchLower) || content.includes(searchLower) || tags.includes(searchLower);
-    });
-  }, [debouncedSearchText, ownerFilter, todos]);
-
-  const selectedTreeTodo = useMemo(() => {
-    if (!selectedTreeTodoId) return null;
-    return treeViewTodos.find(todo => String(todo.id) === selectedTreeTodoId) || null;
-  }, [selectedTreeTodoId, treeViewTodos]);
-
   // 性能优化：分层缓存计算结果
   // 第一层：基础过滤（按Tab状态过滤）
   const baseFilteredTodos = useMemo(() => {
@@ -2167,27 +2096,6 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
                     onUpdateDisplayOrder={handleUpdateDisplayOrder}
                     onUpdateDisplayOrders={handleUpdateDisplayOrders}
                     colorTheme={colorTheme}
-                  />
-                </motion.div>
-              )}
-              {currentTabSettings.viewMode === 'tree' && (
-                <motion.div
-                  key="tree"
-                  variants={shouldReduceMotion() ? {} : optimizedMotionVariants.pageTransition}
-                  initial="hidden"
-                  animate="visible"
-                  exit="exit"
-                  style={{ height: '100%', overflow: 'hidden' }}
-                >
-                  <TodoTreeView
-                    todos={treeViewTodos}
-                    relations={relations}
-                    loading={loading}
-                    selectedTodo={selectedTreeTodo}
-                    onSelectTodo={handleSelectTreeTodo}
-                    onEdit={handleEditTodo}
-                    onDelete={handleDeleteTreeTodo}
-                    onReparent={handleReparentTreeTodo}
                   />
                 </motion.div>
               )}
