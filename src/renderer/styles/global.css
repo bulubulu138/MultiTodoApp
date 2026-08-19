@@ -101,11 +101,11 @@ body {
 }
 
 [data-theme='dark'] ::-webkit-scrollbar-thumb {
-  background: #404040;
+  background: var(--scroll-thumb-bg);
 }
 
 [data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
-  background: #525252;
+  background: var(--scroll-thumb-hover-bg);
 }
 
 /* 待办事项状态颜色 */
@@ -1283,20 +1283,20 @@ body {
 }
 
 .todo-list-panel::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--scroll-thumb-bg);
   border-radius: 3px;
 }
 
 .todo-list-panel::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--scroll-thumb-hover-bg);
 }
 
 [data-theme='dark'] .todo-list-panel::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--scroll-thumb-bg);
 }
 
 [data-theme='dark'] .todo-list-panel::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--scroll-thumb-hover-bg);
 }
 
 /* ============================================

@@ -318,13 +318,13 @@ export const useGlassTheme = (initialMode: ThemeMode = 'light') => {
       }
 
       .glass-scrollbar::-webkit-scrollbar-thumb {
-        background: var(--glass-border-secondary);
+        background: var(--scroll-thumb-bg);
         border-radius: var(--glass-border-radius-sm);
         transition: var(--glass-transition-base);
       }
 
       .glass-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: var(--glass-border-primary);
+        background: var(--scroll-thumb-hover-bg);
       }
     `;
 
