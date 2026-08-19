@@ -482,16 +482,29 @@ export class FileStorageManager {
       throw new Error(`Todo not found: ${uuid}`);
     }
 
+    // updatedAt 只由实际数据变化触发，查看详情或重复保存相同内容不应改变它。
+    const contentUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([key]) => key !== 'updatedAt')
+    ) as Partial<Todo>;
+    const hasChanges = Object.entries(contentUpdates).some(([key, nextValue]) => {
+      const currentValue = currentTodo[key as keyof Todo];
+      return JSON.stringify(currentValue) !== JSON.stringify(nextValue);
+    });
+
+    if (!hasChanges) {
+      return;
+    }
+
     const updatedTodo: Todo = {
       ...currentTodo,
-      ...updates,
+      ...contentUpdates,
       id: uuid, // 确保 ID 不被覆盖
       updatedAt: new Date().toISOString(),
       // 自动处理 completedAt：状态变为 completed 时设置时间戳，从 completed 变为其他状态时清除
-      ...(updates.status === 'completed' && !updates.completedAt && currentTodo.status !== 'completed'
+      ...(contentUpdates.status === 'completed' && !contentUpdates.completedAt && currentTodo.status !== 'completed'
         ? { completedAt: new Date().toISOString() }
         : {}),
-      ...(updates.status && updates.status !== 'completed' && currentTodo.status === 'completed'
+      ...(contentUpdates.status && contentUpdates.status !== 'completed' && currentTodo.status === 'completed'
         ? { completedAt: undefined }
         : {})
     };

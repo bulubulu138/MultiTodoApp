@@ -749,14 +749,20 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const handleUpdateTodo = async (id: string, updates: Partial<Todo>) => {
     PerformanceMonitor.start('save');
     const previousTodos = todos;
+    const contentUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([key]) => key !== 'updatedAt')
+    ) as Partial<Todo>;
+    const currentTodo = todos.find(todo => todo.id === id);
+    const hasChanges = currentTodo && Object.entries(contentUpdates)
+      .some(([key, value]) => JSON.stringify(currentTodo[key as keyof Todo]) !== JSON.stringify(value));
 
     setTodos(prev => prev.map(todo => {
       if (todo.id !== id) return todo;
-      return { ...todo, ...updates, updatedAt: new Date().toISOString() };
+      return { ...todo, ...contentUpdates, ...(hasChanges ? { updatedAt: new Date().toISOString() } : {}) };
     }));
     setEditingTodo(null);
 
-    scheduleTodoPersist(id, updates, () => {
+    scheduleTodoPersist(id, contentUpdates, () => {
       setTodos(previousTodos);
       message.error('更新待办事项失败，已恢复');
     });
@@ -890,6 +896,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   // 专注模式专用：乐观更新（不刷新页面，保持滚动位置）
   const handleUpdateTodoInPlace = useCallback(async (id: string, updates: Partial<Todo>) => {
     const idString = id;
+    const contentUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([key]) => key !== 'updatedAt')
+    ) as Partial<Todo>;
     // 1. 标记为正在保存
     savingTodosRef.current.add(idString);
 
@@ -897,10 +906,13 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     setTodos(prev => prev.map(todo => {
       if (!areIdsEqual(todo.id, id)) return todo;
 
+      const hasChanges = Object.entries(contentUpdates)
+        .some(([key, value]) => JSON.stringify(todo[key as keyof Todo]) !== JSON.stringify(value));
+
       // 准备乐观更新的数据
       const optimisticUpdates: Partial<Todo> = {
-        ...updates,
-        updatedAt: new Date().toISOString()
+        ...contentUpdates,
+        ...(hasChanges ? { updatedAt: new Date().toISOString() } : {})
       };
 
       // 如果状态改为 completed，设置 completedAt
@@ -918,7 +930,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     // 3. 创建保存 Promise 并追踪
     const savePromise = (async () => {
       try {
-        await window.electronAPI.todo.update(String(id), updates);
+        await window.electronAPI.todo.update(String(id), contentUpdates);
 
         // 🔥 新增：保存成功后，从数据库重新获取最新数据
         // 这确保React state与数据库完全同步，特别是content字段
