@@ -1,9 +1,10 @@
 import { Todo, TodoRelation } from '../../shared/types';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Modal, Form, Input, Select, Button, App, Tag, Space, DatePicker, InputNumber, Typography } from 'antd';
+import { Modal, Form, Input, Select, Button, App, Tag, Space, DatePicker, InputNumber, Typography, AutoComplete } from 'antd';
 const { Text } = Typography;
 import { CopyOutlined } from '@ant-design/icons';
 import MilkdownEditorWrapper, { MilkdownEditorRef } from './MilkdownEditor';
+import TodoOwnerAvatar from './TodoOwnerAvatar';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import { collectTodoOwners, normalizeTodoOwner } from '../utils/todoOwner';
 import dayjs from 'dayjs';
@@ -39,6 +40,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
   const [isEditorReady, setIsEditorReady] = useState(false);
   const [editorError, setEditorError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false); // 🔧 新增：防止重复提交
+  const isSubmittingRef = React.useRef(false);
 
   const richEditorRef = React.useRef<MilkdownEditorRef>(null);
 
@@ -84,6 +86,15 @@ const TodoForm: React.FC<TodoFormProps> = ({
   }, [allTodos]);
 
   const historyOwners = useMemo(() => collectTodoOwners(allTodos), [allTodos]);
+  const ownerOptions = useMemo(() => historyOwners.map((owner) => ({
+    value: owner,
+    label: (
+      <Space size={8}>
+        <TodoOwnerAvatar owner={owner} size={20} showTooltip={false} />
+        <span>{owner}</span>
+      </Space>
+    ),
+  })), [historyOwners]);
 
   useEffect(() => {
     if (visible) {
@@ -150,16 +161,14 @@ const TodoForm: React.FC<TodoFormProps> = ({
     return firstLine;
   };
 
-  const handleSubmit = async () => {
-    // 🔧 防止重复提交
-    if (isSubmitting) {
-      console.log('[TodoForm] ⚠️ Already submitting, ignoring duplicate submit');
+  const handleSubmit = async (values: Record<string, any>) => {
+    if (isSubmittingRef.current) {
       return;
     }
 
+    isSubmittingRef.current = true;
     try {
       setIsSubmitting(true); // 标记为正在提交
-      const values = await form.validateFields();
 
       // 🔧 修复：优先使用编辑器的 getMarkdown，确保获取最新内容
       let submitContent = '';
@@ -219,10 +228,12 @@ const TodoForm: React.FC<TodoFormProps> = ({
             try {
               await onSubmit(todoData);
             } finally {
+              isSubmittingRef.current = false;
               setIsSubmitting(false); // 重置提交状态
             }
           },
           onCancel: () => {
+            isSubmittingRef.current = false;
             setIsSubmitting(false); // 用户取消时也要重置状态
           },
         });
@@ -230,11 +241,13 @@ const TodoForm: React.FC<TodoFormProps> = ({
         try {
           await onSubmit(todoData);
         } finally {
+          isSubmittingRef.current = false;
           setIsSubmitting(false); // 重置提交状态
         }
       }
     } catch (error) {
       console.error('Form validation failed:', error);
+      isSubmittingRef.current = false;
       setIsSubmitting(false); // 发生错误时也要重置状态
     }
   };
@@ -295,18 +308,15 @@ const TodoForm: React.FC<TodoFormProps> = ({
         label="负责人"
         extra={historyOwners.length > 0 ? `可从 ${historyOwners.length} 个历史负责人中选择，也可直接输入新负责人` : '可直接输入负责人'}
       >
-        <Input
+        <AutoComplete
           placeholder="输入负责人，或参考已有负责人名称"
-          list="todo-owner-history"
           allowClear
+          options={ownerOptions}
+          filterOption={(inputValue, option) =>
+            String(option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase())
+          }
         />
       </Form.Item>
-
-      <datalist id="todo-owner-history">
-        {historyOwners.map((item) => (
-          <option key={item} value={item} />
-        ))}
-      </datalist>
 
       <Form.Item
         name="startTime"
@@ -412,7 +422,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
           )}
           <Space>
             <Button onClick={onCancel}>取消</Button>
-            <Button type="primary" onClick={handleSubmit}>
+            <Button type="primary" htmlType="submit" form="todo-form" loading={isSubmitting} disabled={isSubmitting}>
               保存
             </Button>
           </Space>
@@ -420,8 +430,10 @@ const TodoForm: React.FC<TodoFormProps> = ({
       }
     >
       <Form
+        id="todo-form"
         form={form}
         layout="vertical"
+        onFinish={handleSubmit}
         initialValues={{
           status: 'pending',
           priority: 'trivial'
