@@ -64,6 +64,7 @@ userData/
 
 # Claude Code settings
 .claude/settings.local.json
+.claude/tmp/
 
 # Build and cache files
 electron-cache/

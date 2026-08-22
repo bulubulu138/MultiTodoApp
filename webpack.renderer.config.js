@@ -80,6 +80,13 @@ module.exports = (env, argv) => {
     static: {
       directory: path.join(__dirname, 'public'),
     },
+    // 只对编译错误显示全屏遮罩;第三方库的 warning(如 framer-motion 动态依赖)不再遮挡 UI
+    client: {
+      overlay: {
+        errors: true,
+        warnings: false,
+      },
+    },
   },
   };
 };
