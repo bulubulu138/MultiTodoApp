@@ -17,6 +17,7 @@ import { formatCompletedTime } from '../utils/timeFormatter';
 import { PerformanceMonitor } from '../utils/performanceMonitor';
 import { ColorTheme } from '../theme/themes';
 import dayjs from 'dayjs';
+import { shouldUseVirtualScroll } from '../utils/tabPerformance';
 
 const { Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -574,7 +575,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   }
 
   // 启用虚拟滚动来处理大量任务
-  if (enableVirtualScroll && todos.length > 50) {
+  if (enableVirtualScroll && shouldUseVirtualScroll(todos.length)) {
     return (
       <VirtualizedTodoList
         todos={todos}

@@ -1,4 +1,5 @@
 import { Todo, TodoRelation } from '../../shared/types';
+import { buildParallelRelationIndex } from '../../shared/utils/parallelRelationIndex';
 import React, { useState, useMemo, useCallback, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { Divider, Button, Checkbox, Space, Spin, Empty, App, Input, InputNumber, Tag, Tooltip } from 'antd';
 import { SaveOutlined, EyeOutlined, CheckCircleOutlined, ClockCircleOutlined, PlayCircleOutlined } from '@ant-design/icons';
@@ -43,6 +44,7 @@ interface ContentFocusItemProps {
   relations: TodoRelation[];
   parallelGroup?: Set<string>;
   parallelGroupsMap?: Map<string, Set<string>>;
+  hasParallel: boolean;
   prevTodo: Todo | null;
   nextTodo: Todo | null;
   onUpdateDisplayOrder: (todoId: string, tabKey: string, displayOrder: number) => Promise<void>;
@@ -67,6 +69,7 @@ const ContentFocusItem = React.memo(
     relations,
     parallelGroup,
     parallelGroupsMap,
+    hasParallel,
     prevTodo,
     nextTodo,
     onUpdateDisplayOrder,
@@ -598,17 +601,11 @@ const ContentFocusItem = React.memo(
     // 计算分组边界和并列关系
     const isInParallelGroup = parallelGroup && parallelGroup.size > 1;
     const isInGroup = isInParallelGroup && (
-      (prevTodo && parallelGroup?.has(prevTodo.id)) ||
-      (nextTodo && parallelGroup?.has(nextTodo.id))
+      (prevTodo && parallelGroup?.has(String(prevTodo.id))) ||
+      (nextTodo && parallelGroup?.has(String(nextTodo.id)))
     );
-    const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(prevTodo.id));
-    const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(nextTodo.id));
-    
-    // 检查是否有并列关系
-    const hasParallel = relations.some(r => 
-      r.relation_type === 'parallel' && 
-      (r.source_id === todo.id || r.target_id === todo.id)
-    );
+    const isGroupStart = isInGroup && (!prevTodo || !parallelGroup?.has(String(prevTodo.id)));
+    const isGroupEnd = isInGroup && (!nextTodo || !parallelGroup?.has(String(nextTodo.id)));
     
     // 获取当前显示的序号
     const currentDisplayOrder = editingOrder !== undefined 
@@ -862,49 +859,12 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
   // 为每个待办项创建 ref
   const itemRefsMap = useRef<Map<string, ContentFocusItemRef>>(new Map());
 
-  // 使用 DFS 构建并列关系分组 Map（复用自TodoList）
-  const parallelGroups = useMemo(() => {
-    const groups = new Map<string, Set<string>>();
-    const visited = new Set<string>();
-
-    const dfs = (todoId: string, groupSet: Set<string>) => {
-      if (visited.has(todoId)) return;
-      visited.add(todoId);
-      groupSet.add(todoId);
-
-      // 找到所有与该 todo 有并列关系的其他 todo
-      const relatedIds = relations
-        .filter(r => r.relation_type === 'parallel')
-        .filter(r => r.source_id === todoId || r.target_id === todoId)
-        .map(r => String(r.source_id) === todoId ? String(r.target_id) : String(r.source_id));
-
-      for (const relatedId of relatedIds) {
-        dfs(relatedId, groupSet);
-      }
-    };
-    
-    // 为每个有并列关系的 todo 构建分组
-    todos.forEach(todo => {
-      if (!todo.id) return;
-
-      const hasParallel = relations.some(r =>
-        r.relation_type === 'parallel' &&
-        (r.source_id === todo.id || r.target_id === todo.id)
-      );
-
-      if (hasParallel && !visited.has(todo.id)) {
-        const groupSet = new Set<string>();
-        dfs(todo.id, groupSet);
-
-        // 将这个分组应用到所有成员
-        groupSet.forEach(id => {
-          groups.set(id, groupSet);
-        });
-      }
-    });
-    
-    return groups;
-  }, [relations, todos]);
+  // 一次性构建并列关系索引，保留全量加载和渲染行为
+  const parallelRelationIndex = useMemo(
+    () => buildParallelRelationIndex(relations),
+    [relations]
+  );
+  const parallelGroups = parallelRelationIndex.parallelGroupByTodo;
 
   // 暴露给父组件的保存所有方法
   useImperativeHandle(ref, () => ({
@@ -957,8 +917,9 @@ const ContentFocusView = forwardRef<ContentFocusViewRef, ContentFocusViewProps>(
               sortedTodos={todos}
               allTodos={allTodos || todos}
               relations={relations}
-              parallelGroup={parallelGroups.get(todo.id)}
+              parallelGroup={parallelGroups.get(String(todo.id))}
               parallelGroupsMap={parallelGroups}
+              hasParallel={parallelRelationIndex.hasParallelByTodo.has(String(todo.id))}
               prevTodo={index > 0 ? todos[index - 1] : null}
               nextTodo={index < todos.length - 1 ? todos[index + 1] : null}
               onUpdateDisplayOrder={onUpdateDisplayOrder}

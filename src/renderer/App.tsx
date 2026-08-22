@@ -1,6 +1,6 @@
 import { Todo, TodoRelation, CalendarViewSize, CustomTab } from '../shared/types';
 import { createRelationForNewTodoPlacement } from '../shared/relationDirection';
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, useTransition } from 'react';
 import { Layout, App as AntApp, ConfigProvider, FloatButton, Modal, Typography, Space, Tag, Button, Tooltip } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import {
@@ -37,6 +37,7 @@ import { useGlobalKeyboardHandler } from './hooks/useGlobalKeyboardHandler';
 import { syncParallelGroupOrders, computeAllFinalOrders } from './utils/orderConflictResolver';
 import { collectTodoOwners, matchesTodoOwner, OwnerFilter } from './utils/todoOwner';
 import dayjs from 'dayjs';
+import { countTodoTags } from './utils/tabPerformance';
 
 const { Content } = Layout;
 
@@ -94,6 +95,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const [showPositionSelector, setShowPositionSelector] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [pendingPosition, setPendingPosition] = useState<PositionSelection | null>(null);
+  const [, startTransition] = useTransition();
 
   // ✅ 新增：首次运行状态
   const [showFirstRunDialog, setShowFirstRunDialog] = useState(false);
@@ -129,11 +131,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   }, []);
 
   // 性能优化：并列关系分组缓存 - 避免重复计算
-  const parallelGroupsCacheRef = useRef<{
-    relationsHash: string;
-    todoIds: string;
-    groups: Map<string, Set<string>>;
-  } | null>(null);
+  const parallelGroupsCacheRef = useRef<Map<string, Map<string, Set<string>>>>(new Map());
 
   // 保存状态追踪（用于专注模式的乐观更新）
   const savingTodosRef = useRef<Set<string>>(new Set());
@@ -330,7 +328,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     // 清理派生缓存（当待办数据变化时）
     searchCacheRef.current.clear();
     sortingCacheRef.current.clear();
-    parallelGroupsCacheRef.current = null;
+    parallelGroupsCacheRef.current.clear();
   }, [todos]);
 
   // 定期清理缓存机制
@@ -1621,12 +1619,19 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   }, [ownerFilter, ownerOptions]);
 
   // 统计各状态的待办数量
-  const statusCounts = useMemo(() => ({
-    all: todos.filter(t => t && t.id).length,
-    pending: todos.filter(t => t && t.status === 'pending').length,
-    in_progress: todos.filter(t => t && t.status === 'in_progress').length,
-    completed: todos.filter(t => t && t.status === 'completed').length
-  }), [todos]);
+  const statusCounts = useMemo(() => {
+    const counts = { all: 0, pending: 0, in_progress: 0, completed: 0 };
+
+    todos.forEach((todo) => {
+      if (!todo?.id) return;
+      counts.all += 1;
+      if (todo.status === 'pending') counts.pending += 1;
+      if (todo.status === 'in_progress') counts.in_progress += 1;
+      if (todo.status === 'completed') counts.completed += 1;
+    });
+
+    return counts;
+  }, [todos]);
 
   // 性能优化：分层缓存计算结果
   // 第一层：基础过滤（按Tab状态过滤）
@@ -1726,15 +1731,24 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       .map(t => `${t.id}:${t.updatedAt ?? ''}:${t.status ?? ''}`)
       .join(',');
 
-    // 检查缓存
+    const cacheKey = `${relationsHash}::${todoIds}`;
     const cache = parallelGroupsCacheRef.current;
-    if (cache && cache.relationsHash === relationsHash && cache.todoIds === todoIds) {
-      return cache.groups;
+    const cachedGroups = cache.get(cacheKey);
+    if (cachedGroups) {
+      return cachedGroups;
     }
 
     // 缓存未命中 - 计算分组
     const groups = buildParallelGroups(searchedTodos, relations);
-    parallelGroupsCacheRef.current = { relationsHash, todoIds, groups };
+    cache.set(cacheKey, groups);
+
+    // 保留最近 8 个 Tab/筛选结果，防止关系缓存无限增长。
+    if (cache.size > 8) {
+      const oldestKey = cache.keys().next().value;
+      if (oldestKey !== undefined) {
+        cache.delete(oldestKey);
+      }
+    }
 
     if (process.env.NODE_ENV === 'development') {
       console.log('[性能优化] 并列关系分组缓存未命中，重新计算');
@@ -1902,6 +1916,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
 
   // Tab配置
   const tabItems = useMemo<TodoTabItem[]>(() => {
+    const tagCounts = countTodoTags(todos);
     const defaultTabs = [
     {
       key: 'all',
@@ -1930,7 +1945,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   ];
 
     // 添加自定义标签Tab
-    const customTabItems = customTabs
+    const customTabItems = [...customTabs]
       .sort((a, b) => a.order - b.order)
       .map(tab => {
         // 类型保护：确保tag是字符串（防止旧数据是数组）
@@ -1940,13 +1955,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         
         // 计算该标签的待办数量（大小写不敏感）
         const targetTag = tagValue.trim().toLowerCase();
-        const count = todos.filter(todo => {
-          if (!todo.tags) return false;
-          const tags = todo.tags.split(',')
-            .map(t => t.trim().toLowerCase())
-            .filter(Boolean);
-          return tags.includes(targetTag);
-        }).length;
+        const count = tagCounts.get(targetTag) ?? 0;
 
         return {
           key: `tag:${tagValue}`,
@@ -1982,8 +1991,10 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       }
     }
 
-    // 等待完成后再切换 tab
-    setActiveTab(newTab);
+    // 保存完成后将列表切换放入低优先级更新，保证侧栏点击和其他输入保持响应。
+    startTransition(() => {
+      setActiveTab(newTab);
+    });
 
     // 性能监控：在下一帧测量切换时间
     requestAnimationFrame(() => {
@@ -1997,7 +2008,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         }
       }
     });
-  }, [currentTabSettings.viewMode, waitForAllSaves]);
+  }, [currentTabSettings.viewMode, waitForAllSaves, startTransition]);
 
   // 如果在复盘模式，显示复盘页面
   if (showReviewMode) {
@@ -2083,7 +2094,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         <div className="content-card-shell" style={{ background: 'var(--color-surface-elevated)' }}>
         <div className="todo-view-stage" style={{ position: 'relative' }}>
           <motion.div key="todo-view-container">
-            <AnimatePresence mode="wait">
+            <AnimatePresence initial={false} mode="sync">
               {currentTabSettings.viewMode === 'content-focus' && (
                 <motion.div
                   key="content-focus"
@@ -2155,7 +2166,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
                     activeTab={activeTab}
                     onUpdateDisplayOrder={handleUpdateDisplayOrder}
                     viewMode={currentTabSettings.viewMode}
-                    enableVirtualScroll={false}
+                    enableVirtualScroll
                     totalCount={filteredTodos.length}
                     colorTheme={colorTheme}
                     onDragEnd={handleDragEnd}
