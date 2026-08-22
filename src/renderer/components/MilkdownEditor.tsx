@@ -459,22 +459,24 @@ const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>(
 
               if (!listItemType || !bulletListType || !paragraphType) break;
 
-              // 先收缩选区到 from 位置，避免 replaceSelectionWith 删除选中内容
               const paragraph = paragraphType.create();
               const listItem = listItemType.create(
                 { checked: false, listType: 'bullet', label: '•' },
                 paragraph
               );
-              const bulletList = bulletListType.create(null, listItem);
+              const nextListItem = listItemType.create(
+                { checked: false, listType: 'bullet', label: '•' },
+                paragraphType.create()
+              );
+              const bulletList = bulletListType.create(null, [listItem, nextListItem]);
 
-              // 将光标收缩到选区起点后再插入，不覆盖已选文本
-              let tr = state.tr.setSelection(TextSelection.create(state.doc, from, from));
-              tr = tr.replaceSelectionWith(bulletList);
+              const $from = state.doc.resolve(from);
+              const currentBlockStart = $from.depth > 0 ? $from.before(1) : state.doc.content.size;
+              const tr = state.tr.insert(currentBlockStart, bulletList);
 
-              // 光标定位到新插入的 paragraph 内部（from偏移+3: ul起点+li起点+p起点）
               try {
-                const cursorPos = tr.doc.resolve(Math.min(from + 3, tr.doc.content.size - 1));
-                dispatch(tr.setSelection(TextSelection.near(cursorPos)));
+                const cursorPos = tr.doc.resolve(currentBlockStart + 7);
+                dispatch(tr.setSelection(TextSelection.create(tr.doc, cursorPos.pos, cursorPos.pos)));
               } catch {
                 dispatch(tr);
               }
