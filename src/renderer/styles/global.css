@@ -1637,13 +1637,20 @@ body {
   margin-bottom: 0;
 }
 
-/* 顶部工具栏 */
+/* 顶部工具栏（sticky 冻结：滚动时吸附在滚动区顶部，被下一个待办顶走） */
 .content-focus-item-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
-  padding-bottom: 4px;
+  /* 吸附到专注模式自己的滚动容器，而不是随着正文一起滚走 */
+  position: sticky;
+  top: var(--content-focus-sticky-top, 0px);
+  z-index: var(--z-sticky, 1020);
+  /* 吸附后必须不透明，遮住下方滚过的内容 */
+  background: var(--color-surface-elevated);
+  /* 原 margin-bottom: 8px 折入 padding，吸附时背景才能盖住整段间距 */
+  padding-top: 4px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--border-color, #f0f0f0);
 }
 
@@ -1857,7 +1864,7 @@ body {
 /* 深色主题适配 */
 [data-theme='dark'] .content-focus-item-header {
   border-bottom-color: #404040;
-  background-color: #0a0a0a;
+  background-color: var(--color-surface-elevated);
 }
 
 [data-theme='dark'] .content-focus-item-header span[style*="#999"] {
@@ -2096,6 +2103,8 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
+  /* 内容区已经位于全局工具栏下方；保留变量便于布局高度变化时调整吸附位置 */
+  --content-focus-sticky-top: 0px;
   /* 防止内容变化时滚动位置跳动 */
   scroll-behavior: auto;
 }
