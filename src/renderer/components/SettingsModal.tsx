@@ -447,6 +447,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       title="设置"
       open={visible}
       onCancel={onCancel}
+      zIndex={1050}
       rootClassName="ios-modal settings-modal"
       width={800}
       footer={[
