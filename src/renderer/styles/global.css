@@ -1646,6 +1646,8 @@ body {
   position: sticky;
   top: var(--content-focus-sticky-top, 0px);
   z-index: var(--z-sticky, 1020);
+  isolation: isolate;
+  min-height: 40px;
   /* 吸附后必须不透明，遮住下方滚过的内容 */
   background: var(--color-surface-elevated);
   /* 原 margin-bottom: 8px 折入 padding，吸附时背景才能盖住整段间距 */
@@ -2103,6 +2105,8 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
+  isolation: isolate;
+  z-index: 0;
   /* 内容区已经位于全局工具栏下方；保留变量便于布局高度变化时调整吸附位置 */
   --content-focus-sticky-top: 0px;
   /* 防止内容变化时滚动位置跳动 */

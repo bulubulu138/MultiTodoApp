@@ -20,10 +20,14 @@ describe('ContentFocusView toolbar pinning', () => {
     expect(scrollAreaStyles).toMatch(/overflow-y:\s*auto/);
     expect(scrollAreaStyles).toMatch(/overflow-x:\s*hidden/);
     expect(scrollAreaStyles).toMatch(/position:\s*relative/);
+    expect(scrollAreaStyles).toMatch(/isolation:\s*isolate/);
+    expect(scrollAreaStyles).toMatch(/z-index:\s*0/);
     expect(scrollAreaStyles).toMatch(/--content-focus-sticky-top:\s*0px/);
     expect(headerStyles).toMatch(/position:\s*sticky/);
     expect(headerStyles).toMatch(/top:\s*var\(--content-focus-sticky-top/);
     expect(headerStyles).toMatch(/z-index:\s*var\(--z-sticky/);
+    expect(headerStyles).toMatch(/isolation:\s*isolate/);
+    expect(headerStyles).toMatch(/min-height:\s*40px/);
     expect(headerStyles).toMatch(/background:\s*var\(--color-surface-elevated/);
     expect(headerStyles).toMatch(/border-bottom:\s*1px/);
   });
