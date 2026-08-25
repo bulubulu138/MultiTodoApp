@@ -13,6 +13,7 @@ export interface TodoIndexEntry {
   contentPreview: string;
   status: string;
   priority: string;
+  urgency: 'high' | 'low';
   tags: string[];
   keywords: string[];
   createdAt: string;
@@ -54,7 +55,7 @@ interface TodoIndex {
  * 提供高性能的搜索和过滤功能
  */
 export class FileIndexer {
-  private static readonly INDEX_VERSION = 2;
+  private static readonly INDEX_VERSION = 3;
   private storagePath: string;
   private indexPath: string;
   private index: TodoIndex;
@@ -87,7 +88,7 @@ export class FileIndexer {
       },
       fullText: new MiniSearch({
         fields: ['title', 'contentPreview', 'tags', 'keywords'],
-        storeFields: ['uuid', 'title', 'status', 'priority', 'tags'],
+        storeFields: ['uuid', 'title', 'status', 'priority', 'urgency', 'tags'],
         searchOptions: {
           boost: { title: 2, tags: 1.5, keywords: 1.3 },
           fuzzy: 0.2
@@ -243,6 +244,7 @@ export class FileIndexer {
       contentPreview: this.generateContentPreview(todo.content),
       status: todo.status,
       priority: todo.priority,
+      urgency: todo.urgency === 'high' ? 'high' : 'low',
       tags: this.parseTags(todo.tags),
       keywords: todo.keywords || [],
       createdAt: todo.createdAt,
@@ -308,21 +310,22 @@ export class FileIndexer {
           contentPreview: this.generateContentPreview(todo.content),
           status: todo.status,
           priority: todo.priority,
+          urgency: todo.urgency === 'high' ? 'high' : 'low',
           tags: this.parseTags(todo.tags),
           keywords: todo.keywords || [],
-      createdAt: todo.createdAt,
-      updatedAt: todo.updatedAt,
-      filePath: '', // Obsidian 风格不需要特定路径
-      owner: todo.owner,
-      imageUrl: todo.imageUrl,
-      images: todo.images,
-      startTime: todo.startTime,
-      deadline: todo.deadline,
-      displayOrder: todo.displayOrder,
-      displayOrders: todo.displayOrders,
-      contentHash: todo.contentHash,
-      completedAt: todo.completedAt,
-      todayCompletedAt: todo.todayCompletedAt
+          createdAt: todo.createdAt,
+          updatedAt: todo.updatedAt,
+          filePath: '', // Obsidian 风格不需要特定路径
+          owner: todo.owner,
+          imageUrl: todo.imageUrl,
+          images: todo.images,
+          startTime: todo.startTime,
+          deadline: todo.deadline,
+          displayOrder: todo.displayOrder,
+          displayOrders: todo.displayOrders,
+          contentHash: todo.contentHash,
+          completedAt: todo.completedAt,
+          todayCompletedAt: todo.todayCompletedAt
         });
       });
 
@@ -510,6 +513,7 @@ export class FileIndexer {
         contentPreview: this.generateContentPreview(parsed.content),
         status: frontmatter.status || 'pending',
         priority: frontmatter.priority || 'medium',
+        urgency: this.normalizeTodoUrgency(frontmatter.urgency),
         tags: this.parseTags(frontmatter.tags),
         keywords: this.parseTags(frontmatter.keywords),
         createdAt: frontmatter.created_at || new Date().toISOString(),
@@ -562,6 +566,7 @@ export class FileIndexer {
       contentPreview: this.generateContentPreview(todo.content || ''),
       status: todo.status || 'pending',
       priority: todo.priority || 'medium',
+      urgency: this.normalizeTodoUrgency(todo.urgency),
       tags: this.parseTags(todo.tags),
       keywords: todo.keywords || [],
       createdAt: todo.createdAt || new Date().toISOString(),
@@ -697,9 +702,19 @@ export class FileIndexer {
    * 反序列化索引
    */
   private deserializeIndex(data: any): TodoIndex {
+    const todos = new Map<string, TodoIndexEntry>(
+      (data.todos || []).map(([uuid, entry]: [string, TodoIndexEntry]) => [
+        uuid,
+        {
+          ...entry,
+          urgency: this.normalizeTodoUrgency(entry?.urgency)
+        }
+      ])
+    );
+
     const index: TodoIndex = {
       metadata: data.metadata,
-      todos: new Map(data.todos),
+      todos,
       indexes: {
         byStatus: new Map(data.indexes.byStatus.map(([k, v]: [string, string[]]) => [k, new Set(v)])),
         byPriority: new Map(data.indexes.byPriority.map(([k, v]: [string, string[]]) => [k, new Set(v)])),
@@ -739,6 +754,10 @@ export class FileIndexer {
       return tags.split(',').map(t => t.trim()).filter(Boolean);
     }
     return [];
+  }
+
+  private normalizeTodoUrgency(urgency: unknown): 'high' | 'low' {
+    return urgency === 'high' ? 'high' : 'low';
   }
 
   /**

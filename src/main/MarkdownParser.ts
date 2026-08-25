@@ -1,6 +1,6 @@
 import matter from 'gray-matter';
 import * as path from 'path';
-import { Todo, TodoRelation } from '../shared/types';
+import { Todo, TodoRelation, TodoUrgency } from '../shared/types';
 import { ImageExtractor, ImageExtractionResult } from './utils/ImageExtractor';
 import {
   normalizeFileProtocolPath,
@@ -46,6 +46,7 @@ export class MarkdownParser {
       content: processedContent,
       status,
       priority: data.priority as Todo['priority'] || 'trivial',
+      urgency: this.normalizeTodoUrgency(data.urgency),
       tags: this.parseTags(data.tags),
       owner: this.parseOwner(data.owner),
       imageUrl: data.imageUrl as string | undefined,
@@ -85,6 +86,7 @@ export class MarkdownParser {
       title: todo.title,
       status: todo.status,
       priority: todo.priority,
+      urgency: this.normalizeTodoUrgency(todo.urgency),
       tags: this.parseTags(todo.tags),
       created_at: todo.createdAt,
       updated_at: todo.updatedAt,
@@ -257,6 +259,10 @@ export class MarkdownParser {
         errors.push(`Invalid priority value: ${data.priority}`);
       }
 
+      if (data.urgency !== undefined && !['high', 'low'].includes(data.urgency)) {
+        errors.push(`Invalid urgency value: ${data.urgency}`);
+      }
+
       if (!data.id) {
         errors.push('Missing required field: id');
       }
@@ -347,6 +353,10 @@ export class MarkdownParser {
 
     const normalized = owner.trim();
     return normalized || undefined;
+  }
+
+  private normalizeTodoUrgency(urgency: unknown): TodoUrgency {
+    return urgency === 'high' ? 'high' : 'low';
   }
 
   /**

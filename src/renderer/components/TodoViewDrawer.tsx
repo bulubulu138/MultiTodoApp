@@ -757,6 +757,8 @@ const TodoViewDrawer: React.FC<TodoViewDrawerProps> = ({
   return (
     <Drawer
       rootClassName="ios-modal ios-drawer"
+      zIndex={1100}
+      getContainer={() => document.body}
       title={
         <Space>
           <span>待办详情</span>

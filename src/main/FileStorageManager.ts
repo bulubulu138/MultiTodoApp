@@ -861,6 +861,7 @@ export class FileStorageManager {
     keyword?: string;
     status?: string;
     priority?: string;
+    urgency?: string;
     tags?: string[];
     dateRange?: { start?: string; end?: string };
   }): Promise<Todo[]> {
@@ -881,6 +882,10 @@ export class FileStorageManager {
     // 优先级过滤
     if (options.priority) {
       results = results.filter(r => r.priority === options.priority);
+    }
+
+    if (options.urgency === 'high' || options.urgency === 'low') {
+      results = results.filter(r => (r.urgency === 'high' ? 'high' : 'low') === options.urgency);
     }
 
     // 标签过滤
@@ -1432,6 +1437,7 @@ export class FileStorageManager {
       contentPreview: entry.contentPreview || '',
       status: this.normalizeTodoStatus(entry.status),
       priority: this.normalizeTodoPriority(entry.priority),
+      urgency: entry.urgency === 'high' ? 'high' : 'low',
       tags: entry.tags.join(', '),
       owner: entry.owner,
       imageUrl: entry.imageUrl,

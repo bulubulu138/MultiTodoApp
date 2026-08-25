@@ -159,6 +159,9 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
     }
   }, []);
 
+  const getUrgencyLabel = useCallback((urgency?: string) => urgency === 'high' ? '高紧急' : '低紧急', []);
+  const getUrgencyColor = useCallback((urgency?: string) => urgency === 'high' ? 'red' : 'default', []);
+
   // 性能优化：使用 useCallback 缓存函数
   const handleStatusChange = useCallback((todoId: string, newStatus: string) => {
     const updates: Partial<Todo> = { status: newStatus as Todo['status'] };
@@ -503,6 +506,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                       </Text>
                       <TodoOwnerAvatar owner={todo.owner} size={24} />
                       <Tag color={getPriorityColor(todo.priority)}>{getPriorityText(todo.priority)}</Tag>
+                      <Tag color={getUrgencyColor(todo.urgency)}>{getUrgencyLabel(todo.urgency)}</Tag>
                     </div>
                     {todo.content && (
                       <Paragraph
@@ -849,6 +853,9 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                 <Space size={8}>
                   <Tag color={getPriorityColor(todo.priority)} style={{ margin: 0 }}>
                     {getPriorityText(todo.priority)}
+                  </Tag>
+                  <Tag color={getUrgencyColor(todo.urgency)} style={{ margin: 0 }}>
+                    {getUrgencyLabel(todo.urgency)}
                   </Tag>
                   <Select
                     value={todo.status}

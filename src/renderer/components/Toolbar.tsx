@@ -4,6 +4,7 @@ import { PlusOutlined, SettingOutlined, CalendarOutlined, SortAscendingOutlined,
 import { motion } from 'framer-motion';
 import TodoOwnerAvatar from './TodoOwnerAvatar';
 import { OwnerFilter, UNASSIGNED_OWNER_FILTER } from '../utils/todoOwner';
+import { UrgencyFilter } from '../utils/urgencyFilter';
 
 const { Option } = Select;
 const { Search } = Input;
@@ -33,6 +34,9 @@ interface ToolbarProps {
   ownerOptions?: string[];
   ownerFilter?: OwnerFilter;
   onOwnerFilterChange?: (value: OwnerFilter) => void;
+  activeTab?: string;
+  urgencyFilter?: UrgencyFilter;
+  onUrgencyFilterChange?: (value: UrgencyFilter) => void;
 }
 
 // 性能优化：使用 React.memo 避免不必要的重渲染
@@ -51,6 +55,9 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
   ownerOptions = [],
   ownerFilter = 'all',
   onOwnerFilterChange,
+  activeTab,
+  urgencyFilter = 'all',
+  onUrgencyFilterChange,
 }) => {
   return (
     <div className="toolbar">
@@ -88,6 +95,20 @@ const Toolbar: React.FC<ToolbarProps> = React.memo(({
             </Option>
           ))}
         </Select>
+
+        {activeTab === 'pending' && (
+          <Select
+            value={urgencyFilter}
+            onChange={(value) => onUrgencyFilterChange?.(value as UrgencyFilter)}
+            className="toolbar-sort-select"
+            style={{ minWidth: 120 }}
+            suffixIcon={<span aria-hidden="true">!</span>}
+          >
+            <Option value="all">全部紧急程度</Option>
+            <Option value="high">高紧急</Option>
+            <Option value="low">低紧急</Option>
+          </Select>
+        )}
 
         <Select
           value={sortOption}

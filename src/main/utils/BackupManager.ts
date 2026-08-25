@@ -519,6 +519,7 @@ updatedAt: ${todo.updatedAt}
         content: contentWithoutTitle || '',
         status: metadata.status || 'pending',
         priority: metadata.priority || 'trivial',
+        urgency: metadata.urgency === 'high' ? 'high' : 'low',
         tags: metadata.tags || '',
         createdAt: metadata.createdAt || new Date().toISOString(),
         updatedAt: metadata.updatedAt || new Date().toISOString(),

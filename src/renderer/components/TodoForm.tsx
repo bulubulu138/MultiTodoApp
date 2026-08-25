@@ -104,6 +104,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
           title: todo.title,
           status: todo.status,
           priority: todo.priority,
+          urgency: todo.urgency ?? 'low',
           owner: todo.owner,
           startTime: todo.startTime ? dayjs(todo.startTime) : undefined,
           deadline: todo.deadline ? dayjs(todo.deadline) : undefined,
@@ -211,6 +212,7 @@ const TodoForm: React.FC<TodoFormProps> = ({
         startTime: values.startTime ? values.startTime.toISOString() : new Date().toISOString(),
         deadline: values.deadline ? values.deadline.toISOString() : undefined,
         priority: values.priority || 'trivial',
+        urgency: values.urgency === 'high' ? 'high' : 'low',
         tags: tags.join(','),
         owner: normalizeTodoOwner(values.owner),
         images: '', // 图片现在嵌入在富文本中
@@ -289,6 +291,16 @@ const TodoForm: React.FC<TodoFormProps> = ({
           <Option value="mental">脑力劳动</Option>
           <Option value="communication">沟通对齐</Option>
           <Option value="trivial">临时小活</Option>
+        </Select>
+      </Form.Item>
+
+      <Form.Item
+        name="urgency"
+        label="紧急程度"
+      >
+        <Select>
+          <Option value="high">高</Option>
+          <Option value="low">低</Option>
         </Select>
       </Form.Item>
 
@@ -398,6 +410,8 @@ const TodoForm: React.FC<TodoFormProps> = ({
       open={visible}
       onCancel={onCancel}
       rootClassName="ios-modal"
+      zIndex={1100}
+      getContainer={() => document.body}
       width={800}
       style={{ top: 20 }}
       styles={{
@@ -436,7 +450,8 @@ const TodoForm: React.FC<TodoFormProps> = ({
         onFinish={handleSubmit}
         initialValues={{
           status: 'pending',
-          priority: 'trivial'
+          priority: 'trivial',
+          urgency: 'low'
         }}
       >
         {todo ? titleAndContentFields : metadataFields}

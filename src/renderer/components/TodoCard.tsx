@@ -77,6 +77,9 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
     }
   }, []);
 
+  const getUrgencyLabel = useCallback((urgency?: string) => urgency === 'high' ? '高紧急' : '低紧急', []);
+  const getUrgencyColor = useCallback((urgency?: string) => urgency === 'high' ? 'red' : 'default', []);
+
   const getStatusText = useCallback((status: string) => {
     switch (status) {
       case 'pending': return '待办池';
@@ -398,6 +401,9 @@ const TodoCard: React.FC<TodoCardProps> = memo(({
             <Space size={8}>
               <Tag color={getPriorityColor(todo.priority)} style={{ margin: 0 }}>
                 {getPriorityText(todo.priority)}
+              </Tag>
+              <Tag color={getUrgencyColor(todo.urgency)} style={{ margin: 0 }}>
+                {getUrgencyLabel(todo.urgency)}
               </Tag>
               <Select
                 value={todo.status}

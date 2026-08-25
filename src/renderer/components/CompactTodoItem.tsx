@@ -335,6 +335,16 @@ export const CompactTodoItem: React.FC<CompactTodoItemProps> = ({
           placeholder="输入待办标题..."
         />
         <TodoOwnerAvatar owner={todo.owner} size={20} />
+        <span
+          style={{
+            color: todo.urgency === 'high' ? '#cf1322' : colors.textMuted,
+            fontSize: '11px',
+            flexShrink: 0,
+            whiteSpace: 'nowrap'
+          }}
+        >
+          {todo.urgency === 'high' ? '高紧急' : '低紧急'}
+        </span>
       </div>
 
       {/* 截止时间显示 */}
@@ -354,6 +364,7 @@ const MemoizedCompactTodoItem = React.memo(CompactTodoItem, (prevProps, nextProp
   return (
     prevProps.todo.id === nextProps.todo.id &&
     prevProps.todo.status === nextProps.todo.status &&
+    prevProps.todo.urgency === nextProps.todo.urgency &&
     prevProps.todo.title === nextProps.todo.title &&
     prevProps.activeTab === nextProps.activeTab &&
     prevProps.currentDisplayOrder === nextProps.currentDisplayOrder &&

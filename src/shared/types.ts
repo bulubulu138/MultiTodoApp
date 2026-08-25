@@ -3,6 +3,7 @@
 
 // Todo ID 类型别名，提高语义化
 export type TodoId = string;
+export type TodoUrgency = 'high' | 'low';
 
 export interface Todo {
   id: TodoId;
@@ -10,6 +11,7 @@ export interface Todo {
   content: string;
   status: 'pending' | 'in_progress' | 'completed' | 'paused';
   priority: 'mental' | 'communication' | 'trivial';
+  urgency: TodoUrgency;
   tags: string;
   owner?: string;
   imageUrl?: string;
@@ -72,6 +74,7 @@ export interface TodoFormData {
   title: string;
   content: string;
   priority: 'mental' | 'communication' | 'trivial';
+  urgency: TodoUrgency;
   tags: string;
   owner?: string;
   imageUrl?: string;

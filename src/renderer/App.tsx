@@ -38,6 +38,8 @@ import { syncParallelGroupOrders, computeAllFinalOrders } from './utils/orderCon
 import { collectTodoOwners, matchesTodoOwner, OwnerFilter } from './utils/todoOwner';
 import dayjs from 'dayjs';
 import { countTodoTags } from './utils/tabPerformance';
+import { filterTodosByUrgency } from './utils/urgencyFilter';
+import type { UrgencyFilter } from './utils/urgencyFilter';
 
 const { Content } = Layout;
 
@@ -92,6 +94,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearchText, setDebouncedSearchText] = useState<string>('');
   const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>('all');
+  const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>('all');
   const [showPositionSelector, setShowPositionSelector] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [pendingPosition, setPendingPosition] = useState<PositionSelection | null>(null);
@@ -124,6 +127,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         todo.title ?? '',
         todo.status ?? '',
         todo.priority ?? '',
+        todo.urgency ?? 'low',
         todo.tags ?? '',
         todo.owner ?? '',
       ].join(':'))
@@ -1657,8 +1661,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
       tabFilteredTodos = activeTab === 'all' ? validTodos : validTodos.filter(todo => todo.status === activeTab);
     }
 
-    return tabFilteredTodos.filter((todo) => matchesTodoOwner(todo, ownerFilter));
-  }, [todos, activeTab, ownerFilter]);
+    const ownerFilteredTodos = tabFilteredTodos.filter((todo) => matchesTodoOwner(todo, ownerFilter));
+    return filterTodosByUrgency(ownerFilteredTodos, activeTab, urgencyFilter);
+  }, [todos, activeTab, ownerFilter, urgencyFilter]);
 
   // 第二层：搜索过滤（带缓存优化）
   const searchedTodos = useMemo(() => {
@@ -1672,7 +1677,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     const sortOption = currentSettings.sortOption;
     const searchScopeKey = buildDisplayOrderSignature(baseFilteredTodos, activeTab);
     const baseDataSignature = buildTodoDataSignature(baseFilteredTodos);
-    const cacheKey = `${activeTab}-${sortOption}-${searchLower}-${searchScopeKey}-${baseDataSignature}`;
+    const cacheKey = `${activeTab}-${urgencyFilter}-${sortOption}-${searchLower}-${searchScopeKey}-${baseDataSignature}`;
 
     // 检查缓存
     if (searchCacheRef.current.has(cacheKey)) {
@@ -1718,7 +1723,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     searchCacheRef.current.set(cacheKey, [...filtered]);
 
     return filtered;
-  }, [baseFilteredTodos, debouncedSearchText, activeTab, getCurrentTabSettings, buildDisplayOrderSignature, buildTodoDataSignature]);
+  }, [baseFilteredTodos, debouncedSearchText, activeTab, urgencyFilter, getCurrentTabSettings, buildDisplayOrderSignature, buildTodoDataSignature]);
 
   // 第三层：构建并列关系分组（优化：添加缓存）
   const parallelGroups = useMemo(() => {
@@ -1767,7 +1772,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     const dragOrderKey = dragOrder ? dragOrder.join(',') : 'none';
     const displayOrderKey = buildDisplayOrderSignature(searchedTodos, activeTab);
     const searchedDataSignature = buildTodoDataSignature(searchedTodos);
-    const cacheKey = `${activeTab}-${sortOption}-${searchedTodos.length}-${dragOrderKey}-${displayOrderKey}-${searchedDataSignature}`;
+    const cacheKey = `${activeTab}-${urgencyFilter}-${sortOption}-${searchedTodos.length}-${dragOrderKey}-${displayOrderKey}-${searchedDataSignature}`;
 
     // 检查缓存
     if (sortingCacheRef.current.has(cacheKey)) {
@@ -1901,7 +1906,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     sortingCacheRef.current.set(cacheKey, result);
 
     return result;
-  }, [searchedTodos, parallelGroups, activeTab, getCurrentTabSettings, getCurrentDragOrder, buildDisplayOrderSignature, buildTodoDataSignature]);
+  }, [searchedTodos, parallelGroups, activeTab, urgencyFilter, getCurrentTabSettings, getCurrentDragOrder, buildDisplayOrderSignature, buildTodoDataSignature]);
 
   const handleToggleTodoSidebar = useCallback(() => {
     setTodoSidebarCollapsed(prev => {
@@ -2047,6 +2052,9 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
         ownerOptions={ownerOptions}
         ownerFilter={ownerFilter}
         onOwnerFilterChange={setOwnerFilter}
+        activeTab={activeTab}
+        urgencyFilter={urgencyFilter}
+        onUrgencyFilterChange={setUrgencyFilter}
       />
 
       <Layout className="app-main-layout">
