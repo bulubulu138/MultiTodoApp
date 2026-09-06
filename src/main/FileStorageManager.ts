@@ -432,6 +432,13 @@ export class FileStorageManager {
   }
 
   /**
+   * 按内容哈希查找待办，只依赖索引，不读取文件正文。
+   */
+  async findTodoByContentHash(contentHash: string, excludeUuid?: string): Promise<TodoIndexEntry | null> {
+    return this.fileIndexer.findByContentHash(contentHash, excludeUuid);
+  }
+
+  /**
    * 批量获取待办（增量加载优化版本）
    * 优先使用缓存，只从文件系统加载未缓存的待办
    */

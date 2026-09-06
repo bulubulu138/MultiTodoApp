@@ -417,6 +417,19 @@ export class FileIndexer {
   }
 
   /**
+   * 按内容哈希查找待办，只读取索引元数据，不加载 Markdown 正文。
+   */
+  findByContentHash(contentHash: string, excludeUuid?: string): TodoIndexEntry | null {
+    for (const entry of this.index.todos.values()) {
+      if (entry.uuid !== excludeUuid && entry.contentHash === contentHash) {
+        return entry;
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * 按状态过滤
    */
   filterByStatus(status: string): TodoIndexEntry[] {

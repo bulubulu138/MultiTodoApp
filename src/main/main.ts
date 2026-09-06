@@ -786,18 +786,8 @@ class Application {
     ipcMain.handle('todo:findDuplicate', async (_, contentHash: string, excludeUuid?: string) => {
       try {
         const storageManager = this.databaseManager.getStorageManager();
-        const allTodos = await storageManager.getAllTodos();
 
-        // 查找具有相同内容哈希的待办
-        const duplicate = allTodos.find(todo => {
-          // 排除当前正在编辑的待办
-          if (excludeUuid && todo.id === excludeUuid) {
-            return false;
-          }
-          return todo.contentHash === contentHash;
-        });
-
-        return duplicate || null;
+        return await storageManager.findTodoByContentHash(contentHash, excludeUuid);
       } catch (error) {
         console.error('Error finding duplicate:', error);
         return null;
