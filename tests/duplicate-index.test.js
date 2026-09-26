@@ -11,7 +11,12 @@ assert.match(
   source,
   /findByContentHash\(contentHash: string, excludeUuid\?: string\): TodoIndexEntry \| null/
 );
-assert.match(source, /entry\.contentHash === contentHash/);
+assert.match(source, /byContentHash: Map<string, Set<string>>/);
+assert.match(source, /byContentHash\.get\(contentHash\)/);
+assert.match(source, /byContentHash\.get\(entry\.contentHash\)/);
+assert.match(source, /const hashSet = this\.index\.indexes\.byContentHash\.get\(entry\.contentHash\)/);
+assert.match(source, /hashSet\.delete\(uuid\)/);
+assert.match(source, /contentHash: todo\.contentHash/);
 assert.doesNotMatch(source, /findByContentHash[\s\S]{0,500}getAllTodos\(\)/);
 
 const mainSource = fs.readFileSync(

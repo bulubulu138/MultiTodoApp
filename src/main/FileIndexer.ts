@@ -46,6 +46,7 @@ interface TodoIndex {
     byPriority: Map<string, Set<string>>;
     byTags: Map<string, Set<string>>;
     byDateRange: Map<string, Set<string>>;
+    byContentHash: Map<string, Set<string>>;
   };
   fullText: MiniSearch;
 }
@@ -84,7 +85,8 @@ export class FileIndexer {
         byStatus: new Map(),
         byPriority: new Map(),
         byTags: new Map(),
-        byDateRange: new Map()
+        byDateRange: new Map(),
+        byContentHash: new Map()
       },
       fullText: new MiniSearch({
         fields: ['title', 'contentPreview', 'tags', 'keywords'],
@@ -249,6 +251,7 @@ export class FileIndexer {
       keywords: todo.keywords || [],
       createdAt: todo.createdAt,
       updatedAt: todo.updatedAt,
+      contentHash: todo.contentHash,
       filePath: '' // Obsidian 风格不需要特定路径，基于 UUID 映射
     };
 
@@ -420,9 +423,13 @@ export class FileIndexer {
    * 按内容哈希查找待办，只读取索引元数据，不加载 Markdown 正文。
    */
   findByContentHash(contentHash: string, excludeUuid?: string): TodoIndexEntry | null {
-    for (const entry of this.index.todos.values()) {
-      if (entry.uuid !== excludeUuid && entry.contentHash === contentHash) {
-        return entry;
+    const uuids = this.index.indexes.byContentHash.get(contentHash);
+    if (!uuids) return null;
+
+    for (const uuid of uuids) {
+      if (uuid !== excludeUuid) {
+        const entry = this.index.todos.get(uuid);
+        if (entry) return entry;
       }
     }
 
@@ -648,6 +655,13 @@ export class FileIndexer {
       this.index.indexes.byDateRange.set(dateKey, new Set());
     }
     this.index.indexes.byDateRange.get(dateKey)!.add(entry.uuid);
+
+    if (entry.contentHash) {
+      if (!this.index.indexes.byContentHash.has(entry.contentHash)) {
+        this.index.indexes.byContentHash.set(entry.contentHash, new Set());
+      }
+      this.index.indexes.byContentHash.get(entry.contentHash)!.add(entry.uuid);
+    }
   }
 
   /**
@@ -692,6 +706,16 @@ export class FileIndexer {
         this.index.indexes.byDateRange.delete(dateKey);
       }
     }
+
+    if (entry.contentHash) {
+      const hashSet = this.index.indexes.byContentHash.get(entry.contentHash);
+      if (hashSet) {
+        hashSet.delete(uuid);
+        if (hashSet.size === 0) {
+          this.index.indexes.byContentHash.delete(entry.contentHash);
+        }
+      }
+    }
   }
 
   /**
@@ -732,10 +756,19 @@ export class FileIndexer {
         byStatus: new Map(data.indexes.byStatus.map(([k, v]: [string, string[]]) => [k, new Set(v)])),
         byPriority: new Map(data.indexes.byPriority.map(([k, v]: [string, string[]]) => [k, new Set(v)])),
         byTags: new Map(data.indexes.byTags.map(([k, v]: [string, string[]]) => [k, new Set(v)])),
-        byDateRange: new Map(data.indexes.byDateRange.map(([k, v]: [string, string[]]) => [k, new Set(v)]))
+        byDateRange: new Map(data.indexes.byDateRange.map(([k, v]: [string, string[]]) => [k, new Set(v)])),
+        byContentHash: new Map()
       },
       fullText: this.createEmptyIndex().fullText // 重新创建 MiniSearch 实例
     };
+
+    for (const entry of todos.values()) {
+      if (!entry.contentHash) continue;
+      if (!index.indexes.byContentHash.has(entry.contentHash)) {
+        index.indexes.byContentHash.set(entry.contentHash, new Set());
+      }
+      index.indexes.byContentHash.get(entry.contentHash)!.add(entry.uuid);
+    }
 
     return index;
   }
