@@ -19,6 +19,8 @@ import { ColorTheme } from '../theme/themes';
 import dayjs from 'dayjs';
 import { shouldUseVirtualScroll } from '../utils/tabPerformance';
 
+const emptyTodos: Todo[] = [];
+
 const { Text, Paragraph } = Typography;
 const { Option } = Select;
 
@@ -103,7 +105,11 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   }, [hasMoreData, onLoadMore]);
 
   // 批量获取所有待办的URL标题
-  const { getUrlTitlesForTodo, loading: urlTitlesLoading } = useBatchURLTitles(todos);
+  const shouldVirtualize = viewMode === 'card' && sortOption !== 'drag' &&
+    enableVirtualScroll && shouldUseVirtualScroll(todos.length);
+  const { getUrlTitlesForTodo } = useBatchURLTitles(
+    shouldVirtualize || viewMode !== 'card' ? emptyTodos : todos
+  );
 
   // 性能监控：记录待办列表渲染时间
   useEffect(() => {
@@ -440,6 +446,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
 
   // 如果是拖拽排序模式，使用拖拽排序组件
   if (sortOption === 'drag' && onDragEnd) {
+    const largeDragList = shouldUseVirtualScroll(todos.length);
     return (
       <DragDropTodoList
         todos={todos}
@@ -453,14 +460,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
           const isGroupStart = isInGroup && todoGroups[0]?.source_id === todo.id;
           const isGroupEnd = isInGroup && todoGroups[todoGroups.length - 1]?.target_id === todo.id;
 
-          return (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
-              style={{ marginBottom: isGroupEnd && isInGroup ? 16 : 6 }}
-            >
+          const card = (
               <Card
                 hoverable
                 style={{
@@ -475,44 +475,25 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                 onClick={() => onView(todo)}
               >
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                  {/* 拖拽手柄 */}
                   {dragHandleProps && (
                     <div
                       {...dragHandleProps.attributes}
                       {...dragHandleProps.listeners}
-                      style={{
-                        cursor: 'grab',
-                        padding: '4px 8px',
-                        marginRight: '8px',
-                        opacity: 0.6,
-                        transition: 'opacity 0.2s',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-                      onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
+                      style={{ cursor: 'grab', padding: '4px 8px', marginRight: '8px', opacity: 0.6 }}
                       title="拖拽排序"
                     >
                       ⋮⋮
                     </div>
                   )}
-
-                  {/* 任务内容 */}
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
-                      <Text strong style={{ fontSize: 16, flex: 1 }}>
-                        {todo.title}
-                      </Text>
+                      <Text strong style={{ fontSize: 16, flex: 1 }}>{todo.title}</Text>
                       <TodoOwnerAvatar owner={todo.owner} size={24} />
                       <Tag color={getPriorityColor(todo.priority)}>{getPriorityText(todo.priority)}</Tag>
                       <Tag color={getUrgencyColor(todo.urgency)}>{getUrgencyLabel(todo.urgency)}</Tag>
                     </div>
                     {todo.content && (
-                      <Paragraph
-                        ellipsis={{ rows: 2 }}
-                        style={{ marginBottom: 8, color: colors.textMuted }}
-                      >
+                      <Paragraph ellipsis={{ rows: 2 }} style={{ marginBottom: 8, color: colors.textMuted }}>
                         {extractPlainText(todo.content)}
                       </Paragraph>
                     )}
@@ -530,6 +511,16 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
                   </div>
                 </div>
               </Card>
+          );
+          return largeDragList ? <div style={{ marginBottom: isGroupEnd && isInGroup ? 16 : 6 }}>{card}</div> : (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              style={{ marginBottom: isGroupEnd && isInGroup ? 16 : 6 }}
+            >
+              {card}
             </motion.div>
           );
         }}
@@ -551,13 +542,14 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
         activeTab={activeTab}
         relations={relations}
         sortOption={sortOption}
-        onDragEnd={onUpdateDisplayOrder ? async (newOrder: Todo[]) => {
-          // 更新显示顺序 - 批量更新每个项目的显示顺序
-          for (let i = 0; i < newOrder.length; i++) {
-            const todo = newOrder[i];
-            await onUpdateDisplayOrder(todo.id, activeTab, i);
-          }
-        } : undefined}
+        onDragEnd={onDragEnd || (onUpdateDisplayOrder ? async (newOrder: Todo[]) => {
+          const updates = newOrder.map((todo, index) => ({
+            uuid: String(todo.id),
+            tabKey: activeTab,
+            displayOrder: index
+          }));
+          await window.electronAPI.todo.batchUpdateDisplayOrders(updates);
+        } : undefined)}
       />
     );
   }
@@ -579,7 +571,7 @@ const TodoList: React.FC<TodoListProps> = React.memo(({
   }
 
   // 启用虚拟滚动来处理大量任务
-  if (enableVirtualScroll && shouldUseVirtualScroll(todos.length)) {
+  if (shouldVirtualize) {
     return (
       <VirtualizedTodoList
         todos={todos}

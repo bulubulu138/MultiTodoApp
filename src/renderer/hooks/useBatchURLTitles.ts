@@ -108,6 +108,7 @@ export function useBatchURLTitles(todos: Todo[]): {
   const [loading, setLoading] = useState(false);
   const cache = useRef(new URLTitleCache());
   const lastContentHashRef = useRef<string>('');
+  const requestIdRef = useRef(0);
 
   /**
    * 计算所有待办内容的哈希值，用于检测变化
@@ -127,6 +128,7 @@ export function useBatchURLTitles(todos: Todo[]): {
    * 批量获取URL标题
    */
   const fetchTitles = useCallback(async (todosToFetch: Todo[]) => {
+    const requestId = requestIdRef.current += 1;
     if (todosToFetch.length === 0) {
       setTitlesByTodo(new Map());
       return;
@@ -221,11 +223,15 @@ export function useBatchURLTitles(todos: Todo[]): {
         newTitlesByTodo.set(toStringId(todo.id!), todoTitles);
       });
 
-      setTitlesByTodo(newTitlesByTodo);
+      if (requestId === requestIdRef.current) {
+        setTitlesByTodo(newTitlesByTodo);
+      }
     } catch (error) {
       console.error('Failed to fetch batch URL titles:', error);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -251,7 +257,9 @@ export function useBatchURLTitles(todos: Todo[]): {
     const todosWithContent = todos.filter(todo => todo.content && todo.content.trim().length > 0);
 
     if (todosWithContent.length === 0) {
+      requestIdRef.current += 1;
       setTitlesByTodo(new Map());
+      setLoading(false);
       return;
     }
 

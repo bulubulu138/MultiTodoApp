@@ -24,6 +24,8 @@ import { dragStartFeedback, dragEndFeedback } from '../utils/hapticFeedback';
 import { dragPerformanceMonitor, getAnimationConfigByPerformance, PerformanceLevel } from '../utils/dragPerformanceMonitor';
 import { useFLIPAnimation } from '../hooks/useFLIPAnimation';
 
+const MAX_ANIMATED_ITEMS = 100;
+
 interface DragDropTodoListProps {
   todos: Todo[];
   activeTab: string;
@@ -123,8 +125,8 @@ export const DragDropTodoList: React.FC<DragDropTodoListProps> = ({
   const { capturePositions, animate } = useFLIPAnimation({
     duration: 250,
     easing: 'cubic-bezier(0.2, 0, 0, 1)',
-    maxItems: 100,
-    enabled: !useCompactAnimation && !shouldReduceMotion()
+    maxItems: MAX_ANIMATED_ITEMS,
+    enabled: !useCompactAnimation && todos.length <= MAX_ANIMATED_ITEMS && !shouldReduceMotion()
   });
 
   // 开发模式检测
@@ -191,7 +193,7 @@ export const DragDropTodoList: React.FC<DragDropTodoListProps> = ({
     setActiveId(event.active.id as string);
 
     // 捕获所有元素的初始位置（FLIP 第一步）；紧凑模式不做松手动画
-    if (!useCompactAnimation && containerRef.current) {
+    if (!useCompactAnimation && todos.length <= MAX_ANIMATED_ITEMS && containerRef.current) {
       capturePositions(containerRef.current);
     }
 
@@ -255,7 +257,7 @@ export const DragDropTodoList: React.FC<DragDropTodoListProps> = ({
         onDragEnd(newTodos);
 
         // 触发 FLIP 动画（FLIP 第二、三、四步）；紧凑模式直接落位
-        if (!useCompactAnimation && containerRef.current) {
+        if (!useCompactAnimation && todos.length <= MAX_ANIMATED_ITEMS && containerRef.current) {
           requestAnimationFrame(() => {
             animate(containerRef.current!);
           });

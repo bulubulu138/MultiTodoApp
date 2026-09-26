@@ -10,6 +10,7 @@ import TodoLinksPreview from './TodoLinksPreview';
 import { copyTodoToClipboard } from '../utils/copyTodo';
 import TodoOwnerAvatar from './TodoOwnerAvatar';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { useBatchURLTitles } from '../hooks/useBatchURLTitles';
 import { formatCompletedTime } from '../utils/timeFormatter';
 import { optimizedMotionVariants, shouldReduceMotion } from '../utils/optimizedMotionVariants';
 import { ColorTheme } from '../theme/themes';
@@ -39,6 +40,7 @@ interface VirtualizedTodoListProps {
 
 // 虚拟化列表项的高度
 const ITEM_HEIGHT = 240; // 根据实际卡片高度调整
+const VISIBLE_PADDING = 3;
 
 // VirtualizedTodoItem props interface
 interface VirtualizedTodoItemProps {
@@ -406,6 +408,19 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
   getUrlTitlesForTodo,
   colorTheme = 'purple',
 }) => {
+  const [visibleRange, setVisibleRange] = useState(() => ({
+    start: 0,
+    stop: Math.max(0, Math.min(todos.length - 1, Math.ceil(window.innerHeight / ITEM_HEIGHT) + VISIBLE_PADDING))
+  }));
+  const handleRowsRendered = useCallback(({ startIndex, stopIndex }: { startIndex: number; stopIndex: number }) => {
+    setVisibleRange(previous => previous.start === startIndex && previous.stop === stopIndex
+      ? previous : { start: startIndex, stop: stopIndex });
+  }, []);
+  const visibleTodos = useMemo(() => todos.slice(
+    Math.max(0, visibleRange.start - VISIBLE_PADDING),
+    Math.min(todos.length, visibleRange.stop + VISIBLE_PADDING + 1)
+  ), [todos, visibleRange]);
+  const { getUrlTitlesForTodo: getVisibleUrlTitles } = useBatchURLTitles(visibleTodos);
   // 创建行组件的props（不包括index和style，这些由List自动提供）
   type RowPropsType = {
     todos: Todo[];
@@ -435,9 +450,9 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
     onView,
     onRelationsChange,
     onUpdateDisplayOrder,
-    getUrlTitlesForTodo,
+    getUrlTitlesForTodo: getVisibleUrlTitles,
     colorTheme
-  }), [todos, allTodos, relations, sortOption, activeTab, onEdit, onDelete, onStatusChange, onView, onRelationsChange, onUpdateDisplayOrder, getUrlTitlesForTodo, colorTheme]);
+  }), [todos, allTodos, relations, sortOption, activeTab, onEdit, onDelete, onStatusChange, onView, onRelationsChange, onUpdateDisplayOrder, getVisibleUrlTitles, colorTheme]);
 
   // 渲染虚拟化列表项 - 接收List自动提供的index和style，以及我们传入的rowProps
   const RowComponent = useCallback((props: {
@@ -480,6 +495,7 @@ const VirtualizedTodoList: React.FC<VirtualizedTodoListProps> = React.memo(({
           rowHeight={ITEM_HEIGHT}
           style={{ width: '100%' }}
           overscanCount={3} // 预渲染3个额外项，提升滚动体验
+          onRowsRendered={handleRowsRendered}
           rowComponent={RowComponent}
           rowProps={rowPropsData as any}
         />

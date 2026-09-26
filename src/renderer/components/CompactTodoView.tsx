@@ -8,6 +8,7 @@ import { sortTodos } from '../utils/sortUtils';
 import DragDropTodoList from './DragDropTodoList';
 import { resolveOrderConflicts, syncParallelGroupOrders } from '../utils/orderConflictResolver';
 import { buildCompactTodoRows } from '../utils/compactTodoNesting';
+import { buildParallelRelationIndex } from '../../shared/utils/parallelRelationIndex';
 
 interface CompactTodoViewProps {
   todos: Todo[];
@@ -45,41 +46,14 @@ export const CompactTodoView: React.FC<CompactTodoViewProps> = ({
 
   // 计算并列关系分组
   const parallelGroups = useMemo(() => {
+    const index = buildParallelRelationIndex(relations);
     const groups = new Map<string, Set<string>>();
-    const visited = new Set<string>();
-
-    const dfs = (todoId: string, groupSet: Set<string>) => {
-      if (visited.has(todoId)) return;
-      visited.add(todoId);
-      groupSet.add(todoId);
-
-      const parallelRels = relations.filter(r =>
-        r.relation_type === 'parallel' &&
-        (r.source_id === todoId || r.target_id === todoId)
-      );
-
-      parallelRels.forEach(rel => {
-        const relatedId = String(rel.source_id) === todoId
-          ? String(rel.target_id)
-          : String(rel.source_id);
-        dfs(relatedId, groupSet);
-      });
-    };
-
-    todos.forEach(todo => {
-      if (!visited.has(todo.id)) {
-        const hasParallel = relations.some(r =>
-          r.relation_type === 'parallel' &&
-          (r.source_id === todo.id || r.target_id === todo.id)
-        );
-
-        if (hasParallel) {
-          const groupSet = new Set<string>();
-          dfs(todo.id, groupSet);
-          groupSet.forEach(id => groups.set(id, groupSet));
-        }
+    for (const todo of todos) {
+      const group = index.parallelGroupByTodo.get(String(todo.id));
+      if (group) {
+        groups.set(String(todo.id), group);
       }
-    });
+    }
 
     return groups;
   }, [relations, todos]);
