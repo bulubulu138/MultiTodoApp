@@ -24,7 +24,6 @@ const mainSource = fs.readFileSync(
   'utf8'
 );
 
-assert.match(mainSource, /findTodoByContentHash\(contentHash, excludeUuid\)/);
-assert.doesNotMatch(mainSource, /todo:findDuplicate[\s\S]{0,500}getAllTodos\(\)/);
+assert.doesNotMatch(mainSource, /todo:findDuplicate/);
 
 console.log('duplicate index lookup regression check passed');

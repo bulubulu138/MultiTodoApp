@@ -201,10 +201,6 @@ const TodoForm: React.FC<TodoFormProps> = ({
       // 生成内容哈希
       const contentHash = await window.electronAPI.todo.generateHash(title, submitContent);
 
-      // 检测重复（编辑时排除自己）
-      const editId = todo?.id !== undefined ? String(todo.id) : undefined;
-      const duplicate = await window.electronAPI.todo.findDuplicate(contentHash, editId);
-
       const todoData: Omit<Todo, 'id' | 'createdAt' | 'updatedAt'> = {
         title: title,
         content: submitContent,
@@ -219,33 +215,11 @@ const TodoForm: React.FC<TodoFormProps> = ({
         contentHash: contentHash,
       };
 
-      // 如果检测到重复，弹出确认对话框
-      if (duplicate) {
-        Modal.confirm({
-          title: '检测到重复待办',
-          content: `与待办"${duplicate.title}"的内容完全相同，是否继续${todo ? '保存' : '创建'}？`,
-          okText: '继续',
-          cancelText: '取消',
-          onOk: async () => {
-            try {
-              await onSubmit(todoData);
-            } finally {
-              isSubmittingRef.current = false;
-              setIsSubmitting(false); // 重置提交状态
-            }
-          },
-          onCancel: () => {
-            isSubmittingRef.current = false;
-            setIsSubmitting(false); // 用户取消时也要重置状态
-          },
-        });
-      } else {
-        try {
-          await onSubmit(todoData);
-        } finally {
-          isSubmittingRef.current = false;
-          setIsSubmitting(false); // 重置提交状态
-        }
+      try {
+        await onSubmit(todoData);
+      } finally {
+        isSubmittingRef.current = false;
+        setIsSubmitting(false); // 重置提交状态
       }
     } catch (error) {
       console.error('Form validation failed:', error);

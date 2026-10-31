@@ -783,17 +783,6 @@ class Application {
       return generateContentHash(title, content);
     });
 
-    ipcMain.handle('todo:findDuplicate', async (_, contentHash: string, excludeUuid?: string) => {
-      try {
-        const storageManager = this.databaseManager.getStorageManager();
-
-        return await storageManager.findTodoByContentHash(contentHash, excludeUuid);
-      } catch (error) {
-        console.error('Error finding duplicate:', error);
-        return null;
-      }
-    });
-
     ipcMain.handle('todo:batchUpdateDisplayOrder', async (_, updates: {uuid: string, displayOrder: number}[]) => {
       const storageManager = this.databaseManager.getStorageManager();
       for (const update of updates) {

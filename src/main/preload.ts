@@ -45,7 +45,6 @@ export interface ElectronAPI {
     delete: (uuid: string) => Promise<boolean>;  // 修复：uuid 参数类型为 string
     deleteAndReorder: (uuid: string, tabKey: string) => Promise<void>;  // 删除并重新编号
     generateHash: (title: string, content: string) => Promise<string>;
-    findDuplicate: (contentHash: string, excludeUuid?: string) => Promise<any | null>;  // 修复：excludeUuid 参数类型为 string
     batchUpdateDisplayOrder: (updates: {uuid: string, displayOrder: number}[]) => Promise<void>;  // 修复：uuid 参数类型为 string
     batchUpdateDisplayOrders: (updates: {uuid: string, tabKey: string, displayOrder: number}[]) => Promise<void>;  // 修复：uuid 参数类型为 string
     bulkUpdateTodos: (updates: Array<{uuid: string; updates: any}>) => Promise<void>;  // 修复：uuid 参数类型为 string
@@ -392,7 +391,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     delete: (uuid: string) => ipcRenderer.invoke('todo:delete', uuid),  // 修复：uuid 参数类型为 string
     deleteAndReorder: (uuid: string, tabKey: string) => ipcRenderer.invoke('todo:deleteAndReorder', uuid, tabKey),  // 删除并重新编号
     generateHash: (title: string, content: string) => ipcRenderer.invoke('todo:generateHash', title, content),
-    findDuplicate: (contentHash: string, excludeUuid?: string) => ipcRenderer.invoke('todo:findDuplicate', contentHash, excludeUuid),  // 修复：excludeUuid 参数类型为 string
     batchUpdateDisplayOrder: (updates: {uuid: string, displayOrder: number}[]) => ipcRenderer.invoke('todo:batchUpdateDisplayOrder', updates),  // 修复：uuid 参数类型为 string
     batchUpdateDisplayOrders: (updates: {uuid: string, tabKey: string, displayOrder: number}[]) => ipcRenderer.invoke('todo:batchUpdateDisplayOrders', updates),  // 修复：uuid 参数类型为 string
     bulkUpdateTodos: (updates: Array<{uuid: string; updates: any}>) => ipcRenderer.invoke('todo:bulkUpdateTodos', updates),  // 修复：uuid 参数类型为 string
