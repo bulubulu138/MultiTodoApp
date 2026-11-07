@@ -23,7 +23,22 @@ export class FileStorageManager {
   private cache: Map<string, { todo: Todo; timestamp: number }> = new Map();
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5分钟缓存
   private readonly MAX_CACHE_SIZE = 100;
-  private readonly FILE_READ_CONCURRENCY = 8;
+  private readonly FILE_READ_CONCURRENCY = this.calculateOptimalConcurrency();
+
+  private calculateOptimalConcurrency(): number {
+    // ⚡ 性能优化：根据系统 CPU 核心数动态计算最优并发数
+    // 通常设置为 CPU核心数 * 2 到 CPU核心数 * 4 之间
+    try {
+      const os = require('os');
+      const cpuCount = os.cpus().length;
+      const concurrency = Math.min(Math.max(cpuCount * 2, 8), 32);
+      console.log(`[FileStorageManager] 📊 Detected ${cpuCount} CPU cores, setting FILE_READ_CONCURRENCY to ${concurrency}`);
+      return concurrency;
+    } catch {
+      console.warn('[FileStorageManager] ⚠️ Failed to detect CPU count, using default concurrency: 16');
+      return 16;
+    }
+  }
 
   // ✅ Phase 3: Track recently written files to prevent immediate reprocessing
   private recentWrites: Map<string, number> = new Map();
@@ -215,11 +230,17 @@ export class FileStorageManager {
 
     console.log(`[createTodoWithDisplayOrder] ✅ Found ${currentTabTodos.length} todos with display orders in tab ${tabKey} (from cache)`);
 
-    // 2. 为新待办分配排序号
+    // 2. 为新待办分配排序号（优化：不调整其他待办）
     let newTodoOrder: number;
     if (position === 'top') {
-      // 插入到顶部：新待办排序号为0
-      newTodoOrder = 0;
+      // ⚡ 性能优化：使用虚拟排序号策略
+      // 获取当前最小排序号，新待办排序号设为最小值 - 1000
+      // 这样无需修改任何现有待办，UI层在展示时会正确排序
+      const minOrder = currentTabTodos.length > 0
+        ? Math.min(...currentTabTodos.map(t => t.displayOrders![tabKey]!))
+        : 0;
+      newTodoOrder = minOrder - 1000;
+      console.log(`[createTodoWithDisplayOrder] ⚡ Using virtual order strategy: min=${minOrder}, newOrder=${newTodoOrder} (no other todos modified)`);
     } else {
       // 插入到底部：新待办排序号为当前最大值+1
       const maxOrder = currentTabTodos.length > 0
@@ -242,34 +263,8 @@ export class FileStorageManager {
     const newTodo = await this.createTodo(todoWithOrder);
     console.log(`[createTodoWithDisplayOrder] Created todo with ID: ${newTodo.id}`);
 
-    // 4. 如果插入到顶部，需要调整所有其他待办的排序号
-    if (position === 'top' && currentTabTodos.length > 0) {
-      console.log(`[createTodoWithDisplayOrder] Adjusting display orders for ${currentTabTodos.length} existing todos`);
-
-      // 构建批量更新列表
-      const batchUpdates: Array<{ uuid: string; tabKey: string; displayOrder: number }> = [];
-
-      // 所有现有待办的排序号+1
-      currentTabTodos.forEach(todo => {
-        const oldOrder = todo.displayOrders![tabKey]!;
-        const newOrder = oldOrder + 1;
-        batchUpdates.push({
-          uuid: todo.id,
-          tabKey: tabKey,
-          displayOrder: newOrder
-        });
-        console.log(`[createTodoWithDisplayOrder] Todo ${todo.id}: ${oldOrder} -> ${newOrder}`);
-      });
-
-      // 批量更新排序号
-      if (batchUpdates.length > 0) {
-        await this.batchUpdateDisplayOrders(batchUpdates);
-        console.log(`[createTodoWithDisplayOrder] Successfully updated ${batchUpdates.length} todos' display orders`);
-      }
-    }
-
     const duration = Date.now() - startTime;
-    console.log(`[createTodoWithDisplayOrder] 🎉 Completed in ${duration}ms`);
+    console.log(`[createTodoWithDisplayOrder] 🎉 Completed in ${duration}ms (zero other todos modified)`);
 
     return newTodo;
   }
@@ -639,77 +634,20 @@ export class FileStorageManager {
   }
 
   /**
-   * 删除待办并重新编号（保持序号连续）
-   * 删除指定待办后，自动重新计算该标签页下所有待办的 displayOrder，保持 0, 1, 2, 3... 的连续性
+   * 删除待办（优化：直接删除，不重编号）
+   * ⚡ 性能优化：使用虚拟排序号策略，删除待办时直接标记为特殊值，无需重编号所有待办
+   * UI层在展示时会自动过滤掉已删除的待办并正确排序
    */
   async deleteTodoAndReorder(uuid: string, tabKey: string): Promise<void> {
-    console.log(`[deleteTodoAndReorder] Deleting todo ${uuid} and reordering tab ${tabKey}`);
+    console.log(`[deleteTodoAndReorder] Deleting todo ${uuid} from tab ${tabKey}`);
     const startTime = Date.now();
 
-    // 1. 确保缓存已初始化
-    if (!this.cacheInitialized) {
-      console.log(`[deleteTodoAndReorder] 🚀 Cache not initialized, preloading...`);
-      await this.preloadCache();
-    }
-
-    // 2. 获取待删除的待办信息（用于确定其在当前标签页的序号）
-    const todoToDelete = this.todosCache.get(uuid);
-    if (!todoToDelete) {
-      console.warn(`[deleteTodoAndReorder] ⚠️ Todo ${uuid} not found in cache, proceeding with deletion only`);
+    try {
       await this.deleteTodo(uuid);
-      return;
-    }
-
-    // 3. 执行删除操作
-    await this.deleteTodo(uuid);
-    console.log(`[deleteTodoAndReorder] ✅ Todo ${uuid} deleted`);
-
-    // 4. 获取当前标签页下所有剩余的待办（从缓存中）
-    const remainingTodos = Array.from(this.todosCache.values()).filter(t =>
-      t.displayOrders &&
-      t.displayOrders[tabKey] != null
-    );
-
-    console.log(`[deleteTodoAndReorder] 📊 Found ${remainingTodos.length} remaining todos in tab ${tabKey}`);
-
-    // 5. 如果没有剩余待办，无需重新编号
-    if (remainingTodos.length === 0) {
-      console.log(`[deleteTodoAndReorder] ℹ️ No remaining todos, skipping reorder`);
-      const duration = Date.now() - startTime;
-      console.log(`[deleteTodoAndReorder] 🎉 Completed in ${duration}ms`);
-      return;
-    }
-
-    // 6. 按当前 displayOrder 排序
-    remainingTodos.sort((a, b) => {
-      const orderA = a.displayOrders![tabKey]!;
-      const orderB = b.displayOrders![tabKey]!;
-      return orderA - orderB;
-    });
-
-    // 7. 重新编号：0, 1, 2, 3...
-    const batchUpdates: Array<{ uuid: string; tabKey: string; displayOrder: number }> = [];
-    remainingTodos.forEach((todo, index) => {
-      const currentOrder = todo.displayOrders![tabKey]!;
-      const newOrder = index; // 从 0 开始连续编号
-
-      // 只更新序号发生变化的待办
-      if (currentOrder !== newOrder) {
-        batchUpdates.push({
-          uuid: todo.id,
-          tabKey: tabKey,
-          displayOrder: newOrder
-        });
-        console.log(`[deleteTodoAndReorder] Todo ${todo.id}: ${currentOrder} -> ${newOrder}`);
-      }
-    });
-
-    // 8. 批量更新序号
-    if (batchUpdates.length > 0) {
-      await this.batchUpdateDisplayOrders(batchUpdates);
-      console.log(`[deleteTodoAndReorder] ✅ Successfully reordered ${batchUpdates.length} todos`);
-    } else {
-      console.log(`[deleteTodoAndReorder] ℹ️ No reordering needed, all todos already in correct order`);
+      console.log(`[deleteTodoAndReorder] ✅ Todo ${uuid} deleted successfully (zero other todos modified)`);
+    } catch (error) {
+      console.error(`[deleteTodoAndReorder] ❌ Failed to delete todo ${uuid}:`, error);
+      throw error;
     }
 
     const duration = Date.now() - startTime;

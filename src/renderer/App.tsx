@@ -1767,12 +1767,12 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     const currentSettings = getCurrentTabSettings();
     const sortOption = currentSettings.sortOption;
 
-    // 性能优化：缓存 key 包含所有影响排序的因素
+    // ⚡ 性能优化：简化缓存 key，去掉 O(n) 计算的数据签名
     const dragOrder = getCurrentDragOrder();
     const dragOrderKey = dragOrder ? dragOrder.join(',') : 'none';
     const displayOrderKey = buildDisplayOrderSignature(searchedTodos, activeTab);
-    const searchedDataSignature = buildTodoDataSignature(searchedTodos);
-    const cacheKey = `${activeTab}-${urgencyFilter}-${sortOption}-${searchedTodos.length}-${dragOrderKey}-${displayOrderKey}-${searchedDataSignature}`;
+    // 去掉 searchedDataSignature，只用长度 + 模式来判断缓存
+    const cacheKey = `${activeTab}-${urgencyFilter}-${sortOption}-${searchedTodos.length}-${dragOrderKey}-${displayOrderKey}`;
 
     // 检查缓存
     if (sortingCacheRef.current.has(cacheKey)) {
@@ -1906,7 +1906,7 @@ const AppContent: React.FC<AppContentProps> = ({ themeMode, onThemeChange, color
     sortingCacheRef.current.set(cacheKey, result);
 
     return result;
-  }, [searchedTodos, parallelGroups, activeTab, urgencyFilter, getCurrentTabSettings, getCurrentDragOrder, buildDisplayOrderSignature, buildTodoDataSignature]);
+  }, [searchedTodos, parallelGroups, activeTab, urgencyFilter, getCurrentTabSettings, getCurrentDragOrder, buildDisplayOrderSignature]);
 
   const handleToggleTodoSidebar = useCallback(() => {
     setTodoSidebarCollapsed(prev => {
